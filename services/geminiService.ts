@@ -1,0 +1,797 @@
+import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
+import { Character, WorldSetting, CreativeSettings, StateChangeRecommendation } from "../types";
+
+const getAIClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("API_KEY environment variable is missing");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
+// Helper for retry logic
+async function retryOperation<T>(operation: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
+  try {
+    return await operation();
+  } catch (error: any) {
+    const errorCode = error?.status || error?.code || error?.response?.status;
+    const errorMessage = error?.message || '';
+    const isRetryable = 
+        errorCode === 503 || 
+        errorCode === 429 || 
+        errorCode === 500 ||
+        errorMessage.includes('503') ||
+        errorMessage.includes('overloaded') ||
+        errorMessage.includes('temporarily unavailable');
+
+    if (retries > 0 && isRetryable) {
+      console.warn(`API call failed with code ${errorCode}. Retrying in ${delay}ms... (Retries left: ${retries})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return retryOperation(operation, retries - 1, delay * 2);
+    }
+    throw error;
+  }
+}
+
+// Helper to format context
+const formatContext = (characters: Character[], worldSettings: WorldSetting[]) => {
+  let context = "";
+  
+  if (characters.length > 0) {
+    context += "【活跃角色档案】\n";
+    characters.forEach(c => {
+      context += `- ${c.name} (${c.role}): ${c.description.slice(0, 100)}...\n`;
+      if (c.relationships) {
+        context += `  关系/羁绊: ${c.relationships}\n`;
+      }
+    });
+    context += "\n";
+  }
+
+  if (worldSettings.length > 0) {
+    context += "【关键世界观设定】\n";
+    worldSettings.forEach(w => {
+      context += `- [${w.category}] ${w.title}: ${w.content.slice(0, 100)}...\n`;
+    });
+    context += "\n";
+  }
+
+  return context;
+};
+
+// NEW: Client-side RAG-lite Relevance Filter
+// Filters a large list of settings down to the most relevant ones based on current context
+const filterRelevantSettings = (
+    allSettings: WorldSetting[],
+    queryContext: string,
+    limit: number = 20
+): WorldSetting[] => {
+    // If the dataset is small, just return everything to ensure serendipity
+    if (allSettings.length <= limit) return allSettings;
+
+    const safeQuery = queryContext.toLowerCase();
+    
+    // Tokenize query for better matching (if browser supports Intl.Segmenter)
+    let queryTokens: string[] = [];
+    if (typeof Intl !== 'undefined' && (Intl as any).Segmenter) {
+        const segmenter = new (Intl as any).Segmenter('zh', { granularity: 'word' });
+        queryTokens = [...segmenter.segment(safeQuery)]
+            .filter((w: any) => w.isWordLike && w.segment.length > 1) // Filter out single chars/punctuation
+            .map((w: any) => w.segment);
+    } else {
+        // Fallback: simple split by space/punctuation or just use the full string check
+        queryTokens = safeQuery.split(/[\s,，.。！!?？]+/);
+    }
+    
+    // Remove duplicates
+    queryTokens = [...new Set(queryTokens)];
+
+    const scored = allSettings.map(s => {
+        let score = 0;
+        const sTitle = s.title.toLowerCase();
+        const sContent = s.content.toLowerCase();
+
+        // 1. Title Match (Strongest signal)
+        // If the setting title appears in the query (e.g. "Ice Kingdom" in plot beat)
+        if (safeQuery.includes(sTitle)) score += 50;
+        
+        // 2. Reverse Title Match
+        // If query keywords appear in the title
+        queryTokens.forEach(token => {
+            if (sTitle.includes(token)) score += 5;
+        });
+
+        // 3. Content Match (Weaker signal)
+        // If query keywords appear in the setting content
+        queryTokens.forEach(token => {
+            if (sContent.includes(token)) score += 1;
+        });
+
+        return { setting: s, score };
+    });
+
+    // Sort by score descending
+    scored.sort((a, b) => b.score - a.score);
+
+    // Return top N
+    return scored.slice(0, limit).map(item => item.setting);
+};
+
+// Helper to inject creative settings into instructions
+const getInstructionWithSettings = (baseInstruction: string, settings?: CreativeSettings) => {
+    let instruction = baseInstruction;
+    if (settings) {
+        instruction += `\n\n【创作偏好控制】
+        - 叙事基调: ${settings.tone}
+        - 文字风格: ${settings.style}
+        - 目标受众: ${settings.targetAudience}`;
+    }
+    instruction += " 请务必使用中文回复。";
+    return instruction;
+};
+
+export const generateText = async (prompt: string, baseInstruction?: string, settings?: CreativeSettings): Promise<string> => {
+  const ai = getAIClient();
+  const instruction = getInstructionWithSettings(baseInstruction || "你是一个专业的创意写作助手。", settings);
+
+  try {
+    const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        systemInstruction: instruction,
+        temperature: settings?.creativity || 0.8,
+      }
+    }));
+    return response.text || "未生成任何内容。";
+  } catch (error) {
+    console.error("Gemini Text Generation Error:", error);
+    throw error;
+  }
+};
+
+export const generateCharacterImage = async (description: string): Promise<string> => {
+  const ai = getAIClient();
+  const prompt = `Digital concept art, detailed character design, cinematic lighting, 4k, trending on artstation. Character description: ${description}`;
+
+  try {
+    const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [{ text: prompt }]
+      },
+      config: {
+        imageConfig: {
+          aspectRatio: "1:1",
+        }
+      }
+    }));
+
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) {
+            return `data:image/png;base64,${part.inlineData.data}`;
+        }
+    }
+    throw new Error("No image data found in response");
+  } catch (error) {
+    console.error("Gemini Image Generation Error:", error);
+    throw error;
+  }
+};
+
+export const analyzePlot = async (premise: string, currentPlot: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings): Promise<string> => {
+  const ai = getAIClient();
+  
+  // Enhanced instruction for deeper emotional and pacing analysis
+  const baseInstruction = `你是一位资深文学编辑。你的任务是深度分析小说大纲。
+  
+  请提供以下三个维度的结构化反馈：
+  
+  1. **🎭 情感弧光与人物成长 (Character Arc)**
+     - 主角在故事开始和结束时有何不同？
+     - 情感转折点是否清晰？
+  
+  2. **📉 节奏与张力曲线 (Pacing & Tension)**
+     - 识别剧情是否在中间塌陷（Middle Muddle）。
+     - 铺垫（Setup）和高潮（Climax）的比例是否合理？
+  
+  3. **🧠 逻辑与世界观审计 (Logic Audit)**
+     - 角色动机是否成立？
+     - 是否违背了世界观设定？
+
+  请使用 Markdown 格式，语气专业且犀利。`;
+  
+  const instruction = getInstructionWithSettings(baseInstruction, settings);
+  const contextStr = formatContext(characters, worldSettings);
+  const prompt = `核心梗概: ${premise}\n\n${contextStr}\n当前剧情大纲:\n${currentPlot}`;
+
+  try {
+    // Enable Thinking for deep analysis
+    const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+      model: 'gemini-3-pro-preview',
+      contents: prompt,
+      config: {
+        systemInstruction: instruction,
+        // The effective token limit for the response is `maxOutputTokens` minus the `thinkingBudget`.
+        // We give it a healthy budget to think through logical inconsistencies.
+        thinkingConfig: { thinkingBudget: 2048 },
+      }
+    }));
+    return response.text || "无法分析剧情。";
+  } catch (error) {
+    console.error("Gemini Plot Analysis Error:", error);
+    throw error;
+  }
+};
+
+export const expandScene = async (premise: string, genre: string, plotOutline: string, userPrompt: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings): Promise<string> => {
+  const ai = getAIClient();
+  const baseInstruction = `你是一位多产的小说家及续写助手。
+  你需要根据现有的【角色关系】、【世界观规则】和【剧情大纲】来扩展具体的场景。
+  
+  写作要求：
+  1. 确保人物对话和行动符合其性格及与他人的关系（如仇恨、爱慕）。
+  2. 融入世界观设定的细节（如环境描写、道具使用）。
+  3. 文风应贴合小说类型 (${genre})。`;
+
+  const instruction = getInstructionWithSettings(baseInstruction, settings);
+  const contextStr = formatContext(characters, worldSettings);
+
+  const prompt = `
+  小说类型: ${genre}
+  核心梗概: ${premise}
+  
+  ${contextStr}
+  
+  当前剧情大纲上下文:
+  ${plotOutline}
+  
+  写作任务:
+  ${userPrompt}
+  
+  请直接开始撰写正文内容，无需过多的开场白。`;
+
+  try {
+     const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        systemInstruction: instruction,
+        temperature: settings?.creativity || 0.9,
+      }
+    }));
+    return response.text || "生成失败。";
+  } catch (error) {
+    console.error("Gemini Scene Expansion Error:", error);
+    throw error;
+  }
+};
+
+export const expandWorldLore = async (title: string, currentContent: string, genre: string, settings?: CreativeSettings): Promise<string> => {
+   const ai = getAIClient();
+   const baseInstruction = "你是一位注重细节的历史学家和人类学家，擅长构建虚构世界的深度背景。";
+   const instruction = getInstructionWithSettings(baseInstruction, settings);
+
+   const prompt = `
+   世界观条目: ${title}
+   所属类型: ${genre}
+   
+   当前设定:
+   ${currentContent}
+   
+   任务：请基于以上内容，详细扩展其"历史演变"和"文化影响"。
+   1. 描述它的起源或它是如何随着时间变化的。
+   2. 描述它对当今社会、信仰或日常生活的具体影响。
+   3. 增加一些传说或轶事。
+   
+   请以 Markdown 格式输出补充内容。`;
+
+   try {
+     const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: prompt,
+      config: {
+        systemInstruction: instruction,
+        temperature: 0.85,
+      }
+    }));
+    return response.text || "生成失败。";
+   } catch (error) {
+     console.error("Gemini Lore Expansion Error:", error);
+     throw error;
+   }
+};
+
+export const generatePlotFromContext = async (premise: string, genre: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings, template?: string): Promise<string> => {
+  const ai = getAIClient();
+  const contextStr = formatContext(characters, worldSettings);
+  
+  const baseInstruction = "你是一位精通故事结构的小说架构师。你的任务是基于已有的角色和世界观，推导出一个逻辑严密、冲突激烈的剧情大纲。";
+  const instruction = getInstructionWithSettings(baseInstruction, settings);
+
+  let taskRequirement = `
+  任务要求：
+  1. 结合人物的性格缺陷和目标，设计引发剧情的激励事件。
+  2. 利用世界观的规则制造障碍和转折。
+  3. 确保角色关系随着剧情推进而发生变化。`;
+
+  if (template) {
+      taskRequirement += `\n\n【关键要求】请严格按照以下经典故事结构模版进行填充和创作：\n${template}`;
+  } else {
+      taskRequirement += `\n\n请生成一个包含 "起、承、转、合" 或 "分章/分幕" 结构的详细大纲。`;
+  }
+
+  const prompt = `
+  小说类型: ${genre}
+  核心梗概: ${premise}
+  
+  ${contextStr}
+  
+  ${taskRequirement}
+  
+  请直接输出大纲内容，使用清晰的 Markdown 格式。
+  `;
+
+  try {
+     // Enable Thinking for complex plotting
+     const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+      model: 'gemini-3-pro-preview', // Stronger model for structural logic
+      contents: prompt,
+      config: {
+        systemInstruction: instruction,
+        thinkingConfig: { thinkingBudget: 4096 }, // Plot generation needs deep thought
+        temperature: settings?.creativity || 0.85,
+      }
+    }));
+    return response.text || "大纲生成失败。";
+  } catch (error) {
+    console.error("Gemini Plot Generation Error:", error);
+    throw error;
+  }
+};
+
+// NEW: Rewrite plot based on feedback or directive
+export const rewritePlot = async (currentPlot: string, directive: string, genre: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings): Promise<string> => {
+    const ai = getAIClient();
+    const contextStr = formatContext(characters, worldSettings);
+    
+    const baseInstruction = "你是一位善于修改和润色的小说编辑。根据用户的反馈或分析报告，对现有大纲进行重写和优化。";
+    const instruction = getInstructionWithSettings(baseInstruction, settings);
+
+    const prompt = `
+    小说类型: ${genre}
+    
+    ${contextStr}
+    
+    当前剧情大纲:
+    ${currentPlot}
+    
+    【修改指令】:
+    ${directive}
+    
+    请根据以上修改指令，重新输出一份完整的、优化后的剧情大纲。保留原大纲中优秀的部分，修正问题或调整方向。
+    请使用清晰的 Markdown 格式。
+    `;
+
+    try {
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: prompt,
+            config: {
+                systemInstruction: instruction,
+                temperature: settings?.creativity || 0.85,
+            }
+        }));
+        return response.text || "重写失败。";
+    } catch (e) {
+        console.error("Gemini Plot Rewrite Error:", e);
+        throw e;
+    }
+};
+
+export const batchGenerateCharacters = async (premise: string, genre: string, settings?: CreativeSettings): Promise<Omit<Character, 'id'>[]> => {
+    const ai = getAIClient();
+    
+    const characterSchema = {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING },
+          role: { type: Type.STRING, description: "One of: 主角, 反派, 导师, 配角" },
+          description: { type: Type.STRING, description: "详细的人物小传，包含外貌、性格、秘密" },
+          relationships: { type: Type.STRING, description: "与其他角色的潜在关系" }
+        },
+        required: ["name", "role", "description"]
+      }
+    };
+
+    // Incorporate settings into the prompt since we can't easily inject system instruction into JSON schema mode cleanly in all cases, 
+    // but Gemini handles instructions in prompt well too.
+    const settingText = settings ? `风格要求：基调 ${settings.tone}，风格 ${settings.style}。` : "";
+
+    const prompt = `基于小说梗概："${premise}" (类型: ${genre})，请设计 **6位** 核心角色。${settingText}
+    
+    严格按照以下配置生成：
+    1. **1位 主角 (Protagonist)**：故事的核心驱动者。
+    2. **1位 反派 (Antagonist)**：与主角对立的主要力量。
+    3. **1位 导师 (Mentor)**：引导主角的人物。
+    4. **3位 关键配角 (Support)**：可以是伙伴、搞怪角色或功能性角色。
+    
+    要求：
+    - 确保这六个人物之间存在复杂的纠葛（如血缘、仇恨、债务、暗恋）。
+    - 每个人物都要有独特的性格缺陷。
+    - 请使用中文输出。`;
+
+    try {
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: characterSchema
+            }
+        }));
+        
+        if (response.text) {
+            return JSON.parse(response.text);
+        }
+        return [];
+    } catch (e) {
+        console.error("Batch Character Generation Error", e);
+        throw e;
+    }
+};
+
+export const batchGenerateWorldSettingsByCategory = async (premise: string, genre: string, category: string, settings?: CreativeSettings): Promise<Omit<WorldSetting, 'id'>[]> => {
+    const ai = getAIClient();
+
+    const worldSchema = {
+        type: Type.ARRAY,
+        items: {
+            type: Type.OBJECT,
+            properties: {
+                title: { type: Type.STRING },
+                category: { type: Type.STRING }, 
+                content: { type: Type.STRING, description: "详细的设定描述" }
+            },
+            required: ["title", "content"]
+        }
+    };
+    
+    const settingText = settings ? `风格要求：基调 ${settings.tone}，风格 ${settings.style}。` : "";
+
+    const prompt = `基于小说梗概："${premise}" (类型: ${genre})。
+    请为世界观分类 **"${category}"** 构思 **2-3个** 关键设定条目。${settingText}
+    
+    要求：
+    - 设定必须独特且符合小说类型。
+    - 能够为剧情提供冲突或背景支持。
+    - 请使用中文输出。`;
+
+    try {
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: worldSchema
+            }
+        }));
+
+        if (response.text) {
+            const rawData = JSON.parse(response.text);
+            return rawData.map((item: any) => ({
+                title: item.title,
+                content: item.content,
+                category: category 
+            }));
+        }
+        return [];
+    } catch (e) {
+        console.error(`Batch World Generation Error (${category})`, e);
+        return []; 
+    }
+};
+
+export type PacingMode = 'SLOW_BURN' | 'BALANCED' | 'CLIMAX';
+
+export const generateSceneFromIngredients = async (
+    genre: string,
+    plotBeat: string,
+    activeCharacters: Character[],
+    activeLocation: WorldSetting | null,
+    allWorldSettings: WorldSetting[], // New: Pass entire bible
+    settings?: CreativeSettings,
+    previousStoryContext?: string, // NEW: Manuscript memory
+    pacing: PacingMode = 'BALANCED' // NEW: Pacing Control
+): Promise<string> => {
+    const ai = getAIClient();
+    
+    let pacingInstruction = "";
+    switch(pacing) {
+        case 'SLOW_BURN':
+            pacingInstruction = `【节奏控制: 铺垫/慢热 (Slow Burn)】
+            - 请放慢叙事节奏，大量使用环境描写、心理活动和细节刻画。
+            - 句子结构可以复杂、修辞丰富。
+            - 重点渲染氛围，为后续剧情蓄力。`;
+            break;
+        case 'CLIMAX':
+            pacingInstruction = `【节奏控制: 高潮/爆发 (Climax)】
+            - 请加快叙事节奏，使用短促有力的句子。
+            - 减少心理活动和环境描写，专注于动作、冲突和直接反应。
+            - 营造紧迫感和危机感。`;
+            break;
+        default:
+            pacingInstruction = `【节奏控制: 平衡推进 (Balanced)】
+            - 保持叙事流畅，平衡对话、动作和描写。
+            - 稳步推进情节发展。`;
+            break;
+    }
+
+    const baseInstruction = `你是一位获得过雨果奖的科幻/奇幻小说家，也就是用户的“幽灵写手”。
+    你的任务不是回答问题，而是根据用户提供的“原料”直接撰写小说正文。
+    
+    写作原则：
+    1. **Show, Don't Tell**: 不要只是叙述，要通过动作、对话和感官细节来展示。
+    2. **忠实于设定**: 严格遵守提供的人物性格和世界观规则（如魔法系统、社会等级、历史背景）。
+    3. **沉浸感**: 根据设定的地点，进行环境描写（光影、气味、声音）。
+    
+    ${pacingInstruction}`;
+
+    const instruction = getInstructionWithSettings(baseInstruction, settings);
+
+    // Build context
+    let context = "";
+    
+    // 0. Episodic Memory (Manuscript Context)
+    if (previousStoryContext) {
+        context += `【📖 前情提要 (Context)】\n(以下是故事上文的最后片段，请确保剧情连贯，接续人物状态和语气)\n"${previousStoryContext}"\n\n`;
+    }
+
+    // 1. Actors
+    if (activeCharacters.length > 0) {
+        context += "【登场角色 (Cast)】\n";
+        activeCharacters.forEach(c => context += `- ${c.name} (${c.role}): ${c.description} (关系: ${c.relationships})\n`);
+        context += "\n";
+    }
+    
+    // 2. Stage (Specific Location)
+    if (activeLocation) {
+        context += `【当前场景地点 (Stage)】\n[${activeLocation.category}] ${activeLocation.title}: ${activeLocation.content}\n\n`;
+    }
+
+    // 3. Rules & Lore (The rest of the bible) - NOW WITH DYNAMIC FILTERING
+    // Filter out the active location to avoid duplication
+    const otherSettings = allWorldSettings.filter(w => !activeLocation || w.id !== activeLocation.id);
+    
+    // Combine text for query: PlotBeat + Previous Context + Active Char Names
+    const queryContext = `${plotBeat} ${previousStoryContext || ''} ${activeCharacters.map(c => c.name).join(' ')}`;
+    
+    // Dynamic Filter
+    const relevantSettings = filterRelevantSettings(otherSettings, queryContext, 20); // Limit to top 20 relevant
+
+    if (relevantSettings.length > 0) {
+        context += "【世界观法则与背景 (World Context)】\n";
+        context += "*请在写作时参考以下规则，确保逻辑自洽：*\n";
+        // Group by category for clarity
+        const categories = Array.from(new Set(relevantSettings.map(w => w.category)));
+        categories.forEach(cat => {
+            const items = relevantSettings.filter(w => w.category === cat);
+            if (items.length > 0) {
+                context += `[${cat}]:\n`;
+                // Increased context limit to allow deeper integration of lore
+                items.forEach(w => context += `  - ${w.title}: ${w.content.slice(0, 1000)}${w.content.length > 1000 ? '...' : ''}\n`);
+            }
+        });
+        context += "\n";
+    }
+
+    const prompt = `
+    小说类型: ${genre}
+    
+    ${context}
+    
+    【本场戏的情节目标 (Plot Beat)】:
+    ${plotBeat}
+    
+    请根据以上要素，撰写一段约 800-1200 字的小说正文片段。
+    请直接开始正文，不需要标题或概述。
+    `;
+
+    try {
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: 'gemini-3-pro-preview', // High quality for prose
+            contents: prompt,
+            config: {
+                systemInstruction: instruction,
+                temperature: settings?.creativity || 0.9,
+                // Thinking config to allow model to plan how to integrate world settings and character arcs before writing
+                thinkingConfig: { thinkingBudget: 2048 },
+            }
+        }));
+        return response.text || "生成失败";
+    } catch (e) {
+        console.error("Scene Generation Error", e);
+        throw e;
+    }
+};
+
+// NEW: Literary Polish Engine
+export type PolishMode = 'SENSORY' | 'CINEMATIC' | 'PSYCHOLOGICAL' | 'MINIMALIST';
+
+export const polishDraft = async (
+    content: string, 
+    mode: PolishMode,
+    settings?: CreativeSettings
+): Promise<string> => {
+    const ai = getAIClient();
+    
+    let modeInstruction = "";
+    switch (mode) {
+        case 'SENSORY':
+            modeInstruction = "任务：【五感增强】。请扫描文本，在只有视觉描写的地方，强制植入嗅觉、听觉、触觉甚至味觉的细节。让读者能“闻到”和“摸到”场景。";
+            break;
+        case 'CINEMATIC':
+            modeInstruction = "任务：【镜头语言优化】。重写动作和场景转换，像电影剧本一样强调空间感、光影变化和动态捕捉。删除静态的说明性文字。";
+            break;
+        case 'PSYCHOLOGICAL':
+            modeInstruction = "任务：【心理侧写加深】。深入角色的内心世界，增加潜台词、微表情和内心挣扎的描写。让角色的动机不仅仅停留在表面。";
+            break;
+        case 'MINIMALIST':
+            modeInstruction = "任务：【极简主义/海明威风格】。删除所有不必要的形容词和副词。使用短句。通过对话和动作来展示情感，而不是直接描述情感。";
+            break;
+    }
+
+    const baseInstruction = `你是一位严苛的文学编辑和润色专家。你的目标是将平庸的文字提升为出版级的文学作品。
+    请保留原意和剧情走向，但大幅度提升文笔质感。
+    
+    ${modeInstruction}`;
+    
+    const prompt = `
+    【待润色文本】:
+    ${content}
+    
+    请直接输出润色后的正文。
+    `;
+
+    try {
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: 'gemini-3-pro-preview', // Use Pro for stylistic nuances
+            contents: prompt,
+            config: {
+                systemInstruction: baseInstruction,
+                temperature: 0.8,
+            }
+        }));
+        return response.text || content;
+    } catch (e) {
+        console.error("Polish Error", e);
+        throw e;
+    }
+};
+
+// NEW: Analyze text for state changes
+export const analyzeStateChanges = async (
+    sceneContent: string, 
+    activeCharacters: Character[], 
+    activeLocation: WorldSetting | null
+): Promise<StateChangeRecommendation[]> => {
+    if (!sceneContent || (activeCharacters.length === 0 && !activeLocation)) return [];
+
+    const ai = getAIClient();
+
+    const responseSchema = {
+        type: Type.ARRAY,
+        items: {
+            type: Type.OBJECT,
+            properties: {
+                targetName: { type: Type.STRING, description: "Name of the character or world setting" },
+                targetType: { type: Type.STRING, description: "CHARACTER or WORLD" },
+                suggestedUpdate: { type: Type.STRING, description: "Specifically what changed (e.g., 'Lost an arm', 'Village destroyed'). Keep it concise." },
+                reason: { type: Type.STRING, description: "Quote from the text justifying this change." }
+            },
+            required: ["targetName", "targetType", "suggestedUpdate", "reason"]
+        }
+    };
+
+    const prompt = `
+    阅读以下小说片段，分析是否发生了对【人物状态】或【世界环境】有**永久性或重大影响**的事件。
+    只有当发生重大变更（如：受伤、死亡、获得重要道具、关系决裂、地点损毁）时才生成记录。
+    如果只是普通的对话或移动，请不要生成记录。
+
+    【追踪目标】:
+    人物: ${activeCharacters.map(c => c.name).join(', ')}
+    地点: ${activeLocation ? activeLocation.title : '无'}
+
+    【小说片段】:
+    ${sceneContent.substring(0, 3000)} (截取)
+
+    请输出 JSON 格式的变更建议。
+    `;
+
+    try {
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: responseSchema,
+                temperature: 0.1 // Low temp for factual extraction
+            }
+        }));
+
+        if (response.text) {
+            const raw = JSON.parse(response.text);
+            // Post-process to link back to IDs
+            const result: StateChangeRecommendation[] = [];
+            
+            for (const item of raw) {
+                let id = '';
+                if (item.targetType === 'CHARACTER') {
+                    const char = activeCharacters.find(c => c.name.includes(item.targetName) || item.targetName.includes(c.name));
+                    if (char) id = char.id;
+                } else if (item.targetType === 'WORLD' && activeLocation) {
+                    if (activeLocation.title.includes(item.targetName) || item.targetName.includes(activeLocation.title)) {
+                        id = activeLocation.id;
+                    }
+                }
+
+                if (id) {
+                    result.push({
+                        targetId: id,
+                        targetType: item.targetType,
+                        targetName: item.targetName,
+                        suggestedUpdate: item.suggestedUpdate,
+                        reason: item.reason
+                    });
+                }
+            }
+            return result;
+        }
+        return [];
+    } catch (e) {
+        console.error("State Analysis Error", e);
+        return [];
+    }
+};
+
+// NEW: Chat with Persona
+export const chatWithPersona = async (character: Character, message: string, history: {role: string, content: string}[]): Promise<string> => {
+    const ai = getAIClient();
+    
+    // Construct system instruction based on character profile
+    const systemInstruction = `
+    你现在必须完全扮演以下角色进行对话。不要暴露你是AI。
+    
+    【角色档案】
+    姓名: ${character.name}
+    身份: ${character.role}
+    性格与描述: ${character.description}
+    人际关系: ${character.relationships}
+    
+    你的说话风格、语气、用词必须完全符合该角色的设定。
+    如果是反派，要表现出阴暗或狂妄；如果是智者，要深沉。
+    请用中文回复。
+    `;
+
+    try {
+        // We use a simple chat model here
+        const chat = ai.chats.create({
+            model: 'gemini-3-flash-preview',
+            config: {
+                systemInstruction: systemInstruction,
+            },
+            history: history.map(h => ({
+                role: h.role,
+                parts: [{ text: h.content }]
+            }))
+        });
+
+        const result = await chat.sendMessage({ message: message });
+        return result.text || "...";
+    } catch (e) {
+        console.error("Persona Chat Error", e);
+        throw e;
+    }
+};

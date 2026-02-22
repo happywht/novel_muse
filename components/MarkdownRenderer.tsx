@@ -1,0 +1,48 @@
+import React from 'react';
+
+// A simple component to render text with basic formatting without heavy dependencies
+// It handles newlines, bolding, and bullet points reasonably well for this context.
+export const MarkdownRenderer: React.FC<{ content: string; className?: string }> = ({ content, className = '' }) => {
+  if (!content) return null;
+
+  const sections = content.split('\n\n').map((block, index) => {
+    // Check for headers
+    if (block.startsWith('## ')) {
+      return <h3 key={index} className="text-xl font-bold text-muse-300 mb-2 mt-4">{block.replace('## ', '')}</h3>;
+    }
+    if (block.startsWith('# ')) {
+      return <h2 key={index} className="text-2xl font-bold text-muse-400 mb-3 mt-5">{block.replace('# ', '')}</h2>;
+    }
+    if (block.startsWith('### ')) {
+        return <h4 key={index} className="text-lg font-semibold text-muse-200 mb-2 mt-3">{block.replace('### ', '')}</h4>;
+    }
+
+    // Check for list items
+    if (block.trim().startsWith('- ') || block.trim().startsWith('* ')) {
+       const items = block.split('\n').map((line, i) => {
+           const cleanLine = line.replace(/^[-*] /, '');
+           // Simple bold parsing within list
+           const parts = cleanLine.split(/(\*\*.*?\*\*)/g).map((part, j) => {
+                if (part.startsWith('**') && part.endsWith('**')) {
+                    return <strong key={j} className="text-muse-100">{part.slice(2, -2)}</strong>;
+                }
+                return part;
+           });
+           return <li key={i} className="ml-4 list-disc pl-1 mb-1 text-slate-300">{parts}</li>;
+       });
+       return <ul key={index} className="mb-4">{items}</ul>;
+    }
+
+    // Paragraph handling with bold support
+    const parts = block.split(/(\*\*.*?\*\*)/g).map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={i} className="text-muse-100">{part.slice(2, -2)}</strong>;
+        }
+        return part;
+    });
+
+    return <p key={index} className="mb-4 text-slate-300 leading-relaxed font-serif">{parts}</p>;
+  });
+
+  return <div className={`${className}`}>{sections}</div>;
+};
