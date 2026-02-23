@@ -7,7 +7,8 @@ import { PlotWeaver } from './components/PlotWeaver';
 import { DraftingRoom } from './components/DraftingRoom';
 import { EchoChamber } from './components/EchoChamber';
 import { UserGuide } from './components/UserGuide';
-import { Layout, Feather, Globe, Users, BookOpen, Menu, HelpCircle, FolderOpen, Plus, Trash2, Save, X, Check, PenTool, Activity, Download, Upload } from 'lucide-react';
+import { Layout, Feather, Globe, Users, BookOpen, Menu, HelpCircle, FolderOpen, Plus, Trash2, Save, X, Check, PenTool, Activity, Download, Upload, Settings } from 'lucide-react';
+import { SettingsPanel } from './components/SettingsPanel';
 
 const INITIAL_PROJECT: ProjectState = {
   id: 'default-project',
@@ -42,6 +43,7 @@ const App: React.FC = () => {
   const [activeSection, setActiveSection] = useState<AppSection>(AppSection.DASHBOARD);
   const [project, setProject] = useState<ProjectState>(INITIAL_PROJECT);
   const [showGuide, setShowGuide] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const importFileRef = React.useRef<HTMLInputElement>(null);
 
   // Project Management State
@@ -244,8 +246,8 @@ const App: React.FC = () => {
               key={item.id}
               onClick={() => setActiveSection(item.id)}
               className={`relative px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${activeSection === item.id
-                  ? 'bg-muse-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                ? 'bg-muse-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
                 }`}
             >
               <item.icon size={16} />
@@ -258,6 +260,14 @@ const App: React.FC = () => {
         </div>
 
         <div className="w-auto flex items-center gap-4 text-right">
+          <button
+            onClick={() => setShowSettings(true)}
+            className="text-slate-400 hover:text-muse-400 transition-colors flex items-center gap-1 text-sm font-medium"
+            title="全局设置"
+          >
+            <Settings size={18} />
+            <span className="hidden sm:inline">设置</span>
+          </button>
           <button
             onClick={() => setShowGuide(true)}
             className="text-slate-400 hover:text-muse-400 transition-colors flex items-center gap-1 text-sm font-medium"
@@ -368,6 +378,9 @@ const App: React.FC = () => {
 
       {/* User Guide Modal */}
       {showGuide && <UserGuide onClose={() => setShowGuide(false)} />}
+
+      {/* Settings Panel Modal */}
+      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
     </div>
   );
 };

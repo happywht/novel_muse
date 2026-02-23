@@ -1,86 +1,95 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Character, WorldSetting, CreativeSettings, StateChangeRecommendation, Echo } from "../types";
 
+const STORAGE_KEY_API = 'muse_gemini_api_key';
+const STORAGE_KEY_MODEL = 'muse_gemini_model';
+
 const getAIClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("API_KEY environment variable is missing");
-  }
-  return new GoogleGenAI({ apiKey });
+    const apiKey = localStorage.getItem(STORAGE_KEY_API) || process.env.API_KEY;
+    if (!apiKey) {
+        throw new Error("请先在全局设置面板中配置您的 Gemini API Key。");
+    }
+    return new GoogleGenAI({ apiKey });
+};
+
+export const getModelName = (tier: 'flash' | 'pro' = 'flash'): string => {
+    const customModel = localStorage.getItem(STORAGE_KEY_MODEL);
+    if (customModel) return customModel;
+    return tier === 'pro' ? 'gemini-2.5-pro-preview-05-06' : 'gemini-2.5-flash-preview-05-20';
 };
 
 // Helper for retry logic
 async function retryOperation<T>(operation: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
-  try {
-    return await operation();
-  } catch (error: any) {
-    const errorCode = error?.status || error?.code || error?.response?.status;
-    const errorMessage = error?.message || '';
-    const isRetryable = 
-        errorCode === 503 || 
-        errorCode === 429 || 
-        errorCode === 500 ||
-        errorMessage.includes('503') ||
-        errorMessage.includes('overloaded') ||
-        errorMessage.includes('temporarily unavailable');
+    try {
+        return await operation();
+    } catch (error: any) {
+        const errorCode = error?.status || error?.code || error?.response?.status;
+        const errorMessage = error?.message || '';
+        const isRetryable =
+            errorCode === 503 ||
+            errorCode === 429 ||
+            errorCode === 500 ||
+            errorMessage.includes('503') ||
+            errorMessage.includes('overloaded') ||
+            errorMessage.includes('temporarily unavailable');
 
-    if (retries > 0 && isRetryable) {
-      console.warn(`API call failed with code ${errorCode}. Retrying in ${delay}ms... (Retries left: ${retries})`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      return retryOperation(operation, retries - 1, delay * 2);
+        if (retries > 0 && isRetryable) {
+            console.warn(`API call failed with code ${errorCode}. Retrying in ${delay}ms... (Retries left: ${retries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return retryOperation(operation, retries - 1, delay * 2);
+        }
+        throw error;
     }
-    throw error;
-  }
 }
 
 // Helper to format context with Dynamic Echoes
 const formatContext = (characters: Character[], worldSettings: WorldSetting[], echoes: Echo[] = []) => {
-  let context = "";
-  
-  // Filter only accepted echoes
-  const activeEchoes = echoes.filter(e => e.status === 'ACCEPTED');
+    let context = "";
 
-  if (characters.length > 0) {
-    context += "【活跃角色档案 (静态设定 + 动态状态)】\n";
-    characters.forEach(c => {
-      // Find echoes for this character
-      const charEchoes = activeEchoes.filter(e => e.targetId === c.id).sort((a, b) => a.timestamp - b.timestamp);
-      
-      context += `- ${c.name} (${c.role}): ${c.description.slice(0, 150)}...\n`;
-      if (c.relationships) {
-        context += `  关系/羁绊: ${c.relationships}\n`;
-      }
-      
-      // Inject Dynamic State
-      if (charEchoes.length > 0) {
-          context += `  ⚡ [当前状态变更/重要经历]:\n`;
-          charEchoes.forEach(e => {
-              context += `    * ${e.description} (原因: ${e.reason})\n`;
-          });
-      }
-    });
-    context += "\n";
-  }
+    // Filter only accepted echoes
+    const activeEchoes = echoes.filter(e => e.status === 'ACCEPTED');
 
-  if (worldSettings.length > 0) {
-    context += "【世界观设定 (静态规则 + 历史变迁)】\n";
-    worldSettings.forEach(w => {
-      const worldEchoes = activeEchoes.filter(e => e.targetId === w.id).sort((a, b) => a.timestamp - b.timestamp);
-      
-      context += `- [${w.category}] ${w.title}: ${w.content.slice(0, 150)}...\n`;
-      
-      // Inject Dynamic State
-      if (worldEchoes.length > 0) {
-          context += `  ⚡ [环境/规则变更]:\n`;
-          worldEchoes.forEach(e => {
-              context += `    * ${e.description} (原因: ${e.reason})\n`;
-          });
-      }
-    });
-    context += "\n";
-  }
+    if (characters.length > 0) {
+        context += "【活跃角色档案 (静态设定 + 动态状态)】\n";
+        characters.forEach(c => {
+            // Find echoes for this character
+            const charEchoes = activeEchoes.filter(e => e.targetId === c.id).sort((a, b) => a.timestamp - b.timestamp);
 
-  return context;
+            context += `- ${c.name} (${c.role}): ${c.description.slice(0, 150)}...\n`;
+            if (c.relationships) {
+                context += `  关系/羁绊: ${c.relationships}\n`;
+            }
+
+            // Inject Dynamic State
+            if (charEchoes.length > 0) {
+                context += `  ⚡ [当前状态变更/重要经历]:\n`;
+                charEchoes.forEach(e => {
+                    context += `    * ${e.description} (原因: ${e.reason})\n`;
+                });
+            }
+        });
+        context += "\n";
+    }
+
+    if (worldSettings.length > 0) {
+        context += "【世界观设定 (静态规则 + 历史变迁)】\n";
+        worldSettings.forEach(w => {
+            const worldEchoes = activeEchoes.filter(e => e.targetId === w.id).sort((a, b) => a.timestamp - b.timestamp);
+
+            context += `- [${w.category}] ${w.title}: ${w.content.slice(0, 150)}...\n`;
+
+            // Inject Dynamic State
+            if (worldEchoes.length > 0) {
+                context += `  ⚡ [环境/规则变更]:\n`;
+                worldEchoes.forEach(e => {
+                    context += `    * ${e.description} (原因: ${e.reason})\n`;
+                });
+            }
+        });
+        context += "\n";
+    }
+
+    return context;
 };
 
 // NEW: Client-side RAG-lite Relevance Filter
@@ -94,7 +103,7 @@ const filterRelevantSettings = (
     if (allSettings.length <= limit) return allSettings;
 
     const safeQuery = queryContext.toLowerCase();
-    
+
     // Tokenize query for better matching (if browser supports Intl.Segmenter)
     let queryTokens: string[] = [];
     if (typeof Intl !== 'undefined' && (Intl as any).Segmenter) {
@@ -106,7 +115,7 @@ const filterRelevantSettings = (
         // Fallback: simple split by space/punctuation or just use the full string check
         queryTokens = safeQuery.split(/[\s,，.。！!?？]+/);
     }
-    
+
     // Remove duplicates
     queryTokens = [...new Set(queryTokens)];
 
@@ -118,7 +127,7 @@ const filterRelevantSettings = (
         // 1. Title Match (Strongest signal)
         // If the setting title appears in the query (e.g. "Ice Kingdom" in plot beat)
         if (safeQuery.includes(sTitle)) score += 50;
-        
+
         // 2. Reverse Title Match
         // If query keywords appear in the title
         queryTokens.forEach(token => {
@@ -155,59 +164,59 @@ const getInstructionWithSettings = (baseInstruction: string, settings?: Creative
 };
 
 export const generateText = async (prompt: string, baseInstruction?: string, settings?: CreativeSettings): Promise<string> => {
-  const ai = getAIClient();
-  const instruction = getInstructionWithSettings(baseInstruction || "你是一个专业的创意写作助手。", settings);
+    const ai = getAIClient();
+    const instruction = getInstructionWithSettings(baseInstruction || "你是一个专业的创意写作助手。", settings);
 
-  try {
-    const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        systemInstruction: instruction,
-        temperature: settings?.creativity || 0.8,
-      }
-    }));
-    return response.text || "未生成任何内容。";
-  } catch (error) {
-    console.error("Gemini Text Generation Error:", error);
-    throw error;
-  }
+    try {
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt,
+            config: {
+                systemInstruction: instruction,
+                temperature: settings?.creativity || 0.8,
+            }
+        }));
+        return response.text || "未生成任何内容。";
+    } catch (error) {
+        console.error("Gemini Text Generation Error:", error);
+        throw error;
+    }
 };
 
 export const generateCharacterImage = async (description: string): Promise<string> => {
-  const ai = getAIClient();
-  const prompt = `Digital concept art, detailed character design, cinematic lighting, 4k, trending on artstation. Character description: ${description}`;
+    const ai = getAIClient();
+    const prompt = `Digital concept art, detailed character design, cinematic lighting, 4k, trending on artstation. Character description: ${description}`;
 
-  try {
-    const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: {
-        parts: [{ text: prompt }]
-      },
-      config: {
-        imageConfig: {
-          aspectRatio: "1:1",
-        }
-      }
-    }));
+    try {
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: {
+                parts: [{ text: prompt }]
+            },
+            config: {
+                imageConfig: {
+                    aspectRatio: "1:1",
+                }
+            }
+        }));
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-            return `data:image/png;base64,${part.inlineData.data}`;
+        for (const part of response.candidates?.[0]?.content?.parts || []) {
+            if (part.inlineData) {
+                return `data:image/png;base64,${part.inlineData.data}`;
+            }
         }
+        throw new Error("No image data found in response");
+    } catch (error) {
+        console.error("Gemini Image Generation Error:", error);
+        throw error;
     }
-    throw new Error("No image data found in response");
-  } catch (error) {
-    console.error("Gemini Image Generation Error:", error);
-    throw error;
-  }
 };
 
 export const analyzePlot = async (premise: string, currentPlot: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings, echoes: Echo[] = []): Promise<string> => {
-  const ai = getAIClient();
-  
-  // Enhanced instruction for deeper emotional and pacing analysis
-  const baseInstruction = `你是一位资深文学编辑。你的任务是深度分析小说大纲。
+    const ai = getAIClient();
+
+    // Enhanced instruction for deeper emotional and pacing analysis
+    const baseInstruction = `你是一位资深文学编辑。你的任务是深度分析小说大纲。
   
   请提供以下三个维度的结构化反馈：
   
@@ -225,33 +234,33 @@ export const analyzePlot = async (premise: string, currentPlot: string, characte
      - **特别注意**：请检查剧情是否与【当前状态变更】（Echoes）冲突。例如，如果角色已受伤，大纲中是否体现了这一点。
 
   请使用 Markdown 格式，语气专业且犀利。`;
-  
-  const instruction = getInstructionWithSettings(baseInstruction, settings);
-  const contextStr = formatContext(characters, worldSettings, echoes);
-  const prompt = `核心梗概: ${premise}\n\n${contextStr}\n当前剧情大纲:\n${currentPlot}`;
 
-  try {
-    // Enable Thinking for deep analysis
-    const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
-      contents: prompt,
-      config: {
-        systemInstruction: instruction,
-        // The effective token limit for the response is `maxOutputTokens` minus the `thinkingBudget`.
-        // We give it a healthy budget to think through logical inconsistencies.
-        thinkingConfig: { thinkingBudget: 2048 },
-      }
-    }));
-    return response.text || "无法分析剧情。";
-  } catch (error) {
-    console.error("Gemini Plot Analysis Error:", error);
-    throw error;
-  }
+    const instruction = getInstructionWithSettings(baseInstruction, settings);
+    const contextStr = formatContext(characters, worldSettings, echoes);
+    const prompt = `核心梗概: ${premise}\n\n${contextStr}\n当前剧情大纲:\n${currentPlot}`;
+
+    try {
+        // Enable Thinking for deep analysis
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: 'gemini-3-pro-preview',
+            contents: prompt,
+            config: {
+                systemInstruction: instruction,
+                // The effective token limit for the response is `maxOutputTokens` minus the `thinkingBudget`.
+                // We give it a healthy budget to think through logical inconsistencies.
+                thinkingConfig: { thinkingBudget: 2048 },
+            }
+        }));
+        return response.text || "无法分析剧情。";
+    } catch (error) {
+        console.error("Gemini Plot Analysis Error:", error);
+        throw error;
+    }
 };
 
 export const expandScene = async (premise: string, genre: string, plotOutline: string, userPrompt: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings, echoes: Echo[] = []): Promise<string> => {
-  const ai = getAIClient();
-  const baseInstruction = `你是一位多产的小说家及续写助手。
+    const ai = getAIClient();
+    const baseInstruction = `你是一位多产的小说家及续写助手。
   你需要根据现有的【角色关系】、【世界观规则】和【剧情大纲】来扩展具体的场景。
   
   写作要求：
@@ -260,10 +269,10 @@ export const expandScene = async (premise: string, genre: string, plotOutline: s
   3. **严格遵守【当前状态变更】**：如果角色有伤在身或物品已丢失，必须在描写中体现。
   4. 文风应贴合小说类型 (${genre})。`;
 
-  const instruction = getInstructionWithSettings(baseInstruction, settings);
-  const contextStr = formatContext(characters, worldSettings, echoes);
+    const instruction = getInstructionWithSettings(baseInstruction, settings);
+    const contextStr = formatContext(characters, worldSettings, echoes);
 
-  const prompt = `
+    const prompt = `
   小说类型: ${genre}
   核心梗概: ${premise}
   
@@ -277,28 +286,28 @@ export const expandScene = async (premise: string, genre: string, plotOutline: s
   
   请直接开始撰写正文内容，无需过多的开场白。`;
 
-  try {
-     const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        systemInstruction: instruction,
-        temperature: settings?.creativity || 0.9,
-      }
-    }));
-    return response.text || "生成失败。";
-  } catch (error) {
-    console.error("Gemini Scene Expansion Error:", error);
-    throw error;
-  }
+    try {
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt,
+            config: {
+                systemInstruction: instruction,
+                temperature: settings?.creativity || 0.9,
+            }
+        }));
+        return response.text || "生成失败。";
+    } catch (error) {
+        console.error("Gemini Scene Expansion Error:", error);
+        throw error;
+    }
 };
 
 export const expandWorldLore = async (title: string, currentContent: string, genre: string, settings?: CreativeSettings): Promise<string> => {
-   const ai = getAIClient();
-   const baseInstruction = "你是一位注重细节的历史学家和人类学家，擅长构建虚构世界的深度背景。";
-   const instruction = getInstructionWithSettings(baseInstruction, settings);
+    const ai = getAIClient();
+    const baseInstruction = "你是一位注重细节的历史学家和人类学家，擅长构建虚构世界的深度背景。";
+    const instruction = getInstructionWithSettings(baseInstruction, settings);
 
-   const prompt = `
+    const prompt = `
    世界观条目: ${title}
    所属类型: ${genre}
    
@@ -312,43 +321,43 @@ export const expandWorldLore = async (title: string, currentContent: string, gen
    
    请以 Markdown 格式输出补充内容。`;
 
-   try {
-     const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: prompt,
-      config: {
-        systemInstruction: instruction,
-        temperature: 0.85,
-      }
-    }));
-    return response.text || "生成失败。";
-   } catch (error) {
-     console.error("Gemini Lore Expansion Error:", error);
-     throw error;
-   }
+    try {
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: prompt,
+            config: {
+                systemInstruction: instruction,
+                temperature: 0.85,
+            }
+        }));
+        return response.text || "生成失败。";
+    } catch (error) {
+        console.error("Gemini Lore Expansion Error:", error);
+        throw error;
+    }
 };
 
 export const generatePlotFromContext = async (premise: string, genre: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings, template?: string, echoes: Echo[] = []): Promise<string> => {
-  const ai = getAIClient();
-  const contextStr = formatContext(characters, worldSettings, echoes);
-  
-  const baseInstruction = "你是一位精通故事结构的小说架构师。你的任务是基于已有的角色和世界观，推导出一个逻辑严密、冲突激烈的剧情大纲。";
-  const instruction = getInstructionWithSettings(baseInstruction, settings);
+    const ai = getAIClient();
+    const contextStr = formatContext(characters, worldSettings, echoes);
 
-  let taskRequirement = `
+    const baseInstruction = "你是一位精通故事结构的小说架构师。你的任务是基于已有的角色和世界观，推导出一个逻辑严密、冲突激烈的剧情大纲。";
+    const instruction = getInstructionWithSettings(baseInstruction, settings);
+
+    let taskRequirement = `
   任务要求：
   1. 结合人物的性格缺陷和目标，设计引发剧情的激励事件。
   2. 利用世界观的规则制造障碍和转折。
   3. 确保角色关系随着剧情推进而发生变化。
   4. **整合【当前状态变更】**：剧情发展必须考虑角色当前的状态（如伤病、道具、已发生的事件）。`;
 
-  if (template) {
-      taskRequirement += `\n\n【关键要求】请严格按照以下经典故事结构模版进行填充和创作：\n${template}`;
-  } else {
-      taskRequirement += `\n\n请生成一个包含 "起、承、转、合" 或 "分章/分幕" 结构的详细大纲。`;
-  }
+    if (template) {
+        taskRequirement += `\n\n【关键要求】请严格按照以下经典故事结构模版进行填充和创作：\n${template}`;
+    } else {
+        taskRequirement += `\n\n请生成一个包含 "起、承、转、合" 或 "分章/分幕" 结构的详细大纲。`;
+    }
 
-  const prompt = `
+    const prompt = `
   小说类型: ${genre}
   核心梗概: ${premise}
   
@@ -359,29 +368,29 @@ export const generatePlotFromContext = async (premise: string, genre: string, ch
   请直接输出大纲内容，使用清晰的 Markdown 格式。
   `;
 
-  try {
-     // Enable Thinking for complex plotting
-     const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-      model: 'gemini-3-pro-preview', // Stronger model for structural logic
-      contents: prompt,
-      config: {
-        systemInstruction: instruction,
-        thinkingConfig: { thinkingBudget: 4096 }, // Plot generation needs deep thought
-        temperature: settings?.creativity || 0.85,
-      }
-    }));
-    return response.text || "大纲生成失败。";
-  } catch (error) {
-    console.error("Gemini Plot Generation Error:", error);
-    throw error;
-  }
+    try {
+        // Enable Thinking for complex plotting
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: 'gemini-3-pro-preview', // Stronger model for structural logic
+            contents: prompt,
+            config: {
+                systemInstruction: instruction,
+                thinkingConfig: { thinkingBudget: 4096 }, // Plot generation needs deep thought
+                temperature: settings?.creativity || 0.85,
+            }
+        }));
+        return response.text || "大纲生成失败。";
+    } catch (error) {
+        console.error("Gemini Plot Generation Error:", error);
+        throw error;
+    }
 };
 
 // NEW: Rewrite plot based on feedback or directive
 export const rewritePlot = async (currentPlot: string, directive: string, genre: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings, echoes: Echo[] = []): Promise<string> => {
     const ai = getAIClient();
     const contextStr = formatContext(characters, worldSettings, echoes);
-    
+
     const baseInstruction = "你是一位善于修改和润色的小说编辑。根据用户的反馈或分析报告，对现有大纲进行重写和优化。";
     const instruction = getInstructionWithSettings(baseInstruction, settings);
 
@@ -418,19 +427,19 @@ export const rewritePlot = async (currentPlot: string, directive: string, genre:
 
 export const batchGenerateCharacters = async (premise: string, genre: string, settings?: CreativeSettings): Promise<Omit<Character, 'id'>[]> => {
     const ai = getAIClient();
-    
+
     const characterSchema = {
-      type: Type.ARRAY,
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          name: { type: Type.STRING },
-          role: { type: Type.STRING, description: "One of: 主角, 反派, 导师, 伙伴, 守护者, 变形者, 捣蛋鬼, 信使" },
-          description: { type: Type.STRING, description: "详细的人物小传。必须包含：外貌、性格、明确的欲望和恐惧、秘密、标志性特征(Signature)、道德阵营(Alignment)。" },
-          relationships: { type: Type.STRING, description: "与其他角色的潜在关系" }
-        },
-        required: ["name", "role", "description"]
-      }
+        type: Type.ARRAY,
+        items: {
+            type: Type.OBJECT,
+            properties: {
+                name: { type: Type.STRING },
+                role: { type: Type.STRING, description: "One of: 主角, 反派, 导师, 伙伴, 守护者, 变形者, 捣蛋鬼, 信使" },
+                description: { type: Type.STRING, description: "详细的人物小传。必须包含：外貌、性格、明确的欲望和恐惧、秘密、标志性特征(Signature)、道德阵营(Alignment)。" },
+                relationships: { type: Type.STRING, description: "与其他角色的潜在关系" }
+            },
+            required: ["name", "role", "description"]
+        }
     };
 
     // Incorporate settings into the prompt since we can't easily inject system instruction into JSON schema mode cleanly in all cases, 
@@ -459,7 +468,7 @@ export const batchGenerateCharacters = async (premise: string, genre: string, se
                 responseSchema: characterSchema
             }
         }));
-        
+
         if (response.text) {
             return JSON.parse(response.text);
         }
@@ -479,13 +488,13 @@ export const batchGenerateWorldSettingsByCategory = async (premise: string, genr
             type: Type.OBJECT,
             properties: {
                 title: { type: Type.STRING },
-                category: { type: Type.STRING }, 
+                category: { type: Type.STRING },
                 content: { type: Type.STRING, description: "详细的设定描述" }
             },
             required: ["title", "content"]
         }
     };
-    
+
     const settingText = settings ? `风格要求：基调 ${settings.tone}，风格 ${settings.style}。` : "";
 
     const prompt = `基于小说梗概："${premise}" (类型: ${genre})。
@@ -511,13 +520,13 @@ export const batchGenerateWorldSettingsByCategory = async (premise: string, genr
             return rawData.map((item: any) => ({
                 title: item.title,
                 content: item.content,
-                category: category 
+                category: category
             }));
         }
         return [];
     } catch (e) {
         console.error(`Batch World Generation Error (${category})`, e);
-        return []; 
+        return [];
     }
 };
 
@@ -536,9 +545,9 @@ export const generateSceneFromIngredients = async (
     targetWordCount: number = 3000 // NEW: Target Word Count
 ): Promise<string> => {
     const ai = getAIClient();
-    
+
     let pacingInstruction = "";
-    switch(pacing) {
+    switch (pacing) {
         case 'SLOW_BURN':
             pacingInstruction = `【节奏控制: 铺垫/慢热 (Slow Burn)】
             - 请放慢叙事节奏，大量使用环境描写、心理活动和细节刻画。
@@ -574,7 +583,7 @@ export const generateSceneFromIngredients = async (
 
     // Build context
     let context = "";
-    
+
     // Filter only accepted echoes
     const activeEchoes = echoes.filter(e => e.status === 'ACCEPTED');
 
@@ -595,7 +604,7 @@ export const generateSceneFromIngredients = async (
         });
         context += "\n";
     }
-    
+
     // 2. Stage (Specific Location)
     if (activeLocation) {
         const locEchoes = activeEchoes.filter(e => e.targetId === activeLocation.id).sort((a, b) => a.timestamp - b.timestamp);
@@ -609,10 +618,10 @@ export const generateSceneFromIngredients = async (
     // 3. Rules & Lore (The rest of the bible) - NOW WITH DYNAMIC FILTERING
     // Filter out the active location to avoid duplication
     const otherSettings = allWorldSettings.filter(w => !activeLocation || w.id !== activeLocation.id);
-    
+
     // Combine text for query: PlotBeat + Previous Context + Active Char Names
     const queryContext = `${plotBeat} ${previousStoryContext || ''} ${activeCharacters.map(c => c.name).join(' ')}`;
-    
+
     // Dynamic Filter
     const relevantSettings = filterRelevantSettings(otherSettings, queryContext, 20); // Limit to top 20 relevant
 
@@ -666,12 +675,12 @@ export const generateSceneFromIngredients = async (
 export type PolishMode = 'SENSORY' | 'CINEMATIC' | 'PSYCHOLOGICAL' | 'MINIMALIST';
 
 export const polishDraft = async (
-    content: string, 
+    content: string,
     mode: PolishMode,
     settings?: CreativeSettings
 ): Promise<string> => {
     const ai = getAIClient();
-    
+
     let modeInstruction = "";
     switch (mode) {
         case 'SENSORY':
@@ -692,7 +701,7 @@ export const polishDraft = async (
     请保留原意和剧情走向，但大幅度提升文笔质感。
     
     ${modeInstruction}`;
-    
+
     const prompt = `
     【待润色文本】:
     ${content}
@@ -718,8 +727,8 @@ export const polishDraft = async (
 
 // NEW: Analyze text for state changes
 export const analyzeStateChanges = async (
-    sceneContent: string, 
-    activeCharacters: Character[], 
+    sceneContent: string,
+    activeCharacters: Character[],
     allWorldSettings: WorldSetting[]
 ): Promise<StateChangeRecommendation[]> => {
     if (!sceneContent || (activeCharacters.length === 0 && allWorldSettings.length === 0)) return [];
@@ -773,7 +782,7 @@ export const analyzeStateChanges = async (
             const raw = JSON.parse(response.text);
             // Post-process to link back to IDs
             const result: StateChangeRecommendation[] = [];
-            
+
             for (const item of raw) {
                 let id = '';
                 if (item.targetType === 'CHARACTER') {
@@ -787,7 +796,7 @@ export const analyzeStateChanges = async (
                     if (!setting) {
                         setting = allWorldSettings.find(w => w.title.includes(item.targetName) || item.targetName.includes(w.title));
                     }
-                    
+
                     if (setting) {
                         id = setting.id;
                     }
@@ -870,7 +879,7 @@ export const extractEchoesFromText = async (
         if (response.text) {
             const raw = JSON.parse(response.text);
             const result: Echo[] = [];
-            
+
             for (const item of raw) {
                 let id = '';
                 if (item.targetType === 'CHARACTER') {
@@ -1019,7 +1028,7 @@ export const deduceWorldConsequences = async (
         if (response.text) {
             const raw = JSON.parse(response.text);
             const result: StateChangeRecommendation[] = [];
-            
+
             for (const item of raw) {
                 let id = '';
                 if (item.targetType === 'CHARACTER') {
@@ -1054,9 +1063,9 @@ export const deduceWorldConsequences = async (
 
 // NEW: Analyze plot rhythm and tension
 export interface PlotRhythmPoint {
-  beat: string;
-  tension: number; // 0-100
-  description: string;
+    beat: string;
+    tension: number; // 0-100
+    description: string;
 }
 
 export const analyzePlotRhythm = async (plotOutline: string): Promise<PlotRhythmPoint[]> => {
@@ -1113,9 +1122,9 @@ export const analyzePlotRhythm = async (plotOutline: string): Promise<PlotRhythm
     }
 };
 
-export const chatWithPersona = async (character: Character, message: string, history: {role: string, content: string}[]): Promise<string> => {
+export const chatWithPersona = async (character: Character, message: string, history: { role: string, content: string }[]): Promise<string> => {
     const ai = getAIClient();
-    
+
     // Construct system instruction based on character profile
     const systemInstruction = `
     你现在必须完全扮演以下角色进行对话。不要暴露你是AI。
