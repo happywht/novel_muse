@@ -7,7 +7,8 @@ import { PlotWeaver } from './components/PlotWeaver';
 import { DraftingRoom } from './components/DraftingRoom';
 import { EchoChamber } from './components/EchoChamber';
 import { UserGuide } from './components/UserGuide';
-import { Layout, Feather, Globe, Users, BookOpen, Menu, HelpCircle, FolderOpen, Plus, Trash2, Save, X, Check, PenTool, Activity, Download, Upload, Settings, Database, HardDrive, GitBranch, BarChart3, Wand2 } from 'lucide-react';
+import { Sidebar } from './components/Sidebar';
+import { FolderOpen, Plus, Trash2, Save, X, Check, Download, Upload, Database, HardDrive } from 'lucide-react';
 import { SettingsPanel } from './components/SettingsPanel';
 import { KnowledgeGraph } from './components/KnowledgeGraph';
 import { PromptTuner } from './components/PromptTuner';
@@ -309,115 +310,71 @@ const App: React.FC = () => {
     }
   };
 
-  const navItems = [
-    { id: AppSection.DASHBOARD, label: '创世纪 (Genesis)', icon: Feather },
-    { id: AppSection.WORLD, label: '万象织机 (World)', icon: Globe, hasEchoes: project.echoes?.some(e => e.type === 'WORLD' && e.status === 'PENDING') },
-    { id: AppSection.CHARACTERS, label: '灵魂熔炉 (Cast)', icon: Users, hasEchoes: project.echoes?.some(e => e.type === 'CHARACTER' && e.status === 'PENDING') },
-    { id: AppSection.PLOT, label: '情节罗盘 (Plot)', icon: BookOpen },
-    { id: AppSection.DRAFTING, label: '自动工坊 (Forge)', icon: PenTool },
-    { id: AppSection.ECHOES, label: '命运回响 (Echoes)', icon: Activity },
-    { id: AppSection.GRAPH, label: '星图引擎 (Graph)', icon: GitBranch },
-    { id: AppSection.STATS, label: '创作数据 (Stats)', icon: BarChart3 },
-  ];
-
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans selection:bg-muse-500/30 selection:text-muse-100 flex flex-col">
-      {/* Top Navigation Bar */}
-      <nav className="h-16 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md sticky top-0 z-40 flex items-center justify-between px-6">
-        <div className="flex items-center gap-4">
-          {/* Project Switcher Trigger */}
+    <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans selection:bg-muse-500/30 selection:text-muse-100 flex">
+      {/* Sidebar Navigation */}
+      <Sidebar
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+        onOpenSettings={() => setShowSettings(true)}
+        onOpenPromptTuner={() => setShowPromptTuner(true)}
+        onOpenGuide={() => setShowGuide(true)}
+        hasCharEchoes={project.echoes?.some(e => e.type === 'CHARACTER' && e.status === 'PENDING')}
+        hasWorldEchoes={project.echoes?.some(e => e.type === 'WORLD' && e.status === 'PENDING')}
+      />
+
+      {/* Main wrapper (offset by sidebar) */}
+      <div className="flex-1 flex flex-col ml-[68px] min-h-screen">
+        {/* Slim Topbar */}
+        <header className="h-12 border-b border-slate-800/60 bg-slate-900/60 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between px-5">
           <button
             onClick={() => setShowProjectList(true)}
-            className="flex items-center gap-3 hover:bg-slate-800 p-2 rounded-lg transition-colors group"
+            className="flex items-center gap-2.5 hover:bg-slate-800/60 py-1.5 px-3 rounded-lg transition-colors group"
           >
-            <div className="w-8 h-8 bg-gradient-to-tr from-muse-600 to-muse-400 rounded-lg flex items-center justify-center shadow-lg shadow-muse-500/20 group-hover:scale-105 transition-transform">
-              <FolderOpen className="text-white" size={16} />
-            </div>
-            <div className="text-left hidden sm:block">
+            <FolderOpen className="text-muse-400" size={16} />
+            <div className="text-left">
               <h1 className="font-serif font-bold text-sm tracking-tight text-white leading-tight">{project.title || "未命名项目"}</h1>
-              <span className="text-[10px] text-slate-500 font-mono">点击切换项目</span>
             </div>
           </button>
-        </div>
 
-        <div className="flex items-center gap-1 bg-slate-800/50 p-1 rounded-lg border border-slate-700/50 overflow-x-auto">
-          {navItems.map(item => (
-            <button
-              key={item.id}
-              onClick={() => setActiveSection(item.id)}
-              className={`relative px-4 py-2 rounded-md text-sm font-medium transition-all flex items-center gap-2 whitespace-nowrap ${activeSection === item.id
-                ? 'bg-muse-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
-                }`}
-            >
-              <item.icon size={16} />
-              <span className="hidden md:inline">{item.label}</span>
-              {item.hasEchoes && (
-                <span className="absolute top-2 right-2 w-2 h-2 bg-cyan-400 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,211,238,0.8)]"></span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        <div className="w-auto flex items-center gap-4 text-right">
-          <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${useBackend ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' : 'text-amber-400 border-amber-500/30 bg-amber-500/10'}`} title={useBackend ? '数据存储在 MySQL 数据库中' : '数据存储在浏览器本地'}>
-            {useBackend ? <Database size={12} /> : <HardDrive size={12} />}
-            <span className="hidden sm:inline">{useBackend ? 'MySQL' : '本地'}</span>
+          <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border ${useBackend ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' : 'text-amber-400 border-amber-500/30 bg-amber-500/10'}`} title={useBackend ? '数据存储在 MySQL 数据库中' : '数据存储在浏览器本地'}>
+              {useBackend ? <Database size={11} /> : <HardDrive size={11} />}
+              <span>{useBackend ? 'MySQL' : '本地'}</span>
+            </div>
           </div>
-          <button
-            onClick={() => setShowSettings(true)}
-            className="text-slate-400 hover:text-muse-400 transition-colors flex items-center gap-1 text-sm font-medium"
-            title="全局设置"
-          >
-            <Settings size={18} />
-            <span className="hidden sm:inline">设置</span>
-          </button>
-          <button
-            onClick={() => setShowPromptTuner(true)}
-            className="text-slate-400 hover:text-purple-400 transition-colors flex items-center gap-1 text-sm font-medium"
-            title="AI 调教台"
-          >
-            <Wand2 size={18} />
-            <span className="hidden sm:inline">调教</span>
-          </button>
-          <button
-            onClick={() => setShowGuide(true)}
-            className="text-slate-400 hover:text-muse-400 transition-colors flex items-center gap-1 text-sm font-medium"
-            title="使用说明"
-          >
-            <HelpCircle size={18} />
-            <span className="hidden sm:inline">说明书</span>
-          </button>
-        </div>
-      </nav>
+        </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 p-6 overflow-hidden max-w-7xl mx-auto w-full">
-        {activeSection === AppSection.DASHBOARD && (
-          <Dashboard project={project} updateProject={updateProject} />
-        )}
-        {activeSection === AppSection.WORLD && (
-          <WorldBuilder project={project} updateProject={updateProject} />
-        )}
-        {activeSection === AppSection.CHARACTERS && (
-          <CharacterCreator project={project} updateProject={updateProject} />
-        )}
-        {activeSection === AppSection.PLOT && (
-          <PlotWeaver project={project} updateProject={updateProject} />
-        )}
-        {activeSection === AppSection.DRAFTING && (
-          <DraftingRoom project={project} updateProject={updateProject} />
-        )}
-        {activeSection === AppSection.ECHOES && (
-          <EchoChamber project={project} updateProject={updateProject} />
-        )}
-        {activeSection === AppSection.GRAPH && (
-          <KnowledgeGraph projectId={project.id} useBackend={useBackend} />
-        )}
-        {activeSection === AppSection.STATS && (
-          <WritingStats project={project} />
-        )}
-      </main>
+        {/* Main Content Area */}
+        <main className="flex-1 p-6 overflow-auto">
+          <div className="max-w-7xl mx-auto w-full">
+            {activeSection === AppSection.DASHBOARD && (
+              <Dashboard project={project} updateProject={updateProject} />
+            )}
+            {activeSection === AppSection.WORLD && (
+              <WorldBuilder project={project} updateProject={updateProject} />
+            )}
+            {activeSection === AppSection.CHARACTERS && (
+              <CharacterCreator project={project} updateProject={updateProject} />
+            )}
+            {activeSection === AppSection.PLOT && (
+              <PlotWeaver project={project} updateProject={updateProject} />
+            )}
+            {activeSection === AppSection.DRAFTING && (
+              <DraftingRoom project={project} updateProject={updateProject} />
+            )}
+            {activeSection === AppSection.ECHOES && (
+              <EchoChamber project={project} updateProject={updateProject} />
+            )}
+            {activeSection === AppSection.GRAPH && (
+              <KnowledgeGraph projectId={project.id} useBackend={useBackend} />
+            )}
+            {activeSection === AppSection.STATS && (
+              <WritingStats project={project} />
+            )}
+          </div>
+        </main>
+      </div>
 
       {/* Project List Modal */}
       {showProjectList && (
