@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id               String    @id @default(cuid())
+  title            String    @default("未命名项目")
+  genre            String    @default("")
+  premise          String    @db.LongText
+  plotOutline       String?   @db.LongText
+  currentWorldDate String    @default("元年")
+
+  // Creative Settings (embedded, not separate table)
+  tone             String    @default("平衡")
+  style            String    @default("")
+  creativity       Float     @default(0.7)
+  targetAudience   String    @default("")
+
+  // World Gen Config
+  detailLevel      String    @default("Standard")
+  focus            String    @default("Balanced")
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  characters       Character[]
+  worldSettings    WorldSetting[]
+  plotVersions     PlotVersion[]
+  drafts           Draft[]
+  chapters         Chapter[]
+  echoes           Echo[]
+  timeline         TimelineEvent[]
+}
+
+model Character {
+  id            String   @id @default(cuid())
+  name          String
+  role          String
+  archetype     String   @default("")
+  description   String   @db.LongText
+  relationships String?  @db.Text
+  imageUrl      String?  @db.Text
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model WorldSetting {
+  id        String  @id @default(cuid())
+  category  String
+  title     String
+  content   String  @db.LongText
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model PlotVersion {
+  id        String   @id @default(cuid())
+  timestamp BigInt
+  content   String   @db.LongText
+  note      String
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model Draft {
+  id               String   @id @default(cuid())
+  title            String
+  content          String   @db.LongText
+  relatedPlotPoint String?
+  lastModified     BigInt
+  projectId        String
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model Chapter {
+  id           String   @id @default(cuid())
+  title        String
+  content      String   @db.LongText
+  order        Int
+  lastModified BigInt
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model Echo {
+  id          String   @id @default(cuid())
+  type        String   
+  targetId    String
+  targetName  String
+  description String   @db.Text
+  reason      String   @db.Text
+  status      String   @default("PENDING")
+  timestamp   BigInt
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model TimelineEvent {
+  id                String   @id @default(cuid())
+  timestamp         BigInt
+  worldDate         String
+  title             String
+  description       String   @db.Text
+  involvedEntities  String   @db.Text
+  type              String   
+  projectId         String
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}

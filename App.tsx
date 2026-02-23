@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AppSection, ProjectState, WorldGenConfig } from './types';
 import { Dashboard } from './components/Dashboard';
 import { WorldBuilder } from './components/WorldBuilder';
@@ -7,8 +7,9 @@ import { PlotWeaver } from './components/PlotWeaver';
 import { DraftingRoom } from './components/DraftingRoom';
 import { EchoChamber } from './components/EchoChamber';
 import { UserGuide } from './components/UserGuide';
-import { Layout, Feather, Globe, Users, BookOpen, Menu, HelpCircle, FolderOpen, Plus, Trash2, Save, X, Check, PenTool, Activity, Download, Upload, Settings } from 'lucide-react';
+import { Layout, Feather, Globe, Users, BookOpen, Menu, HelpCircle, FolderOpen, Plus, Trash2, Save, X, Check, PenTool, Activity, Download, Upload, Settings, Database, HardDrive } from 'lucide-react';
 import { SettingsPanel } from './components/SettingsPanel';
+import { isBackendAvailable, fetchProjectList, fetchProject, syncProject, deleteProjectApi } from './services/apiService';
 
 const INITIAL_PROJECT: ProjectState = {
   id: 'default-project',
@@ -46,59 +47,127 @@ const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const importFileRef = React.useRef<HTMLInputElement>(null);
 
+  // Backend state
+  const [useBackend, setUseBackend] = useState(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isLoadingRef = useRef(true); // Prevent auto-save during initial load
+
   // Project Management State
   const [showProjectList, setShowProjectList] = useState(false);
   const [savedProjects, setSavedProjects] = useState<ProjectState[]>([]);
 
-  // Load projects from local storage on mount
+  // Load projects on mount: try backend first, fallback to localStorage
   useEffect(() => {
-    const stored = localStorage.getItem('muse_projects');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setSavedProjects(parsed);
-          // Load the most recent project
-          const mostRecent = parsed.sort((a, b) => b.lastModified - a.lastModified)[0];
-          setProject({ ...INITIAL_PROJECT, ...mostRecent }); // Merge to ensure new fields like drafts exist
-        } else {
-          // Initialize with a fresh project if list is empty but exists
-          const newProj = { ...INITIAL_PROJECT, id: Date.now().toString() };
-          setProject(newProj);
-          setSavedProjects([newProj]);
+    const init = async () => {
+      isLoadingRef.current = true;
+      const backendOk = await isBackendAvailable();
+      setUseBackend(backendOk);
+
+      if (backendOk) {
+        console.log('🚀 Backend connected! Loading from MySQL...');
+        try {
+          const list = await fetchProjectList();
+          if (list.length > 0) {
+            // Load the most recent project
+            const sorted = list.sort((a, b) => b.lastModified - a.lastModified);
+            const fullProject = await fetchProject(sorted[0].id);
+            const merged = { ...INITIAL_PROJECT, ...fullProject };
+            setProject(merged);
+            // Build savedProjects from summaries (lightweight)
+            setSavedProjects(list.map(s => ({ ...INITIAL_PROJECT, id: s.id, title: s.title, genre: s.genre, lastModified: s.lastModified } as ProjectState)));
+          } else {
+            // No projects in DB — check localStorage for migration
+            const stored = localStorage.getItem('muse_projects');
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                console.log('📦 Migrating localStorage projects to MySQL...');
+                for (const proj of parsed) {
+                  await syncProject(proj);
+                }
+                const mostRecent = parsed.sort((a: any, b: any) => b.lastModified - a.lastModified)[0];
+                setProject({ ...INITIAL_PROJECT, ...mostRecent });
+                setSavedProjects(parsed);
+                isLoadingRef.current = false;
+                return;
+              }
+            }
+            // Brand new user
+            const newProj = { ...INITIAL_PROJECT, id: Date.now().toString() };
+            await syncProject(newProj);
+            setProject(newProj);
+            setSavedProjects([newProj]);
+          }
+        } catch (err) {
+          console.warn('Backend load failed, falling back to localStorage', err);
+          setUseBackend(false);
+          loadFromLocalStorage();
         }
-      } catch (e) {
-        console.error("Failed to load projects", e);
+      } else {
+        console.log('💾 Backend unavailable, using localStorage');
+        loadFromLocalStorage();
       }
-    } else {
-      // First time user
-      const newProj = { ...INITIAL_PROJECT, id: Date.now().toString() };
-      setProject(newProj);
-      setSavedProjects([newProj]);
-    }
+      isLoadingRef.current = false;
+    };
+
+    const loadFromLocalStorage = () => {
+      const stored = localStorage.getItem('muse_projects');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSavedProjects(parsed);
+            const mostRecent = parsed.sort((a: any, b: any) => b.lastModified - a.lastModified)[0];
+            setProject({ ...INITIAL_PROJECT, ...mostRecent });
+          } else {
+            const newProj = { ...INITIAL_PROJECT, id: Date.now().toString() };
+            setProject(newProj);
+            setSavedProjects([newProj]);
+          }
+        } catch (e) {
+          console.error('Failed to load projects', e);
+        }
+      } else {
+        const newProj = { ...INITIAL_PROJECT, id: Date.now().toString() };
+        setProject(newProj);
+        setSavedProjects([newProj]);
+      }
+    };
+
+    init();
   }, []);
 
-  // Auto-save effect: Update the specific project in the list whenever 'project' changes
+  // Auto-save effect: debounced, saves to both localStorage AND backend
   useEffect(() => {
-    if (!project.id) return;
+    if (!project.id || isLoadingRef.current) return;
 
+    // Always update localStorage immediately
     setSavedProjects(prev => {
       const index = prev.findIndex(p => p.id === project.id);
       let newList;
       const updatedProject = { ...project, lastModified: Date.now() };
-
       if (index >= 0) {
         newList = [...prev];
         newList[index] = updatedProject;
       } else {
         newList = [...prev, updatedProject];
       }
-
       localStorage.setItem('muse_projects', JSON.stringify(newList));
       return newList;
     });
-  }, [project]); // Dependency on 'project' means it saves on every edit. 
-  // In a real app, you might want to debounce this, but for local state it's usually fine.
+
+    // Debounced backend sync (2 seconds after last change)
+    if (useBackend) {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(async () => {
+        try {
+          await syncProject({ ...project, lastModified: Date.now() });
+        } catch (err) {
+          console.warn('Backend sync failed:', err);
+        }
+      }, 2000);
+    }
+  }, [project, useBackend]);
 
   const updateProject = (data: Partial<ProjectState>) => {
     setProject(prev => ({ ...prev, ...data }));
@@ -115,29 +184,54 @@ const App: React.FC = () => {
     setSavedProjects(prev => [...prev, newProj]);
     setShowProjectList(false);
     setActiveSection(AppSection.DASHBOARD);
+    // Sync to backend
+    if (useBackend) {
+      syncProject(newProj).catch(err => console.warn('Backend create sync failed:', err));
+    }
   };
 
-  const handleSwitchProject = (id: string) => {
+  const handleSwitchProject = async (id: string) => {
+    if (useBackend) {
+      try {
+        const fullProject = await fetchProject(id);
+        setProject({ ...INITIAL_PROJECT, ...fullProject });
+        setShowProjectList(false);
+        setActiveSection(AppSection.DASHBOARD);
+        return;
+      } catch (err) {
+        console.warn('Backend fetch failed, using local copy', err);
+      }
+    }
+    // Fallback to local copy
     const target = savedProjects.find(p => p.id === id);
     if (target) {
-      setProject({ ...INITIAL_PROJECT, ...target }); // Merge to ensure schema safety
+      setProject({ ...INITIAL_PROJECT, ...target });
       setShowProjectList(false);
       setActiveSection(AppSection.DASHBOARD);
     }
   };
 
-  const handleDeleteProject = (e: React.MouseEvent, id: string) => {
+  const handleDeleteProject = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     if (savedProjects.length <= 1) {
-      alert("至少保留一个项目。");
+      alert('至少保留一个项目。');
       return;
     }
-    if (window.confirm("确定要删除这个项目吗？此操作无法撤销。")) {
+    if (window.confirm('确定要删除这个项目吗？此操作无法撤销。')) {
       const newList = savedProjects.filter(p => p.id !== id);
       setSavedProjects(newList);
       localStorage.setItem('muse_projects', JSON.stringify(newList));
-
+      if (useBackend) {
+        deleteProjectApi(id).catch(err => console.warn('Backend delete failed:', err));
+      }
       if (project.id === id) {
+        if (useBackend) {
+          try {
+            const fullProject = await fetchProject(newList[0].id);
+            setProject({ ...INITIAL_PROJECT, ...fullProject });
+            return;
+          } catch { /* fallback below */ }
+        }
         setProject(newList[0]);
       }
     }
@@ -260,6 +354,10 @@ const App: React.FC = () => {
         </div>
 
         <div className="w-auto flex items-center gap-4 text-right">
+          <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border ${useBackend ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' : 'text-amber-400 border-amber-500/30 bg-amber-500/10'}`} title={useBackend ? '数据存储在 MySQL 数据库中' : '数据存储在浏览器本地'}>
+            {useBackend ? <Database size={12} /> : <HardDrive size={12} />}
+            <span className="hidden sm:inline">{useBackend ? 'MySQL' : '本地'}</span>
+          </div>
           <button
             onClick={() => setShowSettings(true)}
             className="text-slate-400 hover:text-muse-400 transition-colors flex items-center gap-1 text-sm font-medium"

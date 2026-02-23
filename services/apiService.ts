@@ -1,0 +1,64 @@
+/**
+ * API Service Layer
+ * Handles communication between the React frontend and the Express backend.
+ * Falls back to localStorage when the backend is unavailable.
+ */
+
+const API_BASE = 'http://localhost:3001/api';
+
+interface ProjectSummary {
+    id: string;
+    title: string;
+    genre: string;
+    lastModified: number;
+    characterCount: number;
+    worldSettingCount: number;
+    chapterCount: number;
+}
+
+/** Check if the backend server is reachable */
+export const isBackendAvailable = async (): Promise<boolean> => {
+    try {
+        const res = await fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(2000) });
+        return res.ok;
+    } catch {
+        return false;
+    }
+};
+
+/** Fetch project list from the backend */
+export const fetchProjectList = async (): Promise<ProjectSummary[]> => {
+    const res = await fetch(`${API_BASE}/projects`);
+    if (!res.ok) throw new Error(`Failed to fetch projects: ${res.statusText}`);
+    return res.json();
+};
+
+/** Fetch a full project by ID */
+export const fetchProject = async (id: string): Promise<any> => {
+    const res = await fetch(`${API_BASE}/projects/${id}`);
+    if (!res.ok) throw new Error(`Failed to fetch project: ${res.statusText}`);
+    return res.json();
+};
+
+/** Create a new project on the backend */
+export const createProject = async (): Promise<{ id: string; title: string }> => {
+    const res = await fetch(`${API_BASE}/projects`, { method: 'POST' });
+    if (!res.ok) throw new Error(`Failed to create project: ${res.statusText}`);
+    return res.json();
+};
+
+/** Full-sync: save the entire ProjectState to the backend */
+export const syncProject = async (project: any): Promise<void> => {
+    const res = await fetch(`${API_BASE}/projects/${project.id}/full`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(project),
+    });
+    if (!res.ok) throw new Error(`Failed to sync project: ${res.statusText}`);
+};
+
+/** Delete a project on the backend */
+export const deleteProjectApi = async (id: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/projects/${id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`Failed to delete project: ${res.statusText}`);
+};
