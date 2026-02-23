@@ -66,7 +66,8 @@ export enum AppSection {
   PLOT = 'PLOT',
   DRAFTING = 'DRAFTING',
   ECHOES = 'ECHOES',
-  GRAPH = 'GRAPH'
+  GRAPH = 'GRAPH',
+  STATS = 'STATS'
 }
 
 export interface Echo {

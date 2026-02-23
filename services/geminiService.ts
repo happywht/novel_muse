@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Character, WorldSetting, CreativeSettings, StateChangeRecommendation, Echo } from "../types";
+import { getCustomPrompt } from "../components/PromptTuner";
 
 const STORAGE_KEY_API = 'muse_gemini_api_key';
 const STORAGE_KEY_MODEL = 'muse_gemini_model';
@@ -151,8 +152,16 @@ const filterRelevantSettings = (
 };
 
 // Helper to inject creative settings into instructions
-const getInstructionWithSettings = (baseInstruction: string, settings?: CreativeSettings) => {
+// Now supports custom prompt overrides via PromptTuner
+const getInstructionWithSettings = (baseInstruction: string, settings?: CreativeSettings, promptKey?: string) => {
+    // Check for user-customized prompt override
     let instruction = baseInstruction;
+    if (promptKey) {
+        const customPrompt = getCustomPrompt(promptKey);
+        if (customPrompt) {
+            instruction = customPrompt;
+        }
+    }
     if (settings) {
         instruction += `\n\n【创作偏好控制】
         - 叙事基调: ${settings.tone}
@@ -163,9 +172,9 @@ const getInstructionWithSettings = (baseInstruction: string, settings?: Creative
     return instruction;
 };
 
-export const generateText = async (prompt: string, baseInstruction?: string, settings?: CreativeSettings): Promise<string> => {
+export const generateText = async (prompt: string, baseInstruction?: string, settings?: CreativeSettings, promptKey?: string): Promise<string> => {
     const ai = getAIClient();
-    const instruction = getInstructionWithSettings(baseInstruction || "你是一个专业的创意写作助手。", settings);
+    const instruction = getInstructionWithSettings(baseInstruction || "你是一个专业的创意写作助手。", settings, promptKey || 'writing_base');
 
     try {
         const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
