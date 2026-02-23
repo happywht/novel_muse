@@ -1,20 +1,74 @@
+# Muse: 小说架构师 (Novel Architect)
+
 <div align="center">
 <img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
-# Run and deploy your AI Studio app
+**Muse: 小说架构师** 是一款基于大语言模型（Google Gemini API）的 AI 辅助小说创作工作台。本项目是一个由 React 和 Vite 驱动的前端渐进式 Web 应用，专为长篇小说创作者打造。它不仅能帮助创作者记录灵感，还能动态追踪错综复杂的世界观、角色成长和情节线。
 
-This contains everything you need to run your app locally.
+## 🌟 核心功能 (Core Features)
 
-View your app in AI Studio: https://ai.studio/apps/a97fbd29-5f3c-4d8c-9466-9881d187ce41
+本项目通过多个互相联动的模块实现强大的构思和写作辅助：
 
-## Run Locally
+- 🌍 **创世纪 (Dashboard)**: 全局项目概貌、基本设定管理与创作基调配置。
+- 织 **万象织机 (World Builder)**: 细粒度构建世界观架构，包括但不限于地理风光、魔法/科技体系、社会生态与历史渊源。能够结合 AI 输出详尽或简略的世界片段。
+- 👥 **灵魂熔炉 (Character Creator)**: 打造有灵魂的角色，确立主角/配角定位以及复杂的相互情感关系和原型设定。
+- 🧭 **情节罗盘 (Plot Weaver)**: 提供宏观与微观兼具的情节网编织工具，系统性地规划故事情节节点。
+- ✍️ **自动工坊 (Drafting Room)**: 沉浸式写作工坊。您可以在此处编写实际章节和草稿，引入 AI 进行润色、扩写或风格转换。
+- 🦋 **命运回响 (Echo Chamber)**: 独特的“回响引擎”。AI 将主动预判角色的行为演变或世界观的变迁，并提出“等待审查/应用”的动态演进状态变更建议。
 
-**Prerequisites:**  Node.js
+## 🛠️ 技术栈 (Tech Stack)
 
+- **前端框架**: React 19 + TypeScript
+- **构建工具**: Vite 6
+- **UI 设计**: TailwindCSS (极致暗黑科幻风格) + Lucide React (精美图标) + Recharts (数据可视化组件)
+- **AI 引擎**: Google Gemini API (`@google/genai`)
+- **数据存储**: HTML5 Local Storage 浏览器本地持久化
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 🚀 快速开始 (Getting Started)
+
+### 环境要求
+
+- 推荐使用 [Node.js](https://nodejs.org/) 20.x 或更高版本。
+- 获取您的 [Google AI Studio Gemini API Key](https://aistudio.google.com/app/apikey)。
+
+### 安装与运行
+
+1. **进入项目目录**
+   ```bash
+   cd remix_-muse_-小说架构师_022302
+   ```
+
+2. **安装依赖**
+   ```bash
+   npm install
+   ```
+
+3. **配置环境变量**
+   在项目根目录找到或创建 `.env.local` 文件，并将其中的 `GEMINI_API_KEY` 替换为您自己的 API 密钥：
+   ```env
+   GEMINI_API_KEY="your_api_key_here"
+   ```
+
+4. **启动开发服务器**
+   ```bash
+   npm run dev
+   ```
+   启动后，在浏览器中访问控制台输出的本地地址（通常是 `http://localhost:5173` 或通过局域网 IP `http://127.0.0.1:5173/`）。
+
+## 📁 核心目录结构
+
+```text
+├── components/          # React 核心功能组件 (UI 和各模块)
+│   ├── Dashboard.tsx    # 创世纪
+│   ├── WorldBuilder.tsx # 万象织机
+│   ├── CharacterCreator.tsx # 灵魂熔炉
+│   ├── PlotWeaver.tsx   # 情节罗盘
+│   ├── DraftingRoom.tsx # 自动工坊
+│   └── EchoChamber.tsx  # 回响引擎
+├── services/            # API 请求与外部服务接入逻辑
+│   └── gemini.ts        # Gemini API 接口封装示例
+├── types.ts             # TypeScript 全局/业务接口与类型定义
+├── App.tsx              # 主应用入口，带路由管理和顶部导航状态组件
+└── vite.config.ts       # Vite 构建与插件配置
+```
