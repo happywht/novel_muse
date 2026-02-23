@@ -7,8 +7,9 @@ import { PlotWeaver } from './components/PlotWeaver';
 import { DraftingRoom } from './components/DraftingRoom';
 import { EchoChamber } from './components/EchoChamber';
 import { UserGuide } from './components/UserGuide';
-import { Layout, Feather, Globe, Users, BookOpen, Menu, HelpCircle, FolderOpen, Plus, Trash2, Save, X, Check, PenTool, Activity, Download, Upload, Settings, Database, HardDrive } from 'lucide-react';
+import { Layout, Feather, Globe, Users, BookOpen, Menu, HelpCircle, FolderOpen, Plus, Trash2, Save, X, Check, PenTool, Activity, Download, Upload, Settings, Database, HardDrive, GitBranch } from 'lucide-react';
 import { SettingsPanel } from './components/SettingsPanel';
+import { KnowledgeGraph } from './components/KnowledgeGraph';
 import { isBackendAvailable, fetchProjectList, fetchProject, syncProject, deleteProjectApi } from './services/apiService';
 
 const INITIAL_PROJECT: ProjectState = {
@@ -312,6 +313,7 @@ const App: React.FC = () => {
     { id: AppSection.PLOT, label: '情节罗盘 (Plot)', icon: BookOpen },
     { id: AppSection.DRAFTING, label: '自动工坊 (Forge)', icon: PenTool },
     { id: AppSection.ECHOES, label: '命运回响 (Echoes)', icon: Activity },
+    { id: AppSection.GRAPH, label: '星图引擎 (Graph)', icon: GitBranch },
   ];
 
   return (
@@ -396,6 +398,9 @@ const App: React.FC = () => {
         )}
         {activeSection === AppSection.ECHOES && (
           <EchoChamber project={project} updateProject={updateProject} />
+        )}
+        {activeSection === AppSection.GRAPH && (
+          <KnowledgeGraph projectId={project.id} useBackend={useBackend} />
         )}
       </main>
 

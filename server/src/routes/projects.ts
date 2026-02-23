@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { syncProjectToGraph } from '../services/neo4jService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -315,6 +316,11 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                 });
             }
         });
+
+        // Fire-and-forget Neo4j sync (non-blocking)
+        syncProjectToGraph(data).catch(err =>
+            console.warn('Graph sync skipped:', err.message)
+        );
 
         res.json({ success: true, id });
     } catch (err: any) {

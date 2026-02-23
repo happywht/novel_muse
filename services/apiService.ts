@@ -62,3 +62,40 @@ export const deleteProjectApi = async (id: string): Promise<void> => {
     const res = await fetch(`${API_BASE}/projects/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error(`Failed to delete project: ${res.statusText}`);
 };
+
+// ============================================
+// Graph API
+// ============================================
+
+export interface GraphNode {
+    id: string;
+    label: string;
+    type: 'Character' | 'WorldSetting' | 'Event' | 'Echo' | string;
+    properties: Record<string, any>;
+}
+
+export interface GraphEdge {
+    source: string;
+    target: string;
+    type: string;
+    properties: Record<string, any>;
+}
+
+export interface GraphData {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+}
+
+/** Fetch the full knowledge graph for a project */
+export const fetchGraph = async (projectId: string): Promise<GraphData> => {
+    const res = await fetch(`${API_BASE}/graph/${projectId}`);
+    if (!res.ok) throw new Error(`Failed to fetch graph: ${res.statusText}`);
+    return res.json();
+};
+
+/** Fetch neighbors of a specific node */
+export const fetchNeighbors = async (projectId: string, nodeId: string): Promise<any> => {
+    const res = await fetch(`${API_BASE}/graph/${projectId}/neighbors/${nodeId}`);
+    if (!res.ok) throw new Error(`Failed to fetch neighbors: ${res.statusText}`);
+    return res.json();
+};
