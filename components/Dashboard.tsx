@@ -246,84 +246,108 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject }) 
         }
     };
 
-    return (
-        <div className="max-w-6xl mx-auto space-y-8 animate-fade-in relative">
-            <header className="flex justify-between items-start">
-                <div className="space-y-2">
-                    <h1 className="text-3xl font-bold text-white font-serif">项目概览 (Project Overview)</h1>
-                    <p className="text-slate-400">定义你故事的核心灵魂与创作罗盘。</p>
-                </div>
-                <div className="flex gap-2">
-                    <button
-                        onClick={handleCopyMarkdown}
-                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg border border-slate-700 transition-colors flex items-center gap-2 text-sm font-medium"
-                        title="复制 Markdown 到剪贴板"
-                    >
-                        <Clipboard size={16} />
-                    </button>
-                    <button
-                        onClick={handleExportMarkdown}
-                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-lg border border-slate-700 transition-colors flex items-center gap-2 text-sm font-medium"
-                        title="导出为 Markdown 设定集 (含角色/世界观/大纲/章节/草稿/时间线)"
-                    >
-                        <FileText size={16} /> 导出设定集
-                    </button>
-                </div>
-            </header>
+    // Quick stats
+    const totalWords = (project.chapters || []).reduce((s, c) => s + c.content.length, 0)
+        + (project.drafts || []).reduce((s, d) => s + d.content.length, 0);
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Left Column: Metadata & Settings */}
-                <div className="lg:col-span-2 space-y-6">
-                    {/* Main Metadata Form */}
-                    <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-400 mb-1">小说标题</label>
-                                <input
-                                    type="text"
-                                    value={project.title}
-                                    onChange={(e) => updateProject({ title: e.target.value })}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-muse-500 outline-none placeholder-slate-600"
-                                    placeholder="无题·杰作"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-400 mb-1">类型流派</label>
+    return (
+        <div className="max-w-6xl mx-auto space-y-6 animate-fade-in relative">
+            {/* ── Hero: Project Identity Card ── */}
+            <div className="bg-gradient-to-br from-amber-900/20 via-slate-900 to-slate-900 rounded-2xl border border-amber-500/15 p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-amber-500/5 to-transparent rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+                <div className="relative flex flex-col md:flex-row gap-6">
+                    {/* Left: Title & Genre */}
+                    <div className="flex-1 space-y-4">
+                        <div className="flex items-center gap-2 text-amber-400 text-xs font-semibold uppercase tracking-widest">
+                            <Sparkles size={14} />
+                            <span>项目总览</span>
+                        </div>
+                        <input
+                            type="text"
+                            value={project.title}
+                            onChange={(e) => updateProject({ title: e.target.value })}
+                            className="w-full bg-transparent text-3xl font-serif font-bold text-white placeholder-slate-600 outline-none border-b border-transparent hover:border-slate-700 focus:border-amber-500/50 transition-colors pb-1"
+                            placeholder="无题·杰作"
+                        />
+                        <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-slate-500 uppercase tracking-wider">流派</span>
                                 <input
                                     type="text"
                                     value={project.genre}
                                     onChange={(e) => updateProject({ genre: e.target.value })}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-muse-500 outline-none placeholder-slate-600"
-                                    placeholder="例如：赛博朋克"
+                                    className="bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-amber-500/50 outline-none placeholder-slate-600 w-40"
+                                    placeholder="赛博朋克"
                                 />
                             </div>
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-slate-400 mb-1">核心梗概 (Premise)</label>
-                            <textarea
-                                value={project.premise}
-                                onChange={(e) => updateProject({ premise: e.target.value })}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-muse-500 outline-none placeholder-slate-600 resize-none font-serif leading-relaxed custom-scrollbar min-h-[120px]"
-                                placeholder="你的故事是关于什么的？细节越丰富，AI 辅助效果越好。"
-                            />
-                        </div>
                     </div>
 
-                    {/* Creative Settings (New Feature) */}
-                    <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700">
-                        <div className="flex items-center gap-2 mb-4 text-muse-300">
-                            <Sliders size={20} />
-                            <h3 className="font-semibold text-white">创作罗盘 (Creative Compass)</h3>
+                    {/* Right: Quick Stats */}
+                    <div className="grid grid-cols-4 gap-3 md:w-[380px] shrink-0">
+                        {[
+                            { label: '章节', value: (project.chapters || []).length, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+                            { label: '角色', value: (project.characters || []).length, color: 'text-violet-400', bg: 'bg-violet-500/10' },
+                            { label: '设定', value: (project.worldSettings || []).length, color: 'text-sky-400', bg: 'bg-sky-500/10' },
+                            { label: '总字数', value: totalWords > 1000 ? `${(totalWords / 1000).toFixed(1)}k` : totalWords, color: 'text-amber-400', bg: 'bg-amber-500/10' },
+                        ].map(stat => (
+                            <div key={stat.label} className={`${stat.bg} rounded-xl p-3 text-center border border-slate-700/30`}>
+                                <div className={`text-xl font-bold font-mono ${stat.color}`}>{stat.value}</div>
+                                <div className="text-[10px] text-slate-500 mt-0.5">{stat.label}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Export buttons */}
+                <div className="flex gap-2 mt-4 pt-4 border-t border-slate-800/80">
+                    <button
+                        onClick={handleCopyMarkdown}
+                        className="bg-slate-800/60 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700/50 transition-colors flex items-center gap-1.5 text-xs"
+                    >
+                        <Clipboard size={13} /> 复制 MD
+                    </button>
+                    <button
+                        onClick={handleExportMarkdown}
+                        className="bg-slate-800/60 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700/50 transition-colors flex items-center gap-1.5 text-xs"
+                    >
+                        <FileText size={13} /> 导出设定集
+                    </button>
+                </div>
+            </div>
+
+            {/* ── Two-column body ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                {/* Left: Core Settings (3/5) */}
+                <div className="lg:col-span-3 space-y-5">
+                    {/* Premise */}
+                    <div className="bg-slate-800/40 rounded-xl border border-slate-700/60 p-5 space-y-3">
+                        <label className="flex items-center gap-2 text-xs font-semibold text-amber-400/80 uppercase tracking-wider">
+                            <BookOpen size={14} /> 核心梗概
+                        </label>
+                        <textarea
+                            value={project.premise}
+                            onChange={(e) => updateProject({ premise: e.target.value })}
+                            className="w-full bg-slate-900/60 border border-slate-700/50 rounded-lg p-4 text-white focus:ring-1 focus:ring-amber-500/40 outline-none placeholder-slate-600 resize-none font-serif leading-relaxed custom-scrollbar min-h-[140px] text-sm"
+                            placeholder="你的故事是关于什么的？细节越丰富，AI 辅助效果越好。"
+                        />
+                    </div>
+
+                    {/* Creative Compass */}
+                    <div className="bg-slate-800/40 rounded-xl border border-slate-700/60 p-5">
+                        <div className="flex items-center gap-2 mb-4">
+                            <Sliders size={16} className="text-amber-400" />
+                            <h3 className="font-semibold text-white text-sm">创作罗盘</h3>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">叙事基调 (Tone)</label>
-                                <div className="grid grid-cols-3 gap-2">
+                                <label className="block text-[10px] font-medium text-slate-500 mb-2 uppercase tracking-wider">叙事基调</label>
+                                <div className="grid grid-cols-3 gap-1.5">
                                     {['黑暗', '幽默', '史诗', '悬疑', '治愈', '平衡'].map(tone => (
                                         <button
                                             key={tone}
                                             onClick={() => handleUpdateSettings('tone', tone)}
-                                            className={`text-xs py-2 rounded-md border transition-all ${project.creativeSettings.tone === tone ? 'bg-muse-600 text-white border-muse-500' : 'bg-slate-900 text-slate-400 border-slate-700 hover:border-slate-500'}`}
+                                            className={`text-xs py-1.5 rounded-lg border transition-all ${project.creativeSettings.tone === tone ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-slate-900/60 text-slate-400 border-slate-700/50 hover:border-slate-600'}`}
                                         >
                                             {tone}
                                         </button>
@@ -331,38 +355,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject }) 
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">创意温度 (Creativity): {project.creativeSettings.creativity}</label>
+                                <label className="block text-[10px] font-medium text-slate-500 mb-2 uppercase tracking-wider">创意温度: {project.creativeSettings.creativity}</label>
                                 <input
                                     type="range"
-                                    min="0.1"
-                                    max="1.0"
-                                    step="0.1"
+                                    min="0.1" max="1.0" step="0.1"
                                     value={project.creativeSettings.creativity}
                                     onChange={(e) => handleUpdateSettings('creativity', parseFloat(e.target.value))}
-                                    className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-muse-500"
+                                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
                                 />
-                                <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+                                <div className="flex justify-between text-[9px] text-slate-600 mt-1">
                                     <span>严谨保守</span>
                                     <span>天马行空</span>
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">文字风格 (Style)</label>
+                                <label className="block text-[10px] font-medium text-slate-500 mb-2 uppercase tracking-wider">文字风格</label>
                                 <input
                                     type="text"
                                     value={project.creativeSettings.style}
                                     onChange={(e) => handleUpdateSettings('style', e.target.value)}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-sm text-white focus:border-muse-500 outline-none"
+                                    className="w-full bg-slate-900/60 border border-slate-700/50 rounded-lg p-2 text-sm text-white focus:ring-1 focus:ring-amber-500/40 outline-none placeholder-slate-600"
                                     placeholder="例如：华丽辞藻、极简主义..."
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">目标受众</label>
+                                <label className="block text-[10px] font-medium text-slate-500 mb-2 uppercase tracking-wider">目标受众</label>
                                 <input
                                     type="text"
                                     value={project.creativeSettings.targetAudience}
                                     onChange={(e) => handleUpdateSettings('targetAudience', e.target.value)}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded-md p-2 text-sm text-white focus:border-muse-500 outline-none"
+                                    className="w-full bg-slate-900/60 border border-slate-700/50 rounded-lg p-2 text-sm text-white focus:ring-1 focus:ring-amber-500/40 outline-none placeholder-slate-600"
                                     placeholder="例如：青少年、硬科幻迷..."
                                 />
                             </div>
@@ -370,13 +392,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject }) 
                     </div>
                 </div>
 
-                {/* Right Column: Brainstorming & Kickstart */}
-                <div className="flex flex-col gap-6 h-full">
-                    {/* Brainstorm Area */}
-                    <div className="bg-gradient-to-br from-muse-900/40 to-slate-900 p-6 rounded-xl border border-muse-500/30 flex flex-col flex-1 min-h-[300px]">
-                        <div className="flex items-center space-x-2 mb-4 text-muse-300">
-                            <Sparkles size={20} />
-                            <h3 className="font-semibold">AI 灵感火花</h3>
+                {/* Right: Actions (2/5) */}
+                <div className="lg:col-span-2 space-y-5">
+                    {/* AI Brainstorm */}
+                    <div className="bg-gradient-to-br from-amber-900/15 to-slate-900 rounded-xl border border-amber-500/20 p-5 flex flex-col min-h-[280px]">
+                        <div className="flex items-center gap-2 mb-3 text-amber-300 text-xs font-semibold uppercase tracking-wider">
+                            <Sparkles size={14} />
+                            <span>AI 灵感火花</span>
                         </div>
 
                         {!suggestion && !isGenerating && (
@@ -384,16 +406,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject }) 
                                 <textarea
                                     value={brainstormInput}
                                     onChange={(e) => setBrainstormInput(e.target.value)}
-                                    className="w-full bg-slate-950/50 border border-muse-500/20 rounded-lg p-4 text-slate-200 focus:ring-1 focus:ring-muse-400 outline-none resize-none mb-4"
-                                    rows={4}
+                                    className="w-full bg-slate-950/40 border border-amber-500/15 rounded-lg p-3 text-sm text-slate-200 focus:ring-1 focus:ring-amber-400/40 outline-none resize-none mb-3"
+                                    rows={3}
                                     placeholder="例如：一个能通过与鬼魂对话破案的侦探..."
                                 />
                                 <button
                                     onClick={handleBrainstorm}
-                                    className="w-full bg-muse-600 hover:bg-muse-500 text-white py-2 rounded-lg transition-colors font-medium flex items-center justify-center space-x-2"
+                                    className="w-full bg-amber-600/80 hover:bg-amber-500 text-white py-2 rounded-lg transition-colors font-medium text-sm flex items-center justify-center gap-2"
                                 >
-                                    <span>点燃灵感</span>
-                                    <BookOpen size={16} />
+                                    <Zap size={14} /> 点燃灵感
                                 </button>
                             </div>
                         )}
@@ -405,64 +426,83 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject }) 
                         )}
 
                         {suggestion && !isGenerating && (
-                            <div className="flex-1 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar flex flex-col">
-                                <div className="bg-slate-950/50 rounded-lg p-4 text-sm flex-1 mb-4">
+                            <div className="flex-1 overflow-y-auto max-h-[300px] pr-1 custom-scrollbar flex flex-col">
+                                <div className="bg-slate-950/40 rounded-lg p-3 text-sm flex-1 mb-3">
                                     <MarkdownRenderer content={suggestion} />
                                 </div>
-                                <div className="flex space-x-2 shrink-0">
+                                <div className="flex gap-2 shrink-0">
                                     <button
                                         onClick={() => setSuggestion('')}
-                                        className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg text-sm transition-colors"
+                                        className="flex-1 bg-slate-700/60 hover:bg-slate-600 text-white py-1.5 rounded-lg text-xs transition-colors"
                                     >
                                         清除
                                     </button>
                                     <button
                                         onClick={handleSaveIdea}
-                                        className="flex-1 bg-muse-700 hover:bg-muse-600 text-white py-2 rounded-lg text-sm transition-colors flex items-center justify-center font-medium"
-                                        title="复制到梗概"
+                                        className="flex-1 bg-amber-700/80 hover:bg-amber-600 text-white py-1.5 rounded-lg text-xs transition-colors font-medium flex items-center justify-center gap-1"
                                     >
-                                        <Target size={14} className="mr-1" /> 采纳此创意
+                                        <Target size={12} /> 采纳此创意
                                     </button>
                                 </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Kickstart Project Area */}
-                    <div className="bg-slate-800/80 p-6 rounded-xl border border-slate-700 flex flex-col items-center justify-center text-center space-y-3 relative overflow-hidden min-h-[140px]">
-                        <div className="z-10 relative space-y-3 w-full">
+                    {/* Kickstart */}
+                    <div className="bg-slate-800/40 rounded-xl border border-slate-700/60 p-5 relative overflow-hidden">
+                        <div className="relative z-10">
                             {!isKickstarting ? (
-                                <>
-                                    <h3 className="text-white font-bold flex items-center justify-center gap-2">
-                                        <Rocket className="text-muse-400" /> 项目一键初始化
-                                    </h3>
-                                    <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                                        深度生成 6 位核心角色、覆盖全分类的 10+ 条世界观设定，并推演完整大纲。
-                                    </p>
+                                <div className="text-center space-y-3">
+                                    <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center border border-indigo-500/20">
+                                        <Rocket className="text-indigo-400" size={22} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-white font-bold text-sm">一键创世纪</h3>
+                                        <p className="text-[11px] text-slate-400 mt-1 max-w-[240px] mx-auto">
+                                            深度生成 6 位角色 + 10 条世界观 + 完整大纲
+                                        </p>
+                                    </div>
                                     <button
                                         onClick={requestKickstart}
                                         disabled={!project.premise}
-                                        className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white px-6 py-2 rounded-full font-medium text-sm transition-all shadow-lg shadow-indigo-900/50 flex items-center gap-2 mx-auto"
+                                        className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white px-5 py-2 rounded-xl font-medium text-sm transition-all shadow-lg shadow-indigo-900/30 flex items-center gap-2 mx-auto"
                                     >
-                                        <span>✨ 启动深度创世纪</span>
+                                        ✨ 启动
                                     </button>
-                                </>
+                                </div>
                             ) : (
-                                <div className="flex flex-col items-center animate-fade-in w-full px-4">
-                                    <div className="flex items-center gap-2 mb-3 w-full justify-center">
-                                        <div className={`h-2 w-1/4 rounded-full transition-all duration-500 ${kickstartStep >= 1 ? 'bg-muse-500' : 'bg-slate-700'}`}></div>
-                                        <div className={`h-2 w-1/4 rounded-full transition-all duration-500 ${kickstartStep >= 2 ? 'bg-muse-500' : 'bg-slate-700'}`}></div>
-                                        <div className={`h-2 w-1/4 rounded-full transition-all duration-500 ${kickstartStep >= 3 ? 'bg-muse-500' : 'bg-slate-700'}`}></div>
+                                <div className="space-y-4 animate-fade-in">
+                                    {/* Step indicators */}
+                                    <div className="flex items-center gap-2">
+                                        {[
+                                            { step: 1, label: '角色', icon: '👤' },
+                                            { step: 2, label: '世界', icon: '🌍' },
+                                            { step: 3, label: '大纲', icon: '📈' },
+                                        ].map((s, idx) => (
+                                            <React.Fragment key={s.step}>
+                                                <div className={`flex-1 flex flex-col items-center gap-1 transition-all duration-500 ${kickstartStep >= s.step ? 'opacity-100' : 'opacity-30'}`}>
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all duration-500 ${kickstartStep > s.step ? 'bg-emerald-500/20 text-emerald-400' :
+                                                            kickstartStep === s.step ? 'bg-indigo-500/20 text-indigo-400 animate-pulse' :
+                                                                'bg-slate-800 text-slate-600'
+                                                        }`}>
+                                                        {kickstartStep > s.step ? <CheckCircle size={16} /> : s.icon}
+                                                    </div>
+                                                    <span className="text-[9px] text-slate-500">{s.label}</span>
+                                                </div>
+                                                {idx < 2 && (
+                                                    <div className={`w-8 h-0.5 rounded-full transition-all duration-500 ${kickstartStep > s.step ? 'bg-emerald-500/40' : 'bg-slate-800'}`} />
+                                                )}
+                                            </React.Fragment>
+                                        ))}
                                     </div>
-                                    <div className="flex items-center gap-3 text-white font-medium">
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                        <span>{kickstartStatus}</span>
+                                    <div className="flex items-center gap-2 justify-center text-sm text-white">
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        <span className="text-xs">{kickstartStatus}</span>
                                     </div>
                                 </div>
                             )}
                         </div>
-                        {/* Decorative background pulse */}
-                        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-muse-900/0 via-muse-500/5 to-muse-900/0 pointer-events-none"></div>
+                        <div className="absolute inset-0 bg-gradient-to-r from-indigo-900/0 via-indigo-500/[0.03] to-indigo-900/0 pointer-events-none" />
                     </div>
                 </div>
             </div>
