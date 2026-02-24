@@ -352,13 +352,11 @@ const App: React.FC = () => {
             </div>
 
             {isSaving && (
-              <div className="flex items-center gap-1.5 text-[10px] text-slate-500 animate-pulse bg-slate-800/50 px-2.5 py-1 rounded-full border border-slate-700/50">
-                <RefreshCw size={10} className="animate-spin text-muse-400" />
-                <span>同步中...</span>
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-500 animate-pulse bg-slate-800/10 px-2 py-0.5 rounded-full" title="数据正在自动同步到云端...">
+                <div className="w-1 h-1 bg-emerald-400 rounded-full animate-ping" />
+                <span>Cloud Sync...</span>
               </div>
             )}
-
-            <WritingStats project={project} slim />
           </div>
         </header>
 

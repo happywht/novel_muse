@@ -260,7 +260,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject }) 
                     <div className="flex-1 space-y-4">
                         <div className="flex items-center gap-2 text-amber-400 text-xs font-semibold uppercase tracking-widest">
                             <Sparkles size={14} />
-                            <span>项目总览</span>
+                            <span>创世纪 · 项目概览</span>
                         </div>
                         <input
                             type="text"
@@ -280,39 +280,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject }) 
                                     placeholder="赛博朋克"
                                 />
                             </div>
+
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleCopyMarkdown}
+                                    className="bg-slate-800/40 hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 px-3 py-1 rounded-lg border border-slate-700/30 transition-colors flex items-center gap-1.5 text-[10px]"
+                                >
+                                    <Clipboard size={12} /> 复制设定集
+                                </button>
+                                <button
+                                    onClick={handleExportMarkdown}
+                                    className="bg-slate-800/40 hover:bg-slate-700/60 text-slate-400 hover:text-slate-200 px-3 py-1 rounded-lg border border-slate-700/30 transition-colors flex items-center gap-1.5 text-[10px]"
+                                >
+                                    <FileText size={12} /> 导出 .muse
+                                </button>
+                            </div>
                         </div>
                     </div>
-
-                    {/* Right: Quick Stats */}
-                    <div className="grid grid-cols-4 gap-3 md:w-[380px] shrink-0">
-                        {[
-                            { label: '章节', value: (project.chapters || []).length, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
-                            { label: '角色', value: (project.characters || []).length, color: 'text-violet-400', bg: 'bg-violet-500/10' },
-                            { label: '设定', value: (project.worldSettings || []).length, color: 'text-sky-400', bg: 'bg-sky-500/10' },
-                            { label: '总字数', value: totalWords > 1000 ? `${(totalWords / 1000).toFixed(1)}k` : totalWords, color: 'text-amber-400', bg: 'bg-amber-500/10' },
-                        ].map(stat => (
-                            <div key={stat.label} className={`${stat.bg} rounded-xl p-3 text-center border border-slate-700/30`}>
-                                <div className={`text-xl font-bold font-mono ${stat.color}`}>{stat.value}</div>
-                                <div className="text-[10px] text-slate-500 mt-0.5">{stat.label}</div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Export buttons */}
-                <div className="flex gap-2 mt-4 pt-4 border-t border-slate-800/80">
-                    <button
-                        onClick={handleCopyMarkdown}
-                        className="bg-slate-800/60 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700/50 transition-colors flex items-center gap-1.5 text-xs"
-                    >
-                        <Clipboard size={13} /> 复制 MD
-                    </button>
-                    <button
-                        onClick={handleExportMarkdown}
-                        className="bg-slate-800/60 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg border border-slate-700/50 transition-colors flex items-center gap-1.5 text-xs"
-                    >
-                        <FileText size={13} /> 导出设定集
-                    </button>
                 </div>
             </div>
 
@@ -482,8 +466,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject }) 
                                             <React.Fragment key={s.step}>
                                                 <div className={`flex-1 flex flex-col items-center gap-1 transition-all duration-500 ${kickstartStep >= s.step ? 'opacity-100' : 'opacity-30'}`}>
                                                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all duration-500 ${kickstartStep > s.step ? 'bg-emerald-500/20 text-emerald-400' :
-                                                            kickstartStep === s.step ? 'bg-indigo-500/20 text-indigo-400 animate-pulse' :
-                                                                'bg-slate-800 text-slate-600'
+                                                        kickstartStep === s.step ? 'bg-indigo-500/20 text-indigo-400 animate-pulse' :
+                                                            'bg-slate-800 text-slate-600'
                                                         }`}>
                                                         {kickstartStep > s.step ? <CheckCircle size={16} /> : s.icon}
                                                     </div>
