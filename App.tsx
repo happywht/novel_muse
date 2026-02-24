@@ -367,7 +367,9 @@ const App: React.FC = () => {
               <EchoChamber project={project} updateProject={updateProject} />
             )}
             {activeSection === AppSection.GRAPH && (
-              <KnowledgeGraph projectId={project.id} useBackend={useBackend} />
+              <div className="flex-1 flex flex-col min-h-0 bg-[#0b1222] animate-fade-in relative z-10 p-6">
+                <KnowledgeGraph projectId={project.id} useBackend={useBackend} projectData={project} updateProject={updateProject} />
+              </div>
             )}
             {activeSection === AppSection.STATS && (
               <WritingStats project={project} />

@@ -225,7 +225,7 @@ export const analyzePlot = async (premise: string, currentPlot: string, characte
     const ai = getAIClient();
 
     // Enhanced instruction for deeper emotional and pacing analysis
-    const baseInstruction = `你是一位资深文学编辑。你的任务是深度分析小说大纲。
+    const baseInstruction = `你是一位资深文学编辑兼世界观逻辑审查员。你的任务是深度分析小说大纲。
   
   请提供以下三个维度的结构化反馈：
   
@@ -239,10 +239,10 @@ export const analyzePlot = async (premise: string, currentPlot: string, characte
   
   3. **🧠 逻辑与世界观审计 (Logic Audit)**
      - 角色动机是否成立？
-     - 是否违背了世界观设定？
-     - **特别注意**：请检查剧情是否与【当前状态变更】（Echoes）冲突。例如，如果角色已受伤，大纲中是否体现了这一点。
+     - 是否违背了【高相关度世界观法则】？
+     - **极为重要**：请仔细比对剧情与【当前状态变更】（Echoes）。如果发现逻辑断层或冲突（例如：角色此前已失去右臂，大纲中却描写他用右手挥剑；或者村庄已经被毁，角色却回到该村庄酒馆），**必须在报告的最上方使用 "🚨 逻辑冲突预警：" 明确指出错误**。如果逻辑完全自洽，请明确回复"未发现明显逻辑冲突"。
 
-  请使用 Markdown 格式，语气专业且犀利。`;
+  请使用 Markdown 格式，语气专业、犀利。`;
 
     const instruction = getInstructionWithSettings(baseInstruction, settings);
     const contextStr = formatContext(characters, worldSettings, echoes);
@@ -348,15 +348,50 @@ export const expandWorldLore = async (title: string, currentContent: string, gen
 
 export const generatePlotFromContext = async (premise: string, genre: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings, template?: string, echoes: Echo[] = []): Promise<string> => {
     const ai = getAIClient();
-    const contextStr = formatContext(characters, worldSettings, echoes);
 
-    const baseInstruction = "你是一位精通故事结构的小说架构师。你的任务是基于已有的角色和世界观，推导出一个逻辑严密、冲突激烈的剧情大纲。";
+    // DYNAMIC CONTEXT INJECTION (Phase 6B.1)
+    // Combine text for query: Premise + Template (if any) + Character Names
+    const queryContext = `${premise} ${template || ''} ${characters.map(c => c.name).join(' ')}`;
+
+    // Filter relevant world settings based on the core premise
+    // Limit to top 15 to leave enough room for deep thinking on the plot structure
+    const relevantSettings = filterRelevantSettings(worldSettings, queryContext, 15);
+
+    // Build focused context string
+    let contextStr = "【登场角色 (Cast)】\n";
+    if (characters.length > 0) {
+        characters.forEach(c => {
+            const charEchoes = echoes.filter(e => e.targetId === c.id && e.status === 'ACCEPTED').sort((a, b) => a.timestamp - b.timestamp);
+            contextStr += `- ${c.name} (${c.role}): ${c.description} (关系: ${c.relationships})\n`;
+            if (charEchoes.length > 0) {
+                contextStr += `  ⚡ [当前状态变更]: ${charEchoes.map(e => e.description).join('; ')}\n`;
+            }
+        });
+    } else {
+        contextStr += "尚未设定。\n";
+    }
+
+    contextStr += "\n【高相关度世界观法则 (Deep Lore Context)】\n";
+    if (relevantSettings.length > 0) {
+        const categories = Array.from(new Set(relevantSettings.map(w => w.category)));
+        categories.forEach(cat => {
+            const items = relevantSettings.filter(w => w.category === cat);
+            if (items.length > 0) {
+                contextStr += `[${cat}]:\n`;
+                items.forEach(w => contextStr += `  - ${w.title}: ${w.content.slice(0, 500)}${w.content.length > 500 ? '...' : ''}\n`);
+            }
+        });
+    } else {
+        contextStr += "无特别约束设定。\n";
+    }
+
+    const baseInstruction = "你是一位精通故事结构的小说架构师。你的任务是基于已有的角色和高相关度的世界观，推导出一个逻辑严密、冲突激烈的剧情大纲。";
     const instruction = getInstructionWithSettings(baseInstruction, settings);
 
     let taskRequirement = `
   任务要求：
   1. 结合人物的性格缺陷和目标，设计引发剧情的激励事件。
-  2. 利用世界观的规则制造障碍和转折。
+  2. 利用【高相关度世界观法则】制造专属设定的障碍、谜题和转折。
   3. 确保角色关系随着剧情推进而发生变化。
   4. **整合【当前状态变更】**：剧情发展必须考虑角色当前的状态（如伤病、道具、已发生的事件）。`;
 

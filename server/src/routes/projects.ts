@@ -52,7 +52,7 @@ router.get('/', async (_req: Request, res: Response) => {
 router.get('/:id', async (req: Request, res: Response) => {
     try {
         const project = await prisma.project.findUnique({
-            where: { id: req.params.id },
+            where: { id: req.params.id as string },
             include: {
                 characters: true,
                 worldSettings: true,
@@ -116,14 +116,14 @@ router.get('/:id', async (req: Request, res: Response) => {
                 relatedPlotPoint: d.relatedPlotPoint || undefined,
                 lastModified: Number(d.lastModified),
             })),
-            chapters: project.chapters.map(ch => ({
+            chapters: project.chapters.map((ch: any) => ({
                 id: ch.id,
                 title: ch.title,
                 content: ch.content,
                 order: ch.order,
                 lastModified: Number(ch.lastModified),
             })),
-            echoes: project.echoes.map(e => ({
+            echoes: project.echoes.map((e: any) => ({
                 id: e.id,
                 type: e.type as 'CHARACTER' | 'WORLD',
                 targetId: e.targetId,
@@ -133,7 +133,7 @@ router.get('/:id', async (req: Request, res: Response) => {
                 status: e.status as any,
                 timestamp: Number(e.timestamp),
             })),
-            timeline: project.timeline.map(t => ({
+            timeline: project.timeline.map((t: any) => ({
                 id: t.id,
                 timestamp: Number(t.timestamp),
                 worldDate: t.worldDate,
@@ -172,7 +172,7 @@ router.post('/', async (_req: Request, res: Response) => {
 // This is the main data sync endpoint used by the frontend.
 // ============================================
 router.put('/:id/full', async (req: Request, res: Response) => {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const data = req.body;
 
     try {
@@ -180,9 +180,9 @@ router.put('/:id/full', async (req: Request, res: Response) => {
         await prisma.$transaction(async (tx) => {
             // 1. Upsert the project itself
             await tx.project.upsert({
-                where: { id },
+                where: { id: id as string },
                 create: {
-                    id,
+                    id: id as string,
                     title: data.title || '未命名项目',
                     genre: data.genre || '',
                     premise: data.premise || '',
@@ -190,7 +190,7 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                     currentWorldDate: data.currentWorldDate || '元年',
                     tone: data.creativeSettings?.tone || '平衡',
                     style: data.creativeSettings?.style || '',
-                    creativity: data.creativeSettings?.creativity ?? 0.7,
+                    creativity: Number(data.creativeSettings?.creativity ?? 0.7),
                     targetAudience: data.creativeSettings?.targetAudience || '',
                     detailLevel: data.worldGenConfig?.detailLevel || 'Standard',
                     focus: data.worldGenConfig?.focus || 'Balanced',
@@ -203,7 +203,7 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                     currentWorldDate: data.currentWorldDate || '元年',
                     tone: data.creativeSettings?.tone || '平衡',
                     style: data.creativeSettings?.style || '',
-                    creativity: data.creativeSettings?.creativity ?? 0.7,
+                    creativity: Number(data.creativeSettings?.creativity ?? 0.7),
                     targetAudience: data.creativeSettings?.targetAudience || '',
                     detailLevel: data.worldGenConfig?.detailLevel || 'Standard',
                     focus: data.worldGenConfig?.focus || 'Balanced',
@@ -334,7 +334,7 @@ router.put('/:id/full', async (req: Request, res: Response) => {
 // ============================================
 router.delete('/:id', async (req: Request, res: Response) => {
     try {
-        await prisma.project.delete({ where: { id: req.params.id } });
+        await prisma.project.delete({ where: { id: req.params.id as string } });
         res.json({ success: true });
     } catch (err: any) {
         res.status(500).json({ error: err.message });

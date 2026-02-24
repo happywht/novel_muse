@@ -342,3 +342,36 @@ export const getNeighbors = async (
         await session.close();
     }
 };
+
+// ============================================
+// Mutation: Create a manual edge
+// ============================================
+
+export const createEdge = async (
+    projectId: string,
+    sourceId: string,
+    targetId: string,
+    relType: string
+): Promise<void> => {
+    const d = getDriver();
+    const session = d.session();
+
+    // Sanitize relType to prevent Cypher injection
+    const sanitizedRelType = relType.replace(/[^A-Z_]/gi, '').toUpperCase();
+    if (!sanitizedRelType) {
+        throw new Error('Invalid relationship type');
+    }
+
+    try {
+        await session.run(
+            `MATCH (a {id: $sourceId, projectId: $projectId})
+             MATCH (b {id: $targetId, projectId: $projectId})
+             MERGE (a)-[r:${sanitizedRelType}]->(b)
+             RETURN r`,
+            { sourceId, targetId, projectId }
+        );
+        console.log(`🔗 Created edge ${sourceId} -[:${sanitizedRelType}]-> ${targetId} in project ${projectId}`);
+    } finally {
+        await session.close();
+    }
+};

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { ProjectState, Character, WorldSetting, Draft, Chapter, StateChangeRecommendation } from '../types';
-import { generateSceneFromIngredients, analyzeStateChanges, PacingMode, polishDraft, PolishMode } from '../services/geminiService';
+import { ProjectState, Character, WorldSetting, Draft, Chapter, StateChangeRecommendation, Echo } from '../types';
+import { generateSceneFromIngredients, analyzeStateChanges, PacingMode, polishDraft, PolishMode, extractEchoesFromText } from '../services/geminiService';
 import { Loader } from './Loader';
-import { PenTool, MapPin, Users, Zap, Plus, FileText, Trash2, Clipboard, Save, RefreshCw, GitCommit, ArrowRight, Check, Globe, Book, Archive, Layout, Sidebar, X, User, Wand2, Gauge, Flame, Feather, Eye, Clapperboard, Brain } from 'lucide-react';
+import { PenTool, MapPin, Users, Zap, Plus, FileText, Trash2, Clipboard, Save, RefreshCw, GitCommit, ArrowRight, Check, Globe, Book, Archive, Layout, Sidebar, X, User, Wand2, Gauge, Flame, Feather, Eye, Clapperboard, Brain, ScanSearch, Sparkles } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface DraftingRoomProps {
@@ -34,6 +34,10 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     // Sync State
     const [isAnalyzingState, setIsAnalyzingState] = useState(false);
 
+    // Echo Extraction State
+    const [isExtracting, setIsExtracting] = useState(false);
+    const [extractedEchoes, setExtractedEchoes] = useState<Echo[]>([]);
+
     // Manuscript State
     const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
 
@@ -57,22 +61,23 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
             return;
         }
         setIsGenerating(true);
+        setExtractedEchoes([]); // Clear previous echoes
 
         try {
-            const activeCharacters = project.characters.filter(c => selectedChars.includes(c.id));
-            const activeLocation = project.worldSettings.find(w => w.id === selectedLocationId) || null;
+            const activeCharacters = (project.characters || []).filter(c => selectedChars.includes(c.id));
+            const activeLocation = (project.worldSettings || []).find(w => w.id === selectedLocationId) || null;
             const previousContext = getLastStoryContext();
 
             const result = await generateSceneFromIngredients(
                 project.genre,
-                plotBeat + (povCharId ? `\n\n【视角指令】请以 ${project.characters.find(c => c.id === povCharId)?.name || '主角'} 的第一人称或限制性第三人称视角进行叙事。只展现该角色能感知到的信息，用其独特的思维方式和语言风格来表达。` : ''),
+                plotBeat + (povCharId ? `\n\n【视角指令】请以 ${(project.characters || []).find(c => c.id === povCharId)?.name || '主角'} 的第一人称或限制性第三人称视角进行叙事。只展现该角色能感知到的信息，用其独特的思维方式和语言风格来表达。` : ''),
                 activeCharacters,
                 activeLocation,
-                project.worldSettings,
+                project.worldSettings || [],
                 project.creativeSettings,
                 previousContext,
                 pacing,
-                project.echoes,
+                project.echoes || [],
                 targetWordCount
             );
 
@@ -97,7 +102,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
             const result = await polishDraft(generatedContent, mode, project.creativeSettings);
             setGeneratedContent(result);
             // Re-trigger analysis as content changed significantly
-            const activeCharacters = project.characters.filter(c => selectedChars.includes(c.id));
+            const activeCharacters = (project.characters || []).filter(c => selectedChars.includes(c.id));
             triggerStateAnalysis(result, activeCharacters);
         } catch (e) {
             alert("润色失败，请重试");
@@ -109,7 +114,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     const triggerStateAnalysis = async (content: string, chars: Character[]) => {
         setIsAnalyzingState(true);
         try {
-            const changes = await analyzeStateChanges(content, chars, project.worldSettings);
+            const changes = await analyzeStateChanges(content, chars, project.worldSettings || []);
             if (changes.length > 0) {
                 const newEchoes = changes.map(c => ({
                     id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -121,13 +126,41 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                     status: 'PENDING' as const,
                     timestamp: Date.now()
                 }));
-                updateProject({ echoes: [...(project.echoes || []), ...newEchoes] });
+                // We don't auto-add them anymore, we let handleExtractEchoes do it, or we could just set extractedEchoes here
+                // For a more deliberate UX, we might prefer a manual extraction button, or a hybrid.
+                // Let's set them to extractedEchoes for review
+                setExtractedEchoes(newEchoes as Echo[]);
             }
         } catch (e) {
             console.error("State analysis failed", e);
         } finally {
             setIsAnalyzingState(false);
         }
+    };
+
+    const handleExtractEchoes = async () => {
+        if (!generatedContent) return;
+        setIsExtracting(true);
+        try {
+            const activeCharacters = (project.characters || []).filter(c => selectedChars.includes(c.id));
+            const newEchoes = await extractEchoesFromText(generatedContent, activeCharacters, project.worldSettings || []);
+            const echoesWithIds = newEchoes.map(e => ({
+                ...e,
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            }));
+            setExtractedEchoes(echoesWithIds);
+        } catch (e) {
+            console.error("Echo extraction failed", e);
+            alert("提取状态变更失败");
+        } finally {
+            setIsExtracting(false);
+        }
+    };
+
+    const handleAddEcho = (echo: Echo) => {
+        const newEcho = { ...echo, status: 'ACCEPTED' as const, timestamp: Date.now() };
+        updateProject({ echoes: [...(project.echoes || []), newEcho] });
+        setExtractedEchoes(prev => prev.filter(e => e.id !== echo.id));
     };
 
     const handleSaveDraft = () => {
@@ -186,7 +219,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     };
 
     // Calculate active world context items for display
-    const totalRuleCount = project.worldSettings.filter(w => w.id !== selectedLocationId).length;
+    const totalRuleCount = (project.worldSettings || []).filter(w => w.id !== selectedLocationId).length;
     // If count is large, we show a dynamic message
     const isDynamicContext = totalRuleCount > 20;
 
@@ -228,9 +261,9 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                     <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
                         <div>
                             <h4 className="text-muse-400 text-xs font-bold uppercase mb-2 flex items-center gap-1"><User size={12} /> 核心角色</h4>
-                            {project.characters.length === 0 && <p className="text-slate-600 text-xs">暂无角色。</p>}
+                            {(project.characters || []).length === 0 && <p className="text-slate-600 text-xs">暂无角色。</p>}
                             <div className="space-y-3">
-                                {project.characters.map(c => (
+                                {(project.characters || []).map(c => (
                                     <div key={c.id} className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
                                         <div className="flex justify-between">
                                             <span className="text-slate-200 font-bold text-sm">{c.name}</span>
@@ -243,9 +276,9 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                         </div>
                         <div>
                             <h4 className="text-muse-400 text-xs font-bold uppercase mb-2 flex items-center gap-1"><Globe size={12} /> 世界观设定</h4>
-                            {project.worldSettings.length === 0 && <p className="text-slate-600 text-xs">暂无设定。</p>}
+                            {(project.worldSettings || []).length === 0 && <p className="text-slate-600 text-xs">暂无设定。</p>}
                             <div className="space-y-3">
-                                {project.worldSettings.map(w => (
+                                {(project.worldSettings || []).map(w => (
                                     <div key={w.id} className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
                                         <div className="flex justify-between">
                                             <span className="text-slate-200 font-bold text-sm">{w.title}</span>
@@ -286,8 +319,8 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                                 <h3>2. 选择登场角色 (Cast)</h3>
                             </div>
                             <div className="flex flex-wrap gap-2">
-                                {project.characters.length === 0 && <p className="text-xs text-slate-500">暂无角色，请去灵魂熔炉创建。</p>}
-                                {project.characters.map(char => (
+                                {(project.characters || []).length === 0 && <p className="text-xs text-slate-500">暂无角色，请去灵魂熔炉创建。</p>}
+                                {(project.characters || []).map(char => (
                                     <button
                                         key={char.id}
                                         onClick={() => toggleCharSelection(char.id)}
@@ -317,7 +350,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                                     className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm focus:ring-1 focus:ring-indigo-500 outline-none"
                                 >
                                     <option value="">-- 全知视角（上帝视角） --</option>
-                                    {project.characters.filter(c => selectedChars.includes(c.id)).map(char => (
+                                    {(project.characters || []).filter(c => selectedChars.includes(c.id)).map(char => (
                                         <option key={char.id} value={char.id}>
                                             👁️ {char.name} 的视角 ({char.role})
                                         </option>
@@ -325,7 +358,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                                 </select>
                                 {povCharId && (
                                     <p className="text-[10px] text-indigo-400/70 mt-2 italic">
-                                        AI 将以 {project.characters.find(c => c.id === povCharId)?.name} 的认知边界和语言风格进行叙事
+                                        AI 将以 {(project.characters || []).find(c => c.id === povCharId)?.name} 的认知边界和语言风格进行叙事
                                     </p>
                                 )}
                             </div>
@@ -343,7 +376,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm focus:ring-1 focus:ring-muse-500 outline-none"
                             >
                                 <option value="">-- 不指定地点 (由 AI 决定) --</option>
-                                {project.worldSettings.map(w => (
+                                {(project.worldSettings || []).map(w => (
                                     <option key={w.id} value={w.id}>
                                         [{w.category}] {w.title}
                                     </option>
@@ -351,7 +384,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                             </select>
                             {selectedLocationId && (
                                 <p className="text-xs text-slate-500 mt-2 line-clamp-2 bg-slate-900/50 p-2 rounded">
-                                    {project.worldSettings.find(w => w.id === selectedLocationId)?.content}
+                                    {(project.worldSettings || []).find(w => w.id === selectedLocationId)?.content}
                                 </p>
                             )}
                         </div>
@@ -551,61 +584,61 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                                     <>
                                         <MarkdownRenderer content={generatedContent} />
 
-                                        {/* Auto-Echo Capture Section (NEW) */}
-                                        <div className="border-t border-slate-800 pt-8 mt-8 not-prose">
-                                            <div className="flex justify-between items-center mb-4">
-                                                <h4 className="text-sm font-bold text-muse-400 flex items-center gap-2 uppercase tracking-wider">
-                                                    <ScanSearch size={16} /> 命运回响捕获 (Auto-Echo Capture)
-                                                </h4>
-                                                {extractedEchoes.length === 0 && !isExtracting && (
-                                                    <button
-                                                        onClick={handleExtractEchoes}
-                                                        className="text-xs bg-indigo-900/50 hover:bg-indigo-900 text-indigo-300 border border-indigo-500/30 px-3 py-1.5 rounded-full transition-all flex items-center gap-1 shadow-lg shadow-indigo-900/20"
-                                                    >
-                                                        <Sparkles size={12} /> 分析正文并提取
-                                                    </button>
-                                                )}
+                                        {/* Auto-Echo Capture Section */}
+                                        <div className="mt-12 pt-8 border-t border-slate-700/50">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                                    <ScanSearch className="text-muse-400" size={20} />
+                                                    命运回响 (状态提取)
+                                                </h3>
+                                                <button
+                                                    onClick={handleExtractEchoes}
+                                                    disabled={isExtracting}
+                                                    className="text-xs bg-muse-600 hover:bg-muse-500 text-white px-3 py-1.5 rounded-lg font-medium flex items-center gap-1 transition-colors disabled:opacity-50"
+                                                >
+                                                    {isExtracting ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                                    提取状态变更
+                                                </button>
                                             </div>
 
-                                            {isExtracting && (
-                                                <div className="flex justify-center py-6 bg-slate-900/50 rounded-xl border border-slate-800">
-                                                    <Loader text="正在深度分析正文中的因果链与命运变迁..." size="sm" />
-                                                </div>
-                                            )}
-
-                                            {extractedEchoes.length > 0 && (
-                                                <div className="grid grid-cols-1 gap-3">
+                                            {extractedEchoes.length > 0 ? (
+                                                <div className="space-y-3">
+                                                    <p className="text-xs text-slate-400">AI 从正文中提取了以下潜在的持久化状态变更，请审核并采纳：</p>
                                                     {extractedEchoes.map(echo => (
-                                                        <div key={echo.id} className="bg-slate-800/80 border border-slate-700 rounded-xl p-4 flex justify-between items-start animate-fade-in hover:border-slate-600 transition-colors shadow-sm">
-                                                            <div className="flex-1 mr-4">
-                                                                <div className="flex items-center gap-2 mb-2">
-                                                                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider ${echo.type === 'CHARACTER' ? 'bg-indigo-900/40 text-indigo-300 border border-indigo-500/20' : 'bg-emerald-900/40 text-emerald-300 border border-emerald-500/20'}`}>
-                                                                        {echo.targetName}
+                                                        <div key={echo.id} className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 flex gap-4 items-start shadow-lg">
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${echo.type === 'CHARACTER' ? 'bg-indigo-900/50 text-indigo-300 border border-indigo-700' : 'bg-emerald-900/50 text-emerald-300 border border-emerald-700'}`}>
+                                                                        {echo.type === 'CHARACTER' ? '人物' : '世界'}
                                                                     </span>
-                                                                    <span className="text-sm font-bold text-white">{echo.description}</span>
+                                                                    <span className="font-bold text-slate-200 text-sm">{echo.targetName}</span>
                                                                 </div>
-                                                                <p className="text-xs text-slate-400 italic border-l-2 border-slate-700 pl-3">
-                                                                    "{echo.reason}"
-                                                                </p>
+                                                                <p className="text-muse-300 font-medium text-sm mt-2">变更: {echo.description}</p>
+                                                                <p className="text-xs text-slate-500 mt-1 italic mt-2 border-l-2 border-slate-600 pl-2">依据: "{echo.reason}"</p>
                                                             </div>
-                                                            <div className="flex gap-2 shrink-0">
+                                                            <div className="flex flex-col gap-2">
                                                                 <button
                                                                     onClick={() => handleAddEcho(echo)}
-                                                                    className="p-2 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-600/30 rounded-lg transition-all"
-                                                                    title="采纳并记录为命运回响"
+                                                                    className="bg-emerald-600 hover:bg-emerald-500 text-white p-2 rounded-lg flex items-center justify-center transition-colors shadow-lg shadow-emerald-900/20"
+                                                                    title="采纳并写入记忆库"
                                                                 >
-                                                                    <Plus size={16} />
+                                                                    <Check size={16} />
                                                                 </button>
                                                                 <button
                                                                     onClick={() => setExtractedEchoes(prev => prev.filter(e => e.id !== echo.id))}
-                                                                    className="p-2 bg-slate-700/30 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-600/30 rounded-lg transition-all"
-                                                                    title="忽略此条目"
+                                                                    className="bg-slate-700 hover:bg-slate-600 text-slate-300 p-2 rounded-lg flex items-center justify-center transition-colors"
+                                                                    title="忽略此条"
                                                                 >
-                                                                    <Trash2 size={16} />
+                                                                    <X size={16} />
                                                                 </button>
                                                             </div>
                                                         </div>
                                                     ))}
+                                                </div>
+                                            ) : (
+                                                <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6 text-center text-slate-500 flex flex-col items-center">
+                                                    <ScanSearch size={32} className="opacity-20 mb-2" />
+                                                    <p className="text-sm">尚未提取状态变更。如果刚生成的正文包含了角色受伤、物品获得等重要变动，请点击右上方按钮提取。</p>
                                                 </div>
                                             )}
                                         </div>

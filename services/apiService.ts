@@ -99,3 +99,13 @@ export const fetchNeighbors = async (projectId: string, nodeId: string): Promise
     if (!res.ok) throw new Error(`Failed to fetch neighbors: ${res.statusText}`);
     return res.json();
 };
+
+/** Create a new edge (relationship) between two nodes */
+export const createEdgeApi = async (projectId: string, sourceId: string, targetId: string, type: string): Promise<void> => {
+    const res = await fetch(`${API_BASE}/graph/${projectId}/edge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceId, targetId, type })
+    });
+    if (!res.ok) throw new Error(`Failed to create edge: ${res.statusText}`);
+};
