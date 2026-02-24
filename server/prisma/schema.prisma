@@ -77,7 +77,7 @@ model Draft {
   id               String   @id @default(cuid())
   title            String
   content          String   @db.LongText
-  relatedPlotPoint String?
+  relatedPlotPoint String?  @db.LongText
   lastModified     BigInt
   projectId        String
   project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -102,8 +102,8 @@ model Echo {
   type        String   
   targetId    String
   targetName  String
-  description String   @db.Text
-  reason      String   @db.Text
+  description String   @db.LongText
+  reason      String   @db.LongText
   status      String   @default("PENDING")
   timestamp   BigInt
   projectId   String
@@ -117,7 +117,7 @@ model TimelineEvent {
   timestamp         BigInt
   worldDate         String
   title             String
-  description       String   @db.Text
+  description       String   @db.LongText
   involvedEntities  String   @db.Text
   type              String   
   projectId         String

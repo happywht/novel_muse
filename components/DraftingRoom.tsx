@@ -166,9 +166,10 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     const handleSaveDraft = () => {
         if (!generatedContent) return;
 
+        console.log("💾 Saving draft...");
         const newDraft: Draft = {
             id: Date.now().toString(),
-            title: plotBeat.slice(0, 20) + (plotBeat.length > 20 ? '...' : ''),
+            title: plotBeat.slice(0, 20) + (plotBeat.length > 20 ? '...' : '') || "未命名草稿",
             content: generatedContent,
             relatedPlotPoint: plotBeat,
             lastModified: Date.now()
@@ -177,6 +178,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
         const updatedDrafts = [newDraft, ...(project.drafts || [])];
         updateProject({ drafts: updatedDrafts });
         setActiveDraftId(newDraft.id);
+        alert("草稿已保存到本地。");
     };
 
     const handleCommitToManuscript = () => {
@@ -184,6 +186,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
 
         if (!confirm("确定要将此草稿采纳为正式章节吗？\n这将把它加入到正文列表中，作为后续生成的上下文参考。")) return;
 
+        console.log("📝 Committing to manuscript...");
         const newChapter: Chapter = {
             id: Date.now().toString(),
             title: activeDraftId
@@ -195,10 +198,11 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
         };
 
         // Add to chapters
-        updateProject({ chapters: [...(project.chapters || []), newChapter] });
+        const updatedChapters = [...(project.chapters || []), newChapter];
+        updateProject({ chapters: updatedChapters });
 
-        // Optionally remove from drafts? Let's keep it for now.
-        alert("已成功采纳为正文！");
+        console.log("✅ Successfully committed. Current chapters:", updatedChapters.length);
+        alert("已成功采纳为正文！你可以去 '正文归档' 模式查看，或者继续撰写下一章。");
         setViewMode('MANUSCRIPT');
     };
 

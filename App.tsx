@@ -54,6 +54,7 @@ const App: React.FC = () => {
 
   // Backend state
   const [useBackend, setUseBackend] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLoadingRef = useRef(true); // Prevent auto-save during initial load
 
@@ -140,11 +141,14 @@ const App: React.FC = () => {
     };
 
     init();
-  }, []);
+  }, [useBackend]); // Re-run if backend status changes
 
   // Auto-save effect: debounced, saves to both localStorage AND backend
   useEffect(() => {
-    if (!project.id || isLoadingRef.current) return;
+    if (!project.id || isLoadingRef.current) {
+      console.log("⏭️ Skipping auto-save (initializing or no ID)");
+      return;
+    }
 
     // Always update localStorage immediately
     setSavedProjects(prev => {
@@ -164,11 +168,15 @@ const App: React.FC = () => {
     // Debounced backend sync (2 seconds after last change)
     if (useBackend) {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      setIsSaving(true);
       saveTimerRef.current = setTimeout(async () => {
         try {
+          console.log("☁️ Syncing project to backend:", project.id);
           await syncProject({ ...project, lastModified: Date.now() });
+          setIsSaving(false);
         } catch (err) {
           console.warn('Backend sync failed:', err);
+          setIsSaving(false);
         }
       }, 2000);
     }
@@ -342,6 +350,15 @@ const App: React.FC = () => {
               {useBackend ? <Database size={11} /> : <HardDrive size={11} />}
               <span>{useBackend ? 'MySQL' : '本地'}</span>
             </div>
+
+            {isSaving && (
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-500 animate-pulse bg-slate-800/50 px-2.5 py-1 rounded-full border border-slate-700/50">
+                <RefreshCw size={10} className="animate-spin text-muse-400" />
+                <span>同步中...</span>
+              </div>
+            )}
+
+            <WritingStats project={project} slim />
           </div>
         </header>
 

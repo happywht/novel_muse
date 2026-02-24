@@ -66,7 +66,11 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
     project.echoes.forEach(echo => {
         const sourceId = echo.targetId;
         nodes.forEach(targetNode => {
-            if (sourceId !== targetNode.id && echo.description.includes(targetNode.name)) {
+            // FIX: Add safe check for description and name to prevent crashes
+            if (sourceId !== targetNode.id &&
+                echo.description &&
+                targetNode.name &&
+                echo.description.includes(targetNode.name)) {
                 links.push({ source: sourceId, target: targetNode.id, value: 2 });
             }
         });
