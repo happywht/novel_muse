@@ -8,7 +8,7 @@ import { DraftingRoom } from './components/DraftingRoom';
 import { EchoChamber } from './components/EchoChamber';
 import { UserGuide } from './components/UserGuide';
 import { Sidebar } from './components/Sidebar';
-import { FolderOpen, Plus, Trash2, Save, X, Check, Download, Upload, Database, HardDrive } from 'lucide-react';
+import { FolderOpen, Plus, Trash2, Save, X, Check, Download, Upload, Database, HardDrive, RefreshCw } from 'lucide-react';
 import { SettingsPanel } from './components/SettingsPanel';
 import { KnowledgeGraph } from './components/KnowledgeGraph';
 import { PromptTuner } from './components/PromptTuner';
