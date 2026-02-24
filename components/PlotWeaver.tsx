@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { ProjectState, PlotVersion, AppSection } from '../types';
 import { analyzePlot, expandScene, generatePlotFromContext, rewritePlot, analyzePlotRhythm, PlotRhythmPoint } from '../services/geminiService';
 import { Loader } from './Loader';
-import { GitBranch, Activity, AlertTriangle, LayoutTemplate, Wand2, Info, X, CheckCircle, AlertCircle, History, Zap, Save, Sidebar, User, Globe, FileText, LayoutGrid, TrendingUp, Lightbulb, BookOpen, Map, Swords, Crown } from 'lucide-react';
+import { GitBranch, Activity, AlertTriangle, LayoutTemplate, Wand2, Info, X, CheckCircle, AlertCircle, History, Zap, Save, Sidebar, User, Globe, FileText, LayoutGrid, TrendingUp, Lightbulb, BookOpen, Map, Swords, Crown, Plus, Check, RotateCcw, Edit2, Tag } from 'lucide-react';
 import { PlotAnalysisPanel } from './PlotWeaver/PlotAnalysisPanel';
 import { PlotRhythmChart } from './PlotWeaver/PlotRhythmChart';
 import { PlotHistorySidebar } from './PlotWeaver/PlotHistorySidebar';
@@ -65,7 +65,27 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
 
     // --- Tab & View ---
     const [activeTab, setActiveTab] = useState<TabMode>('CARDS');
-    const [viewMode, setViewMode] = useState<ViewMode>(project.plotNodes.length > 0 ? 'CARDS' : 'TEXT');
+
+    // Migration Effect: Convert old text outline to cards automatically
+    React.useEffect(() => {
+        if (project.plotOutline && project.plotOutline.trim() && project.plotNodes.length === 0) {
+            console.log("Migrating legacy plot outline to cards...");
+            const legacyBeats = project.plotOutline.split(/\n\n+/).filter(b => b.trim().length > 0);
+            const newNodes = legacyBeats.map((beat, idx) => ({
+                id: `migrated-${idx}-${Date.now()}`,
+                title: beat.split('\n')[0].substring(0, 30).trim() || `情节点 ${idx + 1}`,
+                content: beat,
+                order: idx,
+                relatedCharacters: [],
+                relatedLocations: []
+            }));
+            updateProject({
+                plotNodes: newNodes,
+                plotOutline: '' // Clean up legacy field after migration
+            });
+            showToast("检测到旧版大纲，已自动为您转换为情节卡片！", "success");
+        }
+    }, []);
 
     // --- Optimization State ---
     const [customRewritePrompt, setCustomRewritePrompt] = useState('');
@@ -82,6 +102,12 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
     // --- UI States ---
     const [pendingAction, setPendingAction] = useState<{ type: 'GENERATE' | 'TEMPLATE' | 'RESTORE'; payload?: any } | null>(null);
     const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
+
+    // --- Iterative Drafting States (Stage B) ---
+    const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
+    const [draftNodeContent, setDraftNodeContent] = useState<string | null>(null);
+    const [iterationFeedback, setIterationFeedback] = useState('');
+    const [isIterating, setIsIterating] = useState(false);
 
     const { setActiveSection, setActivePlotNodeId } = useProjectStore();
     const plotOutline = project.plotOutline || '';
@@ -132,19 +158,19 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
 
     // --- AI Handlers ---
     const handleAnalyze = async () => {
-        if (!plotOutline.trim()) return;
+        if (!fullContent.trim()) return;
         setIsAnalyzing(true); setActiveTab('ANALYSIS');
         try {
-            const result = await analyzePlot(project.premise, plotOutline, project.characters, project.worldSettings, project.creativeSettings, project.echoes);
+            const result = await analyzePlot(project.premise, fullContent, project.characters, project.worldSettings, project.creativeSettings, project.echoes);
             setAnalysis(result);
         } catch (e) { console.error(e); showToast("分析失败，请重试。", 'error'); }
         finally { setIsAnalyzing(false); }
     };
 
     const handleAnalyzeRhythm = async () => {
-        if (!plotOutline.trim()) { showToast("请先填写大纲内容", 'error'); return; }
+        if (!fullContent.trim()) { showToast("请先填写大纲内容", 'error'); return; }
         setIsAnalyzingRhythm(true);
-        try { const data = await analyzePlotRhythm(plotOutline); setRhythmData(data); }
+        try { const data = await analyzePlotRhythm(fullContent); setRhythmData(data); }
         catch (e) { console.error(e); showToast("节奏分析失败", 'error'); }
         finally { setIsAnalyzingRhythm(false); }
     };
@@ -204,8 +230,7 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
             const template = typeof pendingAction.payload === 'string' ? pendingAction.payload : undefined;
             performGeneratePlot(template);
         } else if (pendingAction?.type === 'TEMPLATE') {
-            updatePlotWithHistory(pendingAction.payload, "应用模版");
-            setPendingAction(null);
+            performApplyTemplate(pendingAction.payload);
         } else if (pendingAction?.type === 'RESTORE') {
             performRestore(pendingAction.payload);
         }
@@ -230,19 +255,71 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
     const handleRemoveCard = (id: string) => {
         const newNodes = project.plotNodes.filter(n => n.id !== id).map((n, idx) => ({ ...n, order: idx }));
         updateProject({ plotNodes: newNodes });
+        if (editingNodeId === id) setEditingNodeId(null);
     };
 
-    const handleConvertOutlineToCards = () => {
-        const newNodes = beats.map((beat, idx) => ({
-            id: `legacy-${idx}-${Date.now()}`,
-            title: beat.split('\n')[0].substring(0, 20) || `情节点 ${idx + 1}`,
-            content: beat,
-            order: idx,
-        }));
-        updateProject({ plotNodes: newNodes });
-        setViewMode('CARDS');
-        showToast("大纲已成功转换为情节卡片！", "success");
+    // --- Iterative Drafting Logic (Stage B) ---
+    const handleGenerateNodeAI = async (nodeId: string) => {
+        const node = project.plotNodes.find(n => n.id === nodeId);
+        if (!node) return;
+
+        setIsIterating(true);
+        setEditingNodeId(nodeId);
+        try {
+            const prompt = `基于小说核心梗概: "${project.premise}" 和类型: "${project.genre}".
+            请扩写并精炼以下情节点。
+            当前标题: ${node.title}
+            当前内容梗概: ${node.content}
+            
+            要求：通过动作、对话和感官细节来扩充，保持叙事节奏，并确保符合整体风格。`;
+
+            const result = await generateText(prompt, 'plot_weaving', project.creativeSettings);
+            setDraftNodeContent(result);
+        } catch (e) {
+            console.error(e);
+            showToast("生成失败", 'error');
+        } finally {
+            setIsIterating(false);
+        }
     };
+
+    const handleIterateNode = async () => {
+        if (!editingNodeId || !draftNodeContent || !iterationFeedback.trim()) return;
+        setIsIterating(true);
+        try {
+            const prompt = `
+            【当前草稿内容】:
+            ${draftNodeContent}
+
+            【用户反馈意见】:
+            ${iterationFeedback}
+            
+            请根据反馈重写并优化这段情节描述。保持风格一致。`;
+
+            const newContent = await generateText(prompt, 'iteration_refinement', project.creativeSettings);
+            setDraftNodeContent(newContent);
+            setIterationFeedback('');
+        } catch (e) {
+            console.error(e);
+            showToast("迭代失败", 'error');
+        } finally {
+            setIsIterating(false);
+        }
+    };
+
+    const handleAcceptDraftNode = () => {
+        if (!editingNodeId || draftNodeContent === null) return;
+        handleUpdateCard(editingNodeId, { content: draftNodeContent });
+        setDraftNodeContent(null);
+        setEditingNodeId(null);
+        showToast("剧情已更新并采纳", 'success');
+    };
+
+    // Aggregation: Collect all card content into a single string for legacy AI analysis
+    const fullContent = project.plotNodes
+        .sort((a, b) => a.order - b.order)
+        .map(n => `### ${n.title}\n${n.content}`)
+        .join('\n\n');
 
     const handleQuickDraft = (nodeId: string) => {
         setActivePlotNodeId(nodeId);
@@ -251,14 +328,29 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
 
     // --- Template Selection Handler ---
     const handleSelectTemplate = (template: typeof STRUCTURE_TEMPLATES[0]) => {
-        if (plotOutline || project.plotNodes.length > 0) {
-            setPendingAction({ type: 'GENERATE', payload: template.content });
+        if (project.plotNodes.length > 0) {
+            setPendingAction({ type: 'TEMPLATE', payload: template.content });
         } else {
-            performGeneratePlot(template.content);
+            performApplyTemplate(template.content);
         }
     };
 
-    const beats = plotOutline.split(/\n\n+/).filter(b => b.trim().length > 0);
+    const performApplyTemplate = (content: string) => {
+        const sections = content.split('\n').filter(s => s.trim());
+        const newNodes = sections.map((section, idx) => ({
+            id: `tpl-${idx}-${Date.now()}`,
+            title: section.split(':')[0].trim() || `节拍 ${idx + 1}`,
+            content: section.split(':')[1]?.trim() || '',
+            order: idx,
+            relatedCharacters: [],
+            relatedLocations: []
+        }));
+        updateProject({ plotNodes: newNodes });
+        setPendingAction(null);
+        showToast("模版应用成功，请填充剧情细节。", "success");
+    };
+
+    const beats = project.plotNodes.map(n => n.content);
 
     // ========================
     // Tab definitions
@@ -323,19 +415,6 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                             <GitBranch className="text-muse-400" size={20} /> 剧情大纲
                         </h2>
                         <div className="flex gap-2">
-                            {/* View Mode Toggle */}
-                            <div className="bg-slate-700 p-0.5 rounded-lg flex mr-2">
-                                <button
-                                    onClick={() => setViewMode('TEXT')}
-                                    className={`p-1.5 rounded-md transition-all ${viewMode === 'TEXT' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-                                    title="文本模式"
-                                ><FileText size={16} /></button>
-                                <button
-                                    onClick={() => setViewMode('CARDS')}
-                                    className={`p-1.5 rounded-md transition-all ${viewMode === 'CARDS' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
-                                    title="卡片模式 (Beat Board)"
-                                ><LayoutGrid size={16} /></button>
-                            </div>
                             <button
                                 onClick={() => setShowReference(!showReference)}
                                 className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all border ${showReference ? 'bg-muse-900 border-muse-500 text-muse-300' : 'bg-slate-700 border-slate-600 text-slate-200 hover:bg-slate-600'}`}
@@ -343,7 +422,6 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                             ><Sidebar size={16} /> <span className="hidden xl:inline">参考</span></button>
                             <button
                                 onClick={() => setShowSaveModal(true)}
-                                disabled={!plotOutline}
                                 className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all border border-slate-600 disabled:opacity-50"
                                 title="保存当前版本"
                             ><Save size={16} /> 存版本</button>
@@ -364,12 +442,12 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                     {/* Editor Area */}
                     <div className="relative flex-1 flex flex-col overflow-hidden">
                         {/* ★ Empty State: Template Selection Cards ★ */}
-                        {!plotOutline.trim() && viewMode === 'TEXT' ? (
+                        {project.plotNodes.length === 0 ? (
                             <div className="flex-1 flex flex-col items-center justify-center p-6 animate-fade-in">
                                 <LayoutTemplate size={40} className="text-slate-600 mb-4 opacity-40" />
                                 <h3 className="text-lg font-serif font-bold text-slate-300 mb-2">选择叙事骨架，开始创作</h3>
                                 <p className="text-sm text-slate-500 mb-6 text-center max-w-sm">
-                                    选择一个经典结构模版，AI 将基于您的小说设定自动填充骨架，或者直接在此输入您的大纲。
+                                    选择一个经典结构模版，AI 将基于您的小说设定自动填充骨架，或者直接在此添加情节卡片。
                                 </p>
                                 <div className="grid grid-cols-2 gap-3 w-full max-w-lg">
                                     {STRUCTURE_TEMPLATES.map((t, i) => (
@@ -387,28 +465,12 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                                     ))}
                                 </div>
                                 <button
-                                    onClick={() => {
-                                        // Switch to textarea directly by focusing it
-                                        updateProject({ plotOutline: ' ' }); // trigger non-empty so textarea shows
-                                        setTimeout(() => {
-                                            updateProject({ plotOutline: '' }); // reset to empty for free typing
-                                            textareaRef.current?.focus();
-                                        }, 50);
-                                    }}
+                                    onClick={handleAddCard}
                                     className="mt-4 text-xs text-slate-500 hover:text-muse-400 transition-colors underline underline-offset-4"
                                 >
-                                    跳过模版，直接手写大纲 →
+                                    跳过模版，直接手动添加情节 →
                                 </button>
                             </div>
-                        ) : viewMode === 'TEXT' ? (
-                            <textarea
-                                ref={textareaRef}
-                                value={plotOutline}
-                                onChange={(e) => updateProject({ plotOutline: e.target.value })}
-                                onSelect={handleTextSelect}
-                                placeholder="在此构建你的故事骨架... "
-                                className="flex-1 w-full bg-slate-900 border border-slate-700 rounded-lg p-4 text-slate-300 focus:ring-1 focus:ring-muse-500 outline-none resize-none font-serif leading-relaxed custom-scrollbar"
-                            />
                         ) : (
                             <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 p-1 pb-20">
                                 {project.plotNodes.length > 0 ? (
@@ -482,19 +544,17 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                                             <LayoutGrid size={40} />
                                         </div>
                                         <div className="max-w-xs">
-                                            <h3 className="text-lg font-bold text-white mb-2">切换到情节看板</h3>
+                                            <h3 className="text-lg font-bold text-white mb-2">开始构建你的故事</h3>
                                             <p className="text-sm text-slate-500 leading-relaxed">
-                                                结构化的卡片能帮你更清晰地拆解任务，并直接驱动 AI 自动工坊。
+                                                使用上方的“自由生成”通过 AI 开启灵感，或者点击下方按钮手动添加情节。
                                             </p>
                                         </div>
                                         <button
-                                            onClick={handleConvertOutlineToCards}
-                                            disabled={!plotOutline}
-                                            className="bg-muse-600 hover:bg-muse-500 text-white px-6 py-3 rounded-xl font-bold shadow-xl shadow-muse-900/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                                            onClick={handleAddCard}
+                                            className="bg-muse-600 hover:bg-muse-500 text-white px-6 py-3 rounded-xl font-bold shadow-xl shadow-muse-900/20 transition-all flex items-center gap-2"
                                         >
-                                            <Wand2 size={18} /> 从现有大纲自动拆解
+                                            <Plus size={18} /> 添加第一张情节卡片
                                         </button>
-                                        {!plotOutline && <p className="text-xs text-red-400/60">当前还没有文本大纲，请先切换到文本模式。</p>}
                                     </div>
                                 )}
                             </div>
@@ -510,18 +570,14 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                             </div>
                         )}
 
-                        {/* Selection Context Menu */}
-                        {selectedText && viewMode === 'TEXT' && (
+                        {/* Selection Context Menu (Removed as card centric) */}
+                        {selectedText && (
                             <div className="absolute bottom-16 right-4 bg-slate-800 border border-muse-500/50 shadow-2xl rounded-lg p-2 flex flex-col gap-1 animate-fade-in z-30">
                                 <div className="text-[10px] text-slate-500 px-2 uppercase font-bold mb-1">已选中 {selectedText.length} 字</div>
                                 <button
                                     onClick={() => { setActiveTab('OPTIMIZE'); setCustomRewritePrompt("润色这段文字，使其更具画面感"); }}
                                     className="text-xs text-left px-3 py-2 hover:bg-slate-700 rounded text-slate-200 flex items-center gap-2"
                                 ><Zap size={12} /> 局部润色</button>
-                                <button
-                                    onClick={() => { setActiveTab('STRUCTURE'); }}
-                                    className="text-xs text-left px-3 py-2 hover:bg-slate-700 rounded text-slate-200 flex items-center gap-2"
-                                ><Lightbulb size={12} /> 结构分析此段</button>
                             </div>
                         )}
 
@@ -600,7 +656,7 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                         <PlotStructureAssistant
                             premise={project.premise}
                             genre={project.genre}
-                            plotOutline={plotOutline}
+                            plotOutline={fullContent}
                             selectedText={selectedText}
                             characters={project.characters}
                             worldSettings={project.worldSettings}

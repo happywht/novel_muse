@@ -38,6 +38,7 @@ export const INITIAL_PROJECT: ProjectState = {
     plotHistory: [],
     drafts: [],
     chapters: [],
+    customPrompts: {},
     plotNodes: [],
     echoes: [],
     timeline: [],
@@ -87,6 +88,7 @@ interface ProjectStore {
     syncToBackend: () => void;
     loadFromLocalStorage: () => void;
     fetchChapterContent: (chapterId: string) => Promise<void>;
+    forceSync: () => Promise<void>;
 }
 
 // ============================================================
@@ -124,7 +126,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     setSavedProjects: (projects) => set({ savedProjects: projects }),
 
     // --- UI State ---
-    activeSection: AppSection.DASHBOARD,
+    activeSection: AppSection.LOBBY,
     setActiveSection: (section) => set({ activeSection: section }),
     showGuide: false,
     setShowGuide: (show) => set({ showGuide: show }),
@@ -162,6 +164,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
                     const merged = { ...INITIAL_PROJECT, ...fullProject };
                     set({
                         project: merged,
+                        activeSection: AppSection.LOBBY, // Default to lobby on start
                         savedProjects: list.map(s => ({
                             ...INITIAL_PROJECT,
                             id: s.id,
@@ -183,6 +186,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
                             const mostRecent = parsed.sort((a: any, b: any) => b.lastModified - a.lastModified)[0];
                             set({
                                 project: { ...INITIAL_PROJECT, ...mostRecent },
+                                activeSection: AppSection.LOBBY,
                                 savedProjects: parsed,
                                 isLoading: false,
                             });
@@ -328,6 +332,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
                     set({
                         savedProjects: parsed,
                         project: { ...INITIAL_PROJECT, ...mostRecent },
+                        activeSection: AppSection.LOBBY,
                     });
                     return;
                 }
@@ -365,4 +370,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
             set({ isLoading: false });
         }
     },
+
+    // NEW: Manual force sync for the Save button
+    forceSync: async () => {
+        const { syncToBackend, saveToLocalStorage } = get();
+        saveToLocalStorage();
+        syncToBackend();
+        // Immediately trigger sync without waiting for debounce if needed, 
+        // but syncToBackend already handles it. We can make it more explicit if we want.
+    }
 }));

@@ -3,7 +3,7 @@ import { AppSection } from '../types';
 import {
     Feather, Globe, Users, BookOpen, PenTool, Activity,
     GitBranch, BarChart3, Settings, Wand2, HelpCircle,
-    ChevronLeft, ChevronRight, Sparkles
+    ChevronLeft, ChevronRight, Sparkles, Home
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -152,6 +152,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </h1>
                     <span className="text-[10px] text-slate-500 font-mono">小说架构师</span>
                 </div>
+            </div>
+
+            {/* Project Lobby Entry */}
+            <div className="py-2 px-2 border-b border-slate-800/80">
+                <button
+                    onClick={() => setActiveSection(AppSection.LOBBY)}
+                    className={`group relative w-full flex items-center gap-3 rounded-xl transition-all duration-200 ${expanded ? 'px-3 py-2.5' : 'px-0 py-2.5 justify-center'
+                        } ${activeSection === AppSection.LOBBY
+                            ? 'bg-slate-800 text-white shadow-md'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                        }`}
+                    title={expanded ? undefined : '返回项目大厅'}
+                >
+                    <div className="p-1.5 rounded-lg">
+                        <Home size={18} />
+                    </div>
+                    <span
+                        className={`text-sm font-bold whitespace-nowrap transition-all duration-300 overflow-hidden ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'
+                            }`}
+                    >
+                        项目大厅
+                    </span>
+                </button>
             </div>
 
             {/* Navigation Items */}

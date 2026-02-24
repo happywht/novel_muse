@@ -70,6 +70,7 @@ export interface WorldGenConfig {
 }
 
 export enum AppSection {
+  LOBBY = 'LOBBY',
   DASHBOARD = 'DASHBOARD',
   WORLD = 'WORLD',
   CHARACTERS = 'CHARACTERS',
@@ -125,6 +126,7 @@ export interface ProjectState {
   drafts: Draft[]; // New: Store generated drafts
   chapters: Chapter[]; // New: Store official manuscript
   echoes: Echo[]; // NEW: Echo Engine pending state changes
+  customPrompts: Record<string, string>;
   timeline: TimelineEvent[]; // NEW: Chronological history of the world
   currentWorldDate: string; // NEW: Current in-world date
 }

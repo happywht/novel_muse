@@ -1,6 +1,5 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Character, WorldSetting, CreativeSettings, StateChangeRecommendation, Echo } from "../types";
-import { getCustomPrompt } from "../components/PromptTuner";
 import {
     safeParseAiJson,
     AiCharacterArraySchema,
@@ -9,6 +8,8 @@ import {
     AiEchoArraySchema,
     AiPlotRhythmArraySchema,
 } from './schemas';
+import { buildPromptContent } from '../config/prompts';
+import { useProjectStore } from '../store/useProjectStore';
 
 const STORAGE_KEY_API = 'muse_gemini_api_key';
 const STORAGE_KEY_MODEL = 'muse_gemini_model';
@@ -160,29 +161,15 @@ const filterRelevantSettings = (
 };
 
 // Helper to inject creative settings into instructions
-// Now supports custom prompt overrides via PromptTuner
-const getInstructionWithSettings = (baseInstruction: string, settings?: CreativeSettings, promptKey?: string) => {
-    // Check for user-customized prompt override
-    let instruction = baseInstruction;
-    if (promptKey) {
-        const customPrompt = getCustomPrompt(promptKey);
-        if (customPrompt) {
-            instruction = customPrompt;
-        }
-    }
-    if (settings) {
-        instruction += `\n\n【创作偏好控制】
-        - 叙事基调: ${settings.tone}
-        - 文字风格: ${settings.style}
-        - 目标受众: ${settings.targetAudience}`;
-    }
-    instruction += " 请务必使用中文回复。";
-    return instruction;
+// Now supports custom prompt overrides via the project store
+const getInstructionWithSettings = (promptKey: string, settings?: CreativeSettings) => {
+    const { project } = useProjectStore.getState();
+    return buildPromptContent(promptKey, project.customPrompts, settings);
 };
 
-export const generateText = async (prompt: string, baseInstruction?: string, settings?: CreativeSettings, promptKey?: string): Promise<string> => {
+export const generateText = async (prompt: string, promptKey: string = 'writing_base', settings?: CreativeSettings): Promise<string> => {
     const ai = getAIClient();
-    const instruction = getInstructionWithSettings(baseInstruction || "你是一个专业的创意写作助手。", settings, promptKey || 'writing_base');
+    const instruction = getInstructionWithSettings(promptKey, settings);
 
     try {
         const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
@@ -231,28 +218,7 @@ export const generateCharacterImage = async (description: string): Promise<strin
 
 export const analyzePlot = async (premise: string, currentPlot: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings, echoes: Echo[] = []): Promise<string> => {
     const ai = getAIClient();
-
-    // Enhanced instruction for deeper emotional and pacing analysis
-    const baseInstruction = `你是一位资深文学编辑兼世界观逻辑审查员。你的任务是深度分析小说大纲。
-  
-  请提供以下三个维度的结构化反馈：
-  
-  1. **🎭 情感弧光与人物成长 (Character Arc)**
-     - 主角在故事开始和结束时有何不同？
-     - 情感转折点是否清晰？
-  
-  2. **📉 节奏与张力曲线 (Pacing & Tension)**
-     - 识别剧情是否在中间塌陷（Middle Muddle）。
-     - 铺垫（Setup）和高潮（Climax）的比例是否合理？
-  
-  3. **🧠 逻辑与世界观审计 (Logic Audit)**
-     - 角色动机是否成立？
-     - 是否违背了【高相关度世界观法则】？
-     - **极为重要**：请仔细比对剧情与【当前状态变更】（Echoes）。如果发现逻辑断层或冲突（例如：角色此前已失去右臂，大纲中却描写他用右手挥剑；或者村庄已经被毁，角色却回到该村庄酒馆），**必须在报告的最上方使用 "🚨 逻辑冲突预警：" 明确指出错误**。如果逻辑完全自洽，请明确回复"未发现明显逻辑冲突"。
-
-  请使用 Markdown 格式，语气专业、犀利。`;
-
-    const instruction = getInstructionWithSettings(baseInstruction, settings);
+    const instruction = getInstructionWithSettings('plot_analysis', settings);
     const contextStr = formatContext(characters, worldSettings, echoes);
     const prompt = `核心梗概: ${premise}\n\n${contextStr}\n当前剧情大纲:\n${currentPlot}`;
 
@@ -277,16 +243,7 @@ export const analyzePlot = async (premise: string, currentPlot: string, characte
 
 export const expandScene = async (premise: string, genre: string, plotOutline: string, userPrompt: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings, echoes: Echo[] = []): Promise<string> => {
     const ai = getAIClient();
-    const baseInstruction = `你是一位多产的小说家及续写助手。
-  你需要根据现有的【角色关系】、【世界观规则】和【剧情大纲】来扩展具体的场景。
-  
-  写作要求：
-  1. 确保人物对话和行动符合其性格及与他人的关系（如仇恨、爱慕）。
-  2. 融入世界观设定的细节（如环境描写、道具使用）。
-  3. **严格遵守【当前状态变更】**：如果角色有伤在身或物品已丢失，必须在描写中体现。
-  4. 文风应贴合小说类型 (${genre})。`;
-
-    const instruction = getInstructionWithSettings(baseInstruction, settings);
+    const instruction = getInstructionWithSettings('scene_expansion', settings);
     const contextStr = formatContext(characters, worldSettings, echoes);
 
     const prompt = `
@@ -321,8 +278,7 @@ export const expandScene = async (premise: string, genre: string, plotOutline: s
 
 export const expandWorldLore = async (title: string, currentContent: string, genre: string, settings?: CreativeSettings): Promise<string> => {
     const ai = getAIClient();
-    const baseInstruction = "你是一位注重细节的历史学家和人类学家，擅长构建虚构世界的深度背景。";
-    const instruction = getInstructionWithSettings(baseInstruction, settings);
+    const instruction = getInstructionWithSettings('world_building', settings);
 
     const prompt = `
    世界观条目: ${title}
@@ -393,8 +349,7 @@ export const generatePlotFromContext = async (premise: string, genre: string, ch
         contextStr += "无特别约束设定。\n";
     }
 
-    const baseInstruction = "你是一位精通故事结构的小说架构师。你的任务是基于已有的角色和高相关度的世界观，推导出一个逻辑严密、冲突激烈的剧情大纲。";
-    const instruction = getInstructionWithSettings(baseInstruction, settings);
+    const instruction = getInstructionWithSettings('plot_weaving', settings);
 
     let taskRequirement = `
   任务要求：
@@ -443,8 +398,7 @@ export const rewritePlot = async (currentPlot: string, directive: string, genre:
     const ai = getAIClient();
     const contextStr = formatContext(characters, worldSettings, echoes);
 
-    const baseInstruction = "你是一位善于修改和润色的小说编辑。根据用户的反馈或分析报告，对现有大纲进行重写和优化。";
-    const instruction = getInstructionWithSettings(baseInstruction, settings);
+    const instruction = getInstructionWithSettings('plot_weaving', settings); // Re-use weaving for rewrite context
 
     const prompt = `
     小说类型: ${genre}
@@ -617,19 +571,7 @@ export const generateSceneFromIngredients = async (
             break;
     }
 
-    const baseInstruction = `你是一位获得过雨果奖的科幻/奇幻小说家，也就是用户的“幽灵写手”。
-    你的任务不是回答问题，而是根据用户提供的“原料”直接撰写小说正文。
-    
-    写作原则：
-    1. **Show, Don't Tell**: 不要只是叙述，要通过动作、对话和感官细节来展示。
-    2. **忠实于设定**: 严格遵守提供的人物性格和世界观规则（如魔法系统、社会等级、历史背景）。
-    3. **沉浸感**: 根据设定的地点，进行环境描写（光影、气味、声音）。
-    4. **严格遵守【当前状态变更】**：如果角色有伤在身或物品已丢失，必须在描写中体现。
-    5. **篇幅控制**: 目标字数为 ${targetWordCount} 字左右。请确保内容充实，不要草草了事，也不要过度注水。
-    
-    ${pacingInstruction}`;
-
-    const instruction = getInstructionWithSettings(baseInstruction, settings);
+    const instruction = getInstructionWithSettings('scene_generation', settings);
 
     // Build context
     let context = "";
@@ -747,10 +689,7 @@ export const polishDraft = async (
             break;
     }
 
-    const baseInstruction = `你是一位严苛的文学编辑和润色专家。你的目标是将平庸的文字提升为出版级的文学作品。
-    请保留原意和剧情走向，但大幅度提升文笔质感。
-    
-    ${modeInstruction}`;
+    const instruction = getInstructionWithSettings('polish_engine', settings);
 
     const prompt = `
     【待润色文本】:
@@ -764,7 +703,7 @@ export const polishDraft = async (
             model: 'gemini-3-pro-preview', // Use Pro for stylistic nuances
             contents: prompt,
             config: {
-                systemInstruction: baseInstruction,
+                systemInstruction: instruction,
                 temperature: 0.8,
             }
         }));
@@ -802,6 +741,7 @@ export const analyzeStateChanges = async (
     // Simplify the list for the prompt to save tokens, but include all names
     const worldList = allWorldSettings.map(w => `${w.title} (${w.category})`).join(', ');
 
+    const instruction = getInstructionWithSettings('echo_analysis');
     const prompt = `
     阅读以下小说片段，分析是否发生了对【人物状态】或【世界环境】有**永久性或重大影响**的事件。
     只有当发生重大变更（如：受伤、死亡、获得重要道具、关系决裂、地点损毁、物品丢失）时才生成记录。
@@ -809,12 +749,10 @@ export const analyzeStateChanges = async (
 
     【追踪目标】:
     人物: ${activeCharacters.map(c => c.name).join(', ')}
-    世界设定 (物品/地点/规则): ${worldList}
+    世界/地点: ${worldList}
 
-    【小说片段】:
-    ${sceneContent.substring(0, 3000)} (截取)
-
-    请输出 JSON 格式的变更建议。
+    【待分析文本】:
+    ${sceneContent}
     `;
 
     try {
@@ -824,6 +762,7 @@ export const analyzeStateChanges = async (
             config: {
                 responseMimeType: "application/json",
                 responseSchema: responseSchema,
+                systemInstruction: instruction,
                 temperature: 0.1 // Low temp for factual extraction
             }
         }));

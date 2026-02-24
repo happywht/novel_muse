@@ -8,11 +8,12 @@ import { DraftingRoom } from './components/DraftingRoom';
 import { EchoChamber } from './components/EchoChamber';
 import { UserGuide } from './components/UserGuide';
 import { Sidebar } from './components/Sidebar';
-import { FolderOpen, Plus, Trash2, Save, X, Check, Download, Upload, Database, HardDrive, RefreshCw } from 'lucide-react';
+import { FolderOpen, Plus, Trash2, Save, X, Check, Download, Upload, Database, HardDrive, RefreshCw, BookOpen } from 'lucide-react';
 import { SettingsPanel } from './components/SettingsPanel';
 import { KnowledgeGraph } from './components/KnowledgeGraph';
 import { PromptTuner } from './components/PromptTuner';
 import { WritingStats } from './components/WritingStats';
+import { ProjectLobby } from './components/ProjectLobby';
 import { useProjectStore, INITIAL_PROJECT } from './store/useProjectStore';
 
 const MUSE_FILE_VERSION = '1.0';
@@ -33,12 +34,12 @@ const App: React.FC = () => {
     setShowGuide,
     setShowSettings,
     setShowPromptTuner,
-    setShowProjectList,
     updateProject,
     initialize,
     createProject,
     switchProject,
-    deleteProject
+    deleteProject,
+    forceSync
   } = useProjectStore();
 
   const importFileRef = React.useRef<HTMLInputElement>(null);
@@ -109,13 +110,12 @@ const App: React.FC = () => {
           lastModified: Date.now(),
         };
 
-        const { setSavedProjects, setProject, setActiveSection, setShowProjectList } = useProjectStore.getState();
+        const { setSavedProjects, setProject, setActiveSection } = useProjectStore.getState();
 
         setSavedProjects([...savedProjects, importedProject]);
         localStorage.setItem('muse_projects', JSON.stringify([...savedProjects, importedProject]));
 
         setProject(importedProject);
-        setShowProjectList(false);
         setActiveSection(AppSection.DASHBOARD);
         alert(`成功导入项目「${importedProject.title}」！`);
       } catch (err) {
@@ -131,8 +131,31 @@ const App: React.FC = () => {
     }
   };
 
+  if (activeSection === AppSection.LOBBY) {
+    return (
+      <ProjectLobby
+        projects={savedProjects}
+        currentProjectId={project.id}
+        onSwitchProject={handleSwitchProject}
+        onCreateProject={handleCreateProject}
+        onImportProject={() => importFileRef.current?.click()}
+        onExportProject={handleExportProject}
+        onDeleteProject={(id) => deleteProject(id)}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans selection:bg-muse-500/30 selection:text-muse-100 flex">
+      {/* Hidden file input for import */}
+      <input
+        ref={importFileRef}
+        type="file"
+        accept=".muse,.json"
+        onChange={handleImportProject}
+        className="hidden"
+      />
+
       {/* Sidebar Navigation */}
       <Sidebar
         activeSection={activeSection}
@@ -146,30 +169,49 @@ const App: React.FC = () => {
 
       {/* Main wrapper (offset by sidebar) */}
       <div className="flex-1 flex flex-col ml-[68px] min-h-screen">
-        {/* Slim Topbar */}
-        <header className="h-12 border-b border-slate-800/60 bg-slate-900/60 backdrop-blur-md sticky top-0 z-30 flex items-center justify-between px-5">
-          <button
-            onClick={() => setShowProjectList(true)}
-            className="flex items-center gap-2.5 hover:bg-slate-800/60 py-1.5 px-3 rounded-lg transition-colors group"
-          >
-            <FolderOpen className="text-muse-400" size={16} />
-            <div className="text-left">
-              <h1 className="font-serif font-bold text-sm tracking-tight text-white leading-tight">{project.title || "未命名项目"}</h1>
+        {/* New Enhanced Topbar */}
+        <header className="h-14 border-b border-slate-800/60 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-30 flex items-center justify-between px-6">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-slate-400">
+              <BookOpen size={16} className="text-muse-400" />
+              <span className="text-xs font-bold uppercase tracking-widest opacity-50">Project</span>
             </div>
-          </button>
+            <h1 className="font-serif font-bold text-base text-white tracking-tight">{project.title || "未命名宇宙"}</h1>
+          </div>
 
-          <div className="flex items-center gap-3">
-            <div className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border ${useBackend ? 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' : 'text-amber-400 border-amber-500/30 bg-amber-500/10'}`} title={useBackend ? '数据存储在 MySQL 数据库中' : '数据存储在浏览器本地'}>
-              {useBackend ? <Database size={11} /> : <HardDrive size={11} />}
-              <span>{useBackend ? 'MySQL' : '本地'}</span>
-            </div>
-
-            {isSaving && (
-              <div className="flex items-center gap-1.5 text-[10px] text-slate-500 animate-pulse bg-slate-800/10 px-2 py-0.5 rounded-full" title="数据正在自动同步到云端...">
-                <div className="w-1 h-1 bg-emerald-400 rounded-full animate-ping" />
-                <span>Cloud Sync...</span>
+          <div className="flex items-center gap-4">
+            {/* Sync Hub */}
+            <div className="flex items-center bg-slate-950/50 rounded-2xl border border-slate-800/50 p-1 pr-3 gap-3">
+              <div className={`flex items-center gap-1.5 text-[10px] uppercase font-bold px-3 py-1.5 rounded-xl border ${useBackend ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5' : 'text-amber-400 border-amber-500/20 bg-amber-500/5'}`}>
+                {useBackend ? <Database size={10} /> : <HardDrive size={10} />}
+                <span>{useBackend ? 'MySQL Sync' : 'LocalStorage'}</span>
               </div>
-            )}
+
+              <div className="flex items-center gap-2">
+                {isSaving ? (
+                  <div className="flex items-center gap-2 px-1">
+                    <RefreshCw size={14} className="text-muse-400 animate-spin" />
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Syncing...</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={forceSync}
+                    className="flex items-center gap-2 px-1 group text-slate-500 hover:text-emerald-400 transition-colors"
+                  >
+                    <Check size={14} className="group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Saved</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => handleExportProject(null as any, project)}
+              className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all"
+              title="导出当前宇宙"
+            >
+              <Download size={18} />
+            </button>
           </div>
         </header>
 
@@ -205,81 +247,6 @@ const App: React.FC = () => {
           </div>
         </main>
       </div>
-
-      {/* Project List Modal */}
-      {showProjectList && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
-            <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-950/50">
-              <h3 className="font-serif font-bold text-lg text-white flex items-center gap-2">
-                <FolderOpen size={20} className="text-muse-400" />
-                我的项目库
-              </h3>
-              <button onClick={() => setShowProjectList(false)} className="text-slate-500 hover:text-white"><X size={20} /></button>
-            </div>
-
-            <div className="overflow-y-auto p-2 space-y-2 custom-scrollbar flex-1">
-              {savedProjects.sort((a, b) => b.lastModified - a.lastModified).map(p => (
-                <div
-                  key={p.id}
-                  onClick={() => handleSwitchProject(p.id)}
-                  className={`p-4 rounded-xl cursor-pointer flex justify-between items-center group transition-all border ${project.id === p.id ? 'bg-muse-900/30 border-muse-500/50' : 'bg-slate-800/50 border-transparent hover:bg-slate-800'}`}
-                >
-                  <div className="flex-1">
-                    <h4 className={`font-bold ${project.id === p.id ? 'text-muse-200' : 'text-slate-200 group-hover:text-white'}`}>
-                      {p.title || "未命名项目"}
-                    </h4>
-                    <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
-                      <span>{new Date(p.lastModified).toLocaleString()}</span>
-                      <span>• {p.genre || "未定义类型"}</span>
-                      <span>• {p.characters.length} 角色</span>
-                    </div>
-                  </div>
-                  {project.id === p.id && <Check size={18} className="text-muse-400 mr-2" />}
-                  <button
-                    onClick={(e) => handleExportProject(e, p)}
-                    className="p-2 text-slate-600 hover:text-sky-400 hover:bg-sky-400/10 rounded-lg transition-colors"
-                    title="导出为 .muse 文件"
-                  >
-                    <Download size={16} />
-                  </button>
-                  <button
-                    onClick={(e) => handleDeleteProject(e, p.id)}
-                    className="p-2 text-slate-600 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                    title="删除项目"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className="p-4 border-t border-slate-700 bg-slate-950/30 space-y-2">
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCreateProject}
-                  className="flex-1 bg-muse-600 hover:bg-muse-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-transform active:scale-95"
-                >
-                  <Plus size={18} /> 新建项目
-                </button>
-                <button
-                  onClick={() => importFileRef.current?.click()}
-                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-transform active:scale-95 border border-slate-600"
-                >
-                  <Upload size={18} /> 导入 .muse
-                </button>
-              </div>
-              <input
-                ref={importFileRef}
-                type="file"
-                accept=".muse,.json"
-                onChange={handleImportProject}
-                className="hidden"
-              />
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* User Guide Modal */}
       {showGuide && <UserGuide onClose={() => setShowGuide(false)} />}
