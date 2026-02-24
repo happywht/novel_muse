@@ -13,240 +13,54 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { KnowledgeGraph } from './components/KnowledgeGraph';
 import { PromptTuner } from './components/PromptTuner';
 import { WritingStats } from './components/WritingStats';
-import { isBackendAvailable, fetchProjectList, fetchProject, syncProject, deleteProjectApi } from './services/apiService';
-
-const INITIAL_PROJECT: ProjectState = {
-  id: 'default-project',
-  lastModified: Date.now(),
-  title: '',
-  genre: '',
-  premise: '',
-  creativeSettings: {
-    tone: '平衡 (Balanced)',
-    style: '通俗易懂 (Standard)',
-    creativity: 0.8,
-    targetAudience: '大众读者'
-  },
-  worldGenConfig: {
-    detailLevel: 'Standard',
-    focus: 'Balanced'
-  },
-  characters: [],
-  worldSettings: [],
-  plotOutline: '',
-  plotHistory: [],
-  drafts: [],
-  chapters: [],
-  echoes: [],
-  timeline: [],
-  currentWorldDate: '元年'
-};
+import { useProjectStore, INITIAL_PROJECT } from './store/useProjectStore';
 
 const MUSE_FILE_VERSION = '1.0';
 
 const App: React.FC = () => {
-  const [activeSection, setActiveSection] = useState<AppSection>(AppSection.DASHBOARD);
-  const [project, setProject] = useState<ProjectState>(INITIAL_PROJECT);
-  const [showGuide, setShowGuide] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showPromptTuner, setShowPromptTuner] = useState(false);
+  const {
+    project,
+    activeSection,
+    savedProjects,
+    useBackend,
+    isSaving,
+    isLoading,
+    showGuide,
+    showSettings,
+    showPromptTuner,
+    showProjectList,
+    setActiveSection,
+    setShowGuide,
+    setShowSettings,
+    setShowPromptTuner,
+    setShowProjectList,
+    updateProject,
+    initialize,
+    createProject,
+    switchProject,
+    deleteProject
+  } = useProjectStore();
+
   const importFileRef = React.useRef<HTMLInputElement>(null);
 
-  // Backend state
-  const [useBackend, setUseBackend] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isLoadingRef = useRef(true); // Prevent auto-save during initial load
-
-  // Project Management State
-  const [showProjectList, setShowProjectList] = useState(false);
-  const [savedProjects, setSavedProjects] = useState<ProjectState[]>([]);
-
-  // Load projects on mount: try backend first, fallback to localStorage
   useEffect(() => {
-    const init = async () => {
-      isLoadingRef.current = true;
-      const backendOk = await isBackendAvailable();
-      setUseBackend(backendOk);
-
-      if (backendOk) {
-        console.log('🚀 Backend connected! Loading from MySQL...');
-        try {
-          const list = await fetchProjectList();
-          if (list.length > 0) {
-            // Load the most recent project
-            const sorted = list.sort((a, b) => b.lastModified - a.lastModified);
-            const fullProject = await fetchProject(sorted[0].id);
-            const merged = { ...INITIAL_PROJECT, ...fullProject };
-            setProject(merged);
-            // Build savedProjects from summaries (lightweight)
-            setSavedProjects(list.map(s => ({ ...INITIAL_PROJECT, id: s.id, title: s.title, genre: s.genre, lastModified: s.lastModified } as ProjectState)));
-          } else {
-            // No projects in DB — check localStorage for migration
-            const stored = localStorage.getItem('muse_projects');
-            if (stored) {
-              const parsed = JSON.parse(stored);
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                console.log('📦 Migrating localStorage projects to MySQL...');
-                for (const proj of parsed) {
-                  await syncProject(proj);
-                }
-                const mostRecent = parsed.sort((a: any, b: any) => b.lastModified - a.lastModified)[0];
-                setProject({ ...INITIAL_PROJECT, ...mostRecent });
-                setSavedProjects(parsed);
-                isLoadingRef.current = false;
-                return;
-              }
-            }
-            // Brand new user
-            const newProj = { ...INITIAL_PROJECT, id: Date.now().toString() };
-            await syncProject(newProj);
-            setProject(newProj);
-            setSavedProjects([newProj]);
-          }
-        } catch (err) {
-          console.warn('Backend load failed, falling back to localStorage', err);
-          setUseBackend(false);
-          loadFromLocalStorage();
-        }
-      } else {
-        console.log('💾 Backend unavailable, using localStorage');
-        loadFromLocalStorage();
-      }
-      isLoadingRef.current = false;
-    };
-
-    const loadFromLocalStorage = () => {
-      const stored = localStorage.getItem('muse_projects');
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            setSavedProjects(parsed);
-            const mostRecent = parsed.sort((a: any, b: any) => b.lastModified - a.lastModified)[0];
-            setProject({ ...INITIAL_PROJECT, ...mostRecent });
-          } else {
-            const newProj = { ...INITIAL_PROJECT, id: Date.now().toString() };
-            setProject(newProj);
-            setSavedProjects([newProj]);
-          }
-        } catch (e) {
-          console.error('Failed to load projects', e);
-        }
-      } else {
-        const newProj = { ...INITIAL_PROJECT, id: Date.now().toString() };
-        setProject(newProj);
-        setSavedProjects([newProj]);
-      }
-    };
-
-    init();
-  }, [useBackend]); // Re-run if backend status changes
-
-  // Auto-save effect: debounced, saves to both localStorage AND backend
-  useEffect(() => {
-    if (!project.id || isLoadingRef.current) {
-      console.log("⏭️ Skipping auto-save (initializing or no ID)");
-      return;
-    }
-
-    // Always update localStorage immediately
-    setSavedProjects(prev => {
-      const index = prev.findIndex(p => p.id === project.id);
-      let newList;
-      const updatedProject = { ...project, lastModified: Date.now() };
-      if (index >= 0) {
-        newList = [...prev];
-        newList[index] = updatedProject;
-      } else {
-        newList = [...prev, updatedProject];
-      }
-      localStorage.setItem('muse_projects', JSON.stringify(newList));
-      return newList;
-    });
-
-    // Debounced backend sync (2 seconds after last change)
-    if (useBackend) {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      setIsSaving(true);
-      saveTimerRef.current = setTimeout(async () => {
-        try {
-          console.log("☁️ Syncing project to backend:", project.id);
-          await syncProject({ ...project, lastModified: Date.now() });
-          setIsSaving(false);
-        } catch (err) {
-          console.warn('Backend sync failed:', err);
-          setIsSaving(false);
-        }
-      }, 2000);
-    }
-  }, [project, useBackend]);
-
-  const updateProject = (data: Partial<ProjectState>) => {
-    setProject(prev => ({ ...prev, ...data }));
-  };
+    initialize();
+  }, [initialize]);
 
   const handleCreateProject = () => {
-    const newProj: ProjectState = {
-      ...INITIAL_PROJECT,
-      id: Date.now().toString(),
-      title: '未命名项目',
-      lastModified: Date.now()
-    };
-    setProject(newProj);
-    setSavedProjects(prev => [...prev, newProj]);
-    setShowProjectList(false);
+    createProject();
     setActiveSection(AppSection.DASHBOARD);
-    // Sync to backend
-    if (useBackend) {
-      syncProject(newProj).catch(err => console.warn('Backend create sync failed:', err));
-    }
   };
 
-  const handleSwitchProject = async (id: string) => {
-    if (useBackend) {
-      try {
-        const fullProject = await fetchProject(id);
-        setProject({ ...INITIAL_PROJECT, ...fullProject });
-        setShowProjectList(false);
-        setActiveSection(AppSection.DASHBOARD);
-        return;
-      } catch (err) {
-        console.warn('Backend fetch failed, using local copy', err);
-      }
-    }
-    // Fallback to local copy
-    const target = savedProjects.find(p => p.id === id);
-    if (target) {
-      setProject({ ...INITIAL_PROJECT, ...target });
-      setShowProjectList(false);
-      setActiveSection(AppSection.DASHBOARD);
-    }
+  const handleSwitchProject = (id: string) => {
+    switchProject(id);
+    setActiveSection(AppSection.DASHBOARD);
   };
 
-  const handleDeleteProject = async (e: React.MouseEvent, id: string) => {
+  const handleDeleteProject = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (savedProjects.length <= 1) {
-      alert('至少保留一个项目。');
-      return;
-    }
     if (window.confirm('确定要删除这个项目吗？此操作无法撤销。')) {
-      const newList = savedProjects.filter(p => p.id !== id);
-      setSavedProjects(newList);
-      localStorage.setItem('muse_projects', JSON.stringify(newList));
-      if (useBackend) {
-        deleteProjectApi(id).catch(err => console.warn('Backend delete failed:', err));
-      }
-      if (project.id === id) {
-        if (useBackend) {
-          try {
-            const fullProject = await fetchProject(newList[0].id);
-            setProject({ ...INITIAL_PROJECT, ...fullProject });
-            return;
-          } catch { /* fallback below */ }
-        }
-        setProject(newList[0]);
-      }
+      deleteProject(id);
     }
   };
 
@@ -295,11 +109,10 @@ const App: React.FC = () => {
           lastModified: Date.now(),
         };
 
-        setSavedProjects(prev => {
-          const newList = [...prev, importedProject];
-          localStorage.setItem('muse_projects', JSON.stringify(newList));
-          return newList;
-        });
+        const { setSavedProjects, setProject, setActiveSection, setShowProjectList } = useProjectStore.getState();
+
+        setSavedProjects([...savedProjects, importedProject]);
+        localStorage.setItem('muse_projects', JSON.stringify([...savedProjects, importedProject]));
 
         setProject(importedProject);
         setShowProjectList(false);

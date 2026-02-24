@@ -12,7 +12,11 @@ interface DraftingRoomProps {
 
 type ViewMode = 'FORGE' | 'MANUSCRIPT';
 
+import { useProjectStore } from '../store/useProjectStore';
+
 export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProject }) => {
+    const fetchChapterContent = useProjectStore(state => state.fetchChapterContent);
+    const isLoading = useProjectStore(state => state.isLoading);
     const [viewMode, setViewMode] = useState<ViewMode>('FORGE');
     const [showReference, setShowReference] = useState(false);
 
@@ -40,6 +44,13 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
 
     // Manuscript State
     const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
+
+    // Auto-fetch chapter content when selected
+    React.useEffect(() => {
+        if (activeChapterId && viewMode === 'MANUSCRIPT') {
+            fetchChapterContent(activeChapterId);
+        }
+    }, [activeChapterId, viewMode, fetchChapterContent]);
 
     const toggleCharSelection = (id: string) => {
         setSelectedChars(prev =>
@@ -705,24 +716,35 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                             (() => {
                                 const chapter = (project.chapters || []).find(c => c.id === activeChapterId);
                                 if (!chapter) return null;
+
+                                const hasContent = chapter.content && chapter.content.trim() !== "";
+
                                 return (
                                     <>
                                         <div className="p-6 border-b border-slate-800 bg-slate-950/30 flex justify-between items-end">
                                             <div>
                                                 <h2 className="text-3xl font-serif font-bold text-white">{chapter.title}</h2>
-                                                <p className="text-sm text-slate-500 mt-2">字数统计: {chapter.content.length} 字</p>
+                                                <p className="text-sm text-slate-500 mt-2">字数统计: {hasContent ? chapter.content.length : 0} 字</p>
                                             </div>
                                             <div className="flex gap-2">
                                                 <button
                                                     onClick={() => navigator.clipboard.writeText(chapter.content)}
-                                                    className="text-xs bg-slate-800 px-3 py-1.5 rounded border border-slate-700 text-slate-300 hover:text-white"
+                                                    disabled={!hasContent}
+                                                    className="text-xs bg-slate-800 px-3 py-1.5 rounded border border-slate-700 text-slate-300 hover:text-white disabled:opacity-50"
                                                 >
                                                     复制全文
                                                 </button>
                                             </div>
                                         </div>
-                                        <div className="flex-1 overflow-y-auto custom-scrollbar p-8 prose prose-invert prose-lg max-w-none font-serif leading-loose text-slate-300">
-                                            <MarkdownRenderer content={chapter.content} />
+                                        <div className="flex-1 overflow-y-auto custom-scrollbar p-8 prose prose-invert prose-lg max-w-none font-serif leading-loose text-slate-300 relative">
+                                            {hasContent ? (
+                                                <MarkdownRenderer content={chapter.content} />
+                                            ) : (
+                                                <div className="flex flex-col items-center justify-center h-full space-y-4">
+                                                    <RefreshCw className="animate-spin text-muse-500" size={32} />
+                                                    <p className="text-slate-500 animate-pulse">正在加载卷轴内容...</p>
+                                                </div>
+                                            )}
                                         </div>
                                     </>
                                 );

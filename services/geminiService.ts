@@ -1,6 +1,14 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Character, WorldSetting, CreativeSettings, StateChangeRecommendation, Echo } from "../types";
 import { getCustomPrompt } from "../components/PromptTuner";
+import {
+    safeParseAiJson,
+    AiCharacterArraySchema,
+    AiWorldSettingArraySchema,
+    AiStateChangeArraySchema,
+    AiEchoArraySchema,
+    AiPlotRhythmArraySchema,
+} from './schemas';
 
 const STORAGE_KEY_API = 'muse_gemini_api_key';
 const STORAGE_KEY_MODEL = 'muse_gemini_model';
@@ -513,10 +521,8 @@ export const batchGenerateCharacters = async (premise: string, genre: string, se
             }
         }));
 
-        if (response.text) {
-            return JSON.parse(response.text);
-        }
-        return [];
+        const parsed = safeParseAiJson(response.text, AiCharacterArraySchema, 'batchGenerateCharacters');
+        return parsed ?? [];
     } catch (e) {
         console.error("Batch Character Generation Error", e);
         throw e;
@@ -559,12 +565,12 @@ export const batchGenerateWorldSettingsByCategory = async (premise: string, genr
             }
         }));
 
-        if (response.text) {
-            const rawData = JSON.parse(response.text);
-            return rawData.map((item: any) => ({
+        const parsed = safeParseAiJson(response.text, AiWorldSettingArraySchema, 'batchGenerateWorldSettings');
+        if (parsed) {
+            return parsed.map(item => ({
                 title: item.title,
                 content: item.content,
-                category: category
+                category: category as WorldSetting['category']
             }));
         }
         return [];
@@ -822,8 +828,9 @@ export const analyzeStateChanges = async (
             }
         }));
 
-        if (response.text) {
-            const raw = JSON.parse(response.text);
+        {
+            const raw = safeParseAiJson(response.text, AiStateChangeArraySchema, 'analyzeStateChanges');
+            if (!raw) return [];
             // Post-process to link back to IDs
             const result: StateChangeRecommendation[] = [];
 
@@ -920,8 +927,9 @@ export const extractEchoesFromText = async (
             }
         }));
 
-        if (response.text) {
-            const raw = JSON.parse(response.text);
+        {
+            const raw = safeParseAiJson(response.text, AiEchoArraySchema, 'extractEchoesFromText');
+            if (!raw) return [];
             const result: Echo[] = [];
 
             for (const item of raw) {
@@ -1069,8 +1077,9 @@ export const deduceWorldConsequences = async (
             }
         }));
 
-        if (response.text) {
-            const raw = JSON.parse(response.text);
+        {
+            const raw = safeParseAiJson(response.text, AiStateChangeArraySchema, 'deduceWorldConsequences');
+            if (!raw) return [];
             const result: StateChangeRecommendation[] = [];
 
             for (const item of raw) {
@@ -1156,10 +1165,8 @@ export const analyzePlotRhythm = async (plotOutline: string): Promise<PlotRhythm
             }
         }));
 
-        if (response.text) {
-            return JSON.parse(response.text);
-        }
-        return [];
+        const parsed = safeParseAiJson(response.text, AiPlotRhythmArraySchema, 'analyzePlotRhythm');
+        return parsed ?? [];
     } catch (e) {
         console.error("Rhythm Analysis Error", e);
         return [];

@@ -30,7 +30,7 @@ router.get('/', async (_req: Request, res: Response) => {
             orderBy: { updatedAt: 'desc' }
         });
 
-        const result = projects.map(p => ({
+        const sortedResult = projects.map((p: any) => ({
             id: p.id,
             title: p.title,
             genre: p.genre,
@@ -40,7 +40,7 @@ router.get('/', async (_req: Request, res: Response) => {
             chapterCount: p._count.chapters,
         }));
 
-        res.json(result);
+        res.json(sortedResult);
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
@@ -58,7 +58,17 @@ router.get('/:id', async (req: Request, res: Response) => {
                 worldSettings: true,
                 plotVersions: { orderBy: { timestamp: 'desc' } },
                 drafts: true,
-                chapters: { orderBy: { order: 'asc' } },
+                chapters: {
+                    select: {
+                        id: true,
+                        title: true,
+                        order: true,
+                        lastModified: true,
+                        projectId: true,
+                        // content: false // In Prisma, if you use select you must explicitly include what you want
+                    },
+                    orderBy: { order: 'asc' }
+                },
                 echoes: true,
                 timeline: { orderBy: { timestamp: 'asc' } },
             }
@@ -88,7 +98,7 @@ router.get('/:id', async (req: Request, res: Response) => {
                 detailLevel: project.detailLevel,
                 focus: project.focus,
             },
-            characters: project.characters.map(c => ({
+            characters: project.characters.map((c: any) => ({
                 id: c.id,
                 name: c.name,
                 role: c.role,
@@ -97,19 +107,19 @@ router.get('/:id', async (req: Request, res: Response) => {
                 relationships: c.relationships || undefined,
                 imageUrl: c.imageUrl || undefined,
             })),
-            worldSettings: project.worldSettings.map(w => ({
+            worldSettings: project.worldSettings.map((w: any) => ({
                 id: w.id,
                 category: w.category,
                 title: w.title,
                 content: w.content,
             })),
-            plotHistory: project.plotVersions.map(p => ({
+            plotHistory: project.plotVersions.map((p: any) => ({
                 id: p.id,
                 timestamp: Number(p.timestamp),
                 content: p.content,
                 note: p.note,
             })),
-            drafts: project.drafts.map(d => ({
+            drafts: project.drafts.map((d: any) => ({
                 id: d.id,
                 title: d.title,
                 content: d.content,
@@ -119,7 +129,7 @@ router.get('/:id', async (req: Request, res: Response) => {
             chapters: project.chapters.map((ch: any) => ({
                 id: ch.id,
                 title: ch.title,
-                content: ch.content,
+                content: "", // Content is lazy-loaded
                 order: ch.order,
                 lastModified: Number(ch.lastModified),
             })),
@@ -145,6 +155,28 @@ router.get('/:id', async (req: Request, res: Response) => {
         };
 
         res.json(state);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// GET /api/projects/:id/chapters/:chapterId - Fetch specific chapter content
+// ============================================
+router.get('/:id/chapters/:chapterId', async (req: Request, res: Response) => {
+    try {
+        const chapter = await prisma.chapter.findUnique({
+            where: { id: req.params.chapterId as string }
+        });
+
+        if (!chapter || chapter.projectId !== req.params.id) {
+            return res.status(404).json({ error: 'Chapter not found' });
+        }
+
+        res.json({
+            ...chapter,
+            lastModified: Number(chapter.lastModified)
+        });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
@@ -177,7 +209,7 @@ router.put('/:id/full', async (req: Request, res: Response) => {
 
     try {
         // Use a transaction to ensure atomicity
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: any) => {
             // 1. Upsert the project itself
             await tx.project.upsert({
                 where: { id: id as string },
@@ -325,6 +357,58 @@ router.put('/:id/full', async (req: Request, res: Response) => {
         res.json({ success: true, id });
     } catch (err: any) {
         console.error('Full sync error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// PATCH /api/projects/:id - Incremental sync (partial update)
+// Updates only the provided fields in the Project model.
+// ============================================
+router.patch('/:id', async (req: Request, res: Response) => {
+    const id = req.params.id as string;
+    const data = req.body;
+
+    try {
+        const updateData: any = {};
+
+        // Top-level fields
+        if (data.title !== undefined) updateData.title = data.title;
+        if (data.genre !== undefined) updateData.genre = data.genre;
+        if (data.premise !== undefined) updateData.premise = data.premise;
+        if (data.plotOutline !== undefined) updateData.plotOutline = data.plotOutline;
+        if (data.currentWorldDate !== undefined) updateData.currentWorldDate = data.currentWorldDate;
+
+        // Creative Settings (flattened in DB)
+        if (data.creativeSettings) {
+            if (data.creativeSettings.tone !== undefined) updateData.tone = data.creativeSettings.tone;
+            if (data.creativeSettings.style !== undefined) updateData.style = data.creativeSettings.style;
+            if (data.creativeSettings.creativity !== undefined) updateData.creativity = Number(data.creativeSettings.creativity);
+            if (data.creativeSettings.targetAudience !== undefined) updateData.targetAudience = data.creativeSettings.targetAudience;
+        }
+
+        // World Gen Config (flattened in DB)
+        if (data.worldGenConfig) {
+            if (data.worldGenConfig.detailLevel !== undefined) updateData.detailLevel = data.worldGenConfig.detailLevel;
+            if (data.worldGenConfig.focus !== undefined) updateData.focus = data.worldGenConfig.focus;
+        }
+
+        const project = await prisma.project.update({
+            where: { id },
+            data: updateData
+        });
+
+        // Fire-and-forget Neo4j sync if metadata changed
+        // We only sync if there's enough data to build a project context
+        if (updateData.title || updateData.premise) {
+            syncProjectToGraph({ ...project, ...data }).catch(err =>
+                console.warn('Graph sync skipped (PATCH):', err.message)
+            );
+        }
+
+        res.json({ success: true, id: project.id });
+    } catch (err: any) {
+        console.error('Patch sync error:', err);
         res.status(500).json({ error: err.message });
     }
 });

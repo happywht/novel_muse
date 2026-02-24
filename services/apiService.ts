@@ -40,6 +40,13 @@ export const fetchProject = async (id: string): Promise<any> => {
     return res.json();
 };
 
+/** Fetch individual chapter content from the backend */
+export const fetchChapter = async (projectId: string, chapterId: string): Promise<any> => {
+    const res = await fetch(`${API_BASE}/projects/${projectId}/chapters/${chapterId}`);
+    if (!res.ok) throw new Error(`Failed to fetch chapter: ${res.statusText}`);
+    return res.json();
+};
+
 /** Create a new project on the backend */
 export const createProject = async (): Promise<{ id: string; title: string }> => {
     const res = await fetch(`${API_BASE}/projects`, { method: 'POST' });
@@ -55,6 +62,16 @@ export const syncProject = async (project: any): Promise<void> => {
         body: JSON.stringify(project),
     });
     if (!res.ok) throw new Error(`Failed to sync project: ${res.statusText}`);
+};
+
+/** Incremental sync: save only changed fields to the backend */
+export const patchProject = async (id: string, delta: any): Promise<void> => {
+    const res = await fetch(`${API_BASE}/projects/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(delta),
+    });
+    if (!res.ok) throw new Error(`Failed to patch project: ${res.statusText}`);
 };
 
 /** Delete a project on the backend */
