@@ -33,6 +33,7 @@ model Project {
   plotVersions     PlotVersion[]
   drafts           Draft[]
   chapters         Chapter[]
+  plotNodes        PlotNode[]
   echoes           Echo[]
   timeline         TimelineEvent[]
 }
@@ -122,6 +123,19 @@ model TimelineEvent {
   type              String   
   projectId         String
   project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model PlotNode {
+  id               String   @id @default(cuid())
+  title            String
+  content          String   @db.LongText
+  order            Int
+  relatedCharacters String? @db.Text // JSON string of IDs
+  relatedLocations  String? @db.Text // JSON string of IDs
+  projectId        String
+  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }

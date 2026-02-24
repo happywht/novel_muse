@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { ProjectState, PlotVersion } from '../types';
+import { ProjectState, PlotVersion, AppSection } from '../types';
 import { analyzePlot, expandScene, generatePlotFromContext, rewritePlot, analyzePlotRhythm, PlotRhythmPoint } from '../services/geminiService';
 import { Loader } from './Loader';
 import { GitBranch, Activity, AlertTriangle, LayoutTemplate, Wand2, Info, X, CheckCircle, AlertCircle, History, Zap, Save, Sidebar, User, Globe, FileText, LayoutGrid, TrendingUp, Lightbulb, BookOpen, Map, Swords, Crown } from 'lucide-react';
@@ -8,13 +8,15 @@ import { PlotRhythmChart } from './PlotWeaver/PlotRhythmChart';
 import { PlotHistorySidebar } from './PlotWeaver/PlotHistorySidebar';
 import { PlotStructureAssistant } from './PlotWeaver/PlotStructureAssistant';
 
+import { useProjectStore } from '../store/useProjectStore';
+
 interface PlotWeaverProps {
     project: ProjectState;
     updateProject: (data: Partial<ProjectState>) => void;
 }
 
-type TabMode = 'ANALYSIS' | 'OPTIMIZE' | 'RHYTHM' | 'STRUCTURE';
-type ViewMode = 'TEXT' | 'BOARD';
+type TabMode = 'ANALYSIS' | 'OPTIMIZE' | 'RHYTHM' | 'STRUCTURE' | 'CARDS';
+type ViewMode = 'TEXT' | 'CARDS';
 
 const STRUCTURE_TEMPLATES = [
     {
@@ -62,8 +64,8 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
     const [showReference, setShowReference] = useState(false);
 
     // --- Tab & View ---
-    const [activeTab, setActiveTab] = useState<TabMode>('ANALYSIS');
-    const [viewMode, setViewMode] = useState<ViewMode>('TEXT');
+    const [activeTab, setActiveTab] = useState<TabMode>('CARDS');
+    const [viewMode, setViewMode] = useState<ViewMode>(project.plotNodes.length > 0 ? 'CARDS' : 'TEXT');
 
     // --- Optimization State ---
     const [customRewritePrompt, setCustomRewritePrompt] = useState('');
@@ -81,6 +83,7 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
     const [pendingAction, setPendingAction] = useState<{ type: 'GENERATE' | 'TEMPLATE' | 'RESTORE'; payload?: any } | null>(null);
     const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
 
+    const { setActiveSection, setActivePlotNodeId } = useProjectStore();
     const plotOutline = project.plotOutline || '';
 
     // ========================
@@ -208,9 +211,47 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
         }
     };
 
+    // --- Plot Nodes Handlers ---
+    const handleAddCard = () => {
+        const newNode = {
+            id: Date.now().toString(),
+            title: `情节点 ${project.plotNodes.length + 1}`,
+            content: '',
+            order: project.plotNodes.length,
+        };
+        updateProject({ plotNodes: [...project.plotNodes, newNode] });
+    };
+
+    const handleUpdateCard = (id: string, updates: Partial<any>) => {
+        const newNodes = project.plotNodes.map(n => n.id === id ? { ...n, ...updates } : n);
+        updateProject({ plotNodes: newNodes });
+    };
+
+    const handleRemoveCard = (id: string) => {
+        const newNodes = project.plotNodes.filter(n => n.id !== id).map((n, idx) => ({ ...n, order: idx }));
+        updateProject({ plotNodes: newNodes });
+    };
+
+    const handleConvertOutlineToCards = () => {
+        const newNodes = beats.map((beat, idx) => ({
+            id: `legacy-${idx}-${Date.now()}`,
+            title: beat.split('\n')[0].substring(0, 20) || `情节点 ${idx + 1}`,
+            content: beat,
+            order: idx,
+        }));
+        updateProject({ plotNodes: newNodes });
+        setViewMode('CARDS');
+        showToast("大纲已成功转换为情节卡片！", "success");
+    };
+
+    const handleQuickDraft = (nodeId: string) => {
+        setActivePlotNodeId(nodeId);
+        setActiveSection(AppSection.DRAFTING);
+    };
+
     // --- Template Selection Handler ---
     const handleSelectTemplate = (template: typeof STRUCTURE_TEMPLATES[0]) => {
-        if (plotOutline) {
+        if (plotOutline || project.plotNodes.length > 0) {
             setPendingAction({ type: 'GENERATE', payload: template.content });
         } else {
             performGeneratePlot(template.content);
@@ -223,6 +264,7 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
     // Tab definitions
     // ========================
     const tabItems = [
+        { id: 'CARDS' as TabMode, label: '情节看板', icon: LayoutGrid },
         { id: 'ANALYSIS' as TabMode, label: '诊断报告', icon: AlertTriangle },
         { id: 'OPTIMIZE' as TabMode, label: '优化与重写', icon: Zap },
         { id: 'RHYTHM' as TabMode, label: '节奏视图', icon: TrendingUp },
@@ -289,8 +331,8 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                                     title="文本模式"
                                 ><FileText size={16} /></button>
                                 <button
-                                    onClick={() => setViewMode('BOARD')}
-                                    className={`p-1.5 rounded-md transition-all ${viewMode === 'BOARD' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
+                                    onClick={() => setViewMode('CARDS')}
+                                    className={`p-1.5 rounded-md transition-all ${viewMode === 'CARDS' ? 'bg-slate-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
                                     title="卡片模式 (Beat Board)"
                                 ><LayoutGrid size={16} /></button>
                             </div>
@@ -368,16 +410,92 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                                 className="flex-1 w-full bg-slate-900 border border-slate-700 rounded-lg p-4 text-slate-300 focus:ring-1 focus:ring-muse-500 outline-none resize-none font-serif leading-relaxed custom-scrollbar"
                             />
                         ) : (
-                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 p-1">
-                                {beats.length > 0 ? beats.map((beat, idx) => (
-                                    <div key={idx} className="bg-slate-900 border border-slate-700 rounded-lg p-4 hover:border-muse-500/50 transition-colors group">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <span className="text-xs font-bold text-slate-500 uppercase">Beat {idx + 1}</span>
+                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 p-1 pb-20">
+                                {project.plotNodes.length > 0 ? (
+                                    <>
+                                        {project.plotNodes.sort((a, b) => a.order - b.order).map((node, idx) => (
+                                            <div key={node.id} className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 hover:border-muse-500/30 transition-all group relative">
+                                                <div className="flex items-center gap-3 mb-4">
+                                                    <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500 border border-slate-700">
+                                                        {idx + 1}
+                                                    </div>
+                                                    <input
+                                                        type="text"
+                                                        value={node.title}
+                                                        onChange={(e) => handleUpdateCard(node.id, { title: e.target.value })}
+                                                        className="bg-transparent border-none text-white font-bold text-lg focus:ring-0 w-full placeholder:text-slate-700"
+                                                        placeholder="输入情节标题..."
+                                                    />
+                                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                                                        <button
+                                                            onClick={() => handleRemoveCard(node.id)}
+                                                            className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                                                            title="删除卡片"
+                                                        >
+                                                            <X size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <textarea
+                                                    value={node.content}
+                                                    onChange={(e) => handleUpdateCard(node.id, { content: e.target.value })}
+                                                    className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-3 text-sm text-slate-400 focus:text-slate-200 focus:border-muse-500/50 outline-none resize-none font-serif min-h-[100px] transition-all"
+                                                    placeholder="描述这段剧情的发生、冲突与转折..."
+                                                />
+                                                <div className="mt-3 flex justify-between items-center">
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            className="flex items-center gap-1 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-muse-400 px-2 py-1 rounded transition-colors"
+                                                            title="关联角色"
+                                                        >
+                                                            <User size={10} /> {node.relatedCharacters?.length || 0}
+                                                        </button>
+                                                        <button
+                                                            className="flex items-center gap-1 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-muse-400 px-2 py-1 rounded transition-colors"
+                                                            title="关联场景"
+                                                        >
+                                                            <Globe size={10} /> {node.relatedLocations?.length || 0}
+                                                        </button>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleQuickDraft(node.id)}
+                                                        className="px-3 py-1 bg-muse-600/20 hover:bg-muse-600 border border-muse-600/30 text-muse-400 hover:text-white text-xs rounded-lg transition-all flex items-center gap-1"
+                                                    >
+                                                        <Zap size={12} /> 一键开写
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        <button
+                                            onClick={handleAddCard}
+                                            className="w-full py-8 border-2 border-dashed border-slate-800 rounded-xl text-slate-600 hover:text-muse-400 hover:border-muse-500/50 hover:bg-muse-500/5 transition-all flex flex-col items-center gap-2 group"
+                                        >
+                                            <div className="w-10 h-10 rounded-full border-2 border-slate-800 group-hover:border-muse-500/50 flex items-center justify-center">
+                                                <LayoutGrid size={20} />
+                                            </div>
+                                            <span className="text-sm font-medium">添加新情节卡片</span>
+                                        </button>
+                                    </>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center h-full text-center space-y-6 py-12">
+                                        <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center text-slate-600">
+                                            <LayoutGrid size={40} />
                                         </div>
-                                        <p className="text-sm text-slate-300 font-serif leading-relaxed whitespace-pre-wrap">{beat}</p>
+                                        <div className="max-w-xs">
+                                            <h3 className="text-lg font-bold text-white mb-2">切换到情节看板</h3>
+                                            <p className="text-sm text-slate-500 leading-relaxed">
+                                                结构化的卡片能帮你更清晰地拆解任务，并直接驱动 AI 自动工坊。
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={handleConvertOutlineToCards}
+                                            disabled={!plotOutline}
+                                            className="bg-muse-600 hover:bg-muse-500 text-white px-6 py-3 rounded-xl font-bold shadow-xl shadow-muse-900/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                                        >
+                                            <Wand2 size={18} /> 从现有大纲自动拆解
+                                        </button>
+                                        {!plotOutline && <p className="text-xs text-red-400/60">当前还没有文本大纲，请先切换到文本模式。</p>}
                                     </div>
-                                )) : (
-                                    <div className="text-center text-slate-500 mt-10">暂无内容，请切换到文本模式输入大纲。</div>
                                 )}
                             </div>
                         )}
@@ -446,8 +564,8 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                             key={item.id}
                             onClick={() => setActiveTab(item.id)}
                             className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${activeTab === item.id
-                                    ? 'text-muse-400 border-b-2 border-muse-500 bg-muse-900/10'
-                                    : 'text-slate-500 hover:text-slate-300'
+                                ? 'text-muse-400 border-b-2 border-muse-500 bg-muse-900/10'
+                                : 'text-slate-500 hover:text-slate-300'
                                 }`}
                         >
                             <item.icon size={16} /> {item.label}

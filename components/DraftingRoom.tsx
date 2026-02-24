@@ -17,6 +17,8 @@ import { useProjectStore } from '../store/useProjectStore';
 export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProject }) => {
     const fetchChapterContent = useProjectStore(state => state.fetchChapterContent);
     const isLoading = useProjectStore(state => state.isLoading);
+    const activePlotNodeId = useProjectStore(state => state.activePlotNodeId);
+    const setActivePlotNodeId = useProjectStore(state => state.setActivePlotNodeId);
     const [viewMode, setViewMode] = useState<ViewMode>('FORGE');
     const [showReference, setShowReference] = useState(false);
 
@@ -51,6 +53,24 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
             fetchChapterContent(activeChapterId);
         }
     }, [activeChapterId, viewMode, fetchChapterContent]);
+
+    // NEW: Handle bridge from Plot Weaver
+    React.useEffect(() => {
+        if (activePlotNodeId) {
+            const node = project.plotNodes.find(n => n.id === activePlotNodeId);
+            if (node) {
+                setPlotBeat(node.content);
+                setSelectedChars(node.relatedCharacters || []);
+                setSelectedLocationId(node.relatedLocations?.[0] || ''); // Take first location as primary
+
+                // Clear the trigger so it doesn't re-run if we navigate back and forth
+                setActivePlotNodeId(null);
+
+                // Switch to Forge view just in case
+                setViewMode('FORGE');
+            }
+        }
+    }, [activePlotNodeId, project.plotNodes, setActivePlotNodeId]);
 
     const toggleCharSelection = (id: string) => {
         setSelectedChars(prev =>
@@ -137,9 +157,11 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                     status: 'PENDING' as const,
                     timestamp: Date.now()
                 }));
-                // We don't auto-add them anymore, we let handleExtractEchoes do it, or we could just set extractedEchoes here
-                // For a more deliberate UX, we might prefer a manual extraction button, or a hybrid.
-                // Let's set them to extractedEchoes for review
+
+                // NEW: Push to project store so they appear in Echo Chamber
+                updateProject({ echoes: [...(project.echoes || []), ...(newEchoes as Echo[])] });
+
+                // Still keep local state for immediate feedback in the Forge view
                 setExtractedEchoes(newEchoes as Echo[]);
             }
         } catch (e) {
@@ -159,6 +181,10 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                 ...e,
                 id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
             }));
+
+            // Push to project store
+            updateProject({ echoes: [...(project.echoes || []), ...echoesWithIds] });
+
             setExtractedEchoes(echoesWithIds);
         } catch (e) {
             console.error("Echo extraction failed", e);
@@ -169,8 +195,13 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     };
 
     const handleAddEcho = (echo: Echo) => {
-        const newEcho = { ...echo, status: 'ACCEPTED' as const, timestamp: Date.now() };
-        updateProject({ echoes: [...(project.echoes || []), newEcho] });
+        // Update the echo status in the global store
+        const updatedEchoes = project.echoes.map(e =>
+            e.id === echo.id ? { ...e, status: 'ACCEPTED' as const, timestamp: Date.now() } : e
+        );
+        updateProject({ echoes: updatedEchoes });
+
+        // Remove from local feedback list
         setExtractedEchoes(prev => prev.filter(e => e.id !== echo.id));
     };
 

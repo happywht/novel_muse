@@ -38,6 +38,7 @@ export const INITIAL_PROJECT: ProjectState = {
     plotHistory: [],
     drafts: [],
     chapters: [],
+    plotNodes: [],
     echoes: [],
     timeline: [],
     currentWorldDate: '元年',
@@ -58,6 +59,8 @@ interface ProjectStore {
     // --- UI State ---
     activeSection: AppSection;
     setActiveSection: (section: AppSection) => void;
+    activePlotNodeId: string | null;
+    setActivePlotNodeId: (id: string | null) => void;
     showGuide: boolean;
     setShowGuide: (show: boolean) => void;
     showSettings: boolean;
@@ -132,6 +135,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     showProjectList: false,
     setShowProjectList: (show) => set({ showProjectList: show }),
 
+    activePlotNodeId: null,
+    setActivePlotNodeId: (id) => set({ activePlotNodeId: id }),
+
     // --- Sync State ---
     useBackend: false,
     setUseBackend: (use) => set({ useBackend: use }),
@@ -141,7 +147,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     setIsLoading: (loading) => set({ isLoading: loading }),
 
     // --- Actions ---
-
     initialize: async () => {
         set({ isLoading: true });
         const backendOk = await isBackendAvailable();
@@ -291,7 +296,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
             try {
                 const id = project.id;
                 // Determine if we can use PATCH or must use full PUT
-                const complexFields = ['characters', 'worldSettings', 'plotHistory', 'drafts', 'chapters', 'echoes', 'timeline'];
+                const complexFields = ['characters', 'worldSettings', 'plotHistory', 'drafts', 'chapters', 'plotNodes', 'echoes', 'timeline'];
                 const hasComplexChanges = Object.keys(_pendingPatch).some(key => complexFields.includes(key));
 
                 if (hasComplexChanges) {
@@ -336,9 +341,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     fetchChapterContent: async (chapterId) => {
         const { project, useBackend } = get();
-        if (!useBackend) return; // For localStorage, content is likely already there or it's a different strategy
+        if (!useBackend) return;
 
-        // If content already exists and isn't a placeholder, skip
         const chapter = project.chapters.find(c => c.id === chapterId);
         if (chapter && chapter.content && chapter.content.trim() !== "") {
             return;

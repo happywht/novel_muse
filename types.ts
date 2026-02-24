@@ -1,4 +1,14 @@
 
+
+export interface PlotNode {
+  id: string;
+  title: string;
+  content: string; // The beat/summary
+  order: number;
+  relatedCharacters?: string[]; // IDs
+  relatedLocations?: string[]; // IDs
+}
+
 export interface Message {
   role: 'user' | 'model';
   content: string;
@@ -110,6 +120,7 @@ export interface ProjectState {
   characters: Character[];
   worldSettings: WorldSetting[];
   plotOutline?: string;
+  plotNodes: PlotNode[]; // NEW: Structured plot card system
   plotHistory: PlotVersion[];
   drafts: Draft[]; // New: Store generated drafts
   chapters: Chapter[]; // New: Store official manuscript

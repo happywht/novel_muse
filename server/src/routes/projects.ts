@@ -65,8 +65,10 @@ router.get('/:id', async (req: Request, res: Response) => {
                         order: true,
                         lastModified: true,
                         projectId: true,
-                        // content: false // In Prisma, if you use select you must explicitly include what you want
                     },
+                    orderBy: { order: 'asc' }
+                },
+                plotNodes: {
                     orderBy: { order: 'asc' }
                 },
                 echoes: true,
@@ -132,6 +134,14 @@ router.get('/:id', async (req: Request, res: Response) => {
                 content: "", // Content is lazy-loaded
                 order: ch.order,
                 lastModified: Number(ch.lastModified),
+            })),
+            plotNodes: project.plotNodes.map((pn: any) => ({
+                id: pn.id,
+                title: pn.title,
+                content: pn.content,
+                order: pn.order,
+                relatedCharacters: JSON.parse(pn.relatedCharacters || '[]'),
+                relatedLocations: JSON.parse(pn.relatedLocations || '[]'),
             })),
             echoes: project.echoes.map((e: any) => ({
                 id: e.id,
@@ -248,6 +258,7 @@ router.put('/:id/full', async (req: Request, res: Response) => {
             await tx.plotVersion.deleteMany({ where: { projectId: id } });
             await tx.draft.deleteMany({ where: { projectId: id } });
             await tx.chapter.deleteMany({ where: { projectId: id } });
+            await tx.plotNode.deleteMany({ where: { projectId: id } });
             await tx.echo.deleteMany({ where: { projectId: id } });
             await tx.timelineEvent.deleteMany({ where: { projectId: id } });
 
@@ -312,6 +323,20 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                         content: ch.content,
                         order: ch.order,
                         lastModified: BigInt(ch.lastModified),
+                        projectId: id,
+                    }))
+                });
+            }
+
+            if (data.plotNodes?.length > 0) {
+                await tx.plotNode.createMany({
+                    data: data.plotNodes.map((pn: any) => ({
+                        id: pn.id,
+                        title: pn.title,
+                        content: pn.content,
+                        order: pn.order,
+                        relatedCharacters: JSON.stringify(pn.relatedCharacters || []),
+                        relatedLocations: JSON.stringify(pn.relatedLocations || []),
                         projectId: id,
                     }))
                 });
