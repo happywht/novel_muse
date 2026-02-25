@@ -13,16 +13,14 @@ interface AuxiliaryDrawerProps {
     analysis: string;
     selectedText: string;
     customRewritePrompt: string;
-    rhythmData: any[];
     isAnalyzing: boolean;
-    isAnalyzingRhythm: boolean;
     project: ProjectState;
     fullContent: string;
     setShowRightSidebar: (show: boolean) => void;
     setCustomRewritePrompt: (prompt: string) => void;
     handleRewrite: (prompt: string, label: string) => void;
     handleAutoFix: () => void;
-    handleAnalyzeRhythm: () => void;
+    isIterating?: boolean;
     handleAnalyze: () => void;
 }
 
@@ -32,16 +30,14 @@ export const AuxiliaryDrawer: React.FC<AuxiliaryDrawerProps> = ({
     analysis,
     selectedText,
     customRewritePrompt,
-    rhythmData,
     isAnalyzing,
-    isAnalyzingRhythm,
     project,
     fullContent,
     setShowRightSidebar,
     setCustomRewritePrompt,
     handleRewrite,
     handleAutoFix,
-    handleAnalyzeRhythm,
+    isIterating,
     handleAnalyze
 }) => {
     return (
@@ -50,43 +46,13 @@ export const AuxiliaryDrawer: React.FC<AuxiliaryDrawerProps> = ({
             <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/80 backdrop-blur-md">
                 <div className="flex items-center gap-3">
                     {activeTab === 'ANALYSIS' && <><Activity className="text-muse-400" size={20} /> <span className="font-bold text-white uppercase tracking-wider text-sm italic">剧情诊断报告</span></>}
-                    {activeTab === 'RHYTHM' && <><TrendingUp className="text-indigo-400" size={20} /> <span className="font-bold text-white uppercase tracking-wider text-sm italic">叙事张力曲线</span></>}
                     {activeTab === 'STRUCTURE' && <><Lightbulb className="text-amber-400" size={20} /> <span className="font-bold text-white uppercase tracking-wider text-sm italic">创作结构助手</span></>}
-                    {activeTab === 'REFERENCE' && <><Info className="text-slate-400" size={20} /> <span className="font-bold text-white uppercase tracking-wider text-sm italic">核心设定参考</span></>}
                 </div>
                 <button onClick={() => setShowRightSidebar(false)} className="text-slate-500 hover:text-white p-1.5 hover:bg-slate-800 rounded-xl transition-all"><X size={20} /></button>
             </div>
 
             {/* Panel Content */}
             <div className="flex-1 overflow-y-auto custom-scrollbar relative p-6">
-                {activeTab === 'REFERENCE' && (
-                    <div className="space-y-6 animate-fade-in">
-                        <div>
-                            <h4 className="text-muse-400 text-xs font-bold uppercase mb-4 flex items-center gap-2"><User size={14} /> 核心角色设定</h4>
-                            {project.characters.length === 0 && <div className="p-4 bg-slate-800/30 rounded-xl border border-dashed border-slate-700 text-center text-xs text-slate-500">暂无角色设定。</div>}
-                            <div className="space-y-3">
-                                {project.characters.map(c => (
-                                    <div key={c.id} className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 hover:border-slate-600 transition-colors">
-                                        <div className="flex justify-between mb-1"><span className="text-slate-200 font-bold text-sm">{c.name}</span><span className="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">{c.role}</span></div>
-                                        <p className="text-xs text-slate-400 leading-relaxed line-clamp-4">{c.description}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div>
-                            <h4 className="text-muse-400 text-xs font-bold uppercase mb-4 flex items-center gap-2"><Globe size={14} /> 世界观与背景设定</h4>
-                            {project.worldSettings.length === 0 && <div className="p-4 bg-slate-800/30 rounded-xl border border-dashed border-slate-700 text-center text-xs text-slate-500">暂无世界设定。</div>}
-                            <div className="space-y-3">
-                                {project.worldSettings.map(w => (
-                                    <div key={w.id} className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 hover:border-slate-600 transition-colors">
-                                        <div className="flex justify-between mb-1"><span className="text-slate-200 font-bold text-sm">{w.title}</span><span className="text-[10px] text-slate-500">{w.category}</span></div>
-                                        <p className="text-xs text-slate-400 leading-relaxed line-clamp-4">{w.content}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                )}
 
                 {(activeTab === 'ANALYSIS' || activeTab === 'OPTIMIZE') && (
                     <PlotAnalysisPanel
@@ -96,17 +62,11 @@ export const AuxiliaryDrawer: React.FC<AuxiliaryDrawerProps> = ({
                         onCustomRewritePromptChange={setCustomRewritePrompt}
                         onRewrite={handleRewrite}
                         onAutoFix={handleAutoFix}
+                        isIterating={isIterating}
                         activeSubTab={activeTab === 'OPTIMIZE' ? 'OPTIMIZE' : 'ANALYSIS'}
                     />
                 )}
 
-                {activeTab === 'RHYTHM' && (
-                    <PlotRhythmChart
-                        project={project}
-                        isAnalyzingRhythm={isAnalyzingRhythm}
-                        onAnalyzeRhythm={handleAnalyzeRhythm}
-                    />
-                )}
 
                 {activeTab === 'STRUCTURE' && (
                     <PlotStructureAssistant
@@ -122,9 +82,9 @@ export const AuxiliaryDrawer: React.FC<AuxiliaryDrawerProps> = ({
                 )}
 
                 {/* Global Loading Overlay for Right Panels */}
-                {(isAnalyzing || isAnalyzingRhythm) && (
+                {isAnalyzing && (
                     <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-sm flex items-center justify-center z-50">
-                        <Loader text={isAnalyzing ? "正在进行逻辑审计..." : "正在分析剧情节奏..."} />
+                        <Loader text="正在进行深度诊断与逻辑审计..." />
                     </div>
                 )}
             </div>

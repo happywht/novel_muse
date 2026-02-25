@@ -41,22 +41,10 @@ export const PlotToolbar: React.FC<PlotToolbarProps> = ({
                         <Activity size={14} /> 诊断
                     </button>
                     <button
-                        onClick={() => toggleSidebarTab('RHYTHM')}
-                        className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-all ${activeTab === 'RHYTHM' && showRightSidebar ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
-                    >
-                        <TrendingUp size={14} /> 节奏
-                    </button>
-                    <button
                         onClick={() => toggleSidebarTab('STRUCTURE')}
                         className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-all ${activeTab === 'STRUCTURE' && showRightSidebar ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
                     >
                         <Lightbulb size={14} /> 结构
-                    </button>
-                    <button
-                        onClick={() => toggleSidebarTab('REFERENCE')}
-                        className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-all ${activeTab === 'REFERENCE' && showRightSidebar ? 'bg-slate-700 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
-                    >
-                        <Info size={14} /> 参考
                     </button>
                 </div>
             </div>

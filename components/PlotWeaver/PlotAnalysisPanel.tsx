@@ -21,6 +21,7 @@ interface PlotAnalysisPanelProps {
   onCustomRewritePromptChange: (value: string) => void;
   onRewrite: (prompt: string, label: string) => void;
   onAutoFix: () => void;
+  isIterating?: boolean;
   activeSubTab: 'ANALYSIS' | 'OPTIMIZE';
 }
 
@@ -31,6 +32,7 @@ export const PlotAnalysisPanel: React.FC<PlotAnalysisPanelProps> = ({
   onCustomRewritePromptChange,
   onRewrite,
   onAutoFix,
+  isIterating,
   activeSubTab,
 }) => {
 
@@ -40,22 +42,28 @@ export const PlotAnalysisPanel: React.FC<PlotAnalysisPanelProps> = ({
         {analysis ? (
           <div className="prose prose-invert prose-slate max-w-none animate-fade-in">
             <MarkdownRenderer content={analysis} />
-            <div className="mt-8 pt-4 border-t border-slate-700 flex justify-center">
+            <div className="mt-8 pt-4 border-t border-slate-700 flex flex-col items-center gap-4">
+              <p className="text-xs text-slate-500 italic text-center">系统检测到可落地的优化路径，点击下方按钮开启螺旋演进：</p>
               <button
                 onClick={onAutoFix}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-lg"
+                disabled={isIterating}
+                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 text-white px-6 py-3 rounded-xl text-sm font-bold flex items-center gap-2 shadow-xl shadow-indigo-900/40 transition-all hover:scale-105 active:scale-95 disabled:scale-100 disabled:shadow-none"
               >
-                <Zap size={16} />
-                根据此报告自动修复剧情
+                {isIterating ? (
+                  <RefreshCw size={18} className="animate-spin" />
+                ) : (
+                  <Zap size={18} />
+                )}
+                {isIterating ? "正在努力演进中..." : "执行螺旋优化 (Spiral Fix)"}
               </button>
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-slate-600">
-            <Activity size={48} className="opacity-20 mb-4" />
-            <p className="text-center max-w-xs text-sm">
-              点击下方的"深度评估"按钮。<br />
-              AI 将从<strong className="text-muse-400">情感弧光</strong>、<strong className="text-muse-400">节奏张力</strong>和<strong className="text-muse-400">逻辑自洽性</strong>三个维度对大纲进行审计。
+          <div className="flex flex-col items-center justify-center h-full text-slate-600 py-20">
+            <Activity size={56} className="opacity-20 mb-6 animate-pulse" />
+            <p className="text-center max-w-xs text-sm leading-relaxed">
+              点击侧边栏下方的<strong className="text-muse-400">“深度评估”</strong>按钮。<br /><br />
+              AI 将穿透表象，从<strong className="text-muse-400">逻辑自洽</strong>、<strong className="text-muse-400">冲突强度</strong>与<strong className="text-muse-400">节奏张力</strong>维度进行全书审计，并给出可落地的重写建议。
             </p>
           </div>
         )}

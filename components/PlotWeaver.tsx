@@ -14,7 +14,7 @@ interface PlotWeaverProps {
     updateProject: (data: Partial<ProjectState>) => void;
 }
 
-export type TabMode = 'ANALYSIS' | 'OPTIMIZE' | 'RHYTHM' | 'STRUCTURE' | 'CARDS' | 'REFERENCE';
+export type TabMode = 'ANALYSIS' | 'OPTIMIZE' | 'STRUCTURE' | 'CARDS';
 
 export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }) => {
     const { setActiveSection } = useProjectStore();
@@ -302,16 +302,14 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                 analysis={ai.analysis}
                 selectedText={selectedText}
                 customRewritePrompt={customRewritePrompt}
-                rhythmData={ai.rhythmData}
                 isAnalyzing={ai.isAnalyzing}
-                isAnalyzingRhythm={ai.isAnalyzingRhythm}
                 project={project}
                 fullContent={fullContent}
                 setShowRightSidebar={setShowRightSidebar}
                 setCustomRewritePrompt={setCustomRewritePrompt}
                 handleRewrite={(p, l) => {/* Optional: Add rewrite logic to hook if needed */ }}
                 handleAutoFix={ai.handleAutoFix}
-                handleAnalyzeRhythm={() => ai.handleAnalyzeRhythm(fullContent)}
+                isIterating={ai.isIterating}
                 handleAnalyze={() => ai.handleAnalyze(fullContent)}
             />
 

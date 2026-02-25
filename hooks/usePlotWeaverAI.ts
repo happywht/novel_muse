@@ -12,10 +12,8 @@ interface UsePlotWeaverAIProps {
 export const usePlotWeaverAI = ({ project, updateProject, updateProjectWithHistory, setToast }: UsePlotWeaverAIProps) => {
     const [isGeneratingPlot, setIsGeneratingPlot] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [isAnalyzingRhythm, setIsAnalyzingRhythm] = useState(false);
     const [isIterating, setIsIterating] = useState(false);
     const [analysis, setAnalysis] = useState('');
-    const [rhythmData, setRhythmData] = useState<any[]>([]);
 
     // --- Global Plot Generation ---
     const performGeneratePlot = async (templateContext?: string) => {
@@ -127,10 +125,13 @@ export const usePlotWeaverAI = ({ project, updateProject, updateProjectWithHisto
     };
 
     const handleAutoFix = async () => {
-        if (!analysis || project.plotNodes.length === 0) return;
+        if (!analysis || project.plotNodes.length === 0) {
+            setToast({ msg: "请先生成诊断报告后再执行自动修复", type: 'error' });
+            return;
+        }
         setIsIterating(true);
         try {
-            const directive = `请根据以下诊断报告的要求，对原有大纲进行全局优化和重写：\n\n${analysis}`;
+            const directive = `请完全根据以下诊断报告提供的【可操作建议】对大纲进行逻辑修复和全局优化：\n\n${analysis}`;
             const result = await rewritePlot(
                 project.plotNodes.map(n => n.content).join('\n\n'),
                 directive,
@@ -139,6 +140,11 @@ export const usePlotWeaverAI = ({ project, updateProject, updateProjectWithHisto
                 project.worldSettings,
                 project.creativeSettings
             );
+
+            if (!result || result.length === 0) {
+                setToast({ msg: "AI 未能生成有效的修复方案，请尝试手动微调", type: 'error' });
+                return;
+            }
 
             const newNodes: PlotNode[] = result.map((node, idx) => ({
                 id: crypto.randomUUID(),
@@ -150,46 +156,32 @@ export const usePlotWeaverAI = ({ project, updateProject, updateProjectWithHisto
             }));
 
             updateProjectWithHistory({
-                plotNodes: newNodes
-            }, "AI 自动逻辑修复 (基于诊断报告)");
+                plotNodes: newNodes,
+                plotOutline: '' // Clean up any lingering legacy state
+            }, "AI 螺旋优化 (基于深度诊断建议)");
 
-            setToast({ msg: "剧情已根据诊断建议完成优化", type: 'success' });
+            setToast({ msg: "剧情已根据诊断建议完成深度优化", type: 'success' });
+            // Optionally clear the analysis after fix to force a fresh look if needed, 
+            // but keeping it might be better for the user to compare.
         } catch (error) {
             console.error(error);
-            setToast({ msg: "自动修复失败", type: 'error' });
+            setToast({ msg: "自动修复过程中发生错误，请重试", type: 'error' });
         } finally {
             setIsIterating(false);
         }
     };
 
-    // --- Rhythm Analysis ---
-    const handleAnalyzeRhythm = async (fullContent: string) => {
-        if (!fullContent.trim()) return;
-        setIsAnalyzingRhythm(true);
-        try {
-            const result = await analyzePlotRhythm(fullContent);
-            setRhythmData(result);
-        } catch (error) {
-            setToast({ msg: "节奏分析失败", type: 'error' });
-        } finally {
-            setIsAnalyzingRhythm(false);
-        }
-    };
 
     return {
         isGeneratingPlot,
         isAnalyzing,
-        isAnalyzingRhythm,
         isIterating,
         analysis,
-        rhythmData,
         performGeneratePlot,
         handleGenerateNodeAI,
         handleIterateNode,
         handleAnalyze,
         handleAutoFix,
-        handleAnalyzeRhythm,
-        setAnalysis,
-        setRhythmData
+        setAnalysis
     };
 };

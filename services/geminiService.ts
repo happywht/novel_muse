@@ -222,7 +222,24 @@ export const analyzePlot = async (premise: string, currentPlot: string, characte
     const ai = getAIClient();
     const instruction = getInstructionWithSettings('plot_analysis', settings);
     const contextStr = formatContext(characters, worldSettings, echoes);
-    const prompt = `核心梗概: ${premise}\n\n${contextStr}\n当前剧情大纲:\n${currentPlot}`;
+
+    const prompt = `
+    你是一个极其严苛的小说编辑和逻辑审计师。
+    请基于以下【核心梗概】和【设定背景】，对当前的【剧情大纲】进行深度审计。
+    
+    【核心梗概】: ${premise}
+    
+    ${contextStr}
+    
+    【当前剧情大纲】:
+    ${currentPlot}
+    
+    任务要求：
+    1. **逻辑漏洞检测**：找出剧情中的逻辑硬伤、角色动机不合理、或违反既定世界观法则的地方。
+    2. **节奏与情感审计**：分析剧情的张力起伏（Pacing），指出哪里节奏太拖沓或转折太突兀。
+    3. **给出【可操作的优化方案】**：针对每一个发现的问题，请提供具体的修改建议（例如：“在节点 2 中加入关于主角弱点的细节，为节点 5 的失败做铺垫”）。
+    
+    请使用 Markdown 格式输出。请确保报告包含一个明确的“可操作建议列表”，以便后续自动修复程序调用。`;
 
     try {
         // Enable Thinking for deep analysis
@@ -231,8 +248,6 @@ export const analyzePlot = async (premise: string, currentPlot: string, characte
             contents: prompt,
             config: {
                 systemInstruction: instruction,
-                // The effective token limit for the response is `maxOutputTokens` minus the `thinkingBudget`.
-                // We give it a healthy budget to think through logical inconsistencies.
                 thinkingConfig: { thinkingBudget: 2048 },
             }
         }));
@@ -430,17 +445,23 @@ export const rewritePlot = async (
     const instruction = getInstructionWithSettings('plot_weaving', settings); // Re-use weaving for rewrite context
 
     const prompt = `
+    你是一个天才的剧情架构师。
+    你的任务是根据【修改指令】对现有的【剧情大纲】进行局部或全局的优化。
+    
     小说类型: ${genre}
     
     ${contextStr}
     
-    当前剧情大纲:
+    【当前剧情大纲】:
     ${currentPlot}
     
-    【修改指令】:
+    【修改指令/诊断反馈】:
     ${directive}
     
-    请根据以上修改指令，重新输出一份完整的、优化后的剧情大纲。保留原大纲中优秀的部分，修正问题或调整方向。
+    任务要求：
+    1. **精准落实指令**：如果指令（或诊断反馈）指出某处需要修复，请务必在新的大纲中体现出来。
+    2. **保持连贯性**：修改后的剧情必须与角色设定和世界观保持高度的一致性。
+    3. **螺旋升华**：不仅仅是修复错误，更要尝试在原有基础上增加戏剧冲突和张力。
     
     **重要输出格式要求**：
     你必须返回一个符合以下 JSON 结构的数组：
@@ -457,6 +478,7 @@ export const rewritePlot = async (
             contents: prompt,
             config: {
                 systemInstruction: instruction,
+                thinkingConfig: { thinkingBudget: 2048 }, // Added thinking for rewrite quality
                 temperature: settings?.creativity || 0.85,
                 responseMimeType: "application/json",
             }
