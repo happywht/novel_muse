@@ -1,10 +1,13 @@
 
 
+export type BeatTag = 'INCITING_INCIDENT' | 'PLOT_POINT_1' | 'MIDPOINT' | 'PLOT_POINT_2' | 'CLIMAX' | 'RESOLUTION' | 'OTHER' | null;
+
 export interface PlotNode {
   id: string;
   title: string;
   content: string; // The beat/summary
   order: number;
+  beatTag?: BeatTag; // NEW: Narrative milestone tag
   relatedCharacters?: string[]; // IDs
   relatedLocations?: string[]; // IDs
 }
