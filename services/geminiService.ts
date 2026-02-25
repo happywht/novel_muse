@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { Character, WorldSetting, CreativeSettings, StateChangeRecommendation, Echo } from "../types";
+import { Character, WorldSetting, CreativeSettings, StateChangeRecommendation, Echo, PlotNode, Chapter } from "../types";
 import {
     safeParseAiJson,
     AiCharacterArraySchema,
@@ -8,6 +8,7 @@ import {
     AiEchoArraySchema,
     AiPlotRhythmArraySchema,
     AiPlotNodeArraySchema,
+    AiChapterOutlineArraySchema,
 } from './schemas';
 import { buildPromptContent } from '../config/prompts';
 import { useProjectStore } from '../store/useProjectStore';
@@ -26,7 +27,7 @@ const getAIClient = () => {
 export const getModelName = (tier: 'flash' | 'pro' = 'flash'): string => {
     const customModel = localStorage.getItem(STORAGE_KEY_MODEL);
     if (customModel) return customModel;
-    return tier === 'pro' ? 'gemini-2.5-pro-preview-05-06' : 'gemini-2.5-flash-preview-05-20';
+    return tier === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
 };
 
 // Helper for retry logic
@@ -1185,6 +1186,136 @@ export const chatWithPersona = async (character: Character, message: string, his
         return result.text || "...";
     } catch (e) {
         console.error("Persona Chat Error", e);
+        throw e;
+    }
+};
+
+export const splitPlotNodeIntoChapters = async (
+    genre: string,
+    fullPlotSummary: string,
+    targetNode: PlotNode,
+    characters: Character[],
+    worldSettings: WorldSetting[],
+    settings?: CreativeSettings,
+    echoes: Echo[] = [],
+    fissionCount: number | 'AUTO' = 'AUTO'
+): Promise<{ title: string; summary: string; expectedPOV: string }[]> => {
+    const ai = getAIClient();
+    const contextStr = formatContext(characters, worldSettings, echoes);
+    const instruction = getInstructionWithSettings('plot_fission', settings);
+
+    const countInstruction = fissionCount === 'AUTO' ? '2-3 个' : `${fissionCount} 个`;
+
+    const prompt = `
+    小说类型: ${genre}
+    项目全剧情概览: ${fullPlotSummary}
+    
+    ${contextStr}
+    
+    【当前需要拆解的情节节点 (Plot Beat)】:
+    标题: ${targetNode.title}
+    具体内容: ${targetNode.content}
+    
+    任务：
+    请将这个中观维度的“情节节点”进一步细化分解为 ${countInstruction} 具体的“章节细纲”。
+    你要确保：
+    1. 每一章都有明确的【标题】。
+    2. 提供详尽的【章节细纲 (Summary)】，描述本章的核心反转、关键对话或动作，为后续正文协作提供充足依据。
+    3. 指定合适的【视角人物 (Expected POV)】。
+    4. 确保拆分后的章节在逻辑上紧密承接全书概览，且具有戏剧张力。
+    
+    **重要输出格式要求**：
+    你必须返回一个符合以下 JSON 结构的数组：
+    [
+      { "title": "章节标题", "summary": "本章细纲内容...", "expectedPOV": "视角人物姓名" },
+      ...
+    ]
+    禁止包含任何开场白或解释文字。
+    `;
+
+    try {
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: getModelName('pro'),
+            contents: prompt,
+            config: {
+                systemInstruction: instruction,
+                temperature: settings?.creativity || 0.85,
+                responseMimeType: "application/json",
+            }
+        }));
+
+        const result = safeParseAiJson(response.text, AiChapterOutlineArraySchema, "Chapter Fission");
+        return result || [];
+    } catch (e) {
+        console.error("Gemini Chapter Fission Error:", e);
+        throw e;
+    }
+};
+
+export const regenerateChapterOutline = async (
+    genre: string,
+    fullPlotSummary: string,
+    targetNode: PlotNode,
+    chapterToRewrite: Chapter,
+    previousChapter: Chapter | null,
+    nextChapter: Chapter | null,
+    characters: Character[],
+    worldSettings: WorldSetting[],
+    settings?: CreativeSettings,
+    echoes: Echo[] = []
+): Promise<{ title: string; summary: string; expectedPOV: string } | null> => {
+    const ai = getAIClient();
+    const contextStr = formatContext(characters, worldSettings, echoes);
+    const instruction = getInstructionWithSettings('plot_fission', settings);
+
+    const prompt = `
+    小说类型: ${genre}
+    项目全剧情概览: ${fullPlotSummary}
+    
+    ${contextStr}
+    
+    【所属的情节节点 (Plot Beat)】:
+    标题: ${targetNode.title}
+    具体内容: ${targetNode.content}
+
+    ${previousChapter ? `【上一章细纲】:\n标题: ${previousChapter.title}\n内容: ${previousChapter.summary}\n` : ''}
+    ${nextChapter ? `【下一章细纲】:\n标题: ${nextChapter.title}\n内容: ${nextChapter.summary}\n` : ''}
+    
+    【当前需要重写的章节细纲】:
+    标题: ${chapterToRewrite.title}
+    原内容: ${chapterToRewrite.summary}
+    原视角: ${chapterToRewrite.expectedPOV}
+    
+    任务：
+    请结合上下文节点，**单独重写**这个章节的细纲。
+    你要确保：
+    1. 提供详尽的【章节细纲 (Summary)】，描述本章的核心反转、关键对话或动作，修复原有问题。
+    2. 确保它能完美衔接上一章和下一章的剧情，同时符合所属的情节节点目标。
+    3. 保留原标题和视角人物（也可根据剧情需要适当调整优化）。
+    
+    **重要输出格式要求**：
+    你必须返回一个**仅仅包含这一个章节**的 JSON 数组结构（为了格式统一，请放在数组里，但数组长度为1）：
+    [
+      { "title": "章节标题", "summary": "本章细纲内容...", "expectedPOV": "视角人物姓名" }
+    ]
+    禁止包含任何开场白或解释文字。
+    `;
+
+    try {
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: getModelName('pro'),
+            contents: prompt,
+            config: {
+                systemInstruction: instruction,
+                temperature: settings?.creativity || 0.85,
+                responseMimeType: "application/json",
+            }
+        }));
+
+        const result = safeParseAiJson(response.text, AiChapterOutlineArraySchema, "Chapter Regeneration");
+        return result && result.length > 0 ? result[0] : null;
+    } catch (e) {
+        console.error("Gemini Chapter Regeneration Error:", e);
         throw e;
     }
 };

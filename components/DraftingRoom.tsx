@@ -19,6 +19,8 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     const isLoading = useProjectStore(state => state.isLoading);
     const activePlotNodeId = useProjectStore(state => state.activePlotNodeId);
     const setActivePlotNodeId = useProjectStore(state => state.setActivePlotNodeId);
+    const activeChapterId = useProjectStore(state => state.activeChapterId);
+    const setActiveChapterId = useProjectStore(state => state.setActiveChapterId);
     const [viewMode, setViewMode] = useState<ViewMode>('FORGE');
     const [showReference, setShowReference] = useState(false);
 
@@ -44,9 +46,6 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     const [isExtracting, setIsExtracting] = useState(false);
     const [extractedEchoes, setExtractedEchoes] = useState<Echo[]>([]);
 
-    // Manuscript State
-    const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
-
     // Auto-fetch chapter content when selected
     React.useEffect(() => {
         if (activeChapterId && viewMode === 'MANUSCRIPT') {
@@ -71,6 +70,34 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
             }
         }
     }, [activePlotNodeId, project.plotNodes, setActivePlotNodeId]);
+
+    // NEW: Handle bridge from Chapter Outliner
+    React.useEffect(() => {
+        if (activeChapterId) {
+            const chapter = project.chapters.find(c => c.id === activeChapterId);
+            if (chapter) {
+                // If chapter has a summary, use it as the plot beat for generation
+                if (chapter.summary) {
+                    setPlotBeat(chapter.summary);
+                }
+
+                // If it has specific POV, set it
+                if (chapter.expectedPOV) {
+                    const char = project.characters.find(c => c.name.includes(chapter.expectedPOV!) || chapter.expectedPOV!.includes(c.name));
+                    if (char) setPovCharId(char.id);
+                }
+
+                // If it belongs to a plot node, select related characters and location
+                if (chapter.plotNodeId) {
+                    const node = project.plotNodes.find(n => n.id === chapter.plotNodeId);
+                    if (node) {
+                        setSelectedChars(node.relatedCharacters || []);
+                        setSelectedLocationId(node.relatedLocations?.[0] || '');
+                    }
+                }
+            }
+        }
+    }, [activeChapterId, project.chapters, project.characters, project.plotNodes]);
 
     const toggleCharSelection = (id: string) => {
         setSelectedChars(prev =>
@@ -226,25 +253,42 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     const handleCommitToManuscript = () => {
         if (!generatedContent) return;
 
-        if (!confirm("确定要将此草稿采纳为正式章节吗？\n这将把它加入到正文列表中，作为后续生成的上下文参考。")) return;
+        const isUpdatingExisting = !!activeChapterId && project.chapters.some(c => c.id === activeChapterId);
+
+        const confirmMsg = isUpdatingExisting
+            ? "确定要将此内容更新到当前章节正文中吗？"
+            : "确定要将此草稿采纳为正式章节吗？\n这将把它加入到正文列表中，作为后续生成的上下文参考。";
+
+        if (!confirm(confirmMsg)) return;
 
         console.log("📝 Committing to manuscript...");
-        const newChapter: Chapter = {
-            id: Date.now().toString(),
-            title: activeDraftId
-                ? project.drafts.find(d => d.id === activeDraftId)?.title || "新章节"
-                : plotBeat.slice(0, 20) || "新章节",
-            content: generatedContent,
-            order: (project.chapters || []).length + 1,
-            lastModified: Date.now()
-        };
 
-        // Add to chapters
-        const updatedChapters = [...(project.chapters || []), newChapter];
-        updateProject({ chapters: updatedChapters });
+        if (isUpdatingExisting) {
+            // Update existing chapter
+            const updatedChapters = project.chapters.map(c =>
+                c.id === activeChapterId
+                    ? { ...c, content: generatedContent, lastModified: Date.now() }
+                    : c
+            );
+            updateProject({ chapters: updatedChapters });
+            alert("章节内容已更新！");
+        } else {
+            // Create new chapter
+            const newChapter: Chapter = {
+                id: Date.now().toString(),
+                title: activeDraftId
+                    ? project.drafts.find(d => d.id === activeDraftId)?.title || "新章节"
+                    : plotBeat.slice(0, 20) || "新章节",
+                content: generatedContent,
+                order: (project.chapters || []).length + 1,
+                lastModified: Date.now()
+            };
+            const updatedChapters = [...(project.chapters || []), newChapter];
+            updateProject({ chapters: updatedChapters });
+            setActiveChapterId(newChapter.id);
+            alert("已成功采纳为正文！");
+        }
 
-        console.log("✅ Successfully committed. Current chapters:", updatedChapters.length);
-        alert("已成功采纳为正文！你可以去 '正文归档' 模式查看，或者继续撰写下一章。");
         setViewMode('MANUSCRIPT');
     };
 

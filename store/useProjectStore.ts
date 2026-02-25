@@ -62,6 +62,8 @@ interface ProjectStore {
     setActiveSection: (section: AppSection) => void;
     activePlotNodeId: string | null;
     setActivePlotNodeId: (id: string | null) => void;
+    activeChapterId: string | null;
+    setActiveChapterId: (id: string | null) => void;
     showGuide: boolean;
     setShowGuide: (show: boolean) => void;
     showSettings: boolean;
@@ -139,6 +141,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     activePlotNodeId: null,
     setActivePlotNodeId: (id) => set({ activePlotNodeId: id }),
+
+    activeChapterId: null,
+    setActiveChapterId: (id) => set({ activeChapterId: id }),
 
     // --- Sync State ---
     useBackend: false,

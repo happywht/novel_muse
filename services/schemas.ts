@@ -121,3 +121,11 @@ export const AiPlotNodeSchema = z.object({
 });
 
 export const AiPlotNodeArraySchema = z.array(AiPlotNodeSchema);
+// --- Chapter Outlines (splitPlotNodeIntoChapters) ---
+export const AiChapterOutlineSchema = z.object({
+    title: z.string().min(1, '章节标题不能为空'),
+    summary: z.string().default(''),
+    expectedPOV: z.string().default('未设定'),
+});
+
+export const AiChapterOutlineArraySchema = z.array(AiChapterOutlineSchema);

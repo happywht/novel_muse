@@ -4,6 +4,7 @@ import { Dashboard } from './components/Dashboard';
 import { WorldBuilder } from './components/WorldBuilder';
 import { CharacterCreator } from './components/CharacterCreator';
 import { PlotWeaver } from './components/PlotWeaver';
+import { ChapterOutliner } from './components/ChapterOutliner/ChapterOutliner';
 import { DraftingRoom } from './components/DraftingRoom';
 import { EchoChamber } from './components/EchoChamber';
 import { UserGuide } from './components/UserGuide';
@@ -229,6 +230,9 @@ const App: React.FC = () => {
             )}
             {activeSection === AppSection.PLOT && (
               <PlotWeaver project={project} updateProject={updateProject} />
+            )}
+            {activeSection === AppSection.OUTLINER && (
+              <ChapterOutliner project={project} updateProject={updateProject} />
             )}
             {activeSection === AppSection.DRAFTING && (
               <DraftingRoom project={project} updateProject={updateProject} />

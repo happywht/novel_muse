@@ -3,7 +3,7 @@ import { AppSection } from '../types';
 import {
     Feather, Globe, Users, BookOpen, PenTool, Activity,
     GitBranch, BarChart3, Settings, Wand2, HelpCircle,
-    ChevronLeft, ChevronRight, Sparkles, Home
+    ChevronLeft, ChevronRight, Sparkles, Home, LayoutGrid
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -62,6 +62,15 @@ const NAV_ITEMS: NavItem[] = [
         color: 'text-sky-400',
         bgColor: 'bg-sky-500/15',
         activeGlow: 'shadow-sky-500/20',
+    },
+    {
+        id: AppSection.OUTLINER,
+        label: '章节规划 Outliner',
+        shortLabel: '规划',
+        icon: LayoutGrid,
+        color: 'text-indigo-400',
+        bgColor: 'bg-indigo-500/15',
+        activeGlow: 'shadow-indigo-500/20',
     },
     {
         id: AppSection.DRAFTING,

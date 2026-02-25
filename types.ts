@@ -56,6 +56,9 @@ export interface Chapter {
   id: string;
   title: string;
   content: string;
+  summary?: string;     // NEW: For chapter-level outlining
+  expectedPOV?: string; // NEW: Track perspective
+  plotNodeId?: string;  // NEW: Link back to a PlotNode
   order: number;
   lastModified: number;
 }
@@ -78,6 +81,7 @@ export enum AppSection {
   WORLD = 'WORLD',
   CHARACTERS = 'CHARACTERS',
   PLOT = 'PLOT',
+  OUTLINER = 'OUTLINER', // NEW: Chapter fission section
   DRAFTING = 'DRAFTING',
   ECHOES = 'ECHOES',
   GRAPH = 'GRAPH',
