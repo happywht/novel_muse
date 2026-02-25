@@ -225,7 +225,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject }) 
             setKickstartStep(3);
             setKickstartStatus("第三步：正在基于庞大设定推演大纲 (Plot Weaver)...");
             const newPlot = await generatePlotFromContext(project.premise, genre, updatedChars, updatedWorlds, project.creativeSettings);
-            updateProject({ plotOutline: newPlot });
+            const plotString = newPlot.map(p => `### ${p.title}\n\n${p.content}`).join('\n\n---\n\n');
+            updateProject({ plotOutline: plotString });
 
             setKickstartStatus("宏大叙事构建完成！");
             setTimeout(() => {

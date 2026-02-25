@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { ProjectState, Character, WorldSetting, Draft, Chapter, StateChangeRecommendation, Echo } from '../types';
 import { generateSceneFromIngredients, analyzeStateChanges, PacingMode, polishDraft, PolishMode, extractEchoesFromText } from '../services/geminiService';
 import { Loader } from './Loader';
-import { PenTool, MapPin, Users, Zap, Plus, FileText, Trash2, Clipboard, Save, RefreshCw, GitCommit, ArrowRight, Check, Globe, Book, Archive, Layout, Sidebar, X, User, Wand2, Gauge, Flame, Feather, Eye, Clapperboard, Brain, ScanSearch, Sparkles } from 'lucide-react';
+import { PenTool, MapPin, Users, Zap, Plus, FileText, Trash2, Clipboard, Save, RefreshCw, GitCommit, ArrowRight, Check, Globe, Book, Archive, Layout, Sidebar, X, User, Wand2, Gauge, Flame, Feather, Eye, Clapperboard, Brain, ScanSearch, Sparkles, AlertTriangle } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { DraftEditor } from './DraftingRoom/DraftEditor';
+import { rewriteLocalText } from '../services/geminiService';
 
 interface DraftingRoomProps {
     project: ProjectState;
@@ -11,6 +13,36 @@ interface DraftingRoomProps {
 }
 
 type ViewMode = 'FORGE' | 'MANUSCRIPT';
+
+const ContinuityBanner: React.FC<{ project: ProjectState, activeChapterId: string | null }> = ({ project, activeChapterId }) => {
+    if (!activeChapterId) return null;
+
+    const sortedChapters = [...(project.chapters || [])].sort((a, b) => a.order - b.order);
+    const currentIndex = sortedChapters.findIndex(c => c.id === activeChapterId);
+
+    if (currentIndex <= 0) return null;
+
+    // Check for empty chapters before this one
+    const precedingChapters = sortedChapters.slice(0, currentIndex);
+    const emptyChapters = precedingChapters.filter(c => !c.content || c.content.trim().length < 50);
+
+    if (emptyChapters.length > 0) {
+        return (
+            <div className="bg-amber-900/30 border border-amber-500/30 p-3 rounded-xl flex items-start gap-3 mb-4 animate-in slide-in-from-top-2 duration-300">
+                <div className="mt-0.5"><AlertTriangle className="text-amber-500" size={16} /></div>
+                <div className="flex-1">
+                    <p className="text-amber-200 text-xs font-bold">检测到叙事断层 (Continuity Gap)</p>
+                    <p className="text-amber-400/80 text-[10px] leading-relaxed mt-0.5">
+                        前序章节（如：{emptyChapters.slice(0, 2).map(c => `"${c.title}"`).join(', ')}{emptyChapters.length > 2 ? ' 等' : ''}）内容缺失。
+                        这会导致 AI 无法继承之前的关键伏笔或状态变更，建议先补全前文。
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    return null;
+};
 
 import { useProjectStore } from '../store/useProjectStore';
 
@@ -23,6 +55,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     const setActiveChapterId = useProjectStore(state => state.setActiveChapterId);
     const [viewMode, setViewMode] = useState<ViewMode>('FORGE');
     const [showReference, setShowReference] = useState(false);
+    const [showAdvancedParams, setShowAdvancedParams] = useState(false); // NEW: Toggle advanced params
 
     // Inputs
     const [selectedChars, setSelectedChars] = useState<string[]>([]);
@@ -34,6 +67,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
 
     // State
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isLocalRewriting, setIsLocalRewriting] = useState(false); // NEW
     const [isPolishing, setIsPolishing] = useState(false);
     const [showPolishMenu, setShowPolishMenu] = useState(false);
     const [generatedContent, setGeneratedContent] = useState('');
@@ -105,12 +139,27 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
         );
     };
 
-    const getLastStoryContext = () => {
+    const getPrecedingContext = () => {
         if (!project.chapters || project.chapters.length === 0) return undefined;
-        // Get the last chapter
-        const lastChapter = project.chapters[project.chapters.length - 1];
-        // Return last 2000 chars roughly
-        return lastChapter.content.slice(-2000);
+
+        // Sort chapters by order to ensure chronological sequence
+        const sortedChapters = [...project.chapters].sort((a, b) => a.order - b.order);
+
+        // Find current chapter index
+        const currentIndex = sortedChapters.findIndex(c => c.id === activeChapterId);
+
+        if (currentIndex <= 0) {
+            // If no active chapter or it's the first one, fallback to last available if activeChapterId is null
+            if (!activeChapterId) {
+                const last = sortedChapters[sortedChapters.length - 1];
+                return last?.content?.slice(-2000);
+            }
+            return undefined;
+        }
+
+        // Get the immediately preceding chapter
+        const prevChapter = sortedChapters[currentIndex - 1];
+        return prevChapter.content ? prevChapter.content.slice(-2000) : undefined;
     };
 
     const handleGenerate = async () => {
@@ -124,7 +173,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
         try {
             const activeCharacters = (project.characters || []).filter(c => selectedChars.includes(c.id));
             const activeLocation = (project.worldSettings || []).find(w => w.id === selectedLocationId) || null;
-            const previousContext = getLastStoryContext();
+            const previousContext = getPrecedingContext();
 
             const result = await generateSceneFromIngredients(
                 project.genre,
@@ -139,7 +188,14 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                 targetWordCount
             );
 
-            setGeneratedContent(result);
+            // Format raw text with line breaks into HTML paragraphs for Tiptap
+            const formattedResult = result
+                .split('\n')
+                .filter(p => p.trim() !== '')
+                .map(p => `<p>${p.trim()}</p>`)
+                .join('');
+
+            setGeneratedContent(formattedResult);
             setActiveDraftId(null); // It's a fresh unsaved generation
 
             // Auto-trigger state analysis after generation
@@ -166,6 +222,30 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
             alert("润色失败，请重试");
         } finally {
             setIsPolishing(false);
+        }
+    };
+
+    // NEW: Handle local rewrites from Tiptap Editor
+    const handleLocalRewrite = async (targetText: string, instruction: string, contextBefore: string, contextAfter: string, applyRewrite: (newText: string) => void) => {
+        setIsLocalRewriting(true);
+        try {
+            const rewrittenText = await rewriteLocalText(
+                project.genre,
+                targetText,
+                contextBefore,
+                contextAfter,
+                instruction,
+                project.creativeSettings
+            );
+
+            // Apply the AI response directly into the editor
+            applyRewrite(rewrittenText);
+
+        } catch (e) {
+            console.error("Local rewrite failed:", e);
+            alert("局部重写失败，请重试");
+        } finally {
+            setIsLocalRewriting(false);
         }
     };
 
@@ -308,6 +388,20 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
         }
     };
 
+    const handleDeleteChapter = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if (!confirm("确定要删除此章节吗？此操作不可恢复。")) return;
+
+        const updatedChapters = (project.chapters || []).filter(c => c.id !== id);
+        // Re-order remaining chapters
+        updatedChapters.forEach((c, idx) => c.order = idx + 1);
+
+        updateProject({ chapters: updatedChapters });
+        if (activeChapterId === id) {
+            setActiveChapterId(updatedChapters.length > 0 ? updatedChapters[0].id : null);
+        }
+    };
+
     // Calculate active world context items for display
     const totalRuleCount = (project.worldSettings || []).filter(w => w.id !== selectedLocationId).length;
     // If count is large, we show a dynamic message
@@ -388,6 +482,8 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                     {/* Left: Director's Console */}
                     <div className="w-1/3 flex flex-col gap-4 overflow-y-auto custom-scrollbar pr-2 pt-10">
 
+                        <ContinuityBanner project={project} activeChapterId={activeChapterId} />
+
                         {/* Step 1: Plot Beat */}
                         <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
                             <div className="flex items-center gap-2 mb-3 text-muse-300 font-bold">
@@ -426,176 +522,126 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                             </div>
                         </div>
 
-                        {/* Step 2.5: POV Mode */}
-                        {selectedChars.length > 0 && (
-                            <div className="bg-gradient-to-r from-indigo-900/20 to-purple-900/20 p-4 rounded-xl border border-indigo-500/20">
-                                <div className="flex items-center gap-2 mb-3 text-indigo-300 font-bold">
-                                    <Eye size={18} />
-                                    <h3>视角模式 (POV)</h3>
-                                    <span className="text-[10px] px-2 py-0.5 bg-indigo-500/20 text-indigo-400 rounded-full border border-indigo-500/30 ml-auto">NEW</span>
-                                </div>
-                                <select
-                                    value={povCharId}
-                                    onChange={(e) => setPovCharId(e.target.value)}
-                                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm focus:ring-1 focus:ring-indigo-500 outline-none"
-                                >
-                                    <option value="">-- 全知视角（上帝视角） --</option>
-                                    {(project.characters || []).filter(c => selectedChars.includes(c.id)).map(char => (
-                                        <option key={char.id} value={char.id}>
-                                            👁️ {char.name} 的视角 ({char.role})
-                                        </option>
-                                    ))}
-                                </select>
-                                {povCharId && (
-                                    <p className="text-[10px] text-indigo-400/70 mt-2 italic">
-                                        AI 将以 {(project.characters || []).find(c => c.id === povCharId)?.name} 的认知边界和语言风格进行叙事
-                                    </p>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Step 3: Location Selection */}
+                        {/* Expandable Advanced Params Panel */}
                         <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                            <div className="flex items-center gap-2 mb-3 text-muse-300 font-bold">
-                                <MapPin size={18} />
-                                <h3>3. 选择场景地点 (Location)</h3>
-                            </div>
-                            <select
-                                value={selectedLocationId}
-                                onChange={(e) => setSelectedLocationId(e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-white text-sm focus:ring-1 focus:ring-muse-500 outline-none"
+                            <button
+                                onClick={() => setShowAdvancedParams(!showAdvancedParams)}
+                                className="w-full flex justify-between items-center text-slate-400 hover:text-white"
                             >
-                                <option value="">-- 不指定地点 (由 AI 决定) --</option>
-                                {(project.worldSettings || []).map(w => (
-                                    <option key={w.id} value={w.id}>
-                                        [{w.category}] {w.title}
-                                    </option>
-                                ))}
-                            </select>
-                            {selectedLocationId && (
-                                <p className="text-xs text-slate-500 mt-2 line-clamp-2 bg-slate-900/50 p-2 rounded">
-                                    {(project.worldSettings || []).find(w => w.id === selectedLocationId)?.content}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Context Indicator */}
-                        <div className="space-y-2">
-                            {/* Global Context Indicator */}
-                            <div className={`bg-slate-900/50 p-3 rounded-xl border flex items-center gap-3 transition-colors ${isDynamicContext ? 'border-muse-500/50 bg-muse-900/20' : 'border-slate-800'}`}>
-                                <div className={`p-2 rounded-lg ${isDynamicContext ? 'bg-muse-500 text-white animate-pulse' : 'bg-muse-900/50 text-muse-400'}`}>
-                                    <Globe size={16} />
+                                <div className="flex items-center gap-2 font-bold font-serif text-sm">
+                                    <Sparkles size={16} className={showAdvancedParams ? "text-muse-400" : ""} />
+                                    高级生信参数控制 (Advanced Directives)
                                 </div>
-                                <div className="flex-1">
-                                    <h4 className={`text-xs font-bold uppercase ${isDynamicContext ? 'text-muse-300' : 'text-slate-300'}`}>
-                                        {isDynamicContext ? '智能相关性筛选已激活' : '全局世界观法则'}
-                                    </h4>
-                                    <p className="text-[10px] text-slate-500">
-                                        {isDynamicContext
-                                            ? `AI 正基于剧情关键词动态筛选最相关的 20 条设定 (共 ${totalRuleCount} 条)`
-                                            : `AI 将参考库中所有 ${totalRuleCount} 条世界观设定`
-                                        }
-                                    </p>
-                                </div>
-                                <Check size={16} className="text-emerald-500/50" />
-                            </div>
+                                <div className={`transition-transform ${showAdvancedParams ? 'rotate-180' : ''}`}>▼</div>
+                            </button>
 
-                            {/* Manuscript Continuity Indicator */}
-                            {(project.chapters || []).length > 0 && (
-                                <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800 flex items-center gap-3 border-l-4 border-l-amber-500/50">
-                                    <div className="p-2 bg-amber-900/20 rounded-lg text-amber-400">
-                                        <Archive size={16} />
+                            {showAdvancedParams && (
+                                <div className="mt-4 pt-4 border-t border-slate-700 space-y-4 animate-fade-in custom-scrollbar">
+                                    {/* Step 2.5: POV Mode */}
+                                    {selectedChars.length > 0 && (
+                                        <div className="bg-gradient-to-r from-indigo-900/20 to-purple-900/20 p-3 rounded-xl border border-indigo-500/20">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <h3 className="text-xs text-indigo-300 font-bold flex items-center gap-1"><Eye size={14} /> 限制性视角锁定 (POV)</h3>
+                                            </div>
+                                            <select
+                                                value={povCharId}
+                                                onChange={(e) => setPovCharId(e.target.value)}
+                                                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg p-2 text-slate-300 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                                            >
+                                                <option value="">-- 全知上帝视角 --</option>
+                                                {(project.characters || []).filter(c => selectedChars.includes(c.id)).map(char => (
+                                                    <option key={char.id} value={char.id}>👁️ {char.name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {/* Location Selection */}
+                                    <div className="space-y-2">
+                                        <h3 className="text-xs text-slate-400 font-bold flex items-center gap-1"><MapPin size={14} /> 强制锚定场景维度 (Location)</h3>
+                                        <select
+                                            value={selectedLocationId}
+                                            onChange={(e) => setSelectedLocationId(e.target.value)}
+                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-lg p-2 text-slate-300 text-xs focus:ring-1 focus:ring-muse-500 outline-none"
+                                        >
+                                            <option value="">-- 无 (由 AI 自主决定) --</option>
+                                            {(project.worldSettings || []).map(w => (
+                                                <option key={w.id} value={w.id}>[{w.category}] {w.title}</option>
+                                            ))}
+                                        </select>
                                     </div>
-                                    <div className="flex-1">
-                                        <h4 className="text-xs font-bold text-slate-300 uppercase">正文连贯性引擎</h4>
-                                        <p className="text-[10px] text-slate-500">
-                                            AI 已读取上一章最后 2000 字，确保剧情无缝衔接。
-                                        </p>
+
+                                    {/* Pacing Control */}
+                                    <div className="space-y-2 pt-2">
+                                        <h3 className="text-xs text-slate-400 font-bold flex items-center gap-1"><Gauge size={14} /> 叙事节奏控制 (Pacing)</h3>
+                                        <div className="flex justify-between items-center gap-1">
+                                            <button
+                                                onClick={() => setPacing('SLOW_BURN')}
+                                                className={`flex-1 py-1.5 text-[10px] font-medium rounded-lg flex flex-col items-center transition-all ${pacing === 'SLOW_BURN' ? 'bg-emerald-900/50 text-emerald-300 border border-emerald-500/30' : 'bg-slate-900/50 text-slate-500 hover:bg-slate-700/50'}`}
+                                            >铺垫蓄力
+                                            </button>
+                                            <button
+                                                onClick={() => setPacing('BALANCED')}
+                                                className={`flex-1 py-1.5 text-[10px] font-medium rounded-lg flex flex-col items-center transition-all ${pacing === 'BALANCED' ? 'bg-muse-900/50 text-muse-300 border border-muse-500/30' : 'bg-slate-900/50 text-slate-500 hover:bg-slate-700/50'}`}
+                                            >平衡推进
+                                            </button>
+                                            <button
+                                                onClick={() => setPacing('CLIMAX')}
+                                                className={`flex-1 py-1.5 text-[10px] font-medium rounded-lg flex flex-col items-center transition-all ${pacing === 'CLIMAX' ? 'bg-rose-900/50 text-rose-300 border border-rose-500/30' : 'bg-slate-900/50 text-slate-500 hover:bg-slate-700/50'}`}
+                                            >高潮爆发
+                                            </button>
+                                        </div>
                                     </div>
-                                    <Check size={16} className="text-emerald-500/50" />
+
+                                    {/* Word Count Slider */}
+                                    <div className="space-y-2 pt-2">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs text-slate-400 font-bold flex items-center gap-1"><FileText size={14} /> 目标体量</span>
+                                            <span className="text-[10px] px-1.5 py-0.5 bg-slate-900 rounded font-mono text-muse-400">{targetWordCount} 字</span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="1000"
+                                            max="5000"
+                                            step="500"
+                                            value={targetWordCount}
+                                            onChange={(e) => setTargetWordCount(parseInt(e.target.value))}
+                                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-muse-500"
+                                        />
+                                    </div>
                                 </div>
                             )}
-                        </div>
-
-                        {/* Pacing Control (New) */}
-                        <div className="bg-slate-800/50 p-2 rounded-xl border border-slate-700 flex flex-col gap-3">
-                            <div className="flex justify-between items-center gap-1">
-                                <button
-                                    onClick={() => setPacing('SLOW_BURN')}
-                                    className={`flex-1 py-2 text-xs font-medium rounded-lg flex flex-col items-center gap-1 transition-all ${pacing === 'SLOW_BURN' ? 'bg-emerald-900/50 text-emerald-300 border border-emerald-500/30' : 'text-slate-500 hover:bg-slate-700'}`}
-                                    title="铺垫/慢热：侧重氛围描写和心理活动"
-                                >
-                                    <Feather size={14} /> 铺垫蓄力
-                                </button>
-                                <button
-                                    onClick={() => setPacing('BALANCED')}
-                                    className={`flex-1 py-2 text-xs font-medium rounded-lg flex flex-col items-center gap-1 transition-all ${pacing === 'BALANCED' ? 'bg-muse-900/50 text-muse-300 border border-muse-500/30' : 'text-slate-500 hover:bg-slate-700'}`}
-                                    title="平衡推进：标准的叙事节奏"
-                                >
-                                    <Gauge size={14} /> 剧情推进
-                                </button>
-                                <button
-                                    onClick={() => setPacing('CLIMAX')}
-                                    className={`flex-1 py-2 text-xs font-medium rounded-lg flex flex-col items-center gap-1 transition-all ${pacing === 'CLIMAX' ? 'bg-rose-900/50 text-rose-300 border border-rose-500/30' : 'text-slate-500 hover:bg-slate-700'}`}
-                                    title="高潮/爆发：快节奏，侧重动作和冲突"
-                                >
-                                    <Flame size={14} /> 高潮爆发
-                                </button>
-                            </div>
-
-                            {/* Word Count Slider */}
-                            <div className="px-2 pb-1">
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="text-xs text-slate-400 font-medium flex items-center gap-1"><FileText size={12} /> 目标字数</span>
-                                    <span className="text-xs font-mono text-muse-400">{targetWordCount} 字</span>
-                                </div>
-                                <input
-                                    type="range"
-                                    min="1000"
-                                    max="10000"
-                                    step="500"
-                                    value={targetWordCount}
-                                    onChange={(e) => setTargetWordCount(parseInt(e.target.value))}
-                                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-muse-500 hover:accent-muse-400"
-                                />
-                                <div className="flex justify-between text-[10px] text-slate-600 mt-1 font-mono">
-                                    <span>1k</span>
-                                    <span>5k</span>
-                                    <span>10k</span>
-                                </div>
-                            </div>
                         </div>
 
                         {/* Action Button */}
                         <button
                             onClick={handleGenerate}
                             disabled={isGenerating}
-                            className="w-full bg-gradient-to-r from-muse-600 to-indigo-600 hover:from-muse-500 hover:to-indigo-500 text-white py-3 rounded-xl font-bold shadow-lg shadow-muse-900/50 flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50"
+                            className="w-full bg-gradient-to-r from-muse-600 to-indigo-600 hover:from-muse-500 hover:to-indigo-500 text-white py-3 rounded-xl font-bold shadow-lg shadow-muse-900/50 flex items-center justify-center gap-2 transition-transform active:scale-95 disabled:opacity-50 mt-2"
                         >
                             {isGenerating ? <div className="animate-spin w-5 h-5 border-2 border-white/30 border-t-white rounded-full" /> : <PenTool size={20} />}
-                            <span>AI 自动撰写场景</span>
+                            <span>AI 自动撰写场景草稿</span>
                         </button>
 
                         {/* Draft History List */}
-                        <div className="mt-4">
-                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">草稿箱 (Drafts)</h3>
-                            <div className="space-y-2">
+                        <div className="mt-2">
+                            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">草稿箱 (Drafts)</h3>
+                            <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
                                 {(project.drafts || []).length === 0 && <p className="text-xs text-slate-600 italic">暂无草稿。</p>}
                                 {(project.drafts || []).map(draft => (
                                     <div
                                         key={draft.id}
                                         onClick={() => loadDraft(draft)}
-                                        className={`p-3 rounded-lg border cursor-pointer group flex justify-between items-start transition-all ${activeDraftId === draft.id ? 'bg-muse-900/30 border-muse-500/50' : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800'}`}
+                                        className={`p-2 rounded-lg border cursor-pointer group flex justify-between items-start transition-all ${activeDraftId === draft.id ? 'bg-muse-900/30 border-muse-500/50' : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800'}`}
                                     >
                                         <div className="flex-1 min-w-0">
-                                            <h4 className={`text-sm font-medium truncate ${activeDraftId === draft.id ? 'text-muse-300' : 'text-slate-300'}`}>{draft.title}</h4>
-                                            <p className="text-[10px] text-slate-500 mt-1">{new Date(draft.lastModified).toLocaleString()}</p>
+                                            <h4 className={`text-xs font-medium truncate ${activeDraftId === draft.id ? 'text-muse-300' : 'text-slate-300'}`}>{draft.title}</h4>
                                         </div>
                                         <button
                                             onClick={(e) => deleteDraft(e, draft.id)}
                                             className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
                                         >
-                                            <Trash2 size={14} />
+                                            <Trash2 size={12} />
                                         </button>
                                     </div>
                                 ))}
@@ -669,80 +715,56 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                                 </div>
                             </div>
 
-                            <div className="flex-1 p-8 overflow-y-auto custom-scrollbar prose prose-invert prose-slate max-w-none leading-loose font-serif text-lg">
-                                {generatedContent ? (
-                                    <>
-                                        <MarkdownRenderer content={generatedContent} />
-
-                                        {/* Auto-Echo Capture Section */}
-                                        <div className="mt-12 pt-8 border-t border-slate-700/50">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                                    <ScanSearch className="text-muse-400" size={20} />
-                                                    命运回响 (状态提取)
-                                                </h3>
-                                                <button
-                                                    onClick={handleExtractEchoes}
-                                                    disabled={isExtracting}
-                                                    className="text-xs bg-muse-600 hover:bg-muse-500 text-white px-3 py-1.5 rounded-lg font-medium flex items-center gap-1 transition-colors disabled:opacity-50"
-                                                >
-                                                    {isExtracting ? <RefreshCw size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                                                    提取状态变更
-                                                </button>
-                                            </div>
-
-                                            {extractedEchoes.length > 0 ? (
-                                                <div className="space-y-3">
-                                                    <p className="text-xs text-slate-400">AI 从正文中提取了以下潜在的持久化状态变更，请审核并采纳：</p>
-                                                    {extractedEchoes.map(echo => (
-                                                        <div key={echo.id} className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 flex gap-4 items-start shadow-lg">
-                                                            <div className="flex-1">
-                                                                <div className="flex items-center gap-2 mb-1">
-                                                                    <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${echo.type === 'CHARACTER' ? 'bg-indigo-900/50 text-indigo-300 border border-indigo-700' : 'bg-emerald-900/50 text-emerald-300 border border-emerald-700'}`}>
-                                                                        {echo.type === 'CHARACTER' ? '人物' : '世界'}
-                                                                    </span>
-                                                                    <span className="font-bold text-slate-200 text-sm">{echo.targetName}</span>
-                                                                </div>
-                                                                <p className="text-muse-300 font-medium text-sm mt-2">变更: {echo.description}</p>
-                                                                <p className="text-xs text-slate-500 mt-1 italic mt-2 border-l-2 border-slate-600 pl-2">依据: "{echo.reason}"</p>
-                                                            </div>
-                                                            <div className="flex flex-col gap-2">
-                                                                <button
-                                                                    onClick={() => handleAddEcho(echo)}
-                                                                    className="bg-emerald-600 hover:bg-emerald-500 text-white p-2 rounded-lg flex items-center justify-center transition-colors shadow-lg shadow-emerald-900/20"
-                                                                    title="采纳并写入记忆库"
-                                                                >
-                                                                    <Check size={16} />
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => setExtractedEchoes(prev => prev.filter(e => e.id !== echo.id))}
-                                                                    className="bg-slate-700 hover:bg-slate-600 text-slate-300 p-2 rounded-lg flex items-center justify-center transition-colors"
-                                                                    title="忽略此条"
-                                                                >
-                                                                    <X size={16} />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl p-6 text-center text-slate-500 flex flex-col items-center">
-                                                    <ScanSearch size={32} className="opacity-20 mb-2" />
-                                                    <p className="text-sm">尚未提取状态变更。如果刚生成的正文包含了角色受伤、物品获得等重要变动，请点击右上方按钮提取。</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-4">
-                                        <Zap size={48} className="opacity-20" />
-                                        <div className="text-center">
-                                            <p className="font-medium text-slate-400">准备就绪</p>
-                                            <p className="text-sm mt-1">请在左侧配置原料，让 AI 为您生成初稿。</p>
-                                        </div>
-                                    </div>
-                                )}
+                            <div className="flex-1 overflow-hidden relative border-t border-slate-800">
+                                <DraftEditor
+                                    content={generatedContent}
+                                    onChange={setGeneratedContent}
+                                    onRewriteSelection={handleLocalRewrite}
+                                    isProcessing={isLocalRewriting}
+                                />
                             </div>
+
+                            {/* Auto-Echo Capture Section (Moved below editor) */}
+                            {generatedContent && (
+                                <div className="bg-slate-950/50 p-4 border-t border-slate-800">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="text-xs font-bold text-slate-400 flex items-center gap-1">
+                                            <ScanSearch className="text-muse-400" size={14} />
+                                            命运回响 (状态提取)
+                                        </h3>
+                                        <button
+                                            onClick={handleExtractEchoes}
+                                            disabled={isExtracting}
+                                            className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded flex items-center gap-1 transition-colors disabled:opacity-50 border border-slate-700"
+                                        >
+                                            {isExtracting ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                                            提取状态变更
+                                        </button>
+                                    </div>
+
+                                    {extractedEchoes.length > 0 && (
+                                        <div className="space-y-2 mt-2 max-h-32 overflow-y-auto custom-scrollbar">
+                                            {extractedEchoes.map(echo => (
+                                                <div key={echo.id} className="bg-slate-800/80 p-2 rounded border border-slate-700 flex gap-2 items-start">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className={`text-[8px] uppercase font-bold px-1.5 py-0.5 rounded-sm ${echo.type === 'CHARACTER' ? 'bg-indigo-900/50 text-indigo-300' : 'bg-emerald-900/50 text-emerald-300'}`}>
+                                                                {echo.type === 'CHARACTER' ? '人物' : '世界'}
+                                                            </span>
+                                                            <span className="font-bold text-slate-300 text-xs truncate">{echo.targetName}</span>
+                                                        </div>
+                                                        <p className="text-muse-300 text-xs mt-1">{echo.description}</p>
+                                                    </div>
+                                                    <div className="flex gap-1 shrink-0">
+                                                        <button onClick={() => handleAddEcho(echo)} className="text-emerald-500 hover:text-emerald-400 p-1"><Check size={14} /></button>
+                                                        <button onClick={() => setExtractedEchoes(prev => prev.filter(e => e.id !== echo.id))} className="text-slate-500 hover:text-red-400 p-1"><X size={14} /></button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             {(isGenerating || isPolishing) && (
                                 <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center z-30">
@@ -751,12 +773,11 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                             )}
                         </div>
 
-                        {isAnalyzingState && (
-                            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 flex items-center justify-center gap-2 text-xs text-slate-400 animate-pulse">
-                                <RefreshCw size={12} className="animate-spin" />
-                                正在后台观测世界线的变动...
-                            </div>
-                        )}
+                        {
+                            isAnalyzingState && (
+                                <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-3 flex items-center justify-center gap-2 text-xs text-slate-400 animate-pulse">
+                                </div>
+                            )}
                     </div>
                 </>
             ) : (
@@ -773,13 +794,21 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                                 <div
                                     key={chapter.id}
                                     onClick={() => setActiveChapterId(chapter.id)}
-                                    className={`p-3 rounded-lg cursor-pointer transition-colors ${activeChapterId === chapter.id ? 'bg-muse-900/50 text-muse-200 border border-muse-500/30' : 'text-slate-300 hover:bg-slate-700/50 border border-transparent'}`}
+                                    className={`p-3 rounded-lg cursor-pointer transition-colors group relative ${activeChapterId === chapter.id ? 'bg-muse-900/50 text-muse-200 border border-muse-500/30' : 'text-slate-300 hover:bg-slate-700/50 border border-transparent'}`}
                                 >
                                     <div className="flex justify-between items-center mb-1">
                                         <span className="text-xs font-bold opacity-50">#{idx + 1}</span>
                                         <span className="text-[10px] text-slate-500">{new Date(chapter.lastModified).toLocaleDateString()}</span>
                                     </div>
-                                    <h4 className="font-medium text-sm truncate">{chapter.title}</h4>
+                                    <h4 className="font-medium text-sm truncate pr-6">{chapter.title}</h4>
+
+                                    <button
+                                        onClick={(e) => handleDeleteChapter(e, chapter.id)}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                                        title="删除章节"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
                                 </div>
                             ))}
                         </div>
@@ -832,7 +861,8 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                         )}
                     </div>
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 };

@@ -1,0 +1,4 @@
+﻿components/PlotWeaver/PlotCard.tsx(160,56): error TS2322: Type '{ size: number; }' is not assignable to type 'IntrinsicAttributes & { text?: string; }'.
+  Property 'size' does not exist on type 'IntrinsicAttributes & { text?: string; }'.
+components/PlotWeaver/PlotCard.tsx(198,81): error TS2322: Type '{ size: number; }' is not assignable to type 'IntrinsicAttributes & { text?: string; }'.
+  Property 'size' does not exist on type 'IntrinsicAttributes & { text?: string; }'.

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { X, Sparkles, RotateCcw, Check, User, Globe, Wand2, Zap, Flag, ChevronDown } from 'lucide-react';
+import { X, Sparkles, RotateCcw, Check, User, Globe, Wand2, Zap, Flag, ChevronDown, Loader2 } from 'lucide-react';
 import { PlotNode, ProjectState, BeatTag } from '../../types';
-import { Loader } from '../Loader';
 import { BEAT_TAGS } from './constants';
 
 interface PlotCardProps {
@@ -157,7 +156,7 @@ export const PlotCard: React.FC<PlotCardProps> = ({
                                 disabled={isIterating || !iterationFeedback.trim()}
                                 className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-muse-400 rounded-lg font-medium flex items-center gap-1 transition-all border border-slate-700 disabled:opacity-50"
                             >
-                                {isIterating ? <Loader size={12} /> : <RotateCcw size={12} />} 再次调整
+                                {isIterating ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />} 再次调整
                             </button>
                             <button
                                 onClick={handleAcceptDraftNode}
@@ -195,7 +194,7 @@ export const PlotCard: React.FC<PlotCardProps> = ({
                             className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-muse-400 text-xs rounded-lg transition-all flex items-center gap-1"
                             title="AI 智能续写/扩写此段"
                         >
-                            {isIterating && editingNodeId === node.id ? <Loader size={12} /> : <Wand2 size={12} />} AI 扩写
+                            {isIterating && editingNodeId === node.id ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />} AI 扩写
                         </button>
                         <button
                             onClick={() => handleQuickDraft(node.id)}

@@ -3,10 +3,9 @@ import { ProjectState, Character, WorldSetting, Echo } from '../types';
 import {
     X, Activity, Clock, User, Globe, Sparkles,
     Filter, Zap, PlayCircle, Brain, CheckCircle,
-    Trash2, ChevronRight, Inbox, History, Search
+    Trash2, ChevronRight, Inbox, History, Search, Loader2
 } from 'lucide-react';
 import { deduceWorldConsequences, consolidateMemory } from '../services/geminiService';
-import { Loader } from './Loader';
 
 interface EchoChamberProps {
     project: ProjectState;
@@ -122,7 +121,7 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                 : (targetEntity.data as WorldSetting).content;
 
             const newDesc = await consolidateMemory(
-                targetEntity.data.name || (targetEntity.data as WorldSetting).title,
+                (targetEntity.data as any).name || (targetEntity.data as any).title || 'Unknown',
                 targetEntity.type,
                 currentDesc,
                 consolidationCandidates
@@ -218,7 +217,7 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                         disabled={isDeducing}
                         className="bg-purple-900/50 hover:bg-purple-800 text-purple-200 border border-purple-500/30 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-all shadow-lg active:scale-95 disabled:opacity-50"
                     >
-                        {isDeducing ? <Loader size="sm" /> : <><Sparkles size={16} /> <span className="text-xs font-bold">推演蝴蝶效应</span></>}
+                        {isDeducing ? <Loader2 size={14} className="animate-spin" /> : <><Sparkles size={16} /> <span className="text-xs font-bold">推演蝴蝶效应</span></>}
                     </button>
                 </div>
 
@@ -234,8 +233,8 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                                 key={echo.id}
                                 onClick={() => setSelectedEchoId(echo.id)}
                                 className={`group p-4 rounded-xl border transition-all cursor-pointer relative ${selectedEchoId === echo.id
-                                        ? 'bg-slate-800 border-muse-500/50 shadow-xl'
-                                        : 'bg-slate-800/40 border-slate-700 hover:border-slate-600'
+                                    ? 'bg-slate-800 border-muse-500/50 shadow-xl'
+                                    : 'bg-slate-800/40 border-slate-700 hover:border-slate-600'
                                     }`}
                             >
                                 <div className="flex justify-between items-start mb-3">
@@ -309,7 +308,7 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                             </div>
 
                             <h2 className="text-3xl font-serif font-bold text-white mb-2 leading-tight">
-                                {targetEntity.data.name || (targetEntity.data as WorldSetting).title}
+                                {(targetEntity.data as any).name || (targetEntity.data as any).title}
                             </h2>
 
                             <div className="flex items-center justify-between mt-4">
@@ -322,12 +321,12 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                                         onClick={handleConsolidateMemory}
                                         disabled={isConsolidating}
                                         className={`text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 transition-all shadow-lg ${consolidationCandidates.length >= 3
-                                                ? 'bg-amber-600 hover:bg-amber-500 text-white animate-pulse'
-                                                : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                            ? 'bg-amber-600 hover:bg-amber-500 text-white animate-pulse'
+                                            : 'bg-slate-800 text-slate-500 cursor-not-allowed'
                                             }`}
                                         title={consolidationCandidates.length >= 3 ? "固化记忆至长期档案" : "积累 3 条以上记忆后可固化"}
                                     >
-                                        {isConsolidating ? <Loader size="sm" /> : <><Brain size={14} /> 记忆固化</>}
+                                        {isConsolidating ? <Loader2 size={14} className="animate-spin" /> : <><Brain size={14} /> 记忆固化</>}
                                     </button>
                                 )}
                             </div>
@@ -361,21 +360,21 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                                     entityHistory.map((item, idx) => (
                                         <div key={item.id} className={`relative pl-8 transition-opacity ${item.status === 'ARCHIVED' ? 'opacity-40 hover:opacity-100' : ''}`}>
                                             <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border flex items-center justify-center z-10 shadow-lg transition-colors ${item.status === 'ACCEPTED' ? 'bg-emerald-900/50 border-emerald-500 text-emerald-400' :
-                                                    item.status === 'REJECTED' ? 'bg-rose-900/50 border-rose-500 text-rose-400' :
-                                                        item.status === 'ARCHIVED' ? 'bg-slate-800 border-slate-700 text-slate-500' :
-                                                            'bg-amber-900/50 border-amber-500 text-amber-400'
+                                                item.status === 'REJECTED' ? 'bg-rose-900/50 border-rose-500 text-rose-400' :
+                                                    item.status === 'ARCHIVED' ? 'bg-slate-800 border-slate-700 text-slate-500' :
+                                                        'bg-amber-900/50 border-amber-500 text-amber-400'
                                                 }`}>
                                                 <Zap size={10} />
                                             </div>
                                             <div className={`p-4 rounded-xl border ${item.status === 'ACCEPTED' ? 'bg-emerald-900/5 border-emerald-900/30' :
-                                                    item.status === 'REJECTED' ? 'bg-rose-900/5 border-rose-900/30' :
-                                                        'bg-slate-800/30 border-slate-700/50'
+                                                item.status === 'REJECTED' ? 'bg-rose-900/5 border-rose-900/30' :
+                                                    'bg-slate-800/30 border-slate-700/50'
                                                 }`}>
                                                 <div className="flex justify-between items-center mb-1">
                                                     <span className="text-[10px] text-slate-500 font-mono">{new Date(item.timestamp).toLocaleDateString()}</span>
                                                     <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${item.status === 'ACCEPTED' ? 'text-emerald-500' :
-                                                            item.status === 'REJECTED' ? 'text-rose-500' :
-                                                                'text-slate-500'
+                                                        item.status === 'REJECTED' ? 'text-rose-500' :
+                                                            'text-slate-500'
                                                         }`}>
                                                         {item.status}
                                                     </span>

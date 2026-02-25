@@ -621,6 +621,8 @@ export const generateSceneFromIngredients = async (
     // 0. Episodic Memory (Manuscript Context)
     if (previousStoryContext) {
         context += `【📖 前情提要 (Context)】\n(以下是故事上文的最后片段，请确保剧情连贯，接续人物状态和语气)\n"${previousStoryContext}"\n\n`;
+    } else {
+        context += `【📖 前情提要 (Context)】\n(注意：此章节之前尚无正式正文内容。如果是故事开篇，请直接开始；如果是非开篇的断层写作，请严格基于【本场情节目标】独立构思切入点。)\n\n`;
     }
 
     // 1. Actors
@@ -680,7 +682,8 @@ export const generateSceneFromIngredients = async (
     【本场戏的情节目标 (Plot Beat)】:
     ${plotBeat}
     
-    请根据以上要素，撰写一段约 800-1200 字的小说正文片段。
+    请根据以上要素，撰写一段约 ${targetWordCount} 字的小说正文片段。
+    【重要字数要求】：请务必拓展细节、对话和环境描写，撑起框架，使最终生成的字数严格逼近 ${targetWordCount} 字的规模，避免干瘪或敷衍。
     请直接开始正文，不需要标题或概述。
     `;
 
@@ -847,6 +850,64 @@ export const analyzeStateChanges = async (
     } catch (e) {
         console.error("State Analysis Error", e);
         return [];
+    }
+};
+
+/**
+ * Localized Text Rewrite (for Tiptap Editor Copilot)
+ * Rewrites a specific selection of text while preserving the context around it.
+ */
+export const rewriteLocalText = async (
+    genre: string,
+    selectedText: string,
+    contextBefore: string,
+    contextAfter: string,
+    instruction: string,
+    settings?: CreativeSettings
+): Promise<string> => {
+    const ai = getAIClient();
+
+    // We can reuse the scene_generation system instruction for consistent tone
+    const sysInstruction = getInstructionWithSettings('scene_generation', settings);
+
+    const prompt = `
+    你现在是一个极其专业的小说润色助手（类型：${genre}）。
+
+    【用户指令】
+    ${instruction}
+
+    【上下文环境】
+    为了保证你重写的连贯性，这里提供选中文字的前后文（仅作参考，绝对不要在你的输出中重复这段前后文！）：
+    [前文]: "...${contextBefore}"
+    [后文]: "${contextAfter}..."
+
+    【需要你重写的原文】
+    "${selectedText}"
+
+    【任务要求】
+    1. 请严格按照用户的指令，**仅**对“需要你重写的原文”进行重造/润色/扩写/精简。
+    2. 生成结果必须能在语义和语境上与 [前文] 和 [后文] 完美、无缝地拼接在一起。
+    3. **极其重要**：直接输出重写后的纯文本素材！绝对不要包含任何 Markdown 格式包裹（如 \`\`\` 或 ** 等），绝对不要自作主张添加“这段话已经重写完毕：”或“以下是...”等废话引导语。你的输出将被程序直接插入原文替换原有片段。
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            // getModelName('flash') typically maps to gemini-2.5-flash for faster lightweight tasks
+            model: getModelName('flash'),
+            contents: prompt,
+            config: {
+                systemInstruction: sysInstruction,
+                temperature: settings?.creativity || 0.7,
+            }
+        });
+
+        let newText = response.text || "";
+        // Ultimate safeguard against AI returning markdown code blocks
+        newText = newText.replace(/^```[a-z]*\n?/gm, '').replace(/```$/gm, '').trim();
+        return newText;
+    } catch (e) {
+        console.error("Local rewrite failed:", e);
+        throw e;
     }
 };
 

@@ -70,8 +70,7 @@ const App: React.FC = () => {
   // Import / Export Logic
   // =====================
 
-  const handleExportProject = (e: React.MouseEvent, proj: ProjectState) => {
-    e.stopPropagation();
+  const handleExportProject = (proj: ProjectState) => {
     const exportData = {
       _museFileVersion: MUSE_FILE_VERSION,
       _exportedAt: new Date().toISOString(),
@@ -207,7 +206,7 @@ const App: React.FC = () => {
             </div>
 
             <button
-              onClick={() => handleExportProject(null as any, project)}
+              onClick={() => handleExportProject(project)}
               className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all"
               title="导出当前宇宙"
             >

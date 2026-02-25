@@ -1,0 +1,23 @@
+﻿App.tsx(143,9): error TS2322: Type '(e: React.MouseEvent, proj: ProjectState) => void' is not assignable to type '(proj: ProjectState) => void'.
+  Target signature provides too few arguments. Expected 2 or more, but got 1.
+components/Dashboard.tsx(228,29): error TS2322: Type '{ title: string; content: string; }[]' is not assignable to type 'string'.
+components/DraftingRoom/DraftEditor.tsx(2,36): error TS2305: Module '"@tiptap/react"' has no exported member 'BubbleMenu'.
+components/DraftingRoom/DraftEditor.tsx(48,56): error TS2554: Expected 1-2 arguments, but got 3.
+components/EchoChamber.tsx(125,35): error TS2339: Property 'name' does not exist on type 'Character | WorldSetting'.
+  Property 'name' does not exist on type 'WorldSetting'.
+components/EchoChamber.tsx(221,47): error TS2322: Type '{ size: string; }' is not assignable to type 'IntrinsicAttributes & { text?: string; }'.
+  Property 'size' does not exist on type 'IntrinsicAttributes & { text?: string; }'.
+components/EchoChamber.tsx(312,52): error TS2339: Property 'name' does not exist on type 'Character | WorldSetting'.
+  Property 'name' does not exist on type 'WorldSetting'.
+components/EchoChamber.tsx(330,68): error TS2322: Type '{ size: string; }' is not assignable to type 'IntrinsicAttributes & { text?: string; }'.
+  Property 'size' does not exist on type 'IntrinsicAttributes & { text?: string; }'.
+components/PlotWeaver.tsx(79,13): error TS2322: Type '(PlotVersion | { id: `${string}-${string}-${string}-${string}-${string}`; timestamp: string; content: { plotNodes: PlotNode[]; plotOutline: string; }; note: string; })[]' is not assignable to type 'PlotVersion[]'.
+  Type 'PlotVersion | { id: `${string}-${string}-${string}-${string}-${string}`; timestamp: string; content: { plotNodes: PlotNode[]; plotOutline: string; }; note: string; }' is not assignable to type 'PlotVersion'.
+    Type '{ id: `${string}-${string}-${string}-${string}-${string}`; timestamp: string; content: { plotNodes: PlotNode[]; plotOutline: string; }; note: string; }' is not assignable to type 'PlotVersion'.
+      Types of property 'timestamp' are incompatible.
+        Type 'string' is not assignable to type 'number'.
+components/PlotWeaver.tsx(136,29): error TS2353: Object literal may only specify known properties, and 'currentDraftId' does not exist in type 'Partial<ProjectState>'.
+components/PlotWeaver/PlotCard.tsx(160,56): error TS2322: Type '{ size: number; }' is not assignable to type 'IntrinsicAttributes & { text?: string; }'.
+  Property 'size' does not exist on type 'IntrinsicAttributes & { text?: string; }'.
+components/PlotWeaver/PlotCard.tsx(198,81): error TS2322: Type '{ size: number; }' is not assignable to type 'IntrinsicAttributes & { text?: string; }'.
+  Property 'size' does not exist on type 'IntrinsicAttributes & { text?: string; }'.

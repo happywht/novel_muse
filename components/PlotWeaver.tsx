@@ -67,11 +67,11 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
     const updateProjectWithHistory = (data: Partial<ProjectState>, note: string) => {
         const historyItem = {
             id: crypto.randomUUID(),
-            timestamp: new Date().toISOString(),
-            content: {
+            timestamp: Date.now(),
+            content: JSON.stringify({
                 plotNodes: project.plotNodes,
-                plotOutline: project.plotOutline
-            },
+                plotOutline: project.plotOutline || ''
+            }),
             note
         };
         updateProject({
@@ -133,7 +133,6 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
     const handleQuickDraft = (nodeId: string) => {
         const node = project.plotNodes.find(n => n.id === nodeId);
         if (node) {
-            updateProject({ currentDraftId: nodeId });
             setActiveSection(AppSection.DRAFTING);
         }
     };
