@@ -217,37 +217,35 @@ const App: React.FC = () => {
 
         {/* Main Content Area */}
         <main className="flex-1 p-6 overflow-auto">
-          <div className="max-w-7xl mx-auto w-full">
-            {activeSection === AppSection.DASHBOARD && (
-              <Dashboard project={project} updateProject={updateProject} />
-            )}
-            {activeSection === AppSection.WORLD && (
-              <WorldBuilder project={project} updateProject={updateProject} />
-            )}
-            {activeSection === AppSection.CHARACTERS && (
-              <CharacterCreator project={project} updateProject={updateProject} />
-            )}
-            {activeSection === AppSection.PLOT && (
-              <PlotWeaver project={project} updateProject={updateProject} />
-            )}
-            {activeSection === AppSection.OUTLINER && (
-              <ChapterOutliner project={project} updateProject={updateProject} />
-            )}
-            {activeSection === AppSection.DRAFTING && (
-              <DraftingRoom project={project} updateProject={updateProject} />
-            )}
-            {activeSection === AppSection.ECHOES && (
-              <EchoChamber project={project} updateProject={updateProject} />
-            )}
-            {activeSection === AppSection.GRAPH && (
-              <div className="flex-1 flex flex-col min-h-0 bg-[#0b1222] animate-fade-in relative z-10 p-6">
-                <KnowledgeGraph projectId={project.id} useBackend={useBackend} projectData={project} updateProject={updateProject} />
-              </div>
-            )}
-            {activeSection === AppSection.STATS && (
-              <WritingStats project={project} />
-            )}
-          </div>
+          {activeSection === AppSection.DASHBOARD && (
+            <Dashboard project={project} updateProject={updateProject} onImportProject={() => importFileRef.current?.click()} />
+          )}
+          {activeSection === AppSection.WORLD && (
+            <WorldBuilder project={project} updateProject={updateProject} />
+          )}
+          {activeSection === AppSection.CHARACTERS && (
+            <CharacterCreator project={project} updateProject={updateProject} />
+          )}
+          {activeSection === AppSection.PLOT && (
+            <PlotWeaver project={project} updateProject={updateProject} />
+          )}
+          {activeSection === AppSection.OUTLINER && (
+            <ChapterOutliner project={project} updateProject={updateProject} />
+          )}
+          {activeSection === AppSection.DRAFTING && (
+            <DraftingRoom project={project} updateProject={updateProject} />
+          )}
+          {activeSection === AppSection.ECHOES && (
+            <EchoChamber project={project} updateProject={updateProject} />
+          )}
+          {activeSection === AppSection.GRAPH && (
+            <div className="flex-1 flex flex-col min-h-0 bg-[#0b1222] animate-fade-in relative z-10 p-6">
+              <KnowledgeGraph projectId={project.id} useBackend={useBackend} projectData={project} updateProject={updateProject} />
+            </div>
+          )}
+          {activeSection === AppSection.STATS && (
+            <WritingStats project={project} />
+          )}
         </main>
       </div>
 

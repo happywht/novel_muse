@@ -8,6 +8,7 @@ import { MarkdownRenderer } from './MarkdownRenderer';
 interface DashboardProps {
     project: ProjectState;
     updateProject: (data: Partial<ProjectState>) => void;
+    onImportProject?: () => void;
 }
 
 const WORLD_CATEGORIES: WorldSetting['category'][] = ['Geography', 'Magic/Tech', 'Society', 'History', 'Other'];

@@ -76,6 +76,10 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     // Sync State
     const [isAnalyzingState, setIsAnalyzingState] = useState(false);
 
+    // Manuscript Editing State
+    const [isEditingManuscript, setIsEditingManuscript] = useState(false);
+    const [editingContent, setEditingContent] = useState('');
+
     // Echo Extraction State
     const [isExtracting, setIsExtracting] = useState(false);
     const [extractedEchoes, setExtractedEchoes] = useState<Echo[]>([]);
@@ -826,27 +830,116 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                                 return (
                                     <>
                                         <div className="p-6 border-b border-slate-800 bg-slate-950/30 flex justify-between items-end">
-                                            <div>
-                                                <h2 className="text-3xl font-serif font-bold text-white">{chapter.title}</h2>
-                                                <p className="text-sm text-slate-500 mt-2">字数统计: {hasContent ? chapter.content.length : 0} 字</p>
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-3">
+                                                    <h2 className="text-3xl font-serif font-bold text-white">{chapter.title}</h2>
+                                                    {isEditingManuscript && <span className="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold uppercase tracking-widest">编辑模式</span>}
+                                                </div>
+                                                <p className="text-sm text-slate-500 mt-2">字数统计: {hasContent ? chapter.content.length : 0} 字 · 最后修改: {new Date(chapter.lastModified).toLocaleString()}</p>
                                             </div>
                                             <div className="flex gap-2">
-                                                <button
-                                                    onClick={() => navigator.clipboard.writeText(chapter.content)}
-                                                    disabled={!hasContent}
-                                                    className="text-xs bg-slate-800 px-3 py-1.5 rounded border border-slate-700 text-slate-300 hover:text-white disabled:opacity-50"
-                                                >
-                                                    复制全文
-                                                </button>
+                                                {!isEditingManuscript ? (
+                                                    <>
+                                                        <button
+                                                            onClick={() => {
+                                                                setIsEditingManuscript(true);
+                                                                setEditingContent(chapter.content || '');
+                                                            }}
+                                                            className="text-xs bg-slate-800 px-3 py-1.5 rounded border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors flex items-center gap-2"
+                                                        >
+                                                            <PenTool size={14} className="text-muse-400" /> 编辑正文
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                if (confirm("确定要放弃本地缓存，重试从云端加载吗？")) {
+                                                                    // We need to clear local content first to trigger fetch
+                                                                    updateProject({
+                                                                        chapters: project.chapters.map(c =>
+                                                                            c.id === chapter.id ? { ...c, content: '' } : c
+                                                                        )
+                                                                    });
+                                                                    fetchChapterContent(chapter.id);
+                                                                }
+                                                            }}
+                                                            className="text-xs bg-slate-800 px-3 py-1.5 rounded border border-slate-700 text-slate-500 hover:text-sky-400 transition-colors flex items-center gap-2"
+                                                            title="从数据库强制拉取内容"
+                                                        >
+                                                            <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => navigator.clipboard.writeText(chapter.content)}
+                                                            disabled={!hasContent}
+                                                            className="text-xs bg-slate-800 px-3 py-1.5 rounded border border-slate-700 text-slate-300 hover:text-white disabled:opacity-50"
+                                                        >
+                                                            <Clipboard size={14} />
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            onClick={() => {
+                                                                const updatedChapters = project.chapters.map(c =>
+                                                                    c.id === chapter.id
+                                                                        ? { ...c, content: editingContent, lastModified: Date.now() }
+                                                                        : c
+                                                                );
+                                                                updateProject({ chapters: updatedChapters });
+                                                                setIsEditingManuscript(false);
+                                                            }}
+                                                            className="text-xs bg-emerald-600 px-4 py-1.5 rounded text-white hover:bg-emerald-500 transition-colors flex items-center gap-2 shadow-lg shadow-emerald-900/40"
+                                                        >
+                                                            <Save size={14} /> 保存修改
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setIsEditingManuscript(false)}
+                                                            className="text-xs bg-slate-800 px-3 py-1.5 rounded border border-slate-700 text-slate-400 hover:text-white"
+                                                        >
+                                                            取消
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
-                                        <div className="flex-1 overflow-y-auto custom-scrollbar p-8 prose prose-invert prose-lg max-w-none font-serif leading-loose text-slate-300 relative">
-                                            {hasContent ? (
-                                                <MarkdownRenderer content={chapter.content} />
+                                        <div className="flex-1 overflow-y-auto custom-scrollbar prose prose-invert prose-lg max-w-none font-serif leading-loose text-slate-300 relative">
+                                            {isEditingManuscript ? (
+                                                <div className="h-full flex flex-col p-8 bg-slate-950/20">
+                                                    <textarea
+                                                        value={editingContent}
+                                                        onChange={(e) => setEditingContent(e.target.value)}
+                                                        className="w-full flex-1 bg-transparent border-none focus:ring-0 text-slate-200 text-lg font-serif leading-loose resize-none custom-scrollbar"
+                                                        placeholder="点击此处开始校对或补全正文内容..."
+                                                    />
+                                                </div>
                                             ) : (
-                                                <div className="flex flex-col items-center justify-center h-full space-y-4">
-                                                    <RefreshCw className="animate-spin text-muse-500" size={32} />
-                                                    <p className="text-slate-500 animate-pulse">正在加载卷轴内容...</p>
+                                                <div className="p-8">
+                                                    {hasContent ? (
+                                                        <MarkdownRenderer content={chapter.content} />
+                                                    ) : (
+                                                        <div className="flex flex-col items-center justify-center h-full space-y-4 py-20 bg-slate-950/10 rounded-2xl border border-dashed border-slate-800">
+                                                            {isLoading ? (
+                                                                <>
+                                                                    <RefreshCw className="animate-spin text-muse-500" size={32} />
+                                                                    <p className="text-slate-500 animate-pulse">正在从卷轴中提取文字...</p>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <div className="w-16 h-16 rounded-full bg-slate-800/50 flex items-center justify-center text-slate-600 mb-2">
+                                                                        <FileText size={32} />
+                                                                    </div>
+                                                                    <p className="text-slate-500">此卷轴尚未记录任何文字</p>
+                                                                    <button
+                                                                        onClick={() => {
+                                                                            setIsEditingManuscript(true);
+                                                                            setEditingContent('');
+                                                                        }}
+                                                                        className="text-xs text-muse-400 hover:text-muse-300 underline underline-offset-4"
+                                                                    >
+                                                                        立即开始书写
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>

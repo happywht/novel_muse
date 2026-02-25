@@ -252,15 +252,22 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                 },
             });
 
-            // 2. Replace all child entities (delete + create for simplicity)
             await tx.character.deleteMany({ where: { projectId: id } });
             await tx.worldSetting.deleteMany({ where: { projectId: id } });
             await tx.plotVersion.deleteMany({ where: { projectId: id } });
             await tx.draft.deleteMany({ where: { projectId: id } });
-            await tx.chapter.deleteMany({ where: { projectId: id } });
             await tx.plotNode.deleteMany({ where: { projectId: id } });
             await tx.echo.deleteMany({ where: { projectId: id } });
             await tx.timelineEvent.deleteMany({ where: { projectId: id } });
+
+            // Surgical handle for chapters to prevent data loss
+            const incomingChapterIds = (data.chapters || []).map((ch: any) => ch.id);
+            await tx.chapter.deleteMany({
+                where: {
+                    projectId: id,
+                    id: { notIn: incomingChapterIds }
+                }
+            });
 
             // 3. Bulk create child entities
             if (data.characters?.length > 0) {
@@ -316,16 +323,33 @@ router.put('/:id/full', async (req: Request, res: Response) => {
             }
 
             if (data.chapters?.length > 0) {
-                await tx.chapter.createMany({
-                    data: data.chapters.map((ch: any) => ({
-                        id: ch.id,
-                        title: ch.title,
-                        content: ch.content,
-                        order: ch.order,
-                        lastModified: BigInt(ch.lastModified),
-                        projectId: id,
-                    }))
-                });
+                // For chapters, we want to be surgical to avoid "lazy-load overwrite"
+                for (const ch of data.chapters) {
+                    const existing = await tx.chapter.findUnique({ where: { id: ch.id } });
+
+                    // If the incoming content is empty BUT the DB has content, skip content update
+                    const contentToSave = (ch.content === "" && existing && existing.content !== "")
+                        ? existing.content
+                        : ch.content;
+
+                    await tx.chapter.upsert({
+                        where: { id: ch.id },
+                        create: {
+                            id: ch.id,
+                            title: ch.title,
+                            content: contentToSave,
+                            order: ch.order,
+                            lastModified: BigInt(ch.lastModified),
+                            projectId: id,
+                        },
+                        update: {
+                            title: ch.title,
+                            content: contentToSave,
+                            order: ch.order,
+                            lastModified: BigInt(ch.lastModified),
+                        }
+                    });
+                }
             }
 
             if (data.plotNodes?.length > 0) {

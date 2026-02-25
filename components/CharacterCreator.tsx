@@ -253,7 +253,7 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
                         return (
                             <div
                                 key={char.id}
-                                onClick={() => setActiveCharId(char.id)}
+                                onClick={() => { setActiveCharId(char.id); setDraftCharacter(null); }}
                                 className={`p-3 rounded-lg cursor-pointer flex items-center gap-3 group transition-all relative overflow-hidden ${activeCharId === char.id ? 'bg-muse-900/50 border border-muse-500/50' : 'bg-slate-800 border border-transparent hover:bg-slate-750'} ${hasEcho && activeCharId !== char.id ? 'shadow-[0_0_15px_rgba(34,211,238,0.15)] border-cyan-900/50' : ''}`}
                             >
                                 {hasEcho && (
@@ -287,12 +287,172 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
             {/* Detail View */}
             <div className="w-2/3 bg-slate-900 rounded-xl border border-slate-800 p-8 overflow-y-auto custom-scrollbar flex flex-col relative">
                 {activeChar ? (
-                    // ... existing activeChar UI ...
                     <div className="animate-fade-in space-y-6">
-                        {/* Detail view content same as before but wrapped in activeChar check */}
-                        <div className="flex gap-6 items-start">
+                        {/* Echo Proposals */}
+                        {activeCharEchoes.length > 0 && !isEditing && (
+                            <div className="mb-6 space-y-3">
+                                {activeCharEchoes.map(echo => (
+                                    <div key={echo.id} className="bg-slate-900/80 border border-cyan-900/50 rounded-xl p-4 shadow-[0_0_20px_rgba(34,211,238,0.05)] relative overflow-hidden animate-fade-in">
+                                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500/0 via-cyan-400/50 to-cyan-500/0"></div>
+                                        <div className="flex items-start gap-3">
+                                            <div className="mt-1 p-1.5 bg-cyan-950 rounded-lg text-cyan-400">
+                                                <GitCommit size={16} />
+                                            </div>
+                                            <div className="flex-1">
+                                                <h4 className="text-xs font-bold text-cyan-400 tracking-wider uppercase mb-1 flex items-center gap-2">
+                                                    🌌 命运回响 (系统洞察)
+                                                </h4>
+                                                <p className="text-sm text-slate-300 mb-2 leading-relaxed">
+                                                    AI 观测到在最新剧情中，该角色的命运发生了偏转：<br />
+                                                    <span className="text-white font-medium">新增特质/经历：[{echo.description}]</span>
+                                                </p>
+                                                <p className="text-xs text-slate-500 italic mb-4 border-l-2 border-slate-700 pl-2">
+                                                    "{echo.reason}"
+                                                </p>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => handleAcceptEcho(echo)}
+                                                        className="text-xs bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-800/50 px-3 py-1.5 rounded-md transition-colors flex items-center gap-1"
+                                                    >
+                                                        <Check size={12} /> 接受并更新
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleRejectEcho(echo)}
+                                                        className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700 px-3 py-1.5 rounded-md transition-colors"
+                                                    >
+                                                        忽略
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        <div className="flex gap-8 items-start">
                             {/* Portrait Section */}
-                            {/* ... */}
+                            <div className="flex-shrink-0">
+                                <div className="w-48 h-64 rounded-2xl bg-slate-800 border border-slate-700 overflow-hidden relative group shadow-2xl">
+                                    {activeChar.imageUrl ? (
+                                        <img src={activeChar.imageUrl} alt={activeChar.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center w-full h-full text-slate-600 space-y-2">
+                                            <User size={48} />
+                                            <p className="text-[10px] font-bold uppercase tracking-widest">暂无画像</p>
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={handleGenerateImage}
+                                        disabled={isGeneratingImage}
+                                        className="absolute inset-x-0 bottom-0 py-3 bg-black/60 backdrop-blur-md text-white text-xs font-bold flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-30"
+                                    >
+                                        {isGeneratingImage ? <div className="animate-spin w-3 h-3 border-2 border-white/30 border-t-white rounded-full"></div> : <Camera size={14} />}
+                                        {activeChar.imageUrl ? "重新生成" : "生成画像"}
+                                    </button>
+                                </div>
+
+                                <div className="mt-4 flex flex-col gap-2">
+                                    <button
+                                        onClick={openChat}
+                                        className="w-full py-2.5 bg-muse-600 hover:bg-muse-500 text-white rounded-xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-muse-900/40 transition-all active:scale-95"
+                                    >
+                                        <MessageCircle size={16} /> 沉浸式对话
+                                    </button>
+                                    <div className="flex gap-1">
+                                        <select
+                                            value={imageStyle}
+                                            onChange={(e) => setImageStyle(e.target.value)}
+                                            className="flex-1 bg-slate-800 border border-slate-700 rounded-lg text-[10px] text-slate-400 px-2 py-1 outline-none"
+                                        >
+                                            <option value="Anime">Anime</option>
+                                            <option value="Realistic">Realistic</option>
+                                            <option value="Cyberpunk">Cyberpunk</option>
+                                            <option value="Oil Painting">Oil Painting</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Info Section */}
+                            <div className="flex-1 space-y-6">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="px-2 py-0.5 bg-muse-950 text-muse-400 border border-muse-500/30 rounded text-[10px] font-bold uppercase tracking-wider">
+                                                {activeChar.role}
+                                            </span>
+                                        </div>
+                                        <h1 className="text-4xl font-serif font-bold text-white tracking-tight">{activeChar.name}</h1>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {isEditing ? (
+                                            <>
+                                                <button
+                                                    onClick={() => setIsEditing(false)}
+                                                    className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg transition-colors"
+                                                >
+                                                    <X size={18} />
+                                                </button>
+                                                <button
+                                                    onClick={handleSaveEdit}
+                                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-bold flex items-center gap-2 transition-all"
+                                                >
+                                                    <Save size={16} /> 保存
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => setIsEditing(true)}
+                                                    className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-colors border border-slate-700"
+                                                    title="编辑角色"
+                                                >
+                                                    <Edit2 size={18} />
+                                                </button>
+                                                <button
+                                                    onClick={() => deleteChar(activeChar.id)}
+                                                    className="p-2 bg-slate-800 hover:bg-red-950 text-slate-400 hover:text-red-400 rounded-lg transition-colors border border-slate-700"
+                                                    title="移除角色"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="bg-slate-800/40 rounded-2xl border border-slate-700/50 p-6 shadow-inner">
+                                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                            <Plus size={12} className="text-muse-500" /> 灵魂档案
+                                        </h3>
+                                        {isEditing ? (
+                                            <textarea
+                                                value={editDescription}
+                                                onChange={(e) => setEditDescription(e.target.value)}
+                                                className="w-full h-64 bg-slate-900 border border-slate-600 rounded-xl p-4 text-slate-200 text-sm focus:border-muse-500 outline-none resize-none leading-relaxed"
+                                            />
+                                        ) : (
+                                            <div className="prose prose-invert prose-slate max-w-none text-slate-300 leading-relaxed font-serif text-lg">
+                                                <MarkdownRenderer content={activeChar.description} />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="bg-slate-800/40 rounded-2xl border border-slate-700/50 p-6 shadow-inner">
+                                        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                            <HeartHandshake size={14} className="text-rose-500" /> 人际羁绊 (Relationships)
+                                        </h3>
+                                        <textarea
+                                            value={activeChar.relationships || ''}
+                                            onChange={(e) => updateRelationship(e.target.value)}
+                                            placeholder="描述该角色与其他人的复杂关系、秘密契约或深仇大恨..."
+                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl p-4 text-sm text-slate-300 focus:border-rose-500 outline-none resize-none h-24 transition-colors"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 ) : draftCharacter ? (

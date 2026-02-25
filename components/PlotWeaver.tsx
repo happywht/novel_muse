@@ -310,7 +310,7 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                 setShowRightSidebar={setShowRightSidebar}
                 setCustomRewritePrompt={setCustomRewritePrompt}
                 handleRewrite={(p, l) => {/* Optional: Add rewrite logic to hook if needed */ }}
-                handleAutoFix={() => {/* Optional: Add autofix logic to hook */ }}
+                handleAutoFix={ai.handleAutoFix}
                 handleAnalyzeRhythm={() => ai.handleAnalyzeRhythm(fullContent)}
                 handleAnalyze={() => ai.handleAnalyze(fullContent)}
             />

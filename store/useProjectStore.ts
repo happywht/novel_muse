@@ -159,17 +159,42 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         const backendOk = await isBackendAvailable();
         set({ useBackend: backendOk });
 
+        const stored = localStorage.getItem('muse_projects');
+        let localProjects: ProjectState[] = [];
+        if (stored) {
+            try {
+                localProjects = JSON.parse(stored);
+            } catch (e) {
+                console.error('Failed to parse localStorage projects', e);
+            }
+        }
+
         if (backendOk) {
-            console.log('🚀 Backend connected! Loading from MySQL...');
+            console.log('🚀 Backend connected! Comparing versions...');
             try {
                 const list = await fetchProjectList();
                 if (list.length > 0) {
                     const sorted = list.sort((a, b) => b.lastModified - a.lastModified);
-                    const fullProject = await fetchProject(sorted[0].id);
-                    const merged = { ...INITIAL_PROJECT, ...fullProject };
+                    const mostRecentRemote = sorted[0];
+
+                    // Check if we have a local version of this project that is NEWER
+                    const localVersion = localProjects.find(p => p.id === mostRecentRemote.id);
+
+                    let projectToLoad: ProjectState;
+                    if (localVersion && localVersion.lastModified > mostRecentRemote.lastModified) {
+                        console.log('💡 Local version is newer than MySQL. Using local and syncing back...');
+                        projectToLoad = { ...INITIAL_PROJECT, ...localVersion };
+                        // Trigger a sync back to backend as local is ahead
+                        setTimeout(() => get().syncToBackend(), 1000);
+                    } else {
+                        console.log('☁️ Loading project from MySQL...');
+                        const fullProject = await fetchProject(mostRecentRemote.id);
+                        projectToLoad = { ...INITIAL_PROJECT, ...fullProject };
+                    }
+
                     set({
-                        project: merged,
-                        activeSection: AppSection.LOBBY, // Default to lobby on start
+                        project: projectToLoad,
+                        activeSection: AppSection.LOBBY,
                         savedProjects: list.map(s => ({
                             ...INITIAL_PROJECT,
                             id: s.id,
@@ -177,31 +202,28 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
                             genre: s.genre,
                             lastModified: s.lastModified,
                         } as ProjectState)),
+                        isLoading: false
                     });
                 } else {
-                    // Check localStorage for migration
-                    const stored = localStorage.getItem('muse_projects');
-                    if (stored) {
-                        const parsed = JSON.parse(stored);
-                        if (Array.isArray(parsed) && parsed.length > 0) {
-                            console.log('📦 Migrating localStorage projects to MySQL...');
-                            for (const proj of parsed) {
-                                await syncProject(proj);
-                            }
-                            const mostRecent = parsed.sort((a: any, b: any) => b.lastModified - a.lastModified)[0];
-                            set({
-                                project: { ...INITIAL_PROJECT, ...mostRecent },
-                                activeSection: AppSection.LOBBY,
-                                savedProjects: parsed,
-                                isLoading: false,
-                            });
-                            return;
+                    // No projects on backend, check for migration
+                    if (localProjects.length > 0) {
+                        console.log('📦 Migrating localStorage projects to MySQL...');
+                        for (const proj of localProjects) {
+                            await syncProject(proj);
                         }
+                        const mostRecent = localProjects.sort((a, b) => b.lastModified - a.lastModified)[0];
+                        set({
+                            project: { ...INITIAL_PROJECT, ...mostRecent },
+                            activeSection: AppSection.LOBBY,
+                            savedProjects: localProjects,
+                            isLoading: false,
+                        });
+                    } else {
+                        // Brand new user
+                        const newProj = { ...INITIAL_PROJECT, id: Date.now().toString() };
+                        await syncProject(newProj);
+                        set({ project: newProj, savedProjects: [newProj], isLoading: false });
                     }
-                    // Brand new user
-                    const newProj = { ...INITIAL_PROJECT, id: Date.now().toString() };
-                    await syncProject(newProj);
-                    set({ project: newProj, savedProjects: [newProj] });
                 }
             } catch (err) {
                 console.warn('Backend load failed, falling back to localStorage', err);
@@ -351,27 +373,35 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     fetchChapterContent: async (chapterId) => {
         const { project, useBackend } = get();
-        if (!useBackend) return;
 
+        // If already have content, don't fetch
         const chapter = project.chapters.find(c => c.id === chapterId);
         if (chapter && chapter.content && chapter.content.trim() !== "") {
+            return;
+        }
+
+        if (!useBackend) {
+            // In local mode, if it's empty, it's just empty
             return;
         }
 
         set({ isLoading: true });
         try {
             const fullChapter = await fetchChapter(project.id, chapterId);
-            set((state) => ({
-                project: {
-                    ...state.project,
-                    chapters: state.project.chapters.map(c =>
-                        c.id === chapterId ? { ...c, content: fullChapter.content } : c
-                    )
-                },
-                isLoading: false
-            }));
+            if (fullChapter && fullChapter.content !== undefined) {
+                set((state) => ({
+                    project: {
+                        ...state.project,
+                        chapters: state.project.chapters.map(c =>
+                            c.id === chapterId ? { ...c, content: fullChapter.content } : c
+                        )
+                    }
+                }));
+            }
         } catch (err) {
             console.error('Failed to fetch chapter content:', err);
+            // Optionally set a fallback flag or toast here
+        } finally {
             set({ isLoading: false });
         }
     },

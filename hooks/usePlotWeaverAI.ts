@@ -126,6 +126,42 @@ export const usePlotWeaverAI = ({ project, updateProject, updateProjectWithHisto
         }
     };
 
+    const handleAutoFix = async () => {
+        if (!analysis || project.plotNodes.length === 0) return;
+        setIsIterating(true);
+        try {
+            const directive = `请根据以下诊断报告的要求，对原有大纲进行全局优化和重写：\n\n${analysis}`;
+            const result = await rewritePlot(
+                project.plotNodes.map(n => n.content).join('\n\n'),
+                directive,
+                project.genre,
+                project.characters,
+                project.worldSettings,
+                project.creativeSettings
+            );
+
+            const newNodes: PlotNode[] = result.map((node, idx) => ({
+                id: crypto.randomUUID(),
+                title: node.title,
+                content: node.content,
+                order: idx,
+                relatedCharacters: [],
+                relatedLocations: []
+            }));
+
+            updateProjectWithHistory({
+                plotNodes: newNodes
+            }, "AI 自动逻辑修复 (基于诊断报告)");
+
+            setToast({ msg: "剧情已根据诊断建议完成优化", type: 'success' });
+        } catch (error) {
+            console.error(error);
+            setToast({ msg: "自动修复失败", type: 'error' });
+        } finally {
+            setIsIterating(false);
+        }
+    };
+
     // --- Rhythm Analysis ---
     const handleAnalyzeRhythm = async (fullContent: string) => {
         if (!fullContent.trim()) return;
@@ -151,6 +187,7 @@ export const usePlotWeaverAI = ({ project, updateProject, updateProjectWithHisto
         handleGenerateNodeAI,
         handleIterateNode,
         handleAnalyze,
+        handleAutoFix,
         handleAnalyzeRhythm,
         setAnalysis,
         setRhythmData

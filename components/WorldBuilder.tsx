@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ProjectState, WorldSetting, WorldGenConfig, Echo } from '../types';
 import { generateText, expandWorldLore } from '../services/geminiService';
 import { Loader } from './Loader';
-import { Globe, Plus, Trash2, Map, Shield, Users, Scroll, BookPlus, AlertCircle, CheckCircle, Settings2, Eye, Cpu, BookOpen, GitCommit, Check, Edit2, Save, X, Search } from 'lucide-react';
+import { Globe, Plus, Trash2, Map, Shield, Users, Scroll, BookPlus, AlertCircle, CheckCircle, Settings2, Eye, Cpu, BookOpen, GitCommit, Check, Edit2, Save, X, Search, Info, RefreshCw } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface WorldBuilderProps {
@@ -56,7 +56,7 @@ export const WorldBuilder: React.FC<WorldBuilderProps> = ({ project, updateProje
             setEditContent(activeItem.content);
             setIsEditing(false);
         }
-    }, [activeItemId]);
+    }, [activeItemId, activeItem?.id]); // Trigger when ID changes OR when item arrives in project state
 
     const showToast = (msg: string, type: 'error' | 'success' = 'error') => {
         setToast({ msg, type });
@@ -99,7 +99,7 @@ export const WorldBuilder: React.FC<WorldBuilderProps> = ({ project, updateProje
             const content = await generateText(prompt, 'world_gen', project.creativeSettings);
 
             const newItem: WorldSetting = {
-                id: Date.now().toString(),
+                id: `world-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
                 title: newItemTitle || `未命名的 ${selectedCategory}`,
                 category: selectedCategory,
                 content: content
@@ -144,9 +144,10 @@ export const WorldBuilder: React.FC<WorldBuilderProps> = ({ project, updateProje
             worldSettings: [...project.worldSettings, draftLore]
         });
         setActiveItemId(draftLore.id);
+        const titleToClear = draftLore.title; // Capture title, we can clear the input but keeping UI consistent
         setDraftLore(null);
         setNewItemTitle('');
-        showToast("设定已确立！", 'success');
+        showToast(`已确立: ${titleToClear}`, 'success');
     };
 
     const handleExpandLore = async () => {
@@ -219,6 +220,19 @@ export const WorldBuilder: React.FC<WorldBuilderProps> = ({ project, updateProje
         w.category === selectedCategory &&
         w.title.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const handleManualAdd = () => {
+        const newItem: WorldSetting = {
+            id: `world-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            title: newItemTitle || `未命名的 ${selectedCategory}`,
+            category: selectedCategory,
+            content: ''
+        };
+        setDraftLore(newItem);
+        setIsEditing(true);
+        setEditContent('');
+        setActiveItemId(null); // Deselect any active item
+    };
 
     return (
         <div className="flex h-[calc(100vh-140px)] gap-6 relative">
@@ -313,13 +327,24 @@ export const WorldBuilder: React.FC<WorldBuilderProps> = ({ project, updateProje
                                 placeholder="新建词条标题..."
                                 className="flex-1 bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-sm text-white focus:border-muse-500 outline-none"
                             />
-                            <button
-                                onClick={handleGenerateLore}
-                                disabled={isGenerating || draftLore !== null} // Disable if generating or a draft exists
-                                className="bg-muse-600 hover:bg-muse-500 text-white p-2 rounded-md disabled:opacity-50"
-                            >
-                                {isGenerating ? <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div> : <Plus size={18} />}
-                            </button>
+                            <div className="flex gap-1">
+                                <button
+                                    onClick={handleManualAdd}
+                                    disabled={draftLore !== null}
+                                    title="手动创建"
+                                    className="bg-slate-700 hover:bg-slate-600 text-white p-2 rounded-md disabled:opacity-50"
+                                >
+                                    <BookPlus size={18} />
+                                </button>
+                                <button
+                                    onClick={handleGenerateLore}
+                                    disabled={isGenerating || draftLore !== null}
+                                    title="AI 灵感生成"
+                                    className="bg-muse-600 hover:bg-muse-500 text-white p-2 rounded-md disabled:opacity-50"
+                                >
+                                    {isGenerating ? <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div> : <Plus size={18} />}
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -328,7 +353,7 @@ export const WorldBuilder: React.FC<WorldBuilderProps> = ({ project, updateProje
                         return (
                             <div
                                 key={lore.id}
-                                onClick={() => setActiveItemId(lore.id)}
+                                onClick={() => { setActiveItemId(lore.id); setDraftLore(null); }}
                                 className={`p-3 rounded-lg cursor-pointer flex justify-between items-center group relative overflow-hidden ${activeItemId === lore.id ? 'bg-muse-900/50 border border-muse-500/50' : 'bg-slate-800 hover:bg-slate-750 border border-transparent'} ${hasEcho && activeItemId !== lore.id ? 'shadow-[0_0_15px_rgba(34,211,238,0.15)] border-cyan-900/50' : ''}`}
                             >
                                 {hasEcho && (
@@ -432,7 +457,7 @@ export const WorldBuilder: React.FC<WorldBuilderProps> = ({ project, updateProje
                                         </button>
                                         <button
                                             onClick={handleExpandLore}
-                                            disabled={isExpanding || isIterating} // isGenerating is removed, replaced with isIterating
+                                            disabled={isExpanding || isIterating}
                                             className="text-sm bg-slate-800 hover:bg-muse-900 text-muse-300 hover:text-white px-3 py-2 rounded-lg border border-slate-700 hover:border-muse-500 transition-all flex items-center gap-2"
                                         >
                                             {isExpanding ? <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full"></div> : <BookPlus size={16} />}
@@ -455,26 +480,130 @@ export const WorldBuilder: React.FC<WorldBuilderProps> = ({ project, updateProje
                             </div>
                         )}
                     </div>
+                ) : draftLore ? (
+                    <div className="animate-fade-in flex-1 flex flex-col">
+                        <div className="flex items-center justify-between mb-6 border-b border-slate-800 pb-4">
+                            <div>
+                                <span className="text-xs font-bold tracking-wider text-amber-500 uppercase bg-amber-500/10 px-2 py-1 rounded flex items-center gap-1">
+                                    <SparklesIcon size={12} /> 待确立的新条目
+                                </span>
+                                <h1 className="text-3xl font-serif font-bold text-white mt-2">{draftLore.title}</h1>
+                            </div>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => { setDraftLore(null); setIsEditing(false); }}
+                                    className="text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-lg border border-slate-700 transition-all"
+                                >
+                                    舍弃草稿
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        // If we're editing, save the draft content first
+                                        const finalDraft = isEditing ? { ...draftLore, content: editContent } : draftLore;
+                                        updateProject({
+                                            worldSettings: [...project.worldSettings, finalDraft]
+                                        });
+                                        setActiveItemId(finalDraft.id);
+                                        setDraftLore(null);
+                                        setNewItemTitle('');
+                                        setIsEditing(false);
+                                        showToast(`已确立: ${finalDraft.title}`, 'success');
+                                    }}
+                                    className="text-sm bg-muse-600 hover:bg-muse-500 text-white px-4 py-2 rounded-lg font-bold shadow-lg shadow-muse-900/20 transition-all flex items-center gap-2"
+                                >
+                                    <Check size={18} /> 确认收录
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 flex flex-col gap-4">
+                            <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-4 flex items-start gap-3">
+                                <Info size={18} className="text-muse-400 mt-1" />
+                                <div className="text-xs text-slate-400 leading-relaxed">
+                                    这是新生成的设定建议。您可以直接在下方修改内容，确认无误后点击“确认收录”将其永久保存到世界观档案中。
+                                </div>
+                            </div>
+
+                            {isEditing ? (
+                                <textarea
+                                    value={editContent}
+                                    onChange={(e) => setEditContent(e.target.value)}
+                                    placeholder="输入设定内容..."
+                                    className="flex-1 w-full bg-slate-950/50 border border-slate-700 rounded-lg p-4 text-slate-300 font-serif leading-relaxed text-lg resize-none focus:border-muse-500 outline-none custom-scrollbar"
+                                />
+                            ) : (
+                                <div className="prose prose-invert prose-slate max-w-none flex-1">
+                                    <MarkdownRenderer content={draftLore.content} />
+                                    {draftLore.content && (
+                                        <button
+                                            onClick={() => { setIsEditing(true); setEditContent(draftLore.content); }}
+                                            className="mt-4 text-sm text-muse-400 hover:text-muse-300 flex items-center gap-1"
+                                        >
+                                            <Edit2 size={14} /> 修改内容
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {!isEditing && (
+                                <div className="border-t border-slate-800 pt-6 mt-6">
+                                    <label className="text-xs text-slate-500 font-bold uppercase mb-2 block">觉得不满意？告诉 AI 如何完善：</label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={iterationFeedback}
+                                            onChange={(e) => setIterationFeedback(e.target.value)}
+                                            placeholder="例如：增加更多的宗教细节，或者描述一下它的起源..."
+                                            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-sm text-white focus:border-muse-500 outline-none"
+                                        />
+                                        <button
+                                            onClick={handleIterateLore}
+                                            disabled={isIterating || !iterationFeedback.trim()}
+                                            className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-sm disabled:opacity-50 flex items-center gap-2"
+                                        >
+                                            {isIterating ? <RefreshCw size={14} className="animate-spin" /> : <SparklesIcon size={14} />}
+                                            优化建议
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center h-full text-slate-600 space-y-4">
                         <Globe size={64} className="opacity-20" />
                         <p>选择或生成一个设定条目以查看详情。</p>
-                    </div>
-                )}
-
-                {(isGenerating || isExpanding) && (
-                    <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-10">
-                        {isGenerating && (
-                            <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-xl">
-                                <Loader text="正在推演万象世界..." />
-                            </div>
-                        )}
-                        {isExpanding && (
-                            <Loader text="正在挖掘历史..." />
-                        )}
+                        <div className="flex gap-4 mt-4">
+                            <button
+                                onClick={handleManualAdd}
+                                className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition-all flex items-center gap-2"
+                            >
+                                <BookPlus size={18} /> 手动创建
+                            </button>
+                            <button
+                                onClick={() => setActiveItemId(null)} // Not strictly needed but resets state
+                                className="px-6 py-2 bg-muse-900/40 hover:bg-muse-800/50 text-muse-400 rounded-xl border border-muse-500/30 transition-all flex items-center gap-2"
+                            >
+                                <Plus size={18} /> AI 灵感
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
+
+            {/* Loading Overlay */}
+            {(isGenerating || isExpanding) && (
+                <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-10">
+                    {isGenerating && (
+                        <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-xl">
+                            <Loader text="正在推演万象世界..." />
+                        </div>
+                    )}
+                    {isExpanding && (
+                        <Loader text="正在挖掘历史..." />
+                    )}
+                </div>
+            )}
 
             {/* Toast Notification */}
             {toast && (
