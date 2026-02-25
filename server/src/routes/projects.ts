@@ -64,6 +64,9 @@ router.get('/:id', async (req: Request, res: Response) => {
                         title: true,
                         order: true,
                         lastModified: true,
+                        summary: true,
+                        expectedPOV: true,
+                        plotNodeId: true,
                         projectId: true,
                     },
                     orderBy: { order: 'asc' }
@@ -90,6 +93,7 @@ router.get('/:id', async (req: Request, res: Response) => {
             premise: project.premise,
             plotOutline: project.plotOutline || '',
             currentWorldDate: project.currentWorldDate,
+            customPrompts: JSON.parse(project.customPrompts || '{}'),
             creativeSettings: {
                 tone: project.tone,
                 style: project.style,
@@ -132,6 +136,9 @@ router.get('/:id', async (req: Request, res: Response) => {
                 id: ch.id,
                 title: ch.title,
                 content: "", // Content is lazy-loaded
+                summary: ch.summary || '',
+                expectedPOV: ch.expectedPOV || '',
+                plotNodeId: ch.plotNodeId || undefined,
                 order: ch.order,
                 lastModified: Number(ch.lastModified),
             })),
@@ -140,6 +147,7 @@ router.get('/:id', async (req: Request, res: Response) => {
                 title: pn.title,
                 content: pn.content,
                 order: pn.order,
+                beatTag: pn.beatTag || undefined,
                 relatedCharacters: JSON.parse(pn.relatedCharacters || '[]'),
                 relatedLocations: JSON.parse(pn.relatedLocations || '[]'),
             })),
@@ -185,7 +193,10 @@ router.get('/:id/chapters/:chapterId', async (req: Request, res: Response) => {
 
         res.json({
             ...chapter,
-            lastModified: Number(chapter.lastModified)
+            lastModified: Number(chapter.lastModified),
+            summary: chapter.summary || '',
+            expectedPOV: chapter.expectedPOV || '',
+            plotNodeId: chapter.plotNodeId || undefined,
         });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
@@ -236,6 +247,7 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                     targetAudience: data.creativeSettings?.targetAudience || '',
                     detailLevel: data.worldGenConfig?.detailLevel || 'Standard',
                     focus: data.worldGenConfig?.focus || 'Balanced',
+                    customPrompts: JSON.stringify(data.customPrompts || {}),
                 },
                 update: {
                     title: data.title || '未命名项目',
@@ -249,6 +261,7 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                     targetAudience: data.creativeSettings?.targetAudience || '',
                     detailLevel: data.worldGenConfig?.detailLevel || 'Standard',
                     focus: data.worldGenConfig?.focus || 'Balanced',
+                    customPrompts: JSON.stringify(data.customPrompts || {}),
                 },
             });
 
@@ -338,6 +351,9 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                             id: ch.id,
                             title: ch.title,
                             content: contentToSave,
+                            summary: ch.summary || null,
+                            expectedPOV: ch.expectedPOV || null,
+                            plotNodeId: ch.plotNodeId || null,
                             order: ch.order,
                             lastModified: BigInt(ch.lastModified),
                             projectId: id,
@@ -345,6 +361,9 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                         update: {
                             title: ch.title,
                             content: contentToSave,
+                            summary: ch.summary || null,
+                            expectedPOV: ch.expectedPOV || null,
+                            plotNodeId: ch.plotNodeId || null,
                             order: ch.order,
                             lastModified: BigInt(ch.lastModified),
                         }
@@ -359,6 +378,7 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                         title: pn.title,
                         content: pn.content,
                         order: pn.order,
+                        beatTag: pn.beatTag || null,
                         relatedCharacters: JSON.stringify(pn.relatedCharacters || []),
                         relatedLocations: JSON.stringify(pn.relatedLocations || []),
                         projectId: id,
@@ -440,6 +460,10 @@ router.patch('/:id', async (req: Request, res: Response) => {
         if (data.worldGenConfig) {
             if (data.worldGenConfig.detailLevel !== undefined) updateData.detailLevel = data.worldGenConfig.detailLevel;
             if (data.worldGenConfig.focus !== undefined) updateData.focus = data.worldGenConfig.focus;
+        }
+
+        if (data.customPrompts !== undefined) {
+            updateData.customPrompts = JSON.stringify(data.customPrompts);
         }
 
         const project = await prisma.project.update({

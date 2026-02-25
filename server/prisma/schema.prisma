@@ -14,6 +14,7 @@ model Project {
   premise          String    @db.LongText
   plotOutline       String?   @db.LongText
   currentWorldDate String    @default("元年")
+  customPrompts    String?   @db.LongText // JSON blob
 
   // Creative Settings (embedded, not separate table)
   tone             String    @default("平衡")
@@ -90,6 +91,9 @@ model Chapter {
   id           String   @id @default(cuid())
   title        String
   content      String   @db.LongText
+  summary      String?  @db.LongText
+  expectedPOV  String?  @db.Text
+  plotNodeId   String?  
   order        Int
   lastModified BigInt
   projectId    String
@@ -132,6 +136,7 @@ model PlotNode {
   title            String
   content          String   @db.LongText
   order            Int
+  beatTag          String?
   relatedCharacters String? @db.Text // JSON string of IDs
   relatedLocations  String? @db.Text // JSON string of IDs
   projectId        String
