@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { ProjectState, PlotVersion, AppSection } from '../types';
-import { analyzePlot, expandScene, generatePlotFromContext, rewritePlot, analyzePlotRhythm, PlotRhythmPoint } from '../services/geminiService';
+import { analyzePlot, expandScene, generatePlotFromContext, rewritePlot, analyzePlotRhythm, PlotRhythmPoint, generateText } from '../services/geminiService';
 import { Loader } from './Loader';
-import { GitBranch, Activity, AlertTriangle, LayoutTemplate, Wand2, Info, X, CheckCircle, AlertCircle, History, Zap, Save, Sidebar, User, Globe, FileText, LayoutGrid, TrendingUp, Lightbulb, BookOpen, Map, Swords, Crown, Plus, Check, RotateCcw, Edit2, Tag } from 'lucide-react';
+import { GitBranch, Activity, AlertTriangle, LayoutTemplate, Wand2, Info, X, CheckCircle, AlertCircle, History, Zap, Save, Sidebar, User, Globe, FileText, LayoutGrid, TrendingUp, Lightbulb, BookOpen, Map, Swords, Crown, Plus, Check, RotateCcw, Edit2, Tag, Sparkles } from 'lucide-react';
 import { PlotAnalysisPanel } from './PlotWeaver/PlotAnalysisPanel';
 import { PlotRhythmChart } from './PlotWeaver/PlotRhythmChart';
 import { PlotHistorySidebar } from './PlotWeaver/PlotHistorySidebar';
@@ -15,7 +15,7 @@ interface PlotWeaverProps {
     updateProject: (data: Partial<ProjectState>) => void;
 }
 
-type TabMode = 'ANALYSIS' | 'OPTIMIZE' | 'RHYTHM' | 'STRUCTURE' | 'CARDS';
+type TabMode = 'ANALYSIS' | 'OPTIMIZE' | 'RHYTHM' | 'STRUCTURE' | 'CARDS' | 'REFERENCE';
 type ViewMode = 'TEXT' | 'CARDS';
 
 const STRUCTURE_TEMPLATES = [
@@ -61,10 +61,11 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
     const [showHistory, setShowHistory] = useState(false);
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [saveNote, setSaveNote] = useState('');
-    const [showReference, setShowReference] = useState(false);
+    const [showRightSidebar, setShowRightSidebar] = useState(false);
+    const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
 
     // --- Tab & View ---
-    const [activeTab, setActiveTab] = useState<TabMode>('CARDS');
+    const [activeTab, setActiveTab] = useState<TabMode>('ANALYSIS');
 
     // Migration Effect: Convert old text outline to cards automatically
     React.useEffect(() => {
@@ -108,6 +109,7 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
     const [draftNodeContent, setDraftNodeContent] = useState<string | null>(null);
     const [iterationFeedback, setIterationFeedback] = useState('');
     const [isIterating, setIsIterating] = useState(false);
+    const [showEntitySelector, setShowEntitySelector] = useState<{ id: string; type: 'CHARACTER' | 'LOCATION' } | null>(null);
 
     const { setActiveSection, setActivePlotNodeId } = useProjectStore();
     const plotOutline = project.plotOutline || '';
@@ -121,21 +123,24 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
         setTimeout(() => setToast(null), 3000);
     };
 
-    const updatePlotWithHistory = (newContent: string, note: string) => {
+    const updateProjectWithHistory = (newNodes: any[], note: string) => {
         const historyEntry: PlotVersion = {
             id: Date.now().toString(),
             timestamp: Date.now(),
-            content: plotOutline,
+            content: JSON.stringify(project.plotNodes), // Store nodes as JSON string in legacy content field for history
             note: note || '自动保存',
         };
-        const newHistory = plotOutline ? [historyEntry, ...project.plotHistory].slice(0, 20) : project.plotHistory;
-        updateProject({ plotOutline: newContent, plotHistory: newHistory });
+        const newHistory = [historyEntry, ...project.plotHistory].slice(0, 20);
+        updateProject({ plotNodes: newNodes, plotHistory: newHistory });
     };
 
     const handleManualSave = () => {
-        if (!plotOutline.trim()) { showToast("大纲内容为空，无法保存。", 'error'); return; }
+        if (project.plotNodes.length === 0) { showToast("无大纲内容可保存。", 'error'); return; }
         const historyEntry: PlotVersion = {
-            id: Date.now().toString(), timestamp: Date.now(), content: plotOutline, note: saveNote || "手动存档"
+            id: Date.now().toString(),
+            timestamp: Date.now(),
+            content: JSON.stringify(project.plotNodes),
+            note: saveNote || "手动存档"
         };
         const newHistory = [historyEntry, ...project.plotHistory].slice(0, 20);
         updateProject({ plotHistory: newHistory });
@@ -185,26 +190,37 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
         setPendingAction(null); setIsGeneratingPlot(true);
         const label = template ? "AI 模版填充" : "AI 智能生成";
         try {
-            const result = await generatePlotFromContext(project.premise, project.genre, project.characters, project.worldSettings, project.creativeSettings, template, project.echoes);
-            updatePlotWithHistory(result, label);
+            const nodes = await generatePlotFromContext(project.premise, project.genre, project.characters, project.worldSettings, project.creativeSettings, template, project.echoes);
+            if (nodes && nodes.length > 0) {
+                const newNodes = nodes.map((n, idx) => ({
+                    ...n,
+                    id: `gen-${idx}-${Date.now()}`,
+                    order: idx,
+                    relatedCharacters: [],
+                    relatedLocations: []
+                }));
+                updateProjectWithHistory(newNodes, label);
+                showToast("情节推演完成！", "success");
+            }
         } catch (e) { console.error(e); showToast("生成失败，请重试。", 'error'); }
         finally { setIsGeneratingPlot(false); }
     };
 
     const handleRewrite = async (prompt: string, label: string) => {
-        if (!plotOutline) return;
+        if (project.plotNodes.length === 0) return;
         setIsGeneratingPlot(true);
         try {
-            if (selectedText && selectionRange) {
-                const result = await rewritePlot(selectedText, prompt, project.genre, project.characters, project.worldSettings, project.creativeSettings, project.echoes);
-                const before = plotOutline.substring(0, selectionRange.start);
-                const after = plotOutline.substring(selectionRange.end);
-                updatePlotWithHistory(before + result + after, `${label} (局部)`);
-                showToast("局部重写完成！", "success");
-            } else {
-                const result = await rewritePlot(plotOutline, prompt, project.genre, project.characters, project.worldSettings, project.creativeSettings, project.echoes);
-                updatePlotWithHistory(result, label);
-                showToast("全局重写完成！", "success");
+            const nodes = await rewritePlot(fullContent, prompt, project.genre, project.characters, project.worldSettings, project.creativeSettings, project.echoes);
+            if (nodes && nodes.length > 0) {
+                const newNodes = nodes.map((n, idx) => ({
+                    ...n,
+                    id: `rewrite-${idx}-${Date.now()}`,
+                    order: idx,
+                    relatedCharacters: [],
+                    relatedLocations: []
+                }));
+                updateProjectWithHistory(newNodes, label);
+                showToast("剧情重写完成！", "success");
             }
         } catch (e) { showToast("重写失败", "error"); }
         finally { setIsGeneratingPlot(false); }
@@ -221,8 +237,25 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
     };
 
     const performRestore = (entry: PlotVersion) => {
-        updatePlotWithHistory(entry.content, `还原自: ${entry.note}`);
-        setPendingAction(null); setShowHistory(false);
+        try {
+            const restoredNodes = JSON.parse(entry.content);
+            updateProjectWithHistory(restoredNodes, `还原自: ${entry.note}`);
+            setPendingAction(null); setShowHistory(false);
+            showToast("已恢复历史版本", "success");
+        } catch (e) {
+            // Fallback for legacy text versions
+            const legacyBeats = entry.content.split(/\n\n+/).filter(b => b.trim().length > 0);
+            const newNodes = legacyBeats.map((beat, idx) => ({
+                id: `restored-legacy-${idx}-${Date.now()}`,
+                title: beat.split('\n')[0].substring(0, 30).trim() || `情节点 ${idx + 1}`,
+                content: beat,
+                order: idx,
+                relatedCharacters: [],
+                relatedLocations: []
+            }));
+            updateProjectWithHistory(newNodes, `还原自旧版文本: ${entry.note}`);
+            setPendingAction(null); setShowHistory(false);
+        }
     };
 
     const confirmAction = () => {
@@ -243,8 +276,19 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
             title: `情节点 ${project.plotNodes.length + 1}`,
             content: '',
             order: project.plotNodes.length,
+            relatedCharacters: [],
+            relatedLocations: []
         };
         updateProject({ plotNodes: [...project.plotNodes, newNode] });
+    };
+
+    const toggleSidebarTab = (tab: TabMode) => {
+        if (activeTab === tab && showRightSidebar) {
+            setShowRightSidebar(false);
+        } else {
+            setActiveTab(tab);
+            setShowRightSidebar(true);
+        }
     };
 
     const handleUpdateCard = (id: string, updates: Partial<any>) => {
@@ -273,7 +317,7 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
             
             要求：通过动作、对话和感官细节来扩充，保持叙事节奏，并确保符合整体风格。`;
 
-            const result = await generateText(prompt, 'plot_weaving', project.creativeSettings);
+            const result = await generateText(prompt, 'plot_node_gen', project.creativeSettings);
             setDraftNodeContent(result);
         } catch (e) {
             console.error(e);
@@ -313,6 +357,19 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
         setDraftNodeContent(null);
         setEditingNodeId(null);
         showToast("剧情已更新并采纳", 'success');
+    };
+
+    const toggleEntityRelation = (nodeId: string, entityId: string, type: 'CHARACTER' | 'LOCATION') => {
+        const node = project.plotNodes.find(n => n.id === nodeId);
+        if (!node) return;
+
+        const field = type === 'CHARACTER' ? 'relatedCharacters' : 'relatedLocations';
+        const currentRelations = node[field] || [];
+        const newRelations = currentRelations.includes(entityId)
+            ? currentRelations.filter(id => id !== entityId)
+            : [...currentRelations, entityId];
+
+        handleUpdateCard(nodeId, { [field]: newRelations });
     };
 
     // Aggregation: Collect all card content into a single string for legacy AI analysis
@@ -361,6 +418,7 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
         { id: 'OPTIMIZE' as TabMode, label: '优化与重写', icon: Zap },
         { id: 'RHYTHM' as TabMode, label: '节奏视图', icon: TrendingUp },
         { id: 'STRUCTURE' as TabMode, label: '结构助手', icon: Lightbulb },
+        { id: 'REFERENCE' as TabMode, label: '参考资料', icon: Info },
     ];
 
     // ========================
@@ -368,269 +426,363 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
     // ========================
     return (
         <div className="flex h-[calc(100vh-140px)] gap-6 relative">
-            {/* Reference Sidebar (Collapsible) */}
-            <div
-                className={`fixed right-0 top-16 bottom-0 bg-slate-900 border-l border-slate-700 shadow-2xl z-40 transition-all duration-300 transform ${showReference ? 'translate-x-0 w-80' : 'translate-x-full w-0'}`}
-            >
-                <div className="flex flex-col h-full w-80">
-                    <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800">
-                        <h3 className="font-bold text-white flex items-center gap-2"><Sidebar size={18} /> 设定参考</h3>
-                        <button onClick={() => setShowReference(false)}><X size={18} className="text-slate-400 hover:text-white" /></button>
-                    </div>
-                    <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
-                        <div>
-                            <h4 className="text-muse-400 text-xs font-bold uppercase mb-2 flex items-center gap-1"><User size={12} /> 核心角色</h4>
-                            {project.characters.length === 0 && <p className="text-slate-600 text-xs">暂无角色。</p>}
-                            <div className="space-y-3">
-                                {project.characters.map(c => (
-                                    <div key={c.id} className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
-                                        <div className="flex justify-between"><span className="text-slate-200 font-bold text-sm">{c.name}</span><span className="text-xs text-slate-500">{c.role}</span></div>
-                                        <p className="text-xs text-slate-400 mt-1 line-clamp-3">{c.description}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div>
-                            <h4 className="text-muse-400 text-xs font-bold uppercase mb-2 flex items-center gap-1"><Globe size={12} /> 世界观设定</h4>
-                            {project.worldSettings.length === 0 && <p className="text-slate-600 text-xs">暂无设定。</p>}
-                            <div className="space-y-3">
-                                {project.worldSettings.map(w => (
-                                    <div key={w.id} className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
-                                        <div className="flex justify-between"><span className="text-slate-200 font-bold text-sm">{w.title}</span><span className="text-xs text-slate-500 truncate max-w-[80px]">{w.category}</span></div>
-                                        <p className="text-xs text-slate-400 mt-1 line-clamp-3">{w.content}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
 
             {/* ===== Left Side: Editor ===== */}
-            <div className="w-1/2 flex flex-col space-y-4">
-                <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 flex-1 flex flex-col relative">
-                    {/* Toolbar */}
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-serif font-bold text-white flex items-center gap-2">
-                            <GitBranch className="text-muse-400" size={20} /> 剧情大纲
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-4">
+                        <h2 className="text-2xl font-serif font-bold text-white flex items-center gap-2">
+                            <GitBranch className="text-muse-400" size={24} /> 剧情开题
                         </h2>
-                        <div className="flex gap-2">
+                        <div className="flex bg-slate-800/50 p-1 rounded-lg border border-slate-700/50">
                             <button
-                                onClick={() => setShowReference(!showReference)}
-                                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all border ${showReference ? 'bg-muse-900 border-muse-500 text-muse-300' : 'bg-slate-700 border-slate-600 text-slate-200 hover:bg-slate-600'}`}
-                                title="查看参考资料"
-                            ><Sidebar size={16} /> <span className="hidden xl:inline">参考</span></button>
+                                onClick={() => toggleSidebarTab('ANALYSIS')}
+                                className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-all ${activeTab === 'ANALYSIS' && showRightSidebar ? 'bg-muse-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
+                            >
+                                <Activity size={14} /> 诊断
+                            </button>
                             <button
-                                onClick={() => setShowSaveModal(true)}
-                                className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all border border-slate-600 disabled:opacity-50"
-                                title="保存当前版本"
-                            ><Save size={16} /> 存版本</button>
+                                onClick={() => toggleSidebarTab('RHYTHM')}
+                                className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-all ${activeTab === 'RHYTHM' && showRightSidebar ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
+                            >
+                                <TrendingUp size={14} /> 节奏
+                            </button>
                             <button
-                                onClick={() => setShowHistory(!showHistory)}
-                                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all border ${showHistory ? 'bg-muse-900 border-muse-500 text-muse-300' : 'bg-slate-700 border-slate-600 text-slate-200 hover:bg-slate-600'}`}
-                                title="历史版本时光机"
-                            ><History size={16} /></button>
-                            <button
-                                onClick={handleGeneratePlotClick}
-                                disabled={isGeneratingPlot}
-                                className="bg-muse-800 hover:bg-muse-700 text-muse-200 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50 transition-all border border-muse-700"
-                                title="AI 智能演绎大纲"
-                            ><Wand2 size={16} /> <span className="hidden xl:inline">自由生成</span></button>
+                                onClick={() => toggleSidebarTab('STRUCTURE')}
+                                className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-all ${activeTab === 'STRUCTURE' && showRightSidebar ? 'bg-amber-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
+                            >
+                                <Lightbulb size={14} /> 结构
+                            </button>
                         </div>
                     </div>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => toggleSidebarTab('REFERENCE')}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all border ${activeTab === 'REFERENCE' && showRightSidebar ? 'bg-muse-900 border-muse-500 text-muse-300' : 'bg-slate-700 border-slate-600 text-slate-200 hover:bg-slate-600'}`}
+                            title="查看参考资料"
+                        ><Info size={16} /> <span className="hidden lg:inline">参考</span></button>
+                        <button
+                            onClick={() => setShowSaveModal(true)}
+                            className="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all border border-slate-600"
+                            title="断点存档"
+                        ><Save size={16} /> <span className="hidden lg:inline">存版本</span></button>
+                        <button
+                            onClick={() => setShowHistory(!showHistory)}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border ${showHistory ? 'bg-muse-900 border-muse-500 text-muse-300' : 'bg-slate-700 border-slate-600 text-slate-200 hover:bg-slate-600'}`}
+                            title="历史时光机"
+                        ><History size={16} /></button>
+                        <button
+                            onClick={handleGeneratePlotClick}
+                            disabled={isGeneratingPlot}
+                            className="bg-muse-800 hover:bg-muse-700 text-muse-200 px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 disabled:opacity-50 transition-all border border-muse-700 shadow-lg shadow-muse-900/20"
+                            title="AI 全局推演"
+                        ><Wand2 size={16} /> 自由生成</button>
+                    </div>
+                </div>
 
-                    {/* Editor Area */}
-                    <div className="relative flex-1 flex flex-col overflow-hidden">
-                        {/* ★ Empty State: Template Selection Cards ★ */}
-                        {project.plotNodes.length === 0 ? (
-                            <div className="flex-1 flex flex-col items-center justify-center p-6 animate-fade-in">
-                                <LayoutTemplate size={40} className="text-slate-600 mb-4 opacity-40" />
-                                <h3 className="text-lg font-serif font-bold text-slate-300 mb-2">选择叙事骨架，开始创作</h3>
-                                <p className="text-sm text-slate-500 mb-6 text-center max-w-sm">
-                                    选择一个经典结构模版，AI 将基于您的小说设定自动填充骨架，或者直接在此添加情节卡片。
-                                </p>
-                                <div className="grid grid-cols-2 gap-3 w-full max-w-lg">
-                                    {STRUCTURE_TEMPLATES.map((t, i) => (
-                                        <button
-                                            key={i}
-                                            onClick={() => handleSelectTemplate(t)}
-                                            className={`relative text-left p-4 rounded-xl border bg-gradient-to-br transition-all duration-200 hover:scale-[1.02] hover:shadow-lg group ${t.color}`}
-                                        >
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <t.icon size={18} className={t.accentColor} />
-                                                <span className={`font-bold text-sm ${t.accentColor}`}>{t.name}</span>
-                                            </div>
-                                            <p className="text-xs text-slate-400 leading-relaxed">{t.description}</p>
-                                        </button>
-                                    ))}
-                                </div>
-                                <button
-                                    onClick={handleAddCard}
-                                    className="mt-4 text-xs text-slate-500 hover:text-muse-400 transition-colors underline underline-offset-4"
-                                >
-                                    跳过模版，直接手动添加情节 →
-                                </button>
+                {/* Editor Area */}
+                <div className="relative flex-1 flex flex-col overflow-hidden">
+                    {/* ★ Empty State: Template Selection Cards ★ */}
+                    {project.plotNodes.length === 0 ? (
+                        <div className="flex-1 flex flex-col items-center justify-center p-6 animate-fade-in">
+                            <LayoutTemplate size={40} className="text-slate-600 mb-4 opacity-40" />
+                            <h3 className="text-lg font-serif font-bold text-slate-300 mb-2">选择叙事骨架，开始创作</h3>
+                            <p className="text-sm text-slate-500 mb-6 text-center max-w-sm">
+                                选择一个经典结构模版，AI 将基于您的小说设定自动填充骨架，或者直接在此添加情节卡片。
+                            </p>
+                            <div className="grid grid-cols-2 gap-3 w-full max-w-lg">
+                                {STRUCTURE_TEMPLATES.map((t, i) => (
+                                    <button
+                                        key={i}
+                                        onClick={() => handleSelectTemplate(t)}
+                                        className={`relative text-left p-4 rounded-xl border bg-gradient-to-br transition-all duration-200 hover:scale-[1.02] hover:shadow-lg group ${t.color}`}
+                                    >
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <t.icon size={18} className={t.accentColor} />
+                                            <span className={`font-bold text-sm ${t.accentColor}`}>{t.name}</span>
+                                        </div>
+                                        <p className="text-xs text-slate-400 leading-relaxed">{t.description}</p>
+                                    </button>
+                                ))}
                             </div>
-                        ) : (
-                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 p-1 pb-20">
-                                {project.plotNodes.length > 0 ? (
-                                    <>
-                                        {project.plotNodes.sort((a, b) => a.order - b.order).map((node, idx) => (
-                                            <div key={node.id} className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 hover:border-muse-500/30 transition-all group relative">
-                                                <div className="flex items-center gap-3 mb-4">
-                                                    <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500 border border-slate-700">
-                                                        {idx + 1}
+                            <button
+                                onClick={handleAddCard}
+                                className="mt-4 text-xs text-slate-500 hover:text-muse-400 transition-colors underline underline-offset-4"
+                            >
+                                跳过模版，直接手动添加情节 →
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 p-1 pb-20">
+                            {project.plotNodes.length > 0 ? (
+                                <>
+                                    {project.plotNodes.sort((a, b) => a.order - b.order).map((node, idx) => (
+                                        <div
+                                            key={node.id}
+                                            className={`bg-slate-900/50 border rounded-2xl p-6 transition-all duration-300 group relative ${focusedNodeId === node.id ? 'border-muse-500 shadow-2xl shadow-muse-900/10' : 'border-slate-800 opacity-60 grayscale-[0.5] hover:opacity-100 hover:grayscale-0 hover:border-slate-700'}`}
+                                            onFocus={() => setFocusedNodeId(node.id)}
+                                            onBlur={() => setFocusedNodeId(null)}
+                                        >
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500 border border-slate-700">
+                                                    {idx + 1}
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={node.title}
+                                                    onChange={(e) => handleUpdateCard(node.id, { title: e.target.value })}
+                                                    className="bg-transparent border-none text-white font-bold text-lg focus:ring-0 w-full placeholder:text-slate-700"
+                                                    placeholder="输入情节标题..."
+                                                />
+                                                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                                                    <button
+                                                        onClick={() => handleRemoveCard(node.id)}
+                                                        className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+                                                        title="删除卡片"
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <textarea
+                                                value={node.content}
+                                                onChange={(e) => handleUpdateCard(node.id, { content: e.target.value })}
+                                                className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-3 text-sm text-slate-400 focus:text-slate-200 focus:border-muse-500/50 outline-none resize-none font-serif min-h-[100px] transition-all"
+                                                placeholder="描述这段剧情的发生、冲突与转折..."
+                                            />
+
+                                            {/* Iterative Drafting Zone (Stage B) */}
+                                            {editingNodeId === node.id && draftNodeContent !== null && (
+                                                <div className="mt-4 p-4 bg-muse-900/10 border border-muse-500/30 rounded-xl animate-fade-in">
+                                                    <div className="flex items-center gap-2 mb-3 text-muse-400 font-bold text-xs uppercase tracking-wider">
+                                                        <Sparkles size={14} /> AI 扩写草稿
                                                     </div>
-                                                    <input
-                                                        type="text"
-                                                        value={node.title}
-                                                        onChange={(e) => handleUpdateCard(node.id, { title: e.target.value })}
-                                                        className="bg-transparent border-none text-white font-bold text-lg focus:ring-0 w-full placeholder:text-slate-700"
-                                                        placeholder="输入情节标题..."
-                                                    />
-                                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
-                                                        <button
-                                                            onClick={() => handleRemoveCard(node.id)}
-                                                            className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                                                            title="删除卡片"
-                                                        >
-                                                            <X size={16} />
-                                                        </button>
+                                                    <div className="text-sm text-slate-300 leading-relaxed bg-slate-900/80 p-3 rounded-lg border border-slate-800 mb-4 whitespace-pre-wrap italic shadow-inner">
+                                                        {draftNodeContent}
+                                                    </div>
+
+                                                    <div className="space-y-3">
+                                                        <textarea
+                                                            value={iterationFeedback}
+                                                            onChange={(e) => setIterationFeedback(e.target.value)}
+                                                            placeholder="觉得哪里不好？告诉 AI 进行调整（例如：增加一些角色内心描写、让气氛更黑暗...）"
+                                                            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-400 focus:border-muse-500 outline-none min-h-[60px]"
+                                                        />
+                                                        <div className="flex justify-end gap-2 text-[10px]">
+                                                            <button
+                                                                onClick={() => { setDraftNodeContent(null); setEditingNodeId(null); }}
+                                                                className="px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-300 transition-colors"
+                                                            >取消</button>
+                                                            <button
+                                                                onClick={handleIterateNode}
+                                                                disabled={isIterating || !iterationFeedback.trim()}
+                                                                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-muse-400 rounded-lg font-medium flex items-center gap-1 transition-all border border-slate-700 disabled:opacity-50"
+                                                            >
+                                                                {isIterating ? <Loader size={12} /> : <RotateCcw size={12} />} 再次调整
+                                                            </button>
+                                                            <button
+                                                                onClick={handleAcceptDraftNode}
+                                                                className="px-3 py-1.5 bg-muse-600 hover:bg-muse-500 text-white rounded-lg font-bold flex items-center gap-1 shadow-lg shadow-muse-900/20"
+                                                            >
+                                                                <Check size={12} /> 采纳并覆盖
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <textarea
-                                                    value={node.content}
-                                                    onChange={(e) => handleUpdateCard(node.id, { content: e.target.value })}
-                                                    className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-3 text-sm text-slate-400 focus:text-slate-200 focus:border-muse-500/50 outline-none resize-none font-serif min-h-[100px] transition-all"
-                                                    placeholder="描述这段剧情的发生、冲突与转折..."
-                                                />
-                                                <div className="mt-3 flex justify-between items-center">
+                                            )}
+
+                                            <div className="mt-3 flex flex-col gap-3">
+                                                <div className="flex justify-between items-center">
                                                     <div className="flex gap-2">
                                                         <button
-                                                            className="flex items-center gap-1 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-muse-400 px-2 py-1 rounded transition-colors"
+                                                            onClick={() => setShowEntitySelector(showEntitySelector?.id === node.id && showEntitySelector?.type === 'CHARACTER' ? null : { id: node.id, type: 'CHARACTER' })}
+                                                            className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded transition-colors ${showEntitySelector?.id === node.id && showEntitySelector?.type === 'CHARACTER' ? 'bg-muse-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-muse-400'}`}
                                                             title="关联角色"
                                                         >
                                                             <User size={10} /> {node.relatedCharacters?.length || 0}
                                                         </button>
                                                         <button
-                                                            className="flex items-center gap-1 text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-muse-400 px-2 py-1 rounded transition-colors"
+                                                            onClick={() => setShowEntitySelector(showEntitySelector?.id === node.id && showEntitySelector?.type === 'LOCATION' ? null : { id: node.id, type: 'LOCATION' })}
+                                                            className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded transition-colors ${showEntitySelector?.id === node.id && showEntitySelector?.type === 'LOCATION' ? 'bg-muse-600 text-white' : 'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-muse-400'}`}
                                                             title="关联场景"
                                                         >
                                                             <Globe size={10} /> {node.relatedLocations?.length || 0}
                                                         </button>
                                                     </div>
-                                                    <button
-                                                        onClick={() => handleQuickDraft(node.id)}
-                                                        className="px-3 py-1 bg-muse-600/20 hover:bg-muse-600 border border-muse-600/30 text-muse-400 hover:text-white text-xs rounded-lg transition-all flex items-center gap-1"
-                                                    >
-                                                        <Zap size={12} /> 一键开写
-                                                    </button>
+                                                    <div className="flex gap-2">
+                                                        <button
+                                                            onClick={() => handleGenerateNodeAI(node.id)}
+                                                            disabled={isIterating && editingNodeId === node.id}
+                                                            className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-muse-400 text-xs rounded-lg transition-all flex items-center gap-1"
+                                                            title="AI 智能续写/扩写此段"
+                                                        >
+                                                            {isIterating && editingNodeId === node.id ? <Loader size={12} /> : <Wand2 size={12} />} AI 扩写
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleQuickDraft(node.id)}
+                                                            className="px-3 py-1 bg-muse-600/20 hover:bg-muse-600 border border-muse-600/30 text-muse-400 hover:text-white text-xs rounded-lg transition-all flex items-center gap-1"
+                                                        >
+                                                            <Zap size={12} /> 一键开写
+                                                        </button>
+                                                    </div>
                                                 </div>
+
+                                                {/* Quick Entity Selector Panel */}
+                                                {showEntitySelector?.id === node.id && (
+                                                    <div className="p-3 bg-slate-950 border border-slate-800 rounded-lg animate-fade-in relative">
+                                                        <div className="flex justify-between items-center mb-2">
+                                                            <span className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                                                                {showEntitySelector.type === 'CHARACTER' ? <><User size={10} /> 选择登场角色</> : <><Globe size={10} /> 选择发生地点</>}
+                                                            </span>
+                                                            <button onClick={() => setShowEntitySelector(null)} className="text-slate-600 hover:text-slate-300"><X size={10} /></button>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar p-1">
+                                                            {showEntitySelector.type === 'CHARACTER' ? (
+                                                                project.characters.length > 0 ? project.characters.map(c => (
+                                                                    <button
+                                                                        key={c.id}
+                                                                        onClick={() => toggleEntityRelation(node.id, c.id, 'CHARACTER')}
+                                                                        className={`text-[10px] px-2 py-1 rounded-full border transition-all ${node.relatedCharacters?.includes(c.id) ? 'bg-muse-900/50 border-muse-500 text-muse-300 shadow-sm shadow-muse-500/20' : 'border-slate-800 text-slate-500 hover:border-slate-700'}`}
+                                                                    >
+                                                                        {c.name}
+                                                                    </button>
+                                                                )) : <p className="text-[10px] text-slate-600 italic">暂无角色设定</p>
+                                                            ) : (
+                                                                project.worldSettings.filter(w => w.category === 'Geography' || w.category === 'Other').length > 0
+                                                                    ? project.worldSettings.filter(w => w.category === 'Geography' || w.category === 'Other').map(w => (
+                                                                        <button
+                                                                            key={w.id}
+                                                                            onClick={() => toggleEntityRelation(node.id, w.id, 'LOCATION')}
+                                                                            className={`text-[10px] px-2 py-1 rounded-full border transition-all ${node.relatedLocations?.includes(w.id) ? 'bg-emerald-900/50 border-emerald-500 text-emerald-300 shadow-sm shadow-emerald-500/20' : 'border-slate-800 text-slate-500 hover:border-slate-700'}`}
+                                                                        >
+                                                                            {w.title}
+                                                                        </button>
+                                                                    ))
+                                                                    : <p className="text-[10px] text-slate-600 italic">暂无地点设定</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
-                                        ))}
-                                        <button
-                                            onClick={handleAddCard}
-                                            className="w-full py-8 border-2 border-dashed border-slate-800 rounded-xl text-slate-600 hover:text-muse-400 hover:border-muse-500/50 hover:bg-muse-500/5 transition-all flex flex-col items-center gap-2 group"
-                                        >
-                                            <div className="w-10 h-10 rounded-full border-2 border-slate-800 group-hover:border-muse-500/50 flex items-center justify-center">
-                                                <LayoutGrid size={20} />
-                                            </div>
-                                            <span className="text-sm font-medium">添加新情节卡片</span>
-                                        </button>
-                                    </>
-                                ) : (
-                                    <div className="flex flex-col items-center justify-center h-full text-center space-y-6 py-12">
-                                        <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center text-slate-600">
-                                            <LayoutGrid size={40} />
                                         </div>
-                                        <div className="max-w-xs">
-                                            <h3 className="text-lg font-bold text-white mb-2">开始构建你的故事</h3>
-                                            <p className="text-sm text-slate-500 leading-relaxed">
-                                                使用上方的“自由生成”通过 AI 开启灵感，或者点击下方按钮手动添加情节。
-                                            </p>
+                                    ))}
+                                    <button
+                                        onClick={handleAddCard}
+                                        className="w-full py-8 border-2 border-dashed border-slate-800 rounded-xl text-slate-600 hover:text-muse-400 hover:border-muse-500/50 hover:bg-muse-500/5 transition-all flex flex-col items-center gap-2 group"
+                                    >
+                                        <div className="w-10 h-10 rounded-full border-2 border-slate-800 group-hover:border-muse-500/50 flex items-center justify-center">
+                                            <LayoutGrid size={20} />
                                         </div>
-                                        <button
-                                            onClick={handleAddCard}
-                                            className="bg-muse-600 hover:bg-muse-500 text-white px-6 py-3 rounded-xl font-bold shadow-xl shadow-muse-900/20 transition-all flex items-center gap-2"
-                                        >
-                                            <Plus size={18} /> 添加第一张情节卡片
-                                        </button>
+                                        <span className="text-sm font-medium">添加新情节卡片</span>
+                                    </button>
+                                </>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center h-full text-center space-y-6 py-12">
+                                    <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center text-slate-600">
+                                        <LayoutGrid size={40} />
                                     </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Status Bar */}
-                        {plotOutline.trim() && (
-                            <div className="absolute bottom-4 right-4 pointer-events-none opacity-80">
-                                <div className="bg-slate-800/90 text-xs text-slate-400 px-3 py-1.5 rounded-full border border-slate-700 flex items-center gap-2 shadow-lg backdrop-blur-sm">
-                                    <Info size={12} className="text-muse-400" />
-                                    <span>AI 已连接: {project.characters.length} 角色 · {project.worldSettings.length} 设定</span>
+                                    <div className="max-w-xs">
+                                        <h3 className="text-lg font-bold text-white mb-2">开始构建你的故事</h3>
+                                        <p className="text-sm text-slate-500 leading-relaxed">
+                                            使用上方的“自由生成”通过 AI 开启灵感，或者点击下方按钮手动添加情节。
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={handleAddCard}
+                                        className="bg-muse-600 hover:bg-muse-500 text-white px-6 py-3 rounded-xl font-bold shadow-xl shadow-muse-900/20 transition-all flex items-center gap-2"
+                                    >
+                                        <Plus size={18} /> 添加第一张情节卡片
+                                    </button>
                                 </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Status Bar */}
+                    {plotOutline.trim() && (
+                        <div className="absolute bottom-4 right-4 pointer-events-none opacity-80">
+                            <div className="bg-slate-800/90 text-xs text-slate-400 px-3 py-1.5 rounded-full border border-slate-700 flex items-center gap-2 shadow-lg backdrop-blur-sm">
+                                <Info size={12} className="text-muse-400" />
+                                <span>AI 已连接: {project.characters.length} 角色 · {project.worldSettings.length} 设定</span>
                             </div>
-                        )}
+                        </div>
+                    )}
 
-                        {/* Selection Context Menu (Removed as card centric) */}
-                        {selectedText && (
-                            <div className="absolute bottom-16 right-4 bg-slate-800 border border-muse-500/50 shadow-2xl rounded-lg p-2 flex flex-col gap-1 animate-fade-in z-30">
-                                <div className="text-[10px] text-slate-500 px-2 uppercase font-bold mb-1">已选中 {selectedText.length} 字</div>
-                                <button
-                                    onClick={() => { setActiveTab('OPTIMIZE'); setCustomRewritePrompt("润色这段文字，使其更具画面感"); }}
-                                    className="text-xs text-left px-3 py-2 hover:bg-slate-700 rounded text-slate-200 flex items-center gap-2"
-                                ><Zap size={12} /> 局部润色</button>
-                            </div>
-                        )}
+                    {/* Selection Context Menu (Removed as card centric) */}
+                    {selectedText && (
+                        <div className="absolute bottom-16 right-4 bg-slate-800 border border-muse-500/50 shadow-2xl rounded-lg p-2 flex flex-col gap-1 animate-fade-in z-30">
+                            <div className="text-[10px] text-slate-500 px-2 uppercase font-bold mb-1">已选中 {selectedText.length} 字</div>
+                            <button
+                                onClick={() => { setActiveTab('OPTIMIZE'); setCustomRewritePrompt("润色这段文字，使其更具画面感"); }}
+                                className="text-xs text-left px-3 py-2 hover:bg-slate-700 rounded text-slate-200 flex items-center gap-2"
+                            ><Zap size={12} /> 局部润色</button>
+                        </div>
+                    )}
 
-                        {/* Loading Overlay */}
-                        {isGeneratingPlot && (
-                            <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
-                                <Loader text="AI 正在推演命运的齿轮..." />
-                            </div>
-                        )}
+                    {/* Loading Overlay */}
+                    {isGeneratingPlot && (
+                        <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-10 rounded-lg">
+                            <Loader text="AI 正在推演命运的齿轮..." />
+                        </div>
+                    )}
 
-                        {/* History Overlay */}
-                        {showHistory && (
-                            <PlotHistorySidebar
-                                plotHistory={project.plotHistory}
-                                onRestore={handleRestoreHistory}
-                                onClose={() => setShowHistory(false)}
-                            />
-                        )}
-                    </div>
-                </div>
-
-                {/* Analysis Trigger Button */}
-                <div className="flex justify-end gap-2 px-2">
-                    <button
-                        onClick={handleAnalyze}
-                        disabled={isAnalyzing || !plotOutline}
-                        className="bg-muse-600 hover:bg-muse-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-50 transition-all shadow-md shadow-muse-900/20"
-                    >
-                        <Activity size={16} /> 执行深度评估 (Analysis)
-                    </button>
+                    {/* History Overlay */}
+                    {showHistory && (
+                        <PlotHistorySidebar
+                            plotHistory={project.plotHistory}
+                            onRestore={handleRestoreHistory}
+                            onClose={() => setShowHistory(false)}
+                        />
+                    )}
                 </div>
             </div>
 
-            {/* ===== Right Side: Panels ===== */}
-            <div className="w-1/2 bg-slate-900 rounded-xl border border-slate-800 flex flex-col overflow-hidden relative">
-                {/* Tab Bar */}
-                <div className="flex border-b border-slate-800 bg-slate-900/50">
-                    {tabItems.map(item => (
-                        <button
-                            key={item.id}
-                            onClick={() => setActiveTab(item.id)}
-                            className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${activeTab === item.id
-                                ? 'text-muse-400 border-b-2 border-muse-500 bg-muse-900/10'
-                                : 'text-slate-500 hover:text-slate-300'
-                                }`}
-                        >
-                            <item.icon size={16} /> {item.label}
-                        </button>
-                    ))}
+
+
+            {/* Right Side Drawer: Auxiliary Tools */}
+            <div className={`fixed top-0 right-0 h-full w-[450px] bg-slate-900 border-l border-slate-800 shadow-2xl z-40 transform transition-transform duration-500 ease-in-out flex flex-col ${showRightSidebar ? 'translate-x-0' : 'translate-x-full'}`}>
+                {/* Header */}
+                <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/80 backdrop-blur-md">
+                    <div className="flex items-center gap-3">
+                        {activeTab === 'ANALYSIS' && <><Activity className="text-muse-400" size={20} /> <span className="font-bold text-white uppercase tracking-wider text-sm italic">剧情诊断报告</span></>}
+                        {activeTab === 'RHYTHM' && <><TrendingUp className="text-indigo-400" size={20} /> <span className="font-bold text-white uppercase tracking-wider text-sm italic">叙事张力曲线</span></>}
+                        {activeTab === 'STRUCTURE' && <><Lightbulb className="text-amber-400" size={20} /> <span className="font-bold text-white uppercase tracking-wider text-sm italic">创作结构助手</span></>}
+                    </div>
+                    <button onClick={() => setShowRightSidebar(false)} className="text-slate-500 hover:text-white p-1.5 hover:bg-slate-800 rounded-xl transition-all"><X size={20} /></button>
                 </div>
 
                 {/* Panel Content */}
-                <div className="flex-1 p-6 overflow-y-auto custom-scrollbar relative">
+                <div className="flex-1 overflow-y-auto custom-scrollbar relative p-6">
+                    {activeTab === 'REFERENCE' && (
+                        <div className="space-y-6 animate-fade-in">
+                            <div>
+                                <h4 className="text-muse-400 text-xs font-bold uppercase mb-4 flex items-center gap-2"><User size={14} /> 核心角色设定</h4>
+                                {project.characters.length === 0 && <div className="p-4 bg-slate-800/30 rounded-xl border border-dashed border-slate-700 text-center text-xs text-slate-500">暂无角色设定。</div>}
+                                <div className="space-y-3">
+                                    {project.characters.map(c => (
+                                        <div key={c.id} className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 hover:border-slate-600 transition-colors">
+                                            <div className="flex justify-between mb-1"><span className="text-slate-200 font-bold text-sm">{c.name}</span><span className="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">{c.role}</span></div>
+                                            <p className="text-xs text-slate-400 leading-relaxed line-clamp-4">{c.description}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <h4 className="text-muse-400 text-xs font-bold uppercase mb-4 flex items-center gap-2"><Globe size={14} /> 世界观与背景设定</h4>
+                                {project.worldSettings.length === 0 && <div className="p-4 bg-slate-800/30 rounded-xl border border-dashed border-slate-700 text-center text-xs text-slate-500">暂无世界设定。</div>}
+                                <div className="space-y-3">
+                                    {project.worldSettings.map(w => (
+                                        <div key={w.id} className="bg-slate-800/50 p-4 rounded-xl border border-slate-700/50 hover:border-slate-600 transition-colors">
+                                            <div className="flex justify-between mb-1"><span className="text-slate-200 font-bold text-sm">{w.title}</span><span className="text-[10px] text-slate-500">{w.category}</span></div>
+                                            <p className="text-xs text-slate-400 leading-relaxed line-clamp-4">{w.content}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {(activeTab === 'ANALYSIS' || activeTab === 'OPTIMIZE') && (
                         <PlotAnalysisPanel
                             analysis={analysis}
@@ -639,110 +791,139 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                             onCustomRewritePromptChange={setCustomRewritePrompt}
                             onRewrite={handleRewrite}
                             onAutoFix={handleAutoFix}
-                            activeSubTab={activeTab}
+                            activeSubTab={activeTab === 'OPTIMIZE' ? 'OPTIMIZE' : 'ANALYSIS'}
                         />
                     )}
 
-                    {activeTab === 'RHYTHM' && (
-                        <PlotRhythmChart
-                            rhythmData={rhythmData}
-                            isAnalyzingRhythm={isAnalyzingRhythm}
-                            hasPlotOutline={!!plotOutline.trim()}
-                            onAnalyzeRhythm={handleAnalyzeRhythm}
-                        />
-                    )}
+                    {
+                        activeTab === 'RHYTHM' && (
+                            <PlotRhythmChart
+                                rhythmData={rhythmData}
+                                isAnalyzingRhythm={isAnalyzingRhythm}
+                                hasPlotOutline={project.plotNodes.length > 0}
+                                onAnalyzeRhythm={handleAnalyzeRhythm}
+                            />
+                        )
+                    }
 
-                    {activeTab === 'STRUCTURE' && (
-                        <PlotStructureAssistant
-                            premise={project.premise}
-                            genre={project.genre}
-                            plotOutline={fullContent}
-                            selectedText={selectedText}
-                            characters={project.characters}
-                            worldSettings={project.worldSettings}
-                            creativeSettings={project.creativeSettings}
-                            echoes={project.echoes}
-                        />
-                    )}
+                    {
+                        activeTab === 'STRUCTURE' && (
+                            <PlotStructureAssistant
+                                premise={project.premise}
+                                genre={project.genre}
+                                plotOutline={fullContent}
+                                selectedText={selectedText}
+                                characters={project.characters}
+                                worldSettings={project.worldSettings}
+                                creativeSettings={project.creativeSettings}
+                                echoes={project.echoes}
+                            />
+                        )
+                    }
 
                     {/* Global Loading Overlay for Right Panels */}
-                    {(isAnalyzing || isAnalyzingRhythm) && (
-                        <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-sm flex items-center justify-center z-20">
-                            <Loader text={isAnalyzing ? "正在进行逻辑审计..." : "正在分析剧情节奏..."} />
+                    {
+                        (isAnalyzing || isAnalyzingRhythm) && (
+                            <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-sm flex items-center justify-center z-50">
+                                <Loader text={isAnalyzing ? "正在进行逻辑审计..." : "正在分析剧情节奏..."} />
+                            </div>
+                        )
+                    }
+                </div >
+
+                {/* Bottom Footer Action */}
+                {
+                    activeTab === 'ANALYSIS' && (
+                        <div className="p-4 border-t border-slate-800 bg-slate-900/80 backdrop-blur-md">
+                            <button
+                                onClick={handleAnalyze}
+                                disabled={isAnalyzing || project.plotNodes.length === 0}
+                                className="w-full bg-muse-600 hover:bg-muse-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-xl shadow-muse-900/20"
+                            >
+                                <Activity size={18} /> 重新分析 (Analysis)
+                            </button>
                         </div>
-                    )}
-                </div>
-            </div>
+                    )
+                }
+            </div >
+
+
 
             {/* ===== Modals ===== */}
 
             {/* Save Version Modal */}
-            {showSaveModal && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                <Save className="text-muse-400" size={20} /> 保存历史版本
-                            </h3>
-                            <button onClick={() => setShowSaveModal(false)} className="text-slate-500 hover:text-white"><X size={20} /></button>
-                        </div>
-                        <div className="space-y-4 mb-6">
-                            <div>
-                                <label className="block text-sm text-slate-400 mb-1">版本备注</label>
-                                <input
-                                    type="text" value={saveNote}
-                                    onChange={(e) => setSaveNote(e.target.value)}
-                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-muse-500 outline-none"
-                                    placeholder="例如：第一稿、增加反转后..."
-                                />
+            {
+                showSaveModal && (
+                    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+                        <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <Save className="text-muse-400" size={20} /> 保存历史版本
+                                </h3>
+                                <button onClick={() => setShowSaveModal(false)} className="text-slate-500 hover:text-white"><X size={20} /></button>
                             </div>
-                            <p className="text-xs text-slate-500">此操作将当前的大纲内容归档，方便日后回溯。</p>
-                        </div>
-                        <div className="flex gap-3 justify-end">
-                            <button onClick={() => setShowSaveModal(false)} className="px-4 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-sm">取消</button>
-                            <button onClick={handleManualSave} className="px-4 py-2 rounded-lg bg-muse-600 hover:bg-muse-500 text-white font-medium shadow-lg text-sm">确认存档</button>
+                            <div className="space-y-4 mb-6">
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">版本备注</label>
+                                    <input
+                                        type="text" value={saveNote}
+                                        onChange={(e) => setSaveNote(e.target.value)}
+                                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-muse-500 outline-none"
+                                        placeholder="例如：第一稿、增加反转后..."
+                                    />
+                                </div>
+                                <p className="text-xs text-slate-500">此操作将当前的大纲内容归档，方便日后回溯。</p>
+                            </div>
+                            <div className="flex gap-3 justify-end">
+                                <button onClick={() => setShowSaveModal(false)} className="px-4 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-sm">取消</button>
+                                <button onClick={handleManualSave} className="px-4 py-2 rounded-lg bg-muse-600 hover:bg-muse-500 text-white font-medium shadow-lg text-sm">确认存档</button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Confirmation Modal */}
-            {pendingAction && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                <AlertTriangle className="text-amber-400" size={20} />
-                                {pendingAction.type === 'GENERATE' && plotOutline ? '覆盖确认' : '操作确认'}
-                            </h3>
-                            <button onClick={() => setPendingAction(null)} className="text-slate-500 hover:text-white"><X size={20} /></button>
-                        </div>
-                        <div className="text-slate-300 text-sm mb-6">
-                            {pendingAction.type === 'GENERATE' && plotOutline && (
-                                <p>当前剧情大纲不为空。继续操作将<strong>覆盖现有内容</strong>，旧版本将自动保存至历史记录。是否继续？</p>
-                            )}
-                            {pendingAction.type === 'RESTORE' && (
-                                <p>确定要回滚到此历史版本吗？当前进度将保存为新的历史记录。</p>
-                            )}
-                            {pendingAction.type === 'GENERATE' && !plotOutline && (
-                                <p>即将在空大纲上生成内容。确定开始吗？</p>
-                            )}
-                        </div>
-                        <div className="flex gap-3 justify-end">
-                            <button onClick={() => setPendingAction(null)} className="px-4 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-sm">取消</button>
-                            <button onClick={confirmAction} className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-medium shadow-lg text-sm">确认</button>
+            {
+                pendingAction && (
+                    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+                        <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <AlertTriangle className="text-amber-400" size={20} />
+                                    {pendingAction.type === 'GENERATE' && plotOutline ? '覆盖确认' : '操作确认'}
+                                </h3>
+                                <button onClick={() => setPendingAction(null)} className="text-slate-500 hover:text-white"><X size={20} /></button>
+                            </div>
+                            <div className="text-slate-300 text-sm mb-6">
+                                {pendingAction.type === 'GENERATE' && plotOutline && (
+                                    <p>当前剧情大纲不为空。继续操作将<strong>覆盖现有内容</strong>，旧版本将自动保存至历史记录。是否继续？</p>
+                                )}
+                                {pendingAction.type === 'RESTORE' && (
+                                    <p>确定要回滚到此历史版本吗？当前进度将保存为新的历史记录。</p>
+                                )}
+                                {pendingAction.type === 'GENERATE' && !plotOutline && (
+                                    <p>即将在空大纲上生成内容。确定开始吗？</p>
+                                )}
+                            </div>
+                            <div className="flex gap-3 justify-end">
+                                <button onClick={() => setPendingAction(null)} className="px-4 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-sm">取消</button>
+                                <button onClick={confirmAction} className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-medium shadow-lg text-sm">确认</button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Toast */}
-            {toast && (
-                <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-50 transition-all animate-fade-in font-medium text-sm flex items-center gap-2 border ${toast.type === 'error' ? 'bg-red-500/10 border-red-500/50 text-red-200' : 'bg-emerald-500/10 border-emerald-500/50 text-emerald-200'}`}>
-                    {toast.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
-                    <span>{toast.msg}</span>
-                </div>
-            )}
+            {
+                toast && (
+                    <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-50 transition-all animate-fade-in font-medium text-sm flex items-center gap-2 border ${toast.type === 'error' ? 'bg-red-500/10 border-red-500/50 text-red-200' : 'bg-emerald-500/10 border-emerald-500/50 text-emerald-200'}`}>
+                        {toast.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
+                        <span>{toast.msg}</span>
+                    </div>
+                )
+            }
         </div>
     );
 };

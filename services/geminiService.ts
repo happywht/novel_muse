@@ -7,6 +7,7 @@ import {
     AiStateChangeArraySchema,
     AiEchoArraySchema,
     AiPlotRhythmArraySchema,
+    AiPlotNodeArraySchema,
 } from './schemas';
 import { buildPromptContent } from '../config/prompts';
 import { useProjectStore } from '../store/useProjectStore';
@@ -310,7 +311,15 @@ export const expandWorldLore = async (title: string, currentContent: string, gen
     }
 };
 
-export const generatePlotFromContext = async (premise: string, genre: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings, template?: string, echoes: Echo[] = []): Promise<string> => {
+export const generatePlotFromContext = async (
+    premise: string,
+    genre: string,
+    characters: Character[],
+    worldSettings: WorldSetting[],
+    settings?: CreativeSettings,
+    template?: string,
+    echoes: Echo[] = []
+): Promise<{ title: string; content: string }[]> => {
     const ai = getAIClient();
 
     // DYNAMIC CONTEXT INJECTION (Phase 6B.1)
@@ -372,7 +381,15 @@ export const generatePlotFromContext = async (premise: string, genre: string, ch
   
   ${taskRequirement}
   
-  请直接输出大纲内容，使用清晰的 Markdown 格式。
+  请直接输出大纲内容。
+  
+  **重要输出格式要求**：
+  你必须返回一个符合以下 JSON 结构的数组：
+  [
+    { "title": "情节标题", "content": "该情节点的详细描述..." },
+    ...
+  ]
+  禁止包含任何开场白或解释文字。
   `;
 
     try {
@@ -384,9 +401,12 @@ export const generatePlotFromContext = async (premise: string, genre: string, ch
                 systemInstruction: instruction,
                 thinkingConfig: { thinkingBudget: 4096 }, // Plot generation needs deep thought
                 temperature: settings?.creativity || 0.85,
+                responseMimeType: "application/json",
             }
         }));
-        return response.text || "大纲生成失败。";
+
+        const result = safeParseAiJson(response.text, AiPlotNodeArraySchema, "Plot Generation");
+        return result || [];
     } catch (error) {
         console.error("Gemini Plot Generation Error:", error);
         throw error;
@@ -394,7 +414,15 @@ export const generatePlotFromContext = async (premise: string, genre: string, ch
 };
 
 // NEW: Rewrite plot based on feedback or directive
-export const rewritePlot = async (currentPlot: string, directive: string, genre: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings, echoes: Echo[] = []): Promise<string> => {
+export const rewritePlot = async (
+    currentPlot: string,
+    directive: string,
+    genre: string,
+    characters: Character[],
+    worldSettings: WorldSetting[],
+    settings?: CreativeSettings,
+    echoes: Echo[] = []
+): Promise<{ title: string; content: string }[]> => {
     const ai = getAIClient();
     const contextStr = formatContext(characters, worldSettings, echoes);
 
@@ -412,7 +440,14 @@ export const rewritePlot = async (currentPlot: string, directive: string, genre:
     ${directive}
     
     请根据以上修改指令，重新输出一份完整的、优化后的剧情大纲。保留原大纲中优秀的部分，修正问题或调整方向。
-    请使用清晰的 Markdown 格式。
+    
+    **重要输出格式要求**：
+    你必须返回一个符合以下 JSON 结构的数组：
+    [
+      { "title": "情节标题", "content": "该情节点的详细描述..." },
+      ...
+    ]
+    禁止包含任何开场白或解释文字。
     `;
 
     try {
@@ -422,9 +457,12 @@ export const rewritePlot = async (currentPlot: string, directive: string, genre:
             config: {
                 systemInstruction: instruction,
                 temperature: settings?.creativity || 0.85,
+                responseMimeType: "application/json",
             }
         }));
-        return response.text || "重写失败。";
+
+        const result = safeParseAiJson(response.text, AiPlotNodeArraySchema, "Plot Rewrite");
+        return result || [];
     } catch (e) {
         console.error("Gemini Plot Rewrite Error:", e);
         throw e;

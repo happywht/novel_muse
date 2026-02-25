@@ -69,8 +69,14 @@ export const PROMPT_REGISTRY: Record<string, PromptTemplate> = {
     plot_weaving: {
         key: 'plot_weaving',
         label: '📈 剧情架构推演',
-        description: '情节罗盘中AI推演大纲的核心逻辑。',
+        description: '情节罗盘中AI推演全局大纲的核心逻辑。',
         instruction: '你是一位精通故事结构的小说架构师。你的任务是基于已有的角色和高相关度的世界观，推导出一个逻辑严密、冲突激烈的剧情大纲。整合【当前状态变更】，确保剧情发展考虑角色当前状态。',
+    },
+    plot_node_gen: {
+        key: 'plot_node_gen',
+        label: '🃏 情节卡片扩写',
+        description: '针对单张情节卡片进行细节扩充与灵感补全。',
+        instruction: '你是一位擅长捕捉瞬间张力的创意写作合伙人。请根据提供的“情节点当前标题与内容”，结合小说背景，为其进行扩充。要求：增加具体的动作描写、关键对话引导或心理预期，使该情节不仅是一个点，而是一个有画面感的叙事单元。不要写正文，而是写富有启发性的情节梗概。',
     },
     scene_generation: {
         key: 'scene_generation',

@@ -113,3 +113,11 @@ export const AiPlotRhythmSchema = z.object({
 });
 
 export const AiPlotRhythmArraySchema = z.array(AiPlotRhythmSchema);
+
+// --- Plot Nodes (generatePlotFromContext, rewritePlot) ---
+export const AiPlotNodeSchema = z.object({
+    title: z.string().min(1, '情节标题不能为空'),
+    content: z.string().default(''),
+});
+
+export const AiPlotNodeArraySchema = z.array(AiPlotNodeSchema);
