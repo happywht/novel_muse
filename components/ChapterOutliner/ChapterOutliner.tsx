@@ -10,11 +10,12 @@ import {
     User,
     Trash2,
     Calendar,
-    ArrowRight
+    ArrowRight,
+    Activity
 } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
-import { splitPlotNodeIntoChapters, regenerateChapterOutline } from '../../services/geminiService';
-import { Loader2, RefreshCw } from 'lucide-react'; // For loading state
+import { splitPlotNodeIntoChapters, regenerateChapterOutline, auditChapterPlan } from '../../services/geminiService';
+import { Loader2, RefreshCw, AlertCircle, CheckCircle2, Info } from 'lucide-react'; // For loading state
 
 // --- Utility for Global Chapter Reordering ---
 const recalculateChapterOrders = (chapters: Chapter[], plotNodes: PlotNode[]): Chapter[] => {
@@ -47,6 +48,8 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
     const [isGenerating, setIsGenerating] = useState(false);
     const [fissionCount, setFissionCount] = useState<number | 'AUTO'>('AUTO');
     const [regeneratingChapterId, setRegeneratingChapterId] = useState<string | null>(null);
+    const [auditResult, setAuditResult] = useState<{ isAligned: boolean; issues: { type: string; description: string; suggestion: string }[] } | null>(null);
+    const [isAuditing, setIsAuditing] = useState(false);
 
     const selectedPlotNode = useMemo(() =>
         project.plotNodes.find(n => n.id === selectedPlotNodeId),
@@ -122,7 +125,13 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                 handleUpdateChapter(chapterId, {
                     title: regeneratedOutline.title,
                     summary: regeneratedOutline.summary,
-                    expectedPOV: regeneratedOutline.expectedPOV
+                    expectedPOV: regeneratedOutline.expectedPOV,
+                    beats: regeneratedOutline.beats?.map(b => ({
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                        type: b.type as any,
+                        description: b.description,
+                        isCompleted: false
+                    }))
                 });
             } else {
                 alert("局部重写未能生成有效内容，请重试。");
@@ -166,7 +175,13 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                     expectedPOV: outline.expectedPOV,
                     plotNodeId: selectedPlotNode.id,
                     order: project.chapters.length + idx, // Will be reordered
-                    lastModified: Date.now()
+                    lastModified: Date.now(),
+                    beats: outline.beats?.map(b => ({
+                        id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                        type: b.type as any,
+                        description: b.description,
+                        isCompleted: false
+                    }))
                 }));
 
                 const newChapterList = [...project.chapters, ...newChapters];
@@ -179,6 +194,27 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
             alert("生成章节细纲失败，请检查网络或配置后重试。");
         } finally {
             setIsGenerating(false);
+        }
+    };
+
+    const handleAudit = async () => {
+        if (!selectedPlotNode || isAuditing) return;
+        setIsAuditing(true);
+        try {
+            const result = await auditChapterPlan(
+                project.genre,
+                selectedPlotNode,
+                relatedChapters,
+                project.characters,
+                project.worldSettings,
+                project.creativeSettings
+            );
+            setAuditResult(result);
+        } catch (error) {
+            console.error("Audit Error:", error);
+            alert("审计失败，请重试。");
+        } finally {
+            setIsAuditing(false);
         }
     };
 
@@ -259,8 +295,67 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                                         {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
                                         {isGenerating ? '正在排布章节...' : '✨ AI 裂变章节细纲'}
                                     </button>
+                                    <button
+                                        onClick={handleAudit}
+                                        disabled={isAuditing || relatedChapters.length === 0}
+                                        className={`bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all border border-slate-700 ${isAuditing || relatedChapters.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    >
+                                        {isAuditing ? <Loader2 size={16} className="animate-spin" /> : <AlertCircle size={16} className="text-amber-400" />}
+                                        结构审计
+                                    </button>
                                 </div>
                             </div>
+
+                            {/* Audit Results Banner */}
+                            {auditResult && (
+                                <div className={`mb-6 p-4 rounded-2xl border flex flex-col gap-3 animate-in fade-in slide-in-from-top-4 duration-500 ${auditResult.isAligned ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            {auditResult.isAligned ? (
+                                                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                                                    <CheckCircle2 size={20} />
+                                                </div>
+                                            ) : (
+                                                <div className="w-10 h-10 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-400">
+                                                    <AlertCircle size={20} />
+                                                </div>
+                                            )}
+                                            <div>
+                                                <h4 className={`text-sm font-bold ${auditResult.isAligned ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                    {auditResult.isAligned ? '结构审计通过' : '检测到潜在的跑偏风险'}
+                                                </h4>
+                                                <p className="text-xs text-slate-400">
+                                                    {auditResult.isAligned ? '当前的章节规划与宏观情节节点目标高度契合。' : `发现 ${auditResult.issues.length} 个可能影响剧情连贯性的问题。`}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => setAuditResult(null)} className="text-slate-600 hover:text-slate-400 p-2">
+                                            关闭提示
+                                        </button>
+                                    </div>
+
+                                    {!auditResult.isAligned && auditResult.issues.length > 0 && (
+                                        <div className="grid grid-cols-1 gap-2 mt-2">
+                                            {auditResult.issues.map((issue, idx) => (
+                                                <div key={idx} className="bg-slate-900/40 rounded-xl p-3 border border-slate-800/60">
+                                                    <div className="flex items-start gap-3">
+                                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold mt-0.5 ${issue.type === 'DRIFT' ? 'bg-rose-500/20 text-rose-400' :
+                                                                issue.type === 'GAP' ? 'bg-amber-500/20 text-amber-400' : 'bg-sky-500/20 text-sky-400'
+                                                            }`}>
+                                                            {issue.type}
+                                                        </span>
+                                                        <div className="flex-1">
+                                                            <p className="text-xs text-slate-300 font-medium mb-1">{issue.description}</p>
+                                                            <p className="text-[11px] text-slate-500 italic">💡 建议：{issue.suggestion}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             <p className="text-slate-400 text-sm leading-relaxed font-serif line-clamp-2 italic">
                                 "{selectedPlotNode.content || "暂无描述..."}"
                             </p>
@@ -334,6 +429,29 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                                                     </button>
                                                 </div>
                                             </div>
+
+                                            {/* Chapter Beats (Scene Chain) */}
+                                            {chapter.beats && chapter.beats.length > 0 && (
+                                                <div className="mt-4 pt-4 border-t border-slate-800/40 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                    <label className="text-[10px] font-bold text-slate-500 uppercase flex items-center gap-1.5 tracking-wider">
+                                                        <Activity size={12} className="text-violet-400" /> 场景节拍 / Scene Chain
+                                                    </label>
+                                                    <div className="space-y-2">
+                                                        {chapter.beats.map((beat) => (
+                                                            <div key={beat.id} className="flex gap-3 group/beat items-start">
+                                                                <div className={`mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 shadow-[0_0_8px_rgba(0,0,0,0.5)] ${beat.type === 'TWIST' ? 'bg-rose-500 ring-4 ring-rose-500/10' :
+                                                                    beat.type === 'ACTION' ? 'bg-amber-500 ring-4 ring-amber-500/10' :
+                                                                        beat.type === 'DIALOGUE' ? 'bg-sky-500 ring-4 ring-sky-500/10' :
+                                                                            'bg-slate-600 ring-4 ring-slate-600/10'
+                                                                    }`} />
+                                                                <div className="flex-1 text-[11px] text-slate-400 font-serif leading-relaxed py-0.5 group-hover/beat:text-slate-200 transition-colors">
+                                                                    <span className="opacity-40 font-sans mr-1 text-[9px] uppercase">[{beat.type}]</span> {beat.description}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}

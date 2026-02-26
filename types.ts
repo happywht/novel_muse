@@ -44,6 +44,13 @@ export interface PlotVersion {
   note: string; // e.g., "Initial Generation", "Darker Tone Rewrite"
 }
 
+export interface ChapterBeat {
+  id: string;
+  type: 'CONTENT' | 'ACTION' | 'DIALOGUE' | 'TWIST';
+  description: string;
+  isCompleted: boolean;
+}
+
 export interface Draft {
   id: string;
   title: string;
@@ -61,6 +68,7 @@ export interface Chapter {
   plotNodeId?: string;  // NEW: Link back to a PlotNode
   order: number;
   lastModified: number;
+  beats?: ChapterBeat[]; // NEW: For granular scene planning
 }
 
 export interface CreativeSettings {

@@ -249,6 +249,7 @@ export const analyzePlot = async (premise: string, currentPlot: string, characte
             config: {
                 systemInstruction: instruction,
                 thinkingConfig: { thinkingBudget: 2048 },
+                temperature: 0.1, // Near-zero temperature for logical stability
             }
         }));
         return response.text || "无法分析剧情。";
@@ -416,7 +417,7 @@ export const generatePlotFromContext = async (
             config: {
                 systemInstruction: instruction,
                 thinkingConfig: { thinkingBudget: 4096 }, // Plot generation needs deep thought
-                temperature: settings?.creativity || 0.85,
+                temperature: 0.6, // Balanced creativity for initial generation
                 responseMimeType: "application/json",
             }
         }));
@@ -459,9 +460,10 @@ export const rewritePlot = async (
     ${directive}
     
     任务要求：
-    1. **精准落实指令**：如果指令（或诊断反馈）指出某处需要修复，请务必在新的大纲中体现出来。
-    2. **保持连贯性**：修改后的剧情必须与角色设定和世界观保持高度的一致性。
-    3. **螺旋升华**：不仅仅是修复错误，更要尝试在原有基础上增加戏剧冲突和张力。
+    1. **精准落实指令**：针对指令（或诊断反馈）指出需要修复的地方进行精准修改。
+    2. **最小变动原则**：禁止进行无关的重写。凡是指令未涉及的部分，应尽可能保持原有的文字、结构和逻辑不变。
+    3. **保持连贯性**：修改后的剧情必须与角色设定和世界观保持高度的一致性。
+    4. **意志遵从度**：你的目标是执行“微创手术”修复问题，严禁自作主张大改大纲基调。
     
     **重要输出格式要求**：
     你必须返回一个符合以下 JSON 结构的数组：
@@ -478,8 +480,8 @@ export const rewritePlot = async (
             contents: prompt,
             config: {
                 systemInstruction: instruction,
-                thinkingConfig: { thinkingBudget: 2048 }, // Added thinking for rewrite quality
-                temperature: settings?.creativity || 0.85,
+                thinkingConfig: { thinkingBudget: 4096 }, // Increased thinking for better logic retention
+                temperature: 0.3, // Low temperature for high compliance
                 responseMimeType: "application/json",
             }
         }));
@@ -1282,7 +1284,7 @@ export const splitPlotNodeIntoChapters = async (
     settings?: CreativeSettings,
     echoes: Echo[] = [],
     fissionCount: number | 'AUTO' = 'AUTO'
-): Promise<{ title: string; summary: string; expectedPOV: string }[]> => {
+): Promise<{ title: string; summary: string; expectedPOV: string; beats?: { type: string; description: string }[] }[]> => {
     const ai = getAIClient();
     const contextStr = formatContext(characters, worldSettings, echoes);
     const instruction = getInstructionWithSettings('plot_fission', settings);
@@ -1310,9 +1312,22 @@ export const splitPlotNodeIntoChapters = async (
     **重要输出格式要求**：
     你必须返回一个符合以下 JSON 结构的数组：
     [
-      { "title": "章节标题", "summary": "本章细纲内容...", "expectedPOV": "视角人物姓名" },
+      { 
+        "title": "章节标题", 
+        "summary": "本章核心目标概览", 
+        "expectedPOV": "视角人物姓名",
+        "beats": [
+          { "type": "CONTENT/ACTION/DIALOGUE/TWIST", "description": "具体场景节拍描述" },
+          ...
+        ]
+      },
       ...
     ]
+    
+    【Beats 说明】：
+    - 每个章节必须包含 3-5 个具体的场景节拍。
+    - 类型包括：CONTENT(铺垫/描写), ACTION(动作/事件), DIALOGUE(关键对话), TWIST(转折/悬念)。
+    
     禁止包含任何开场白或解释文字。
     `;
 
@@ -1335,6 +1350,76 @@ export const splitPlotNodeIntoChapters = async (
     }
 };
 
+export const auditChapterPlan = async (
+    genre: string,
+    targetNode: PlotNode,
+    chapters: Chapter[],
+    characters: Character[],
+    worldSettings: WorldSetting[],
+    settings?: CreativeSettings
+): Promise<{
+    isAligned: boolean;
+    issues: { type: 'GAP' | 'DRIFT' | 'CONTRADICTION'; description: string; suggestion: string }[]
+}> => {
+    const ai = getAIClient();
+    const contextStr = formatContext(characters, worldSettings);
+
+    const chaptersText = chapters.map((c, i) => `[第 ${i + 1} 章: ${c.title}]\n概要: ${c.summary}\n节拍: ${c.beats?.map(b => `- [${b.type}] ${b.description}`).join('\n')}`).join('\n\n');
+
+    const prompt = `
+    你是一个严谨的剧情质量审计员。
+    你的任务是核对【章节规划】是否忠实地落实了所属的【情节节点】要求，并指出是否存在“离题（Drift）”或“过度偏离”的情况。
+    
+    小说类型: ${genre}
+    
+    ${contextStr}
+    
+    【所属情节节点目标】:
+    标题: ${targetNode.title}
+    核心内容: ${targetNode.content}
+    
+    【当前的章节规划列表】:
+    ${chaptersText}
+    
+    审计任务：
+    1. **对齐性检查 (Align)**：章节规划是否完成了情节节点设定的所有核心目标？
+    2. **偏差识别 (Drift)**：是否有章节引入了与主线毫无关系的废戏，或偏离了节点设定的角色动机？
+    3. **逻辑矛盾 (Contradiction)**：章节之间是否有逻辑硬伤？
+    
+    **重要输出格式要求**：
+    你必须返回一个 JSON 对象：
+    {
+      "isAligned": true/false,
+      "issues": [
+        { "type": "GAP/DRIFT/CONTRADICTION", "description": "问题描述", "suggestion": "修改建议" },
+        ...
+      ]
+    }
+    禁止包含任何开场白或解释文字。
+    `;
+
+    try {
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: getModelName('pro'),
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                temperature: 0.1, // High logic, low drift
+                thinkingConfig: { thinkingBudget: 2048 }
+            }
+        }));
+
+        const parsed = JSON.parse(response.text || '{}');
+        return {
+            isAligned: parsed.isAligned ?? true,
+            issues: parsed.issues ?? []
+        };
+    } catch (e) {
+        console.error("Chapter Audit Error:", e);
+        return { isAligned: true, issues: [] };
+    }
+};
+
 export const regenerateChapterOutline = async (
     genre: string,
     fullPlotSummary: string,
@@ -1346,7 +1431,7 @@ export const regenerateChapterOutline = async (
     worldSettings: WorldSetting[],
     settings?: CreativeSettings,
     echoes: Echo[] = []
-): Promise<{ title: string; summary: string; expectedPOV: string } | null> => {
+): Promise<{ title: string; summary: string; expectedPOV: string; beats?: { type: string; description: string }[] } | null> => {
     const ai = getAIClient();
     const contextStr = formatContext(characters, worldSettings, echoes);
     const instruction = getInstructionWithSettings('plot_fission', settings);
@@ -1377,9 +1462,17 @@ export const regenerateChapterOutline = async (
     3. 保留原标题和视角人物（也可根据剧情需要适当调整优化）。
     
     **重要输出格式要求**：
-    你必须返回一个**仅仅包含这一个章节**的 JSON 数组结构（为了格式统一，请放在数组里，但数组长度为1）：
+    你必须返回一个**仅仅包含这一个章节**的 JSON 数组结构：
     [
-      { "title": "章节标题", "summary": "本章细纲内容...", "expectedPOV": "视角人物姓名" }
+      { 
+        "title": "章节标题", 
+        "summary": "本章核心目标概览", 
+        "expectedPOV": "视角人物姓名",
+        "beats": [
+          { "type": "CONTENT/ACTION/DIALOGUE/TWIST", "description": "具体场景节拍描述" },
+          ...
+        ]
+      }
     ]
     禁止包含任何开场白或解释文字。
     `;
