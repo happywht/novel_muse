@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ProjectState, Character, WorldSetting, Draft, Chapter, StateChangeRecommendation, Echo } from '../types';
 import { generateSceneFromIngredients, analyzeStateChanges, PacingMode, polishDraft, PolishMode, extractEchoesFromText } from '../services/geminiService';
 import { Loader } from './Loader';
-import { PenTool, MapPin, Users, Zap, Plus, FileText, Trash2, Clipboard, Save, RefreshCw, GitCommit, ArrowRight, Check, Globe, Book, Archive, Layout, Sidebar, X, User, Wand2, Gauge, Flame, Feather, Eye, Clapperboard, Brain, ScanSearch, Sparkles, AlertTriangle } from 'lucide-react';
+import { PenTool, MapPin, Users, Zap, Plus, FileText, Trash2, Clipboard, Save, RefreshCw, GitCommit, ArrowRight, Check, Globe, Book, Archive, Layout, Sidebar, X, User, Wand2, Gauge, Flame, Feather, Eye, Clapperboard, Brain, ScanSearch, Sparkles, AlertTriangle, Cloud, CloudOff, Loader2 } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { DraftEditor } from './DraftingRoom/DraftEditor';
 import { rewriteLocalText } from '../services/geminiService';
@@ -53,6 +53,8 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     const setActivePlotNodeId = useProjectStore(state => state.setActivePlotNodeId);
     const activeChapterId = useProjectStore(state => state.activeChapterId);
     const setActiveChapterId = useProjectStore(state => state.setActiveChapterId);
+    const isSaving = useProjectStore(state => state.isSaving);
+    const useBackend = useProjectStore(state => state.useBackend);
     const [viewMode, setViewMode] = useState<ViewMode>('FORGE');
     const [showReference, setShowReference] = useState(false);
     const [showAdvancedParams, setShowAdvancedParams] = useState(false); // NEW: Toggle advanced params
@@ -660,6 +662,12 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                                 <h2 className="font-serif font-bold text-lg text-white flex items-center gap-2">
                                     <FileText size={18} className="text-muse-400" />
                                     场景预览
+                                    {useBackend && (
+                                        <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border ml-2 ${isSaving ? 'bg-amber-500/10 border-amber-500/20 text-amber-500 animate-pulse' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'}`}>
+                                            {isSaving ? <Loader2 size={10} className="animate-spin" /> : <Cloud size={10} />}
+                                            {isSaving ? '云端同步中...' : '已安全同步至云端'}
+                                        </div>
+                                    )}
                                 </h2>
                                 <div className="flex gap-2 relative">
                                     {/* Polish Tool */}

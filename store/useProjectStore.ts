@@ -189,7 +189,29 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
                     } else {
                         console.log('☁️ Loading project from MySQL...');
                         const fullProject = await fetchProject(mostRecentRemote.id);
-                        projectToLoad = { ...INITIAL_PROJECT, ...fullProject };
+
+                        // Smart Merge: Preserve local-only content (like prose) if backend is "lazy"
+                        const mergedChapters = (fullProject.chapters || []).map((remoteCh: any) => {
+                            const localCh = localVersion?.chapters?.find(c => c.id === remoteCh.id);
+
+                            // If remote is empty but local has content, keep local content
+                            const content = (remoteCh.content === "" && localCh && localCh.content !== "")
+                                ? localCh.content
+                                : remoteCh.content;
+
+                            // If remote has no beats but local has them (prevent loss before migration)
+                            const beats = (!remoteCh.beats || remoteCh.beats.length === 0) && localCh?.beats
+                                ? localCh.beats
+                                : remoteCh.beats;
+
+                            return { ...remoteCh, content, beats };
+                        });
+
+                        projectToLoad = {
+                            ...INITIAL_PROJECT,
+                            ...fullProject,
+                            chapters: mergedChapters
+                        };
                     }
 
                     set({

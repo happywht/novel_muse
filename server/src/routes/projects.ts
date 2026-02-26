@@ -138,6 +138,7 @@ router.get('/:id', async (req: Request, res: Response) => {
                 content: "", // Content is lazy-loaded
                 summary: ch.summary || '',
                 expectedPOV: ch.expectedPOV || '',
+                beats: ch.beats ? JSON.parse(ch.beats) : [],
                 plotNodeId: ch.plotNodeId || undefined,
                 order: ch.order,
                 lastModified: Number(ch.lastModified),
@@ -196,6 +197,7 @@ router.get('/:id/chapters/:chapterId', async (req: Request, res: Response) => {
             lastModified: Number(chapter.lastModified),
             summary: chapter.summary || '',
             expectedPOV: chapter.expectedPOV || '',
+            beats: chapter.beats ? JSON.parse(chapter.beats) : [],
             plotNodeId: chapter.plotNodeId || undefined,
         });
     } catch (err: any) {
@@ -353,6 +355,7 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                             content: contentToSave,
                             summary: ch.summary || null,
                             expectedPOV: ch.expectedPOV || null,
+                            beats: ch.beats ? JSON.stringify(ch.beats) : null,
                             plotNodeId: ch.plotNodeId || null,
                             order: ch.order,
                             lastModified: BigInt(ch.lastModified),
@@ -363,6 +366,7 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                             content: contentToSave,
                             summary: ch.summary || null,
                             expectedPOV: ch.expectedPOV || null,
+                            beats: ch.beats ? JSON.stringify(ch.beats) : null,
                             plotNodeId: ch.plotNodeId || null,
                             order: ch.order,
                             lastModified: BigInt(ch.lastModified),

@@ -93,6 +93,7 @@ model Chapter {
   content      String   @db.LongText
   summary      String?  @db.LongText
   expectedPOV  String?  @db.Text
+  beats        String?  @db.LongText // JSON blob for scene beats
   plotNodeId   String?  
   order        Int
   lastModified BigInt
