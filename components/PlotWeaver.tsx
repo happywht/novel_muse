@@ -163,8 +163,17 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
             ai.performGeneratePlot(pendingAction.data);
         } else if (pendingAction.type === 'RESTORE') {
             const historyItem = pendingAction.data;
-            updateProjectWithHistory(historyItem.content, `回滚至：${historyItem.note}`);
-            setToast({ msg: "已回滚至历史版本", type: 'success' });
+            try {
+                const restoredData = typeof historyItem.content === 'string'
+                    ? JSON.parse(historyItem.content)
+                    : historyItem.content;
+
+                updateProjectWithHistory(restoredData, `回滚至：${historyItem.note}`);
+                setToast({ msg: "已回放至历史版本", type: 'success' });
+            } catch (e) {
+                console.error("Restore failed:", e);
+                setToast({ msg: "版本数据解析失败，无法恢复", type: 'error' });
+            }
         }
         setPendingAction(null);
     };

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ProjectState, Character, Echo } from '../types';
 import { generateText, generateCharacterImage, chatWithPersona } from '../services/geminiService';
 import { Loader } from './Loader';
-import { User, Plus, Trash2, Camera, Sparkles, HeartHandshake, MessageCircle, X, Send, GitCommit, Check, Edit2, Save, Search, Palette, RotateCcw } from 'lucide-react';
+import { User, Plus, Trash2, Camera, Sparkles, HeartHandshake, MessageCircle, X, Send, GitCommit, Check, Edit2, Save, Search, Palette, RotateCcw, AlertCircle, CheckCircle } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface CharacterCreatorProps {
@@ -35,6 +35,12 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
     // Inputs
     const [nameInput, setNameInput] = useState('');
     const [roleInput, setRoleInput] = useState('主角');
+    const [toast, setToast] = useState<{ msg: string, type: 'error' | 'success' } | null>(null);
+
+    const showToast = (msg: string, type: 'error' | 'success' = 'error') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 3000);
+    };
 
     const activeChar = project.characters.find(c => c.id === activeCharId);
 
@@ -59,7 +65,7 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
             const description = await generateText(prompt, 'character_gen', project.creativeSettings);
 
             const newChar: Character = {
-                id: Date.now().toString(),
+                id: crypto.randomUUID(),
                 name: nameInput || "新角色",
                 role: roleInput,
                 archetype: '待定',
@@ -106,6 +112,22 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
         setActiveCharId(draftCharacter.id);
         setDraftCharacter(null);
         setNameInput('');
+        showToast("角色已确立并入驻宇宙", 'success');
+    };
+
+    const handleManualAdd = () => {
+        const newChar: Character = {
+            id: crypto.randomUUID(),
+            name: nameInput || "新角色",
+            role: roleInput,
+            archetype: '待定',
+            description: '',
+            relationships: ''
+        };
+        setDraftCharacter(newChar);
+        setIsEditing(true);
+        setEditDescription('');
+        setActiveCharId(null);
     };
 
     const handleGenerateImage = async () => {
@@ -134,6 +156,7 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
         );
         updateProject({ characters: updatedChars });
         setIsEditing(false);
+        showToast("档案更新已保存", 'success');
     };
 
     const updateRelationship = (val: string) => {
@@ -150,6 +173,7 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
             characters: project.characters.filter(c => c.id !== id)
         });
         if (activeCharId === id) setActiveCharId(null);
+        showToast("角色已离开该宇宙", 'success');
     };
 
     const openChat = () => {
@@ -237,13 +261,21 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
                             <option value="捣蛋鬼">捣蛋鬼 (Trickster) - 喜剧/变数</option>
                             <option value="信使">信使 (Herald) - 开启剧情</option>
                         </select>
-                        <button
-                            onClick={handleGenerateChar}
-                            disabled={isGeneratingInfo}
-                            className="w-full bg-muse-600 hover:bg-muse-500 text-white py-2 rounded-md font-medium transition-colors flex items-center justify-center space-x-2"
-                        >
-                            {isGeneratingInfo ? <span>正在召唤...</span> : <><Sparkles size={16} /> <span>生成角色档案</span></>}
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleManualAdd}
+                                className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-md font-medium transition-colors flex items-center justify-center space-x-2"
+                            >
+                                <Plus size={16} /> <span>手动创建</span>
+                            </button>
+                            <button
+                                onClick={handleGenerateChar}
+                                disabled={isGeneratingInfo}
+                                className="flex-[1.5] bg-muse-600 hover:bg-muse-500 text-white py-2 rounded-md font-medium transition-colors flex items-center justify-center space-x-2"
+                            >
+                                {isGeneratingInfo ? <span>正在召唤...</span> : <><Sparkles size={16} /> <span>AI 生成档案</span></>}
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -603,6 +635,14 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
                             </button>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-[60] transition-all animate-fade-in font-medium text-sm flex items-center gap-2 border ${toast.type === 'error' ? 'bg-red-500/10 border-red-500/50 text-red-200' : 'bg-emerald-500/10 border-emerald-500/50 text-emerald-200'}`}>
+                    {toast.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
+                    <span>{toast.msg}</span>
                 </div>
             )}
         </div>
