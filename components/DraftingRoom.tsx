@@ -6,6 +6,7 @@ import { PenTool, MapPin, Users, Zap, Plus, FileText, Trash2, Clipboard, Save, R
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { DraftEditor } from './DraftingRoom/DraftEditor';
 import { rewriteLocalText } from '../services/geminiService';
+import { recalculateChapterOrders } from '../utils/chapterUtils';
 
 interface DraftingRoomProps {
     project: ProjectState;
@@ -370,7 +371,9 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                 lastModified: Date.now()
             };
             const updatedChapters = [...(project.chapters || []), newChapter];
-            updateProject({ chapters: updatedChapters });
+            updateProject({
+                chapters: recalculateChapterOrders(updatedChapters, project.plotNodes)
+            });
             setActiveChapterId(newChapter.id);
             alert("已成功采纳为正文！");
         }
@@ -399,10 +402,9 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
         if (!confirm("确定要删除此章节吗？此操作不可恢复。")) return;
 
         const updatedChapters = (project.chapters || []).filter(c => c.id !== id);
-        // Re-order remaining chapters
-        updatedChapters.forEach((c, idx) => c.order = idx + 1);
-
-        updateProject({ chapters: updatedChapters });
+        updateProject({
+            chapters: recalculateChapterOrders(updatedChapters, project.plotNodes)
+        });
         if (activeChapterId === id) {
             setActiveChapterId(updatedChapters.length > 0 ? updatedChapters[0].id : null);
         }
@@ -802,27 +804,29 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                         </div>
                         <div className="flex-1 overflow-y-auto p-2 space-y-1">
                             {(project.chapters || []).length === 0 && <p className="text-slate-500 text-xs p-4 text-center">暂无正文章节。请去工坊采纳草稿。</p>}
-                            {(project.chapters || []).map((chapter, idx) => (
-                                <div
-                                    key={chapter.id}
-                                    onClick={() => setActiveChapterId(chapter.id)}
-                                    className={`p-3 rounded-lg cursor-pointer transition-colors group relative ${activeChapterId === chapter.id ? 'bg-muse-900/50 text-muse-200 border border-muse-500/30' : 'text-slate-300 hover:bg-slate-700/50 border border-transparent'}`}
-                                >
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className="text-xs font-bold opacity-50">#{idx + 1}</span>
-                                        <span className="text-[10px] text-slate-500">{new Date(chapter.lastModified).toLocaleDateString()}</span>
-                                    </div>
-                                    <h4 className="font-medium text-sm truncate pr-6">{chapter.title}</h4>
-
-                                    <button
-                                        onClick={(e) => handleDeleteChapter(e, chapter.id)}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
-                                        title="删除章节"
+                            {[...(project.chapters || [])]
+                                .sort((a, b) => a.order - b.order)
+                                .map((chapter, idx) => (
+                                    <div
+                                        key={chapter.id}
+                                        onClick={() => setActiveChapterId(chapter.id)}
+                                        className={`p-3 rounded-lg cursor-pointer transition-colors group relative ${activeChapterId === chapter.id ? 'bg-muse-900/50 text-muse-200 border border-muse-500/30' : 'text-slate-300 hover:bg-slate-700/50 border border-transparent'}`}
                                     >
-                                        <Trash2 size={14} />
-                                    </button>
-                                </div>
-                            ))}
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-xs font-bold opacity-50">#{idx + 1}</span>
+                                            <span className="text-[10px] text-slate-500">{new Date(chapter.lastModified).toLocaleDateString()}</span>
+                                        </div>
+                                        <h4 className="font-medium text-sm truncate pr-6">{chapter.title}</h4>
+
+                                        <button
+                                            onClick={(e) => handleDeleteChapter(e, chapter.id)}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                                            title="删除章节"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    </div>
+                                ))}
                         </div>
                     </div>
 

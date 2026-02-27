@@ -11,29 +11,18 @@ import {
     Trash2,
     Calendar,
     ArrowRight,
-    Activity
+    Activity,
+    ChevronUp,
+    ChevronDown,
+    PlusCircle,
+    LayoutList,
+    ChevronDownCircle
 } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { splitPlotNodeIntoChapters, regenerateChapterOutline, auditChapterPlan } from '../../services/geminiService';
 import { Loader2, RefreshCw, AlertCircle, CheckCircle2, Info } from 'lucide-react'; // For loading state
+import { recalculateChapterOrders } from '../../utils/chapterUtils';
 
-// --- Utility for Global Chapter Reordering ---
-const recalculateChapterOrders = (chapters: Chapter[], plotNodes: PlotNode[]): Chapter[] => {
-    const nodeOrderMap = new Map(plotNodes.map(node => [node.id, node.order]));
-
-    const sorted = [...chapters].sort((a, b) => {
-        const orderA = a.plotNodeId ? (nodeOrderMap.get(a.plotNodeId) ?? 9999) : 9999;
-        const orderB = b.plotNodeId ? (nodeOrderMap.get(b.plotNodeId) ?? 9999) : 9999;
-
-        if (orderA !== orderB) {
-            return orderA - orderB;
-        }
-
-        return a.order - b.order;
-    });
-
-    return sorted.map((ch, idx) => ({ ...ch, order: idx }));
-};
 
 interface ChapterOutlinerProps {
     project: ProjectState;
@@ -49,6 +38,7 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
     const [fissionCount, setFissionCount] = useState<number | 'AUTO'>('AUTO');
     const [regeneratingChapterId, setRegeneratingChapterId] = useState<string | null>(null);
     const [auditResult, setAuditResult] = useState<{ isAligned: boolean; issues: { type: string; description: string; suggestion: string }[] } | null>(null);
+    const [isAuditCollapsed, setIsAuditCollapsed] = useState(false);
     const [isAuditing, setIsAuditing] = useState(false);
 
     const selectedPlotNode = useMemo(() =>
@@ -63,20 +53,74 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
     const handleAddChapter = () => {
         if (!selectedPlotNodeId) return;
 
+        const newOrder = relatedChapters.length > 0
+            ? relatedChapters[relatedChapters.length - 1].order + 1
+            : 0;
+
         const newChapter: Chapter = {
-            id: Date.now().toString(),
+            id: crypto.randomUUID(),
             title: `新章节 ${relatedChapters.length + 1}`,
             content: '',
             summary: '',
             expectedPOV: '未设定',
             plotNodeId: selectedPlotNodeId,
-            order: project.chapters.length,
+            order: newOrder,
             lastModified: Date.now()
         };
 
         const newChapterList = [...project.chapters, newChapter];
         updateProject({
             chapters: recalculateChapterOrders(newChapterList, project.plotNodes)
+        });
+    };
+
+    const handleInsertChapter = (index: number) => {
+        if (!selectedPlotNodeId) return;
+
+        const newChapter: Chapter = {
+            id: crypto.randomUUID(),
+            title: `插入章节`,
+            content: '',
+            summary: '',
+            expectedPOV: '未设定',
+            plotNodeId: selectedPlotNodeId,
+            order: 0, // Placeholder, will be fixed by splicing and recalculating
+            lastModified: Date.now()
+        };
+
+        // Create a copy of related chapters for splicing
+        const newChapters = [...project.chapters];
+
+        // Find where in the full list to insert. 
+        // We need to insert it at a specific logical position relative to relatedChapters.
+        const targetRelatedChapter = relatedChapters[index];
+        const fullIdx = project.chapters.findIndex(c => c.id === targetRelatedChapter.id);
+
+        newChapters.splice(fullIdx + 1, 0, newChapter);
+
+        updateProject({
+            chapters: recalculateChapterOrders(newChapters, project.plotNodes)
+        });
+    };
+
+    const handleMoveChapter = (chapterId: string, direction: 'UP' | 'DOWN') => {
+        const index = relatedChapters.findIndex(c => c.id === chapterId);
+        if (direction === 'UP' && index === 0) return;
+        if (direction === 'DOWN' && index === relatedChapters.length - 1) return;
+
+        const targetIndex = direction === 'UP' ? index - 1 : index + 1;
+        const currentChapter = relatedChapters[index];
+        const targetChapter = relatedChapters[targetIndex];
+
+        // Swap order values in a copy of the full list
+        const updatedChapters = project.chapters.map(c => {
+            if (c.id === currentChapter.id) return { ...c, order: targetChapter.order };
+            if (c.id === targetChapter.id) return { ...c, order: currentChapter.order };
+            return c;
+        });
+
+        updateProject({
+            chapters: recalculateChapterOrders(updatedChapters, project.plotNodes)
         });
     };
 
@@ -210,6 +254,7 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                 project.creativeSettings
             );
             setAuditResult(result);
+            setIsAuditCollapsed(false);
         } catch (error) {
             console.error("Audit Error:", error);
             alert("审计失败，请重试。");
@@ -308,49 +353,68 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
 
                             {/* Audit Results Banner */}
                             {auditResult && (
-                                <div className={`mb-6 p-4 rounded-2xl border flex flex-col gap-3 animate-in fade-in slide-in-from-top-4 duration-500 ${auditResult.isAligned ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
-                                    <div className="flex items-center justify-between">
+                                <div className={`mb-6 rounded-2xl border overflow-hidden transition-all duration-300 ${auditResult.isAligned ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20'}`}>
+                                    <div className="flex items-center justify-between p-4 bg-slate-900/40">
                                         <div className="flex items-center gap-3">
                                             {auditResult.isAligned ? (
-                                                <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
-                                                    <CheckCircle2 size={20} />
+                                                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                                                    <CheckCircle2 size={16} />
                                                 </div>
                                             ) : (
-                                                <div className="w-10 h-10 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-400">
-                                                    <AlertCircle size={20} />
+                                                <div className="w-8 h-8 rounded-full bg-rose-500/20 flex items-center justify-center text-rose-400">
+                                                    <AlertCircle size={16} />
                                                 </div>
                                             )}
                                             <div>
                                                 <h4 className={`text-sm font-bold ${auditResult.isAligned ? 'text-emerald-400' : 'text-rose-400'}`}>
                                                     {auditResult.isAligned ? '结构审计通过' : '检测到潜在的跑偏风险'}
+                                                    <span className="ml-2 text-[10px] text-slate-500 font-normal uppercase tracking-wider">
+                                                        {isAuditCollapsed ? '(点击展开详情)' : '(点击折叠)'}
+                                                    </span>
                                                 </h4>
-                                                <p className="text-xs text-slate-400">
-                                                    {auditResult.isAligned ? '当前的章节规划与宏观情节节点目标高度契合。' : `发现 ${auditResult.issues.length} 个可能影响剧情连贯性的问题。`}
-                                                </p>
                                             </div>
                                         </div>
-                                        <button onClick={() => setAuditResult(null)} className="text-slate-600 hover:text-slate-400 p-2">
-                                            关闭提示
-                                        </button>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                onClick={() => setIsAuditCollapsed(!isAuditCollapsed)}
+                                                className="text-slate-500 hover:text-sky-400 p-2 transition-colors"
+                                                title={isAuditCollapsed ? "展开审计建议" : "折叠显示"}
+                                            >
+                                                {isAuditCollapsed ? <LayoutList size={16} /> : <ChevronDownCircle size={16} className="rotate-180" />}
+                                            </button>
+                                            <button
+                                                onClick={() => setAuditResult(null)}
+                                                className="text-slate-500 hover:text-rose-400 p-2 transition-colors"
+                                                title="移除审计报告"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </div>
 
-                                    {!auditResult.isAligned && auditResult.issues.length > 0 && (
-                                        <div className="grid grid-cols-1 gap-2 mt-2">
-                                            {auditResult.issues.map((issue, idx) => (
-                                                <div key={idx} className="bg-slate-900/40 rounded-xl p-3 border border-slate-800/60">
-                                                    <div className="flex items-start gap-3">
-                                                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold mt-0.5 ${issue.type === 'DRIFT' ? 'bg-rose-500/20 text-rose-400' :
-                                                                issue.type === 'GAP' ? 'bg-amber-500/20 text-amber-400' : 'bg-sky-500/20 text-sky-400'
-                                                            }`}>
-                                                            {issue.type}
-                                                        </span>
-                                                        <div className="flex-1">
-                                                            <p className="text-xs text-slate-300 font-medium mb-1">{issue.description}</p>
-                                                            <p className="text-[11px] text-slate-500 italic">💡 建议：{issue.suggestion}</p>
+                                    {!isAuditCollapsed && (
+                                        <div className="p-4 pt-0 animate-fade-in">
+                                            {!auditResult.isAligned && auditResult.issues.length > 0 ? (
+                                                <div className="grid grid-cols-1 gap-2 mt-2">
+                                                    {auditResult.issues.map((issue, idx) => (
+                                                        <div key={idx} className="bg-slate-900/60 rounded-xl p-3 border border-slate-800/60">
+                                                            <div className="flex items-start gap-3">
+                                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold mt-0.5 ${issue.type === 'DRIFT' ? 'bg-rose-500/20 text-rose-400' :
+                                                                    issue.type === 'GAP' ? 'bg-amber-500/20 text-amber-400' : 'bg-sky-500/20 text-sky-400'
+                                                                    }`}>
+                                                                    {issue.type}
+                                                                </span>
+                                                                <div className="flex-1">
+                                                                    <p className="text-xs text-slate-200 font-medium mb-1">{issue.description}</p>
+                                                                    <p className="text-[11px] text-slate-500 italic">💡 建议：{issue.suggestion}</p>
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                    </div>
+                                                    ))}
                                                 </div>
-                                            ))}
+                                            ) : (
+                                                <p className="text-xs text-slate-400 p-2">当前的章节规划与宏观情节节点目标高度契合，请保持创作节奏。</p>
+                                            )}
                                         </div>
                                     )}
                                 </div>
@@ -377,7 +441,25 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                                                     onChange={(e) => handleUpdateChapter(chapter.id, { title: e.target.value })}
                                                 />
                                             </div>
-                                            <div className="flex gap-2">
+                                            <div className="flex gap-1">
+                                                <div className="flex flex-col gap-0.5 mr-2 bg-slate-950/40 rounded-lg p-0.5">
+                                                    <button
+                                                        onClick={() => handleMoveChapter(chapter.id, 'UP')}
+                                                        disabled={idx === 0}
+                                                        className="text-slate-600 hover:text-sky-400 disabled:opacity-20 transition-colors"
+                                                        title="上移 CHAPTER"
+                                                    >
+                                                        <ChevronUp size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleMoveChapter(chapter.id, 'DOWN')}
+                                                        disabled={idx === relatedChapters.length - 1}
+                                                        className="text-slate-600 hover:text-sky-400 disabled:opacity-20 transition-colors"
+                                                        title="下移 CHAPTER"
+                                                    >
+                                                        <ChevronDown size={14} />
+                                                    </button>
+                                                </div>
                                                 <button
                                                     onClick={() => handleRegenerateChapter(chapter.id)}
                                                     disabled={regeneratingChapterId === chapter.id}
@@ -452,6 +534,16 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                                                     </div>
                                                 </div>
                                             )}
+                                        </div>
+
+                                        {/* Insert Action Bar */}
+                                        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all z-10 flex flex-col items-center">
+                                            <button
+                                                onClick={() => handleInsertChapter(idx)}
+                                                className="bg-sky-600 hover:bg-sky-500 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1 scale-90 hover:scale-100 transition-transform"
+                                            >
+                                                <PlusCircle size={12} /> 在此后插入章节
+                                            </button>
                                         </div>
                                     </div>
                                 ))}
