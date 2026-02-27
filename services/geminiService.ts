@@ -609,7 +609,8 @@ export const generateSceneFromIngredients = async (
     previousStoryContext?: string, // NEW: Manuscript memory
     pacing: PacingMode = 'BALANCED', // NEW: Pacing Control
     echoes: Echo[] = [], // NEW: Dynamic Echoes
-    targetWordCount: number = 3000 // NEW: Target Word Count
+    targetWordCount: number = 3000, // NEW: Target Word Count
+    povName?: string // NEW: Explicit POV lock
 ): Promise<string> => {
     const ai = getAIClient();
 
@@ -697,6 +698,18 @@ export const generateSceneFromIngredients = async (
         });
         context += "\n";
     }
+
+    // 4. POV & Pacing Constraints (Absolute Priority)
+    let constraintBlock = `【🚨 创作核心限制 (Absolute Constraints)】\n`;
+
+    if (povName) {
+        constraintBlock += `- **视角锁定**: 必须严格以【${povName}】的第一人称或限制性第三人称视角叙事。\n`;
+        constraintBlock += `  * 严禁描写该角色感知范围（视角、听力、触觉等）之外的任何信息。\n`;
+        constraintBlock += `  * 严禁上帝视角，严禁切换到其他角色的内心活动。\n`;
+    }
+
+    constraintBlock += pacingInstruction + "\n";
+    context += constraintBlock + "\n";
 
     const prompt = `
     小说类型: ${genre}

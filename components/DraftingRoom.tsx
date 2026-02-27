@@ -182,9 +182,11 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
             const activeLocation = (project.worldSettings || []).find(w => w.id === selectedLocationId) || null;
             const previousContext = getPrecedingContext();
 
+            const povCharName = povCharId ? (project.characters || []).find(c => c.id === povCharId)?.name : undefined;
+
             const result = await generateSceneFromIngredients(
                 project.genre,
-                plotBeat + (povCharId ? `\n\n【视角指令】请以 ${(project.characters || []).find(c => c.id === povCharId)?.name || '主角'} 的第一人称或限制性第三人称视角进行叙事。只展现该角色能感知到的信息，用其独特的思维方式和语言风格来表达。` : ''),
+                plotBeat,
                 activeCharacters,
                 activeLocation,
                 project.worldSettings || [],
@@ -192,7 +194,8 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                 previousContext,
                 pacing,
                 project.echoes || [],
-                targetWordCount
+                targetWordCount,
+                povCharName
             );
 
             // Format raw text with line breaks into HTML paragraphs for Tiptap
