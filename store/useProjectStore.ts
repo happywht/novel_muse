@@ -11,6 +11,7 @@
 import { create } from 'zustand';
 import { AppSection, ProjectState, WorldGenConfig } from '../types';
 import { isBackendAvailable, fetchProjectList, fetchProject, syncProject, patchProject, deleteProjectApi, fetchChapter } from '../services/apiService';
+import { storageService, STORAGE_KEYS } from '../services/storageService';
 
 // ============================================================
 // Default State
@@ -86,10 +87,11 @@ interface ProjectStore {
     createProject: () => Promise<void>;
     switchProject: (id: string) => Promise<void>;
     deleteProject: (id: string) => Promise<void>;
-    saveToLocalStorage: () => void;
+    saveToPersistentStorage: () => Promise<void>;
     syncToBackend: () => void;
-    loadFromLocalStorage: () => void;
+    loadFromPersistentStorage: () => Promise<void>;
     fetchChapterContent: (chapterId: string) => Promise<void>;
+    updateChapterSummary: (chapterId: string, summary: string) => Promise<void>;
     forceSync: () => Promise<void>;
 }
 
@@ -119,7 +121,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         // Trigger auto-save
         const store = get();
         if (!store.isLoading) {
-            store.saveToLocalStorage();
+            store.saveToPersistentStorage();
             store.syncToBackend();
         }
     },
@@ -159,15 +161,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         const backendOk = await isBackendAvailable();
         set({ useBackend: backendOk });
 
-        const stored = localStorage.getItem('muse_projects');
-        let localProjects: ProjectState[] = [];
-        if (stored) {
-            try {
-                localProjects = JSON.parse(stored);
-            } catch (e) {
-                console.error('Failed to parse localStorage projects', e);
-            }
-        }
+        // Try to migrate from localStorage if needed
+        const migrated = await storageService.migrateFromLocalStorage(STORAGE_KEYS.PROJECTS);
+        const localProjects = await storageService.getItem<ProjectState[]>(STORAGE_KEYS.PROJECTS) || [];
 
         if (backendOk) {
             console.log('🚀 Backend connected! Comparing versions...');
@@ -176,63 +172,40 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
                 if (list.length > 0) {
                     const sorted = list.sort((a, b) => b.lastModified - a.lastModified);
                     const mostRecentRemote = sorted[0];
-
-                    // Check if we have a local version of this project that is NEWER
                     const localVersion = localProjects.find(p => p.id === mostRecentRemote.id);
 
                     let projectToLoad: ProjectState;
                     if (localVersion && localVersion.lastModified > mostRecentRemote.lastModified) {
                         console.log('💡 Local version is newer than MySQL. Using local and syncing back...');
                         projectToLoad = { ...INITIAL_PROJECT, ...localVersion };
-                        // Trigger a sync back to backend as local is ahead
                         setTimeout(() => get().syncToBackend(), 1000);
                     } else {
                         console.log('☁️ Loading project from MySQL...');
                         const fullProject = await fetchProject(mostRecentRemote.id);
-
-                        // Smart Merge: Preserve local-only content (like prose) if backend is "lazy"
                         const mergedChapters = (fullProject.chapters || []).map((remoteCh: any) => {
                             const localCh = localVersion?.chapters?.find(c => c.id === remoteCh.id);
-
-                            // If remote is empty but local has content, keep local content
                             const content = (remoteCh.content === "" && localCh && localCh.content !== "")
-                                ? localCh.content
-                                : remoteCh.content;
-
-                            // If remote has no beats but local has them (prevent loss before migration)
+                                ? localCh.content : remoteCh.content;
                             const beats = (!remoteCh.beats || remoteCh.beats.length === 0) && localCh?.beats
-                                ? localCh.beats
-                                : remoteCh.beats;
-
+                                ? localCh.beats : remoteCh.beats;
                             return { ...remoteCh, content, beats };
                         });
 
-                        projectToLoad = {
-                            ...INITIAL_PROJECT,
-                            ...fullProject,
-                            chapters: mergedChapters
-                        };
+                        projectToLoad = { ...INITIAL_PROJECT, ...fullProject, chapters: mergedChapters };
                     }
 
                     set({
                         project: projectToLoad,
                         activeSection: AppSection.LOBBY,
                         savedProjects: list.map(s => ({
-                            ...INITIAL_PROJECT,
-                            id: s.id,
-                            title: s.title,
-                            genre: s.genre,
-                            lastModified: s.lastModified,
+                            ...INITIAL_PROJECT, id: s.id, title: s.title, genre: s.genre, lastModified: s.lastModified,
                         } as ProjectState)),
                         isLoading: false
                     });
                 } else {
-                    // No projects on backend, check for migration
                     if (localProjects.length > 0) {
-                        console.log('📦 Migrating localStorage projects to MySQL...');
-                        for (const proj of localProjects) {
-                            await syncProject(proj);
-                        }
+                        console.log('📦 Migrating local projects to MySQL...');
+                        for (const proj of localProjects) { await syncProject(proj); }
                         const mostRecent = localProjects.sort((a, b) => b.lastModified - a.lastModified)[0];
                         set({
                             project: { ...INITIAL_PROJECT, ...mostRecent },
@@ -241,21 +214,23 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
                             isLoading: false,
                         });
                     } else {
-                        // Brand new user
                         const newProj = { ...INITIAL_PROJECT, id: Date.now().toString() };
                         await syncProject(newProj);
                         set({ project: newProj, savedProjects: [newProj], isLoading: false });
                     }
                 }
             } catch (err) {
-                console.warn('Backend load failed, falling back to localStorage', err);
+                console.warn('Backend load failed, falling back to local storage', err);
                 set({ useBackend: false });
-                get().loadFromLocalStorage();
+                await get().loadFromPersistentStorage();
             }
         } else {
-            console.log('💾 Backend unavailable, using localStorage');
-            get().loadFromLocalStorage();
+            console.log('💾 Backend unavailable, using local IndexedDB');
+            await get().loadFromPersistentStorage();
         }
+
+        // Cleanup legacy localStorage after successful load/migration
+        storageService.removeLegacyItem(STORAGE_KEYS.PROJECTS);
         set({ isLoading: false });
     },
 
@@ -276,7 +251,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
             savedProjects: [...state.savedProjects, newProject],
             showProjectList: false,
         }));
-        store.saveToLocalStorage();
+        await get().saveToPersistentStorage();
     },
 
     switchProject: async (id) => {
@@ -293,7 +268,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
             }
         }
 
-        // Fallback to local
         const localProject = store.savedProjects.find(p => p.id === id);
         if (localProject) {
             set({ project: { ...INITIAL_PROJECT, ...localProject }, showProjectList: false });
@@ -312,18 +286,17 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
             try { await deleteProjectApi(id); } catch (e) { console.warn('Failed to delete from backend', e); }
         }
 
-        set((state) => {
-            const newList = state.savedProjects.filter(p => p.id !== id);
-            const needsSwitch = state.project.id === id;
-            localStorage.setItem('muse_projects', JSON.stringify(newList));
-            return {
-                savedProjects: newList,
-                project: needsSwitch ? { ...INITIAL_PROJECT, ...newList[0] } : state.project,
-            };
+        const state = get();
+        const newList = state.savedProjects.filter(p => p.id !== id);
+        const needsSwitch = state.project.id === id;
+        await storageService.setItem(STORAGE_KEYS.PROJECTS, newList);
+        set({
+            savedProjects: newList,
+            project: needsSwitch ? { ...INITIAL_PROJECT, ...newList[0] } : state.project,
         });
     },
 
-    saveToLocalStorage: () => {
+    saveToPersistentStorage: async () => {
         const { project, savedProjects } = get();
         const updatedProject = { ...project, lastModified: Date.now() };
         const index = savedProjects.findIndex(p => p.id === project.id);
@@ -334,7 +307,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         } else {
             newList = [...savedProjects, updatedProject];
         }
-        localStorage.setItem('muse_projects', JSON.stringify(newList));
+        await storageService.setItem(STORAGE_KEYS.PROJECTS, newList);
         set({ savedProjects: newList });
     },
 
@@ -348,7 +321,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         _saveTimer = setTimeout(async () => {
             try {
                 const id = project.id;
-                // Determine if we can use PATCH or must use full PUT
                 const complexFields = ['characters', 'worldSettings', 'plotHistory', 'drafts', 'chapters', 'plotNodes', 'echoes', 'timeline'];
                 const hasComplexChanges = Object.keys(_pendingPatch).some(key => complexFields.includes(key));
 
@@ -360,34 +332,25 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
                     await patchProject(id, { ..._pendingPatch, lastModified: Date.now() });
                 }
 
-                _pendingPatch = {}; // Clear after successful sync
+                _pendingPatch = {};
                 set({ isSaving: false });
             } catch (err) {
                 console.warn('Backend sync failed:', err);
                 set({ isSaving: false });
-                // Note: We don't clear _pendingPatch on failure so it can retry in the next cycle
             }
         }, 2000);
     },
 
-    // Private-ish helper (not in interface but accessible via get())
-    loadFromLocalStorage: () => {
-        const stored = localStorage.getItem('muse_projects');
-        if (stored) {
-            try {
-                const parsed = JSON.parse(stored);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    const mostRecent = parsed.sort((a: any, b: any) => b.lastModified - a.lastModified)[0];
-                    set({
-                        savedProjects: parsed,
-                        project: { ...INITIAL_PROJECT, ...mostRecent },
-                        activeSection: AppSection.LOBBY,
-                    });
-                    return;
-                }
-            } catch (e) {
-                console.error('Failed to load projects from localStorage', e);
-            }
+    loadFromPersistentStorage: async () => {
+        const parsed = await storageService.getItem<ProjectState[]>(STORAGE_KEYS.PROJECTS);
+        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
+            const mostRecent = parsed.sort((a, b) => b.lastModified - a.lastModified)[0];
+            set({
+                savedProjects: parsed,
+                project: { ...INITIAL_PROJECT, ...mostRecent },
+                activeSection: AppSection.LOBBY,
+            });
+            return;
         }
         const newProj = { ...INITIAL_PROJECT, id: Date.now().toString() };
         set({ project: newProj, savedProjects: [newProj] });
@@ -395,17 +358,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
     fetchChapterContent: async (chapterId) => {
         const { project, useBackend } = get();
-
-        // If already have content, don't fetch
         const chapter = project.chapters.find(c => c.id === chapterId);
-        if (chapter && chapter.content && chapter.content.trim() !== "") {
-            return;
-        }
-
-        if (!useBackend) {
-            // In local mode, if it's empty, it's just empty
-            return;
-        }
+        if (chapter && chapter.content && chapter.content.trim() !== "") return;
+        if (!useBackend) return;
 
         set({ isLoading: true });
         try {
@@ -422,18 +377,34 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
             }
         } catch (err) {
             console.error('Failed to fetch chapter content:', err);
-            // Optionally set a fallback flag or toast here
         } finally {
             set({ isLoading: false });
         }
     },
 
-    // NEW: Manual force sync for the Save button
+    updateChapterSummary: async (chapterId, summary) => {
+        const { project } = get();
+        const updatedChapters = project.chapters.map(c =>
+            c.id === chapterId ? { ...c, summary, lastModified: Date.now() } : c
+        );
+
+        set((state) => ({
+            project: { ...state.project, chapters: updatedChapters }
+        }));
+
+        // Track changes for sync
+        _pendingPatch = { ..._pendingPatch, chapters: updatedChapters };
+
+        const store = get();
+        if (!store.isLoading) {
+            store.saveToPersistentStorage();
+            store.syncToBackend();
+        }
+    },
+
     forceSync: async () => {
-        const { syncToBackend, saveToLocalStorage } = get();
-        saveToLocalStorage();
+        const { syncToBackend, saveToPersistentStorage } = get();
+        await saveToPersistentStorage();
         syncToBackend();
-        // Immediately trigger sync without waiting for debounce if needed, 
-        // but syncToBackend already handles it. We can make it more explicit if we want.
     }
 }));

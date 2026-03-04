@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Key, Cpu, X, Eye, EyeOff, CheckCircle, AlertCircle, ExternalLink } from 'lucide-react';
+import { storageService, STORAGE_KEYS } from '../services/storageService';
 
-const STORAGE_KEY_API = 'muse_gemini_api_key';
-const STORAGE_KEY_MODEL = 'muse_gemini_model';
+const STORAGE_KEY_API = STORAGE_KEYS.GEMINI_API_KEY;
+const STORAGE_KEY_MODEL = STORAGE_KEYS.MODEL_OVERRIDE;
 
 interface SettingsPanelProps {
     onClose: () => void;
@@ -15,8 +16,22 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
     const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
     useEffect(() => {
-        setApiKey(localStorage.getItem(STORAGE_KEY_API) || '');
-        setModelOverride(localStorage.getItem(STORAGE_KEY_MODEL) || '');
+        const loadSettings = async () => {
+            const savedKey = await storageService.getItem<string>(STORAGE_KEY_API);
+            const savedModel = await storageService.getItem<string>(STORAGE_KEY_MODEL);
+            if (savedKey) setApiKey(savedKey);
+            if (savedModel) setModelOverride(savedModel);
+
+            // Also try to migrate from localStorage if this is first touch
+            if (!savedKey) {
+                const legacy = localStorage.getItem(STORAGE_KEY_API);
+                if (legacy) {
+                    setApiKey(legacy);
+                    await storageService.setItem(STORAGE_KEY_API, legacy);
+                }
+            }
+        };
+        loadSettings();
     }, []);
 
     const showToast = (msg: string, type: 'success' | 'error') => {
@@ -24,25 +39,25 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
         setTimeout(() => setToast(null), 3000);
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (apiKey.trim()) {
-            localStorage.setItem(STORAGE_KEY_API, apiKey.trim());
+            await storageService.setItem(STORAGE_KEY_API, apiKey.trim());
         } else {
-            localStorage.removeItem(STORAGE_KEY_API);
+            await storageService.removeItem(STORAGE_KEY_API);
         }
 
         if (modelOverride.trim()) {
-            localStorage.setItem(STORAGE_KEY_MODEL, modelOverride.trim());
+            await storageService.setItem(STORAGE_KEY_MODEL, modelOverride.trim());
         } else {
-            localStorage.removeItem(STORAGE_KEY_MODEL);
+            await storageService.removeItem(STORAGE_KEY_MODEL);
         }
 
         showToast("设置已保存！", "success");
     };
 
-    const handleClear = () => {
-        localStorage.removeItem(STORAGE_KEY_API);
-        localStorage.removeItem(STORAGE_KEY_MODEL);
+    const handleClear = async () => {
+        await storageService.removeItem(STORAGE_KEY_API);
+        await storageService.removeItem(STORAGE_KEY_MODEL);
         setApiKey('');
         setModelOverride('');
         showToast("已清除所有配置", "success");

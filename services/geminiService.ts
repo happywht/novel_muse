@@ -15,19 +15,22 @@ import { useProjectStore } from '../store/useProjectStore';
 import { fetchOpenAICompatible } from './openAiAdapter';
 import { getProviderForTask, LLMTaskType, Provider } from './llmRouter';
 
-const STORAGE_KEY_API = 'muse_gemini_api_key';
-const STORAGE_KEY_MODEL = 'muse_gemini_model';
+import { storageService, STORAGE_KEYS } from './storageService';
 
-const getAIClient = () => {
-    const apiKey = localStorage.getItem(STORAGE_KEY_API) || process.env.API_KEY;
+const STORAGE_KEY_API = STORAGE_KEYS.GEMINI_API_KEY;
+const STORAGE_KEY_MODEL = STORAGE_KEYS.MODEL_OVERRIDE;
+
+const getAIClient = async () => {
+    const savedKey = await storageService.getItem<string>(STORAGE_KEY_API);
+    const apiKey = savedKey || process.env.API_KEY || process.env.GEMINI_API_KEY;
     if (!apiKey) {
         throw new Error("请先在全局设置面板中配置您的 Gemini API Key。");
     }
     return new GoogleGenAI({ apiKey });
 };
 
-export const getModelName = (tier: 'flash' | 'pro' = 'flash'): string => {
-    const customModel = localStorage.getItem(STORAGE_KEY_MODEL);
+export const getModelName = async (tier: 'flash' | 'pro' = 'flash'): Promise<string> => {
+    const customModel = await storageService.getItem<string>(STORAGE_KEY_MODEL);
     if (customModel) return customModel;
     return tier === 'pro'
         ? (process.env.GEMINI_PRO_MODEL || 'gemini-3-pro-preview')
@@ -212,7 +215,7 @@ const executeModelTask = async (
     }
 
     // Default Gemini Execution
-    const ai = getAIClient();
+    const ai = await getAIClient();
     const config: any = {
         systemInstruction,
         temperature,
@@ -235,7 +238,7 @@ const executeModelTask = async (
 };
 
 export const generateText = async (prompt: string, promptKey: string = 'writing_base', settings?: CreativeSettings): Promise<string> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
     const instruction = getInstructionWithSettings(promptKey, settings);
 
     try {
@@ -255,7 +258,7 @@ export const generateText = async (prompt: string, promptKey: string = 'writing_
 };
 
 export const generateCharacterImage = async (description: string): Promise<string> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
     const prompt = `Digital concept art, detailed character design, cinematic lighting, 4k, trending on artstation. Character description: ${description}`;
 
     try {
@@ -284,7 +287,7 @@ export const generateCharacterImage = async (description: string): Promise<strin
 };
 
 export const analyzePlot = async (premise: string, currentPlot: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings, echoes: Echo[] = []): Promise<string> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
     const instruction = getInstructionWithSettings('plot_analysis', settings);
     const contextStr = formatContext(characters, worldSettings, echoes);
 
@@ -323,7 +326,7 @@ export const analyzePlot = async (premise: string, currentPlot: string, characte
 };
 
 export const expandScene = async (premise: string, genre: string, plotOutline: string, userPrompt: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings, echoes: Echo[] = []): Promise<string> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
     const instruction = getInstructionWithSettings('scene_expansion', settings);
     const contextStr = formatContext(characters, worldSettings, echoes);
 
@@ -356,7 +359,7 @@ export const expandScene = async (premise: string, genre: string, plotOutline: s
 };
 
 export const expandWorldLore = async (title: string, currentContent: string, genre: string, settings?: CreativeSettings): Promise<string> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
     const instruction = getInstructionWithSettings('world_building', settings);
 
     const prompt = `
@@ -396,7 +399,7 @@ export const generatePlotFromContext = async (
     template?: string,
     echoes: Echo[] = []
 ): Promise<{ title: string; content: string }[]> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
 
     // DYNAMIC CONTEXT INJECTION (Phase 6B.1)
     // Combine text for query: Premise + Template (if any) + Character Names
@@ -497,7 +500,7 @@ export const rewritePlot = async (
     settings?: CreativeSettings,
     echoes: Echo[] = []
 ): Promise<{ title: string; content: string }[]> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
     const contextStr = formatContext(characters, worldSettings, echoes);
 
     const instruction = getInstructionWithSettings('plot_weaving', settings); // Re-use weaving for rewrite context
@@ -551,7 +554,7 @@ export const rewritePlot = async (
 };
 
 export const batchGenerateCharacters = async (premise: string, genre: string, settings?: CreativeSettings): Promise<Omit<Character, 'id'>[]> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
 
     const characterSchema = {
         type: Type.ARRAY,
@@ -603,7 +606,7 @@ export const batchGenerateCharacters = async (premise: string, genre: string, se
 };
 
 export const batchGenerateWorldSettingsByCategory = async (premise: string, genre: string, category: string, settings?: CreativeSettings): Promise<Omit<WorldSetting, 'id'>[]> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
 
     const worldSchema = {
         type: Type.ARRAY,
@@ -666,9 +669,10 @@ export const generateSceneFromIngredients = async (
     pacing: PacingMode = 'BALANCED', // NEW: Pacing Control
     echoes: Echo[] = [], // NEW: Dynamic Echoes
     targetWordCount: number = 3000, // NEW: Target Word Count
-    povName?: string // NEW: Explicit POV lock
+    povName?: string, // NEW: Explicit POV lock
+    rollingSummary?: string // NEW: Global Story Arc
 ): Promise<string> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
 
     let pacingInstruction = "";
     switch (pacing) {
@@ -695,6 +699,11 @@ export const generateSceneFromIngredients = async (
 
     // Build context
     let context = "";
+
+    // NEW: Global Story Arc (Rolling Summary)
+    if (rollingSummary) {
+        context += `【📚 全局故事脉络 (Global Story Arc)】\n(以下是目前为止整部小说的情节摘要，请确保当前创作符合整体走向，并注意前后呼应)\n${rollingSummary}\n\n`;
+    }
 
     // Filter only accepted echoes
     const activeEchoes = echoes.filter(e => e.status === 'ACCEPTED');
@@ -804,7 +813,7 @@ export const polishDraft = async (
     mode: PolishMode,
     settings?: CreativeSettings
 ): Promise<string> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
 
     let modeInstruction = "";
     switch (mode) {
@@ -853,7 +862,7 @@ export const analyzeStateChanges = async (
 ): Promise<StateChangeRecommendation[]> => {
     if (!sceneContent || (activeCharacters.length === 0 && allWorldSettings.length === 0)) return [];
 
-    const ai = getAIClient();
+    const ai = await getAIClient();
 
     const responseSchema = {
         type: Type.ARRAY,
@@ -952,7 +961,7 @@ export const rewriteLocalText = async (
     instruction: string,
     settings?: CreativeSettings
 ): Promise<string> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
 
     // We can reuse the scene_generation system instruction for consistent tone
     const sysInstruction = getInstructionWithSettings('scene_generation', settings);
@@ -980,7 +989,7 @@ export const rewriteLocalText = async (
     try {
         const response = await ai.models.generateContent({
             // getModelName('flash') typically maps to gemini-2.5-flash for faster lightweight tasks
-            model: getModelName('flash'),
+            model: await getModelName('flash'),
             contents: prompt,
             config: {
                 systemInstruction: sysInstruction,
@@ -1048,7 +1057,7 @@ export const extractEchoesFromText = async (
             'extractEchoes',
             '',
             prompt,
-            'gemini-3-flash-preview',
+            await getModelName('flash'),
             0.1,
             responseSchema
         );
@@ -1100,7 +1109,7 @@ export const consolidateMemory = async (
 ): Promise<string> => {
     if (echoesToConsolidate.length === 0) return currentDescription;
 
-    const ai = getAIClient();
+    const ai = await getAIClient();
     const echoText = echoesToConsolidate.map(e => `- ${e.description} (${new Date(e.timestamp).toLocaleDateString()})`).join('\n');
 
     const prompt = `
@@ -1129,7 +1138,7 @@ export const consolidateMemory = async (
             'generateText',
             '',
             prompt,
-            'gemini-3-flash-preview',
+            await getModelName('flash'),
             0.3
         );
 
@@ -1149,7 +1158,7 @@ export const deduceWorldConsequences = async (
 ): Promise<StateChangeRecommendation[]> => {
     if (recentEchoes.length === 0) return [];
 
-    const ai = getAIClient();
+    const ai = await getAIClient();
     const contextStr = formatContext(characters, worldSettings, recentEchoes);
 
     // Only consider recent accepted echoes as triggers
@@ -1200,7 +1209,7 @@ export const deduceWorldConsequences = async (
             'deduceWorldConsequences',
             '',
             prompt,
-            'gemini-3-pro-preview',
+            await getModelName('pro'),
             0.4,
             responseSchema
         );
@@ -1250,7 +1259,7 @@ export interface PlotRhythmPoint {
 }
 
 export const analyzePlotRhythm = async (plotOutline: string): Promise<PlotRhythmPoint[]> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
 
     const responseSchema = {
         type: Type.ARRAY,
@@ -1287,7 +1296,7 @@ export const analyzePlotRhythm = async (plotOutline: string): Promise<PlotRhythm
             'analyzePlotRhythm',
             '',
             prompt,
-            'gemini-3-flash-preview',
+            await getModelName('flash'),
             0.2,
             responseSchema
         );
@@ -1301,7 +1310,7 @@ export const analyzePlotRhythm = async (plotOutline: string): Promise<PlotRhythm
 };
 
 export const chatWithPersona = async (character: Character, message: string, history: { role: string, content: string }[]): Promise<string> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
 
     // Construct system instruction based on character profile
     const systemInstruction = `
@@ -1321,7 +1330,7 @@ export const chatWithPersona = async (character: Character, message: string, his
     try {
         // We use a simple chat model here
         const chat = ai.chats.create({
-            model: 'gemini-3-flash-preview',
+            model: await getModelName('flash'),
             config: {
                 systemInstruction: systemInstruction,
             },
@@ -1349,7 +1358,7 @@ export const splitPlotNodeIntoChapters = async (
     echoes: Echo[] = [],
     fissionCount: number | 'AUTO' = 'AUTO'
 ): Promise<{ title: string; summary: string; expectedPOV: string; beats?: { type: string; description: string }[] }[]> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
     const contextStr = formatContext(characters, worldSettings, echoes);
     const instruction = getInstructionWithSettings('plot_fission', settings);
 
@@ -1400,7 +1409,7 @@ export const splitPlotNodeIntoChapters = async (
             'splitPlotNodeIntoChapters',
             instruction,
             prompt,
-            getModelName('pro'),
+            await getModelName('pro'),
             settings?.creativity || 0.85,
             AiChapterOutlineArraySchema
         );
@@ -1424,7 +1433,7 @@ export const auditChapterPlan = async (
     isAligned: boolean;
     issues: { type: 'GAP' | 'DRIFT' | 'CONTRADICTION'; description: string; suggestion: string }[]
 }> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
     const contextStr = formatContext(characters, worldSettings);
 
     const chaptersText = chapters.map((c, i) => `[第 ${i + 1} 章: ${c.title}]\n概要: ${c.summary}\n节拍: ${c.beats?.map(b => `- [${b.type}] ${b.description}`).join('\n')}`).join('\n\n');
@@ -1466,7 +1475,7 @@ export const auditChapterPlan = async (
             'auditChapterPlan',
             '',
             prompt,
-            getModelName('pro'),
+            await getModelName('pro'),
             0.1,
             true, // Enable JSON mode
             2048
@@ -1495,7 +1504,7 @@ export const regenerateChapterOutline = async (
     settings?: CreativeSettings,
     echoes: Echo[] = []
 ): Promise<{ title: string; summary: string; expectedPOV: string; beats?: { type: string; description: string }[] } | null> => {
-    const ai = getAIClient();
+    const ai = await getAIClient();
     const contextStr = formatContext(characters, worldSettings, echoes);
     const instruction = getInstructionWithSettings('plot_fission', settings);
 
@@ -1545,7 +1554,7 @@ export const regenerateChapterOutline = async (
             'regenerateChapterOutline',
             instruction,
             prompt,
-            getModelName('pro'),
+            await getModelName('pro'),
             settings?.creativity || 0.85,
             AiChapterOutlineArraySchema
         );
@@ -1554,6 +1563,42 @@ export const regenerateChapterOutline = async (
         return result && result.length > 0 ? result[0] : null;
     } catch (e) {
         console.error("Gemini Chapter Regeneration Error:", e);
+        throw e;
+    }
+};
+
+/**
+ * Summarize a chapter into a concise plot summary.
+ */
+export const summarizeChapter = async (content: string, previousSummary?: string): Promise<string> => {
+    const model = await getModelName('flash');
+    const ai = await getAIClient();
+
+    const prompt = `
+        你是一位资深小说编辑。请阅读以下小说正文内容，并将其总结为一段精炼的情节摘要（约150字以内）。
+        
+        【要求】：
+        1. 重点突出关键情节转折、核心冲突结果、人物的重要状态变更。
+        2. 语言干练，适合作为长篇小说的“记忆碎片”提供给后续创作 AI 参考。
+        3. 如果提供了【前情摘要】，请确保本段摘要能够逻辑连贯地接续。
+
+        ${previousSummary ? `【前情摘要】：\n${previousSummary}\n` : ''}
+        
+        【正文内容】：
+        ${content}
+
+        【情节摘要】：
+    `;
+
+    try {
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model,
+            contents: prompt,
+            config: { temperature: 0.3 }
+        }));
+        return response.text || "";
+    } catch (e) {
+        console.error("Summarization failed:", e);
         throw e;
     }
 };

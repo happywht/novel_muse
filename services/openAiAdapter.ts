@@ -9,7 +9,7 @@ export const fetchOpenAICompatible = async (
     temperature: number = 0.7,
     responseFormat?: 'json_object'
 ): Promise<string> => {
-    const apiKey = getApiKey(provider);
+    const apiKey = await getApiKey(provider);
     if (!apiKey) {
         throw new Error(`请配置 ${provider} 的 API Key。`);
     }

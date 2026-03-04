@@ -1,4 +1,5 @@
 import { Character, WorldSetting, CreativeSettings, Echo } from '../types';
+import { storageService, STORAGE_KEYS } from './storageService';
 
 export enum Provider {
     GLM = 'GLM',
@@ -55,12 +56,13 @@ export const getProviderForTask = (task: LLMTaskType): Provider => {
     }
 };
 
-export const getApiKey = (provider: Provider): string => {
+export const getApiKey = async (provider: Provider): Promise<string> => {
     switch (provider) {
         case Provider.GLM:
             return process.env.GLM_API_KEY || '';
         case Provider.GEMINI:
-            return localStorage.getItem('muse_gemini_api_key') || process.env.API_KEY || process.env.GEMINI_API_KEY || '';
+            const savedKey = await storageService.getItem<string>(STORAGE_KEYS.GEMINI_API_KEY);
+            return savedKey || process.env.API_KEY || process.env.GEMINI_API_KEY || '';
     }
     return '';
 };

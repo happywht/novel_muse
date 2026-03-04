@@ -16,6 +16,7 @@ import { PromptTuner } from './components/PromptTuner';
 import { WritingStats } from './components/WritingStats';
 import { ProjectLobby } from './components/ProjectLobby';
 import { useProjectStore, INITIAL_PROJECT } from './store/useProjectStore';
+import { storageService, STORAGE_KEYS } from './services/storageService';
 
 const MUSE_FILE_VERSION = '1.0';
 
@@ -87,12 +88,12 @@ const App: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handleImportProject = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportProject = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const text = e.target?.result as string;
         const parsed = JSON.parse(text);
@@ -110,10 +111,11 @@ const App: React.FC = () => {
           lastModified: Date.now(),
         };
 
-        const { setSavedProjects, setProject, setActiveSection } = useProjectStore.getState();
+        const { setSavedProjects, setProject, setActiveSection, savedProjects } = useProjectStore.getState();
+        const newList = [...savedProjects, importedProject];
 
-        setSavedProjects([...savedProjects, importedProject]);
-        localStorage.setItem('muse_projects', JSON.stringify([...savedProjects, importedProject]));
+        await storageService.setItem(STORAGE_KEYS.PROJECTS, newList);
+        setSavedProjects(newList);
 
         setProject(importedProject);
         setActiveSection(AppSection.DASHBOARD);
@@ -184,7 +186,7 @@ const App: React.FC = () => {
             <div className="flex items-center bg-slate-950/50 rounded-2xl border border-slate-800/50 p-1 pr-3 gap-3">
               <div className={`flex items-center gap-1.5 text-[10px] uppercase font-bold px-3 py-1.5 rounded-xl border ${useBackend ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5' : 'text-amber-400 border-amber-500/20 bg-amber-500/5'}`}>
                 {useBackend ? <Database size={10} /> : <HardDrive size={10} />}
-                <span>{useBackend ? 'MySQL Sync' : 'LocalStorage'}</span>
+                <span>{useBackend ? 'MySQL Sync' : 'IndexedDB'}</span>
               </div>
 
               <div className="flex items-center gap-2">

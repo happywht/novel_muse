@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ProjectState, Character, WorldSetting, Draft, Chapter, StateChangeRecommendation, Echo } from '../types';
-import { generateSceneFromIngredients, analyzeStateChanges, PacingMode, polishDraft, PolishMode, extractEchoesFromText } from '../services/geminiService';
+import { generateSceneFromIngredients, analyzeStateChanges, PacingMode, polishDraft, PolishMode, extractEchoesFromText, summarizeChapter } from '../services/geminiService';
 import { Loader } from './Loader';
 import { PenTool, MapPin, Users, Zap, Plus, FileText, Trash2, Clipboard, Save, RefreshCw, GitCommit, ArrowRight, Check, Globe, Book, Archive, Layout, Sidebar, X, User, Wand2, Gauge, Flame, Feather, Eye, Clapperboard, Brain, ScanSearch, Sparkles, AlertTriangle, Cloud, CloudOff, Loader2 } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -50,6 +50,8 @@ import { useProjectStore } from '../store/useProjectStore';
 export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProject }) => {
     const fetchChapterContent = useProjectStore(state => state.fetchChapterContent);
     const isLoading = useProjectStore(state => state.isLoading);
+    const updateChapterSummary = useProjectStore(state => state.updateChapterSummary);
+    const setIsLoading = useProjectStore(state => state.setIsLoading);
     const activePlotNodeId = useProjectStore(state => state.activePlotNodeId);
     const setActivePlotNodeId = useProjectStore(state => state.setActivePlotNodeId);
     const activeChapterId = useProjectStore(state => state.activeChapterId);
@@ -146,6 +148,25 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
         );
     };
 
+    const getRollingSummary = () => {
+        if (!project.chapters || project.chapters.length === 0) return undefined;
+
+        const sortedChapters = [...project.chapters].sort((a, b) => a.order - b.order);
+        const currentIndex = sortedChapters.findIndex(c => c.id === activeChapterId);
+
+        // If no active chapter or it's the first one, we might still want summaries from all chapters if we're at the end
+        const precedingChapters = currentIndex >= 0
+            ? sortedChapters.slice(0, currentIndex)
+            : sortedChapters;
+
+        const summaries = precedingChapters
+            .filter(c => c.summary && c.summary.trim() !== "")
+            .map(c => `[第 ${c.order} 章: ${c.title}]\n${c.summary}`)
+            .join('\n\n');
+
+        return summaries || undefined;
+    };
+
     const getPrecedingContext = () => {
         if (!project.chapters || project.chapters.length === 0) return undefined;
 
@@ -181,6 +202,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
             const activeCharacters = (project.characters || []).filter(c => selectedChars.includes(c.id));
             const activeLocation = (project.worldSettings || []).find(w => w.id === selectedLocationId) || null;
             const previousContext = getPrecedingContext();
+            const rollingSummary = getRollingSummary();
 
             const povCharName = povCharId ? (project.characters || []).find(c => c.id === povCharId)?.name : undefined;
 
@@ -195,7 +217,8 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                 pacing,
                 project.echoes || [],
                 targetWordCount,
-                povCharName
+                povCharName,
+                rollingSummary
             );
 
             // Format raw text with line breaks into HTML paragraphs for Tiptap
@@ -343,7 +366,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     const handleCommitToManuscript = () => {
         if (!generatedContent) return;
 
-        const isUpdatingExisting = !!activeChapterId && project.chapters.some(c => c.id === activeChapterId);
+        const isUpdatingExisting = !!activeChapterId && (viewMode === 'MANUSCRIPT' || project.chapters.some(c => c.id === activeChapterId));
 
         const confirmMsg = isUpdatingExisting
             ? "确定要将此内容更新到当前章节正文中吗？"
@@ -351,20 +374,19 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
 
         if (!confirm(confirmMsg)) return;
 
-        console.log("📝 Committing to manuscript...");
+        let updatedChapters: Chapter[] = [];
+        let newChapter: Chapter | null = null;
 
         if (isUpdatingExisting) {
             // Update existing chapter
-            const updatedChapters = project.chapters.map(c =>
+            updatedChapters = project.chapters.map(c =>
                 c.id === activeChapterId
                     ? { ...c, content: generatedContent, lastModified: Date.now() }
                     : c
             );
-            updateProject({ chapters: updatedChapters });
-            alert("章节内容已更新！");
         } else {
             // Create new chapter
-            const newChapter: Chapter = {
+            newChapter = {
                 id: Date.now().toString(),
                 title: activeDraftId
                     ? project.drafts.find(d => d.id === activeDraftId)?.title || "新章节"
@@ -373,15 +395,34 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                 order: (project.chapters || []).length + 1,
                 lastModified: Date.now()
             };
-            const updatedChapters = [...(project.chapters || []), newChapter];
-            updateProject({
-                chapters: recalculateChapterOrders(updatedChapters, project.plotNodes)
-            });
-            setActiveChapterId(newChapter.id);
-            alert("已成功采纳为正文！");
+            updatedChapters = [...(project.chapters || []), newChapter];
         }
 
+        const updatedChaptersWithNewOne = updatedChapters;
+        updateProject({
+            chapters: recalculateChapterOrders(updatedChaptersWithNewOne, project.plotNodes)
+        });
+
+        if (!isUpdatingExisting) {
+            setActiveChapterId(newChapter.id);
+        }
+
+        alert(isUpdatingExisting ? "章节内容已更新！" : "已成功采纳为正文！");
         setViewMode('MANUSCRIPT');
+
+        // Trigger background summarization
+        const targetChapterId = isUpdatingExisting ? (activeChapterId as string) : newChapter.id;
+        const previousChapters = [...updatedChaptersWithNewOne].sort((a, b) => a.order - b.order);
+        const currentIndex = previousChapters.findIndex(c => c.id === targetChapterId);
+        const prevSummary = currentIndex > 0 ? previousChapters[currentIndex - 1].summary : undefined;
+
+        console.log("📝 Generating chapter summary in background...");
+        summarizeChapter(generatedContent, prevSummary).then(summary => {
+            console.log("✅ Summary generated:", summary);
+            updateChapterSummary(targetChapterId, summary);
+        }).catch(err => {
+            console.error("Failed to generate summary:", err);
+        });
     };
 
     const loadDraft = (draft: Draft) => {
