@@ -12,6 +12,8 @@ import {
 } from './schemas';
 import { buildPromptContent } from '../config/prompts';
 import { useProjectStore } from '../store/useProjectStore';
+import { fetchOpenAICompatible } from './openAiAdapter';
+import { getProviderForTask, LLMTaskType, Provider } from './llmRouter';
 
 const STORAGE_KEY_API = 'muse_gemini_api_key';
 const STORAGE_KEY_MODEL = 'muse_gemini_model';
@@ -27,7 +29,9 @@ const getAIClient = () => {
 export const getModelName = (tier: 'flash' | 'pro' = 'flash'): string => {
     const customModel = localStorage.getItem(STORAGE_KEY_MODEL);
     if (customModel) return customModel;
-    return tier === 'pro' ? 'gemini-3-pro-preview' : 'gemini-3-flash-preview';
+    return tier === 'pro'
+        ? (process.env.GEMINI_PRO_MODEL || 'gemini-3-pro-preview')
+        : (process.env.GEMINI_FLASH_MODEL || 'gemini-3-flash-preview');
 };
 
 // Helper for retry logic
@@ -169,6 +173,67 @@ const getInstructionWithSettings = (promptKey: string, settings?: CreativeSettin
     return buildPromptContent(promptKey, project.customPrompts, settings);
 };
 
+// Unified execution wrapper for Multi-Agent routing
+const executeModelTask = async (
+    task: LLMTaskType,
+    systemInstruction: string,
+    prompt: string,
+    geminiModel: string,
+    temperature: number,
+    responseSchema?: any,
+    thinkingBudget?: number
+): Promise<string> => {
+    const provider = getProviderForTask(task);
+
+    if (provider === Provider.GLM) {
+        // Map to standard models as defined in implementation plan or environment variables
+        const modelName = process.env.GLM_MODEL_NAME || 'glm-4-plus';
+        const endpoint = process.env.GLM_BASE_URL || 'https://open.bigmodel.cn/api/anthropic';
+
+        const isJson = !!responseSchema;
+        let finalPrompt = prompt;
+        // OpenAI compatibility requires explicit JSON mention in prompt
+        if (isJson && !finalPrompt.toLowerCase().includes('json')) {
+            finalPrompt += '\n\n请严格按要求输出 JSON 格式。';
+        }
+
+        const responseText = await fetchOpenAICompatible(
+            provider,
+            endpoint,
+            modelName,
+            [
+                { role: 'system', content: systemInstruction },
+                { role: 'user', content: finalPrompt }
+            ],
+            temperature,
+            isJson ? 'json_object' : undefined
+        );
+        return responseText;
+    }
+
+    // Default Gemini Execution
+    const ai = getAIClient();
+    const config: any = {
+        systemInstruction,
+        temperature,
+    };
+
+    if (responseSchema) {
+        config.responseMimeType = "application/json";
+        config.responseSchema = responseSchema;
+    }
+    if (thinkingBudget) {
+        config.thinkingConfig = { thinkingBudget };
+    }
+
+    const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+        model: geminiModel,
+        contents: prompt,
+        config
+    }));
+    return response.text || "";
+};
+
 export const generateText = async (prompt: string, promptKey: string = 'writing_base', settings?: CreativeSettings): Promise<string> => {
     const ai = getAIClient();
     const instruction = getInstructionWithSettings(promptKey, settings);
@@ -242,17 +307,15 @@ export const analyzePlot = async (premise: string, currentPlot: string, characte
     请使用 Markdown 格式输出。请确保报告包含一个明确的“可操作建议列表”，以便后续自动修复程序调用。`;
 
     try {
-        // Enable Thinking for deep analysis
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
-            contents: prompt,
-            config: {
-                systemInstruction: instruction,
-                thinkingConfig: { thinkingBudget: 2048 },
-                temperature: 0.1, // Near-zero temperature for logical stability
-            }
-        }));
-        return response.text || "无法分析剧情。";
+        return await executeModelTask(
+            'analyzePlot',
+            instruction,
+            prompt,
+            'gemini-3-pro-preview',
+            0.1,
+            undefined,
+            2048
+        ) || "无法分析剧情。";
     } catch (error) {
         console.error("Gemini Plot Analysis Error:", error);
         throw error;
@@ -279,15 +342,13 @@ export const expandScene = async (premise: string, genre: string, plotOutline: s
   请直接开始撰写正文内容，无需过多的开场白。`;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-            config: {
-                systemInstruction: instruction,
-                temperature: settings?.creativity || 0.9,
-            }
-        }));
-        return response.text || "生成失败。";
+        return await executeModelTask(
+            'expandScene',
+            instruction,
+            prompt,
+            'gemini-3-flash-preview',
+            settings?.creativity || 0.9
+        ) || "生成失败。";
     } catch (error) {
         console.error("Gemini Scene Expansion Error:", error);
         throw error;
@@ -313,15 +374,13 @@ export const expandWorldLore = async (title: string, currentContent: string, gen
    请以 Markdown 格式输出补充内容。`;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-            config: {
-                systemInstruction: instruction,
-                temperature: 0.85,
-            }
-        }));
-        return response.text || "生成失败。";
+        return await executeModelTask(
+            'expandLore',
+            instruction,
+            prompt,
+            'gemini-3-flash-preview',
+            0.85
+        ) || "生成失败。";
     } catch (error) {
         console.error("Gemini Lore Expansion Error:", error);
         throw error;
@@ -410,19 +469,17 @@ export const generatePlotFromContext = async (
   `;
 
     try {
-        // Enable Thinking for complex plotting
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-pro-preview', // Stronger model for structural logic
-            contents: prompt,
-            config: {
-                systemInstruction: instruction,
-                thinkingConfig: { thinkingBudget: 4096 }, // Plot generation needs deep thought
-                temperature: 0.6, // Balanced creativity for initial generation
-                responseMimeType: "application/json",
-            }
-        }));
+        const responseText = await executeModelTask(
+            'generatePlot',
+            instruction,
+            prompt,
+            'gemini-3-pro-preview',
+            0.6,
+            AiPlotNodeArraySchema,
+            4096
+        );
 
-        const result = safeParseAiJson(response.text, AiPlotNodeArraySchema, "Plot Generation");
+        const result = safeParseAiJson(responseText, AiPlotNodeArraySchema, "Plot Generation");
         return result || [];
     } catch (error) {
         console.error("Gemini Plot Generation Error:", error);
@@ -475,18 +532,17 @@ export const rewritePlot = async (
     `;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
-            contents: prompt,
-            config: {
-                systemInstruction: instruction,
-                thinkingConfig: { thinkingBudget: 4096 }, // Increased thinking for better logic retention
-                temperature: 0.3, // Low temperature for high compliance
-                responseMimeType: "application/json",
-            }
-        }));
+        const responseText = await executeModelTask(
+            'rewritePlot',
+            instruction,
+            prompt,
+            'gemini-3-pro-preview',
+            0.3,
+            AiPlotNodeArraySchema,
+            4096
+        );
 
-        const result = safeParseAiJson(response.text, AiPlotNodeArraySchema, "Plot Rewrite");
+        const result = safeParseAiJson(responseText, AiPlotNodeArraySchema, "Plot Rewrite");
         return result || [];
     } catch (e) {
         console.error("Gemini Plot Rewrite Error:", e);
@@ -529,16 +585,16 @@ export const batchGenerateCharacters = async (premise: string, genre: string, se
     - 请使用中文输出。`;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: characterSchema
-            }
-        }));
+        const responseText = await executeModelTask(
+            'batchGenerateCharacters',
+            '',
+            prompt,
+            'gemini-3-flash-preview',
+            0.7,
+            characterSchema
+        );
 
-        const parsed = safeParseAiJson(response.text, AiCharacterArraySchema, 'batchGenerateCharacters');
+        const parsed = safeParseAiJson(responseText, AiCharacterArraySchema, 'batchGenerateCharacters');
         return parsed ?? [];
     } catch (e) {
         console.error("Batch Character Generation Error", e);
@@ -573,16 +629,16 @@ export const batchGenerateWorldSettingsByCategory = async (premise: string, genr
     - 请使用中文输出。`;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: worldSchema
-            }
-        }));
+        const responseText = await executeModelTask(
+            'batchGenerateSettings',
+            '',
+            prompt,
+            'gemini-3-flash-preview',
+            0.7,
+            worldSchema
+        );
 
-        const parsed = safeParseAiJson(response.text, AiWorldSettingArraySchema, 'batchGenerateWorldSettings');
+        const parsed = safeParseAiJson(responseText, AiWorldSettingArraySchema, 'batchGenerateWorldSettings');
         if (parsed) {
             return parsed.map(item => ({
                 title: item.title,
@@ -725,17 +781,15 @@ export const generateSceneFromIngredients = async (
     `;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-pro-preview', // High quality for prose
-            contents: prompt,
-            config: {
-                systemInstruction: instruction,
-                temperature: settings?.creativity || 0.9,
-                // Thinking config to allow model to plan how to integrate world settings and character arcs before writing
-                thinkingConfig: { thinkingBudget: 2048 },
-            }
-        }));
-        return response.text || "生成失败";
+        return await executeModelTask(
+            'generateText',
+            instruction,
+            prompt,
+            'gemini-3-flash-preview', // Downgrade to flash for cost savings
+            settings?.creativity || 0.9,
+            undefined,
+            2048 // Optional thinking budget if supported by the provider
+        ) || "生成失败";
     } catch (e) {
         console.error("Scene Generation Error", e);
         throw e;
@@ -778,15 +832,13 @@ export const polishDraft = async (
     `;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-pro-preview', // Use Pro for stylistic nuances
-            contents: prompt,
-            config: {
-                systemInstruction: instruction,
-                temperature: 0.8,
-            }
-        }));
-        return response.text || content;
+        return await executeModelTask(
+            'polishDraft',
+            instruction,
+            prompt,
+            'gemini-3-flash-preview',
+            0.8
+        ) || content;
     } catch (e) {
         console.error("Polish Error", e);
         throw e;
@@ -835,19 +887,17 @@ export const analyzeStateChanges = async (
     `;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: responseSchema,
-                systemInstruction: instruction,
-                temperature: 0.1 // Low temp for factual extraction
-            }
-        }));
+        const responseText = await executeModelTask(
+            'analyzeStateChanges',
+            instruction,
+            prompt,
+            'gemini-3-flash-preview',
+            0.1,
+            responseSchema
+        );
 
         {
-            const raw = safeParseAiJson(response.text, AiStateChangeArraySchema, 'analyzeStateChanges');
+            const raw = safeParseAiJson(responseText, AiStateChangeArraySchema, 'analyzeStateChanges');
             if (!raw) return [];
             // Post-process to link back to IDs
             const result: StateChangeRecommendation[] = [];
@@ -994,17 +1044,17 @@ export const extractEchoesFromText = async (
     `;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-flash-preview', // Flash is fast and good at extraction
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: responseSchema
-            }
-        }));
+        const responseText = await executeModelTask(
+            'extractEchoes',
+            '',
+            prompt,
+            'gemini-3-flash-preview',
+            0.1,
+            responseSchema
+        );
 
         {
-            const raw = safeParseAiJson(response.text, AiEchoArraySchema, 'extractEchoesFromText');
+            const raw = safeParseAiJson(responseText, AiEchoArraySchema, 'extractEchoesFromText');
             if (!raw) return [];
             const result: Echo[] = [];
 
@@ -1075,12 +1125,15 @@ export const consolidateMemory = async (
     `;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-flash-preview', // Flash is sufficient for summarization
-            contents: prompt
-        }));
+        const responseText = await executeModelTask(
+            'generateText',
+            '',
+            prompt,
+            'gemini-3-flash-preview',
+            0.3
+        );
 
-        return response.text?.trim() || currentDescription;
+        return responseText.trim() || currentDescription;
     } catch (e) {
         console.error("Memory Consolidation Error", e);
         return currentDescription;
@@ -1143,18 +1196,17 @@ export const deduceWorldConsequences = async (
     `;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-pro-preview', // Use Pro for complex reasoning
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: responseSchema,
-                temperature: 0.4 // Balanced creativity and logic
-            }
-        }));
+        const responseText = await executeModelTask(
+            'deduceWorldConsequences',
+            '',
+            prompt,
+            'gemini-3-pro-preview',
+            0.4,
+            responseSchema
+        );
 
         {
-            const raw = safeParseAiJson(response.text, AiStateChangeArraySchema, 'deduceWorldConsequences');
+            const raw = safeParseAiJson(responseText, AiStateChangeArraySchema, 'deduceWorldConsequences');
             if (!raw) return [];
             const result: StateChangeRecommendation[] = [];
 
@@ -1231,17 +1283,16 @@ export const analyzePlotRhythm = async (plotOutline: string): Promise<PlotRhythm
     `;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: responseSchema,
-                temperature: 0.2
-            }
-        }));
+        const responseText = await executeModelTask(
+            'analyzePlotRhythm',
+            '',
+            prompt,
+            'gemini-3-flash-preview',
+            0.2,
+            responseSchema
+        );
 
-        const parsed = safeParseAiJson(response.text, AiPlotRhythmArraySchema, 'analyzePlotRhythm');
+        const parsed = safeParseAiJson(responseText, AiPlotRhythmArraySchema, 'analyzePlotRhythm');
         return parsed ?? [];
     } catch (e) {
         console.error("Rhythm Analysis Error", e);
@@ -1345,17 +1396,16 @@ export const splitPlotNodeIntoChapters = async (
     `;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: getModelName('pro'),
-            contents: prompt,
-            config: {
-                systemInstruction: instruction,
-                temperature: settings?.creativity || 0.85,
-                responseMimeType: "application/json",
-            }
-        }));
+        const responseText = await executeModelTask(
+            'splitPlotNodeIntoChapters',
+            instruction,
+            prompt,
+            getModelName('pro'),
+            settings?.creativity || 0.85,
+            AiChapterOutlineArraySchema
+        );
 
-        const result = safeParseAiJson(response.text, AiChapterOutlineArraySchema, "Chapter Fission");
+        const result = safeParseAiJson(responseText, AiChapterOutlineArraySchema, "Chapter Fission");
         return result || [];
     } catch (e) {
         console.error("Gemini Chapter Fission Error:", e);
@@ -1412,17 +1462,17 @@ export const auditChapterPlan = async (
     `;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: getModelName('pro'),
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                temperature: 0.1, // High logic, low drift
-                thinkingConfig: { thinkingBudget: 2048 }
-            }
-        }));
+        const responseText = await executeModelTask(
+            'auditChapterPlan',
+            '',
+            prompt,
+            getModelName('pro'),
+            0.1,
+            true, // Enable JSON mode
+            2048
+        );
 
-        const parsed = JSON.parse(response.text || '{}');
+        const parsed = JSON.parse(responseText || '{}');
         return {
             isAligned: parsed.isAligned ?? true,
             issues: parsed.issues ?? []
@@ -1491,17 +1541,16 @@ export const regenerateChapterOutline = async (
     `;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: getModelName('pro'),
-            contents: prompt,
-            config: {
-                systemInstruction: instruction,
-                temperature: settings?.creativity || 0.85,
-                responseMimeType: "application/json",
-            }
-        }));
+        const responseText = await executeModelTask(
+            'regenerateChapterOutline',
+            instruction,
+            prompt,
+            getModelName('pro'),
+            settings?.creativity || 0.85,
+            AiChapterOutlineArraySchema
+        );
 
-        const result = safeParseAiJson(response.text, AiChapterOutlineArraySchema, "Chapter Regeneration");
+        const result = safeParseAiJson(responseText, AiChapterOutlineArraySchema, "Chapter Regeneration");
         return result && result.length > 0 ? result[0] : null;
     } catch (e) {
         console.error("Gemini Chapter Regeneration Error:", e);
