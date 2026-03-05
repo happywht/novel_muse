@@ -14,11 +14,15 @@ import neo4j, { Driver, Session } from 'neo4j-driver';
 let driver: Driver | null = null;
 
 export const initNeo4j = (): Driver => {
-    const uri = process.env.NEO4J_URI || 'neo4j://127.0.0.1:7687';
-    const user = process.env.NEO4J_USER || 'neo4j';
-    const password = process.env.NEO4J_PASSWORD || '';
+    const uri = process.env.NEO4J_URI;
+    const user = process.env.NEO4J_USER;
+    const password = process.env.NEO4J_PASSWORD;
 
-    driver = neo4j.driver(uri, neo4j.auth.basic(user, password));
+    if (!uri || !user) {
+        throw new Error('Missing Neo4j connection configuration (NEO4J_URI, NEO4J_USER)');
+    }
+
+    driver = neo4j.driver(uri, neo4j.auth.basic(user, password || ''));
     console.log(`🔗 Neo4j connected to ${uri}`);
     return driver;
 };
