@@ -674,25 +674,33 @@ export const generateSceneFromIngredients = async (
 ): Promise<string> => {
     const ai = await getAIClient();
 
+    const profile = settings?.promptProfile || 'LITERARY';
     let pacingInstruction = "";
-    switch (pacing) {
-        case 'SLOW_BURN':
-            pacingInstruction = `【节奏控制: 铺垫/慢热 (Slow Burn)】
-            - 请放慢叙事节奏，大量使用环境描写、心理活动和细节刻画。
-            - 句子结构可以复杂、修辞丰富。
-            - 重点渲染氛围，为后续剧情蓄力。`;
-            break;
-        case 'CLIMAX':
-            pacingInstruction = `【节奏控制: 高潮/爆发 (Climax)】
-            - 请加快叙事节奏，使用短促有力的句子。
-            - 减少心理活动和环境描写，专注于动作、冲突和直接反应。
-            - 营造紧迫感和危机感。`;
-            break;
-        default:
-            pacingInstruction = `【节奏控制: 平衡推进 (Balanced)】
-            - 保持叙事流畅，平衡对话、动作和描写。
-            - 稳步推进情节发展。`;
-            break;
+
+    if (profile === 'WEB_NOVEL') {
+        switch (pacing) {
+            case 'SLOW_BURN':
+                pacingInstruction = "【节奏控制: 心理拉扯/慢热】重点在于角色博弈、对峙和期待感经营。不要写景物！";
+                break;
+            case 'CLIMAX':
+                pacingInstruction = "【节奏控制: 热血爆发/高潮】进入高强度反转或冲突爆发，全对话驱动，营造极致爽感。";
+                break;
+            default:
+                pacingInstruction = "【节奏控制: 稳定爽快】稳步推进主线冲突。";
+                break;
+        }
+    } else {
+        switch (pacing) {
+            case 'SLOW_BURN':
+                pacingInstruction = "【节奏控制: 铺垫/慢热】大量环境描写、心理活动和细节刻画。";
+                break;
+            case 'CLIMAX':
+                pacingInstruction = "【节奏控制: 高潮/爆发】短促有力的句子，专注动作、冲突和直接反应。";
+                break;
+            default:
+                pacingInstruction = "【节奏控制: 平衡推进】保持叙事流畅，平衡对话、动作和描写。";
+                break;
+        }
     }
 
     const instruction = getInstructionWithSettings('scene_generation', settings);
@@ -806,7 +814,7 @@ export const generateSceneFromIngredients = async (
 };
 
 // NEW: Literary Polish Engine
-export type PolishMode = 'SENSORY' | 'CINEMATIC' | 'PSYCHOLOGICAL' | 'MINIMALIST';
+export type PolishMode = 'SENSORY' | 'CINEMATIC' | 'PSYCHOLOGICAL' | 'MINIMALIST' | 'WEB_MEME';
 
 export const polishDraft = async (
     content: string,
@@ -828,6 +836,9 @@ export const polishDraft = async (
             break;
         case 'MINIMALIST':
             modeInstruction = "任务：【极简主义/海明威风格】。删除所有不必要的形容词和副词。使用短句。通过对话和动作来展示情感，而不是直接描述情感。";
+            break;
+        case 'WEB_MEME':
+            modeInstruction = "任务：【网文网感增强/吐槽化】。将平淡的文字重写为带梗、诙谐、具有现代网文生命力的风格。删除冗长景物，强化角色个性和吐槽感，增加潜台词。";
             break;
     }
 

@@ -28,6 +28,7 @@ export const INITIAL_PROJECT: ProjectState = {
         style: '通俗易懂 (Standard)',
         creativity: 0.8,
         targetAudience: '成人 (Adult)',
+        promptProfile: 'WEB_NOVEL',
     },
     worldGenConfig: {
         detailLevel: 'Standard',

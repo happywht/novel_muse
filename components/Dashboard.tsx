@@ -326,6 +326,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject }) 
                             <h3 className="font-semibold text-white text-sm">创作罗盘</h3>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="md:col-span-2">
+                                <label className="block text-[10px] font-medium text-slate-500 mb-3 uppercase tracking-wider">AI 创作模型 (Prompt Pack)</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button
+                                        onClick={() => handleUpdateSettings('promptProfile', 'WEB_NOVEL')}
+                                        className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all ${project.creativeSettings.promptProfile === 'WEB_NOVEL' ? 'bg-amber-500/20 border-amber-500/50 text-amber-200' : 'bg-slate-900/60 border-slate-700/50 text-slate-500 hover:border-slate-600'}`}
+                                    >
+                                        <Zap size={18} className={project.creativeSettings.promptProfile === 'WEB_NOVEL' ? 'text-amber-400 mb-1' : 'text-slate-600 mb-1'} />
+                                        <span className="text-sm font-bold">精品网文模式</span>
+                                        <span className="text-[10px] opacity-60">爽感爆发 / 对话驱动 / 节奏极快</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleUpdateSettings('promptProfile', 'LITERARY')}
+                                        className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all ${project.creativeSettings.promptProfile === 'LITERARY' ? 'bg-sky-500/20 border-sky-500/50 text-sky-200' : 'bg-slate-900/60 border-slate-700/50 text-slate-500 hover:border-slate-600'}`}
+                                    >
+                                        <BookOpen size={18} className={project.creativeSettings.promptProfile === 'LITERARY' ? 'text-sky-400 mb-1' : 'text-slate-600 mb-1'} />
+                                        <span className="text-sm font-bold">传统文学模式</span>
+                                        <span className="text-[10px] opacity-60">文笔细腻 / 环境描写 / 情感共鸣</span>
+                                    </button>
+                                </div>
+                            </div>
                             <div>
                                 <label className="block text-[10px] font-medium text-slate-500 mb-2 uppercase tracking-wider">叙事基调</label>
                                 <div className="grid grid-cols-3 gap-1.5">

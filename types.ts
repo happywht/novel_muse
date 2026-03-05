@@ -71,11 +71,14 @@ export interface Chapter {
   beats?: ChapterBeat[]; // NEW: For granular scene planning
 }
 
+export type PromptProfile = 'LITERARY' | 'WEB_NOVEL';
+
 export interface CreativeSettings {
   tone: string;      // e.g., "Dark", "Humorous", "Epic"
   style: string;     // e.g., "Descriptive", "Concise", "Poetic"
   creativity: number; // 0.0 to 1.0 (Temperature)
   targetAudience: string;
+  promptProfile?: PromptProfile; // NEW: Choice of prompt pack
 }
 
 export interface WorldGenConfig {

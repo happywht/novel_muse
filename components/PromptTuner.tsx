@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Wand2, Save, RotateCcw, ChevronDown, ChevronRight, Sparkles, AlertTriangle } from 'lucide-react';
 
-import { PROMPT_REGISTRY } from '../config/prompts';
+import { PROMPT_REGISTRY_LITERARY, PROMPT_REGISTRY_WEB_NOVEL } from '../config/prompts';
 import { useProjectStore } from '../store/useProjectStore';
 
 export const getCustomPrompt = (key: string): string | null => {
@@ -43,7 +43,10 @@ export const PromptTuner: React.FC<PromptTunerProps> = ({ onClose }) => {
         }
     };
 
-    const categories = Object.values(PROMPT_REGISTRY);
+    const activeRegistry = project.creativeSettings?.promptProfile === 'WEB_NOVEL'
+        ? PROMPT_REGISTRY_WEB_NOVEL
+        : PROMPT_REGISTRY_LITERARY;
+    const categories = Object.values(activeRegistry);
 
     return (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">

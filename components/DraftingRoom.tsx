@@ -142,6 +142,15 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
         }
     }, [activeChapterId, project.chapters, project.characters, project.plotNodes]);
 
+    // NEW: Sync target word count with profile
+    React.useEffect(() => {
+        if (project.creativeSettings.promptProfile === 'WEB_NOVEL' && targetWordCount === 3000) {
+            setTargetWordCount(5000);
+        } else if (project.creativeSettings.promptProfile === 'LITERARY' && targetWordCount === 5000) {
+            setTargetWordCount(3000);
+        }
+    }, [project.creativeSettings.promptProfile]);
+
     const toggleCharSelection = (id: string) => {
         setSelectedChars(prev =>
             prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
@@ -741,6 +750,9 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                                                 </button>
                                                 <button onClick={() => handlePolish('MINIMALIST')} className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-2">
                                                     <Feather size={14} className="text-slate-400" /> 极简张力
+                                                </button>
+                                                <button onClick={() => handlePolish('WEB_MEME')} className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white flex items-center gap-2">
+                                                    <Zap size={14} className="text-amber-400" /> 网文网感
                                                 </button>
                                             </div>
                                         )}
