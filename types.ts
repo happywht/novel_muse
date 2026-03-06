@@ -10,6 +10,7 @@ export interface PlotNode {
   beatTag?: BeatTag; // NEW: Narrative milestone tag
   relatedCharacters?: string[]; // IDs
   relatedLocations?: string[]; // IDs
+  volumeId?: string; // NEW: Parent volume ID
 }
 
 export interface Message {
@@ -66,6 +67,8 @@ export interface Chapter {
   summary?: string;     // NEW: For chapter-level outlining
   expectedPOV?: string; // NEW: Track perspective
   plotNodeId?: string;  // NEW: Link back to a PlotNode
+  volumeId?: string;   // NEW: Link back to a Volume
+  volumeOrder?: number; // Order within the volume
   order: number;
   lastModified: number;
   beats?: ChapterBeat[]; // NEW: For granular scene planning
@@ -78,7 +81,18 @@ export interface CreativeSettings {
   style: string;     // e.g., "Descriptive", "Concise", "Poetic"
   creativity: number; // 0.0 to 1.0 (Temperature)
   targetAudience: string;
-  promptProfile?: PromptProfile; // NEW: Choice of prompt pack
+  promptProfile?: PromptProfile; // Choice of prompt pack
+}
+
+export type VolumeStatus = 'PLANNED' | 'WRITING' | 'COMPLETED';
+
+export interface Volume {
+  id: string;
+  title: string;
+  order: number;
+  description?: string;
+  targetWordCount: number;
+  status: VolumeStatus;
 }
 
 export interface WorldGenConfig {
@@ -147,4 +161,5 @@ export interface ProjectState {
   customPrompts: Record<string, string>;
   timeline: TimelineEvent[]; // NEW: Chronological history of the world
   currentWorldDate: string; // NEW: Current in-world date
+  volumes: Volume[]; // NEW: Collection of narrative volumes
 }

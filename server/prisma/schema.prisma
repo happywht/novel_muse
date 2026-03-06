@@ -29,6 +29,7 @@ model Project {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  volumes          Volume[]
   characters       Character[]
   worldSettings    WorldSetting[]
   plotVersions     PlotVersion[]
@@ -37,6 +38,20 @@ model Project {
   plotNodes        PlotNode[]
   echoes           Echo[]
   timeline         TimelineEvent[]
+}
+
+model Volume {
+  id              String   @id @default(cuid())
+  title           String   @default("新分卷")
+  order           Int      @default(0)
+  description     String?  @db.Text
+  targetWordCount Int      @default(50000)
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  plotNodes       PlotNode[]
+  chapters        Chapter[]
+
+  @@index([projectId])
 }
 
 model Character {
@@ -94,13 +109,17 @@ model Chapter {
   summary      String?  @db.LongText
   expectedPOV  String?  @db.Text
   beats        String?  @db.LongText // JSON blob for scene beats
-  plotNodeId   String?  
   order        Int
+  volumeId     String?
+  volumeOrder  Int?
+  plotNodeId   String?  
   lastModified BigInt
   projectId    String
   project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  volume       Volume?  @relation(fields: [volumeId], references: [id], onDelete: SetNull)
 
   @@index([projectId])
+  @@index([volumeId])
 }
 
 model Echo {
@@ -140,8 +159,12 @@ model PlotNode {
   beatTag          String?
   relatedCharacters String? @db.Text // JSON string of IDs
   relatedLocations  String? @db.Text // JSON string of IDs
+  volumeId         String?
   projectId        String
   project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  volume           Volume?  @relation(fields: [volumeId], references: [id], onDelete: SetNull)
 
   @@index([projectId])
+  @@index([volumeId])
 }
+
