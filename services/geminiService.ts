@@ -1,5 +1,19 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
 import { Character, WorldSetting, CreativeSettings, StateChangeRecommendation, Echo, PlotNode, Chapter } from "../types";
+
+export interface KnowledgeTriple {
+    subject: string;
+    relation: string;
+    object: string;
+}
+
+export interface LogicConflict {
+    type: 'LOCATION_MISMATCH' | 'RELATIONSHIP_CONFLICT' | 'FACTUAL_INCONSISTENCY';
+    description: string;
+    truthInGraph: string;
+    extractedFact: string;
+}
+
 import {
     safeParseAiJson,
     AiCharacterArraySchema,
@@ -110,6 +124,72 @@ const formatContext = (characters: Character[], worldSettings: WorldSetting[], e
 
     return context;
 };
+
+/**
+ * NEW: Tiered Memory System (L1/L2/L3)
+ * L1: Recent full text (Last 1-2 chapters)
+ * L2: Medium-term summaries (Last 10 chapters)
+ * L3: Long-term anchors (Plot Outline, World Bible, Character Archetypes)
+ */
+export const buildTieredMemory = (
+    allChapters: Chapter[],
+    currentChapterOrder: number,
+    plotOutline?: string,
+    characters: Character[] = [],
+    worldSettings: WorldSetting[] = [],
+    echoes: Echo[] = []
+): string => {
+    let context = "";
+
+    // Sort chapters by order to be safe
+    const sortedChapters = [...allChapters].sort((a, b) => a.order - b.order);
+    const previousChapters = sortedChapters.filter(c => c.order < currentChapterOrder);
+
+    // --- L3: Long-term anchors ---
+    context += "【📌 L3: 长期战略锚点 (Long-term Anchors)】\n";
+    if (plotOutline) {
+        context += `1. [核心剧情大纲]: ${plotOutline}\n`;
+    }
+
+    // Character archetypes
+    if (characters.length > 0) {
+        context += `2. [核心角色人设]: ${characters.map(c => `${c.name}(${c.role}/${c.archetype})`).join(', ')}\n`;
+    }
+
+    // Relevant world settings (lite filter)
+    const topSettings = filterRelevantSettings(worldSettings, plotOutline || "", 5);
+    if (topSettings.length > 0) {
+        context += `3. [关键世界观设定]: ${topSettings.map(s => `[${s.title}]`).join(', ')}\n`;
+    }
+    context += "\n";
+
+    // --- L2: Medium-term summaries (Last 10 chapters) ---
+    const l2Chapters = previousChapters.slice(-10);
+    if (l2Chapters.length > 0) {
+        context += "【📜 L2: 中期故事脉络 (Medium-term Arc - Last 10 Chapters)】\n";
+        l2Chapters.forEach(c => {
+            const summary = c.summary || "(尚未生成摘要，请根据剧情自行衔接)";
+            context += `第${c.order}章《${c.title}》摘要: ${summary}\n`;
+        });
+        context += "\n";
+    }
+
+    // --- L1: Recent full text (Last 1 chapter) ---
+    const lastChapter = previousChapters[previousChapters.length - 1];
+    if (lastChapter && lastChapter.content) {
+        context += "【📖 L1: 近期即时细节 (Recent Details - Last Chapter Text)】\n";
+        // Take the last 2000 characters to prevent token overflow while keeping enough context
+        const recentText = lastChapter.content.slice(-2000);
+        context += `(接续第${lastChapter.order}章末尾): ...${recentText}\n\n`;
+    }
+
+    return context;
+};
+
+/**
+ * NEW: Automatic Chapter Summarization
+ * Generates a concise summary (L2 memory) for a given piece of text.
+ */
 
 // NEW: Client-side RAG-lite Relevance Filter
 // Filters a large list of settings down to the most relevant ones based on current context
@@ -670,7 +750,9 @@ export const generateSceneFromIngredients = async (
     echoes: Echo[] = [], // NEW: Dynamic Echoes
     targetWordCount: number = 3000, // NEW: Target Word Count
     povName?: string, // NEW: Explicit POV lock
-    rollingSummary?: string // NEW: Global Story Arc
+    rollingSummary?: string, // NEW: Global Story Arc
+    activeChapterId?: string, // NEW: Optional active chapter ID
+    twistHook?: string // NEW: Optional Twist Hook (Direction Three)
 ): Promise<string> => {
     const ai = await getAIClient();
 
@@ -716,27 +798,23 @@ export const generateSceneFromIngredients = async (
     // Filter only accepted echoes
     const activeEchoes = echoes.filter(e => e.status === 'ACCEPTED');
 
-    // 0. Episodic Memory (Manuscript Context)
-    if (previousStoryContext) {
-        context += `【📖 前情提要 (Context)】\n(以下是故事上文的最后片段，请确保剧情连贯，接续人物状态和语气)\n"${previousStoryContext}"\n\n`;
-    } else {
-        context += `【📖 前情提要 (Context)】\n(注意：此章节之前尚无正式正文内容。如果是故事开篇，请直接开始；如果是非开篇的断层写作，请严格基于【本场情节目标】独立构思切入点。)\n\n`;
-    }
+    // --- NEW: Tiered Memory Context Injection (L1/L2/L3) ---
+    // Instead of simple episodic memory, we use the structured tiered system
+    const { project } = useProjectStore.getState();
+    const currentChapter = activeChapterId ? project.chapters.find(c => c.id === activeChapterId) : null;
+    const currentOrder = currentChapter ? currentChapter.order : (project.chapters.length > 0 ? Math.max(...project.chapters.map(c => c.order)) + 1 : 1);
 
-    // 1. Actors
-    if (activeCharacters.length > 0) {
-        context += "【登场角色 (Cast)】\n";
-        activeCharacters.forEach(c => {
-            const charEchoes = activeEchoes.filter(e => e.targetId === c.id).sort((a, b) => a.timestamp - b.timestamp);
-            context += `- ${c.name} (${c.role}): ${c.description} (关系: ${c.relationships})\n`;
-            if (charEchoes.length > 0) {
-                context += `  ⚡ [当前状态变更]: ${charEchoes.map(e => e.description).join('; ')}\n`;
-            }
-        });
-        context += "\n";
-    }
+    const tieredContext = buildTieredMemory(
+        project.chapters,
+        currentOrder,
+        project.plotOutline || "",
+        activeCharacters,
+        allWorldSettings,
+        activeEchoes
+    );
+    context += tieredContext;
 
-    // 2. Stage (Specific Location)
+    // 3. Stage (Specific Location)
     if (activeLocation) {
         const locEchoes = activeEchoes.filter(e => e.targetId === activeLocation.id).sort((a, b) => a.timestamp - b.timestamp);
         context += `【当前场景地点 (Stage)】\n[${activeLocation.category}] ${activeLocation.title}: ${activeLocation.content}\n`;
@@ -788,6 +866,8 @@ export const generateSceneFromIngredients = async (
     小说类型: ${genre}
     
     ${context}
+
+    ${twistHook ? `【⚠️ 剧情反转指令 (Twist Hook)】: \n${twistHook}\n` : ''}
     
     【本场戏的情节目标 (Plot Beat)】:
     ${plotBeat}
@@ -1579,37 +1659,149 @@ export const regenerateChapterOutline = async (
 };
 
 /**
- * Summarize a chapter into a concise plot summary.
+ * NEW: Automatic Chapter Summarization (L2 Memory Builder)
  */
-export const summarizeChapter = async (content: string, previousSummary?: string): Promise<string> => {
-    const model = await getModelName('flash');
-    const ai = await getAIClient();
-
+export const summarizeChapter = async (
+    title: string,
+    content: string,
+    settings?: CreativeSettings
+): Promise<string> => {
     const prompt = `
-        你是一位资深小说编辑。请阅读以下小说正文内容，并将其总结为一段精炼的情节摘要（约150字以内）。
-        
-        【要求】：
-        1. 重点突出关键情节转折、核心冲突结果、人物的重要状态变更。
-        2. 语言干练，适合作为长篇小说的“记忆碎片”提供给后续创作 AI 参考。
-        3. 如果提供了【前情摘要】，请确保本段摘要能够逻辑连贯地接续。
+你是一位专业的文学编辑。请对以下小说章节进行【极度精简】的摘要（100-200字）。
+要求：
+1. 提取所有关键的剧情转折点（Plot Points）。
+2. 记录角色之间的重要情感/关系状态变化。
+3. 标注任何新出现的伏笔或核心道具。
+4. 语言要客观、利索，作为后续写作的“中期记忆”参考。
 
-        ${previousSummary ? `【前情摘要】：\n${previousSummary}\n` : ''}
-        
-        【正文内容】：
-        ${content}
-
-        【情节摘要】：
+章节标题: ${title}
+正文内容:
+${content.slice(0, 10000)}
     `;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model,
-            contents: prompt,
-            config: { temperature: 0.3 }
-        }));
-        return response.text || "";
-    } catch (e) {
-        console.error("Summarization failed:", e);
-        throw e;
+        const responseText = await executeModelTask(
+            'summarizeChapter',
+            '',
+            prompt,
+            await getModelName('flash'),
+            0.3
+        );
+        return responseText.trim();
+    } catch (error) {
+        console.error("Failed to summarize chapter:", error);
+        return "摘要生成失败。";
+    }
+};
+
+/**
+ * NEW: Twist Agent - Inspiration Jumps
+ */
+export const generateTwistHooks = async (
+    context: string,
+    plotBeat: string
+): Promise<string[]> => {
+    const prompt = `
+你是一位顶级的小说策划大师。基于当前的【故事背景/记忆】和即将发生的【情节目标】，请提供 3 个极具张力的“情节勾子”或“反转灵感”。
+
+【灵感要求】：
+1. 逻辑自洽：反转要出人意料，但情理之中。
+2. 戏剧性：能够瞬间拉升剧情张力或改变角色关系。
+3. 风格匹配：根据故事背景（玄幻、都市、悬疑等）调整反转风格。
+
+【故事背景/记忆】：
+${context.slice(-3000)}
+
+【情节目标】：
+${plotBeat}
+
+请直接返回 3 条灵感，每条占一行，以数字开头（如 1. ...）。不要包含多余的废话。
+    `;
+
+    try {
+        const responseText = await executeModelTask(
+            'generateTwistHooks',
+            '',
+            prompt,
+            await getModelName('pro'), // Use Pro for better creativity
+            0.9
+        );
+
+        return responseText.split('\n').filter(line => /^\d\./.test(line.trim())).map(line => line.replace(/^\d\.\s*/, '').trim());
+    } catch (error) {
+        console.error("Failed to generate twist hooks:", error);
+        return [];
+    }
+};
+
+
+/**
+ * NEW: Knowledge Graph Logic Audit - Triple Extraction
+ */
+export const extractKnowledgeTriples = async (
+    content: string
+): Promise<KnowledgeTriple[]> => {
+    const prompt = `
+你是一位精通逻辑分析的小说编辑。你的任务是从给定的【正文内容】中提取核心的人物位置、人物关系和重大事实三元组。
+
+【提取要求】：
+1. 重点提取“A 在 B 地”、“A 与 B 是 C 关系”、“A 拥有 B 物品”等事实。
+2. 保持 Subject 和 Object 为简短的名称（如角色名、地点名）。
+3. Relation 尽量使用简练的词汇（如：“位于”、“在”、“仇恨”、“爱”、“拥有”）。
+
+【格式要求】：
+必须返回一个纯 JSON 数组，格式如下：
+[
+  {"subject": "角色A", "relation": "位于", "object": "地点B"},
+  {"subject": "角色A", "relation": "爱", "object": "角色B"}
+]
+
+正文内容：
+${content.slice(0, 5000)}
+    `;
+
+    try {
+        const responseText = await executeModelTask(
+            'extractKnowledgeTriples',
+            '',
+            prompt,
+            await getModelName('flash'),
+            0.1
+        );
+
+        // Simple regex-based JSON extraction
+        const match = responseText.match(/\[[\s\S]*\]/);
+        if (match) {
+            return JSON.parse(match[0]);
+        }
+        return [];
+    } catch (error) {
+        console.error("Failed to extract triples:", error);
+        return [];
+    }
+};
+
+/**
+ * NEW: Knowledge Graph Logic Audit - Backend Verification Wrapper
+ */
+export const verifyLogicConflicts = async (
+    projectId: string,
+    triples: KnowledgeTriple[]
+): Promise<LogicConflict[]> => {
+    if (triples.length === 0) return [];
+
+    try {
+        // Note: Make sure the backend endpoint /api/graph/verify-logic exists
+        const response = await fetch('/api/graph/verify-logic', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectId, triples })
+        });
+
+        if (!response.ok) return [];
+        return await response.json();
+    } catch (error) {
+        console.error("Failed to verify logic conflicts:", error);
+        return [];
     }
 };

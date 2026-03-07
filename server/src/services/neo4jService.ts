@@ -379,3 +379,85 @@ export const createEdge = async (
         await session.close();
     }
 };
+// ============================================
+// Logic Verification: Audit triples against ground truth
+// ============================================
+
+export interface KnowledgeTriple {
+    subject: string;
+    relation: string;
+    object: string;
+}
+
+export interface LogicConflict {
+    type: 'LOCATION_MISMATCH' | 'RELATIONSHIP_CONFLICT' | 'FACTUAL_INCONSISTENCY';
+    description: string;
+    truthInGraph: string;
+    extractedFact: string;
+}
+
+export const verifyLogicConflicts = async (
+    projectId: string,
+    triples: KnowledgeTriple[]
+): Promise<LogicConflict[]> => {
+    const d = getDriver();
+    const session = d.session();
+    const conflicts: LogicConflict[] = [];
+
+    try {
+        for (const triple of triples) {
+            const { subject, relation, object } = triple;
+
+            // 1. Check Location Consistency
+            if (relation.toLowerCase().includes('位于') || relation.toLowerCase().includes('在')) {
+                const result = await session.run(
+                    `MATCH (c:Character {name: $sub, projectId: $projectId})-[:LOCATED_IN]->(l:WorldSetting)
+                     WHERE l.title <> $obj
+                     RETURN l.title as currentLoc`,
+                    { sub: subject, obj: object, projectId }
+                );
+
+                if (result.records.length > 0) {
+                    const currentLoc = result.records[0].get('currentLoc');
+                    conflicts.push({
+                        type: 'LOCATION_MISMATCH',
+                        description: `角色 [${subject}] 在设定中位于 [${currentLoc}]，但文中写其在 [${object}]。`,
+                        truthInGraph: currentLoc,
+                        extractedFact: object
+                    });
+                }
+            }
+
+            // 2. Check Static Relationship Consistency (LOVES, ENEMY_OF, etc.)
+            // Mapping common Chinese terms to relationship types
+            let mappedRel = "";
+            if (/仇|恨|红名|敌/.test(relation)) mappedRel = "ENEMY_OF";
+            else if (/爱|喜|情/.test(relation)) mappedRel = "LOVES";
+            else if (/亲|兄|弟|姐|妹|父|母|子|女/.test(relation)) mappedRel = "KIN_OF";
+
+            if (mappedRel) {
+                // Check if a different relationship exists in the graph
+                const result = await session.run(
+                    `MATCH (a:Character {name: $sub, projectId: $projectId})-[r]->(b:Character {name: $obj, projectId: $projectId})
+                     WHERE type(r) <> $mappedRel AND type(r) <> 'RELATED_TO'
+                     RETURN type(r) as existingRel`,
+                    { sub: subject, obj: object, mappedRel, projectId }
+                );
+
+                if (result.records.length > 0) {
+                    const existingRel = result.records[0].get('existingRel');
+                    conflicts.push({
+                        type: 'RELATIONSHIP_CONFLICT',
+                        description: `角色 [${subject}] 与 [${object}] 的关系在设定中是 [${existingRel}]，但文中表现为 [${relation}]。`,
+                        truthInGraph: existingRel,
+                        extractedFact: relation
+                    });
+                }
+            }
+        }
+
+        return conflicts;
+    } finally {
+        await session.close();
+    }
+};

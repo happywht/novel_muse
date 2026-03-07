@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { ProjectState, Character, WorldSetting, Draft, Chapter, StateChangeRecommendation, Echo } from '../types';
-import { generateSceneFromIngredients, analyzeStateChanges, PacingMode, polishDraft, PolishMode, extractEchoesFromText, summarizeChapter } from '../services/geminiService';
+import { generateSceneFromIngredients, analyzeStateChanges, PacingMode, polishDraft, PolishMode, extractEchoesFromText, summarizeChapter, extractKnowledgeTriples, verifyLogicConflicts, LogicConflict, generateTwistHooks, buildTieredMemory, rewriteLocalText, rewritePlot } from '../services/geminiService';
 import { Loader } from './Loader';
 import { PenTool, MapPin, Users, Zap, Plus, FileText, Trash2, Clipboard, Save, RefreshCw, GitCommit, ArrowRight, Check, Globe, Book, Archive, Layout, Sidebar, X, User, Wand2, Gauge, Flame, Feather, Eye, Clapperboard, Brain, ScanSearch, Sparkles, AlertTriangle, Cloud, CloudOff, Loader2 } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { DraftEditor } from './DraftingRoom/DraftEditor';
-import { rewriteLocalText } from '../services/geminiService';
 import { recalculateChapterOrders } from '../utils/chapterUtils';
+import { useProjectStore } from '../store/useProjectStore';
 
 interface DraftingRoomProps {
     project: ProjectState;
@@ -44,8 +44,6 @@ const ContinuityBanner: React.FC<{ project: ProjectState, activeChapterId: strin
 
     return null;
 };
-
-import { useProjectStore } from '../store/useProjectStore';
 
 export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProject }) => {
     const fetchChapterContent = useProjectStore(state => state.fetchChapterContent);
@@ -88,6 +86,15 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     // Echo Extraction State
     const [isExtracting, setIsExtracting] = useState(false);
     const [extractedEchoes, setExtractedEchoes] = useState<Echo[]>([]);
+
+    // Logic Audit State
+    const [isAuditingLogic, setIsAuditingLogic] = useState(false);
+    const [logicConflicts, setLogicConflicts] = useState<LogicConflict[]>([]);
+
+    // Twist Agent State
+    const [isGeneratingTwists, setIsGeneratingTwists] = useState(false);
+    const [suggestedTwists, setSuggestedTwists] = useState<string[]>([]);
+    const [activeTwist, setActiveTwist] = useState<string>('');
 
     // Auto-fetch chapter content when selected
     React.useEffect(() => {
@@ -227,7 +234,9 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                 project.echoes || [],
                 targetWordCount,
                 povCharName,
-                rollingSummary
+                rollingSummary,
+                activeChapterId || undefined,
+                activeTwist || undefined
             );
 
             // Format raw text with line breaks into HTML paragraphs for Tiptap
@@ -242,6 +251,9 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
 
             // Auto-trigger state analysis after generation
             triggerStateAnalysis(result, activeCharacters);
+
+            // Auto-trigger logic audit after generation
+            triggerLogicAudit(result);
 
         } catch (e) {
             alert("生成失败，请检查网络或 API Key");
@@ -317,6 +329,49 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
             console.error("State analysis failed", e);
         } finally {
             setIsAnalyzingState(false);
+        }
+    };
+
+    const triggerLogicAudit = async (content: string) => {
+        if (!useBackend) return; // Only audit if backend (Neo4j) is available
+        setIsAuditingLogic(true);
+        setLogicConflicts([]);
+        try {
+            const triples = await extractKnowledgeTriples(content);
+            if (triples.length > 0) {
+                const conflicts = await verifyLogicConflicts(project.id, triples);
+                setLogicConflicts(conflicts);
+            }
+        } catch (e) {
+            console.error("Logic Audit failed:", e);
+        } finally {
+            setIsAuditingLogic(false);
+        }
+    };
+
+    const handleGenerateTwists = async () => {
+        setIsGeneratingTwists(true);
+        setSuggestedTwists([]);
+        try {
+            const activeCharacters = (project.characters || []).filter(c => selectedChars.includes(c.id));
+            const currentChapter = activeChapterId ? project.chapters.find(c => c.id === activeChapterId) : null;
+            const currentOrder = currentChapter ? currentChapter.order : (project.chapters.length > 0 ? Math.max(...project.chapters.map(c => c.order)) + 1 : 1);
+
+            const context = buildTieredMemory(
+                project.chapters,
+                currentOrder,
+                project.plotOutline || "",
+                activeCharacters,
+                project.worldSettings || [],
+                project.echoes || []
+            );
+
+            const hooks = await generateTwistHooks(context, plotBeat);
+            setSuggestedTwists(hooks);
+        } catch (e) {
+            console.error("Twist generation failed", e);
+        } finally {
+            setIsGeneratingTwists(false);
         }
     };
 
@@ -421,12 +476,12 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
 
         // Trigger background summarization
         const targetChapterId = isUpdatingExisting ? (activeChapterId as string) : newChapter.id;
-        const previousChapters = [...updatedChaptersWithNewOne].sort((a, b) => a.order - b.order);
-        const currentIndex = previousChapters.findIndex(c => c.id === targetChapterId);
-        const prevSummary = currentIndex > 0 ? previousChapters[currentIndex - 1].summary : undefined;
+        const targetChapterTitle = isUpdatingExisting
+            ? project.chapters.find(c => c.id === activeChapterId)?.title || "当前章节"
+            : (newChapter?.title || "新章节");
 
         console.log("📝 Generating chapter summary in background...");
-        summarizeChapter(generatedContent, prevSummary).then(summary => {
+        summarizeChapter(targetChapterTitle, generatedContent, project.creativeSettings).then(summary => {
             console.log("✅ Summary generated:", summary);
             updateChapterSummary(targetChapterId, summary);
         }).catch(err => {
@@ -545,12 +600,60 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
 
                         <ContinuityBanner project={project} activeChapterId={activeChapterId} />
 
+                        {/* Logic Conflict Alerts */}
+                        {logicConflicts.length > 0 && (
+                            <div className="bg-red-900/20 border border-red-500/50 p-4 rounded-xl space-y-3 animate-pulse">
+                                <div className="flex items-center gap-2 text-red-400 font-bold text-sm">
+                                    <AlertTriangle size={18} />
+                                    发现故事逻辑冲突 (Logic Conflicts)
+                                </div>
+                                <div className="space-y-2">
+                                    {logicConflicts.map((c, i) => (
+                                        <div key={i} className="text-xs text-red-200/80 bg-red-900/30 p-2 rounded border border-red-500/20">
+                                            {c.description}
+                                        </div>
+                                    ))}
+                                </div>
+                                <button
+                                    onClick={() => setLogicConflicts([])}
+                                    className="text-[10px] text-red-400 hover:text-red-300 underline"
+                                >
+                                    忽略所有警告
+                                </button>
+                            </div>
+                        )}
+
                         {/* Step 1: Plot Beat */}
                         <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                            <div className="flex items-center gap-2 mb-3 text-muse-300 font-bold">
-                                <Zap size={18} />
-                                <h3>1. 设定情节目标 (Beat)</h3>
+                            <div className="flex items-center justify-between mb-3 text-muse-300 font-bold">
+                                <div className="flex items-center gap-2">
+                                    <Zap size={18} />
+                                    <h3>1. 设定情节目标 (Beat)</h3>
+                                </div>
+                                <button
+                                    onClick={handleGenerateTwists}
+                                    disabled={isGeneratingTwists}
+                                    className="flex items-center gap-1 text-[10px] bg-muse-900/40 hover:bg-muse-800 text-muse-300 px-2 py-1 rounded border border-muse-500/30 transition-all"
+                                    title="生成灵感反转"
+                                >
+                                    {isGeneratingTwists ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                                    灵感跳跃
+                                </button>
                             </div>
+
+                            {suggestedTwists.length > 0 && (
+                                <div className="mb-3 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    {suggestedTwists.map((twist, idx) => (
+                                        <div
+                                            key={idx}
+                                            onClick={() => setActiveTwist(activeTwist === twist ? '' : twist)}
+                                            className={`text-[11px] p-2 rounded border cursor-pointer transition-all ${activeTwist === twist ? 'bg-muse-700/50 border-muse-400 text-white shadow-lg' : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:border-muse-600/50'}`}
+                                        >
+                                            {twist}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                             <textarea
                                 value={plotBeat}
                                 onChange={(e) => setPlotBeat(e.target.value)}
@@ -1022,8 +1125,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                         )}
                     </div>
                 </div>
-            )
-            }
-        </div >
+            )}
+        </div>
     );
 };

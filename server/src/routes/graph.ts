@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getProjectGraph, findPath, getNeighbors, syncProjectToGraph, createEdge } from '../services/neo4jService';
+import { getProjectGraph, findPath, getNeighbors, syncProjectToGraph, createEdge, verifyLogicConflicts } from '../services/neo4jService';
 
 const router = Router();
 
@@ -51,6 +51,22 @@ router.post('/:projectId/edge', async (req: Request, res: Response) => {
         res.json({ success: true });
     } catch (err: any) {
         console.error('Edge creation error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/graph/verify-logic - Audit triples against ground truth
+router.post('/verify-logic', async (req: Request, res: Response) => {
+    const { projectId, triples } = req.body;
+    if (!projectId || !triples) {
+        res.status(400).json({ error: 'Missing projectId or triples' });
+        return;
+    }
+    try {
+        const conflicts = await verifyLogicConflicts(projectId, triples);
+        res.json(conflicts);
+    } catch (err: any) {
+        console.error('Logic verify error:', err);
         res.status(500).json({ error: err.message });
     }
 });

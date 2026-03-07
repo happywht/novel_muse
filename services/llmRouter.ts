@@ -22,7 +22,11 @@ export type LLMTaskType =
     | 'auditChapterPlan'
     | 'regenerateChapterOutline'
     | 'extractEchoes'
-    | 'analyzePlotRhythm';
+    | 'analyzePlotRhythm'
+    | 'summarizeChapter'
+    | 'extractKnowledgeTriples'
+    | 'inspectLogicConflicts'
+    | 'generateTwistHooks';
 
 // A strict rule-based router based on the MAS report
 export const getProviderForTask = (task: LLMTaskType): Provider => {
@@ -49,6 +53,10 @@ export const getProviderForTask = (task: LLMTaskType): Provider => {
         case 'polishDraft':                     // 片段润色
         case 'generateText':                    // 基础对话生成
         case 'analyzePlotRhythm':               // 简单的节奏张力提取 (Flash可胜任)
+        case 'summarizeChapter':                // 章节摘要生成 (L2记忆)
+        case 'extractKnowledgeTriples':         // 知识三元组提取 (Direction One)
+        case 'inspectLogicConflicts':           // 逻辑冲突审计 (Direction One)
+        case 'generateTwistHooks':              // 反转提示词生成 (Direction Three)
             return Provider.GEMINI;
 
         default:
