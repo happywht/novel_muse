@@ -57,6 +57,7 @@ export interface Draft {
   content: string;
   relatedPlotPoint?: string;
   lastModified: number;
+  branchId?: string; // NEW Task 2.2: Identify which branch this draft belongs to
 }
 
 export interface Chapter {
@@ -99,6 +100,20 @@ export enum AppSection {
   STATS = 'STATS'
 }
 
+/**
+ * Phase 4/5: Structural data for Knowledge Graph
+ */
+export interface KnowledgeTriple {
+  subject: string;
+  relation: string;
+  object: string;
+  weight?: number;      // 0-100: Intensity of relationship
+  trajectory?: string;  // rising, falling, stable
+  isForeshadowing?: boolean; // NEW Task 2.1: Whether this is a narrative hook
+  status?: 'OPEN' | 'RESOLVED' | 'ABANDONED'; // Status of the hook
+  branchId?: string; // NEW Task 2.2: Context isolation
+}
+
 export interface Echo {
   id: string;
   type: 'CHARACTER' | 'WORLD';
@@ -108,7 +123,8 @@ export interface Echo {
   reason: string;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'PREDICTION' | 'ARCHIVED';
   timestamp: number;
-  triples?: { subject: string; relation: string; object: string }[]; // NEW: Structural changes associated with this echo
+  triples?: KnowledgeTriple[]; // NEW: Structural changes associated with this echo
+  branchId?: string; // NEW Task 2.2
 }
 
 export interface StateChangeRecommendation {
@@ -148,4 +164,6 @@ export interface ProjectState {
   customPrompts: Record<string, string>;
   timeline: TimelineEvent[]; // NEW: Chronological history of the world
   currentWorldDate: string; // NEW: Current in-world date
+  activeBranchId?: string; // NEW Task 2.2: Track current active sandbox branch
+  availableBranches?: string[]; // NEW Task 2.2: List of all sandbox branches
 }

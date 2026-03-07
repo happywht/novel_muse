@@ -84,6 +84,7 @@ export const deleteProjectApi = async (id: string): Promise<void> => {
 // Graph API
 // ============================================
 
+import { ProjectState, Character, WorldSetting, Draft, Chapter, Echo, KnowledgeTriple } from '../types';
 export interface GraphNode {
     id: string;
     label: string;
@@ -128,15 +129,50 @@ export const createEdgeApi = async (projectId: string, sourceId: string, targetI
 };
 
 /** Fetch relevant subgraph for scene generation context */
-export const fetchRelatedSubgraph = async (projectId: string, anchors: string[]): Promise<string> => {
-    const response = await fetch(`/api/graph/${projectId}/subgraph?anchors=${anchors.join(',')}`);
+export const fetchRelatedSubgraph = async (projectId: string, anchors: string[], branchId: string = 'main'): Promise<string> => {
+    const response = await fetch(`${API_BASE}/graph/${projectId}/subgraph?anchors=${encodeURIComponent(anchors.join(','))}&branchId=${branchId}`);
     if (!response.ok) throw new Error('Failed to fetch subgraph');
     const data = await response.json();
     return data.subgraph;
 };
 
-export const fetchNarrativeInsights = async (projectId: string): Promise<any[]> => {
-    const response = await fetch(`/api/graph/${projectId}/insights`);
+export const fetchNarrativeInsights = async (projectId: string, branchId: string = 'main'): Promise<any[]> => {
+    const response = await fetch(`${API_BASE}/graph/${projectId}/insights?branchId=${branchId}`);
     if (!response.ok) throw new Error('Failed to fetch narrative insights');
     return await response.json();
 };
+
+export interface PhysicalStatus {
+    name: string;
+    location: string;
+    state: string;
+    isDead: boolean;
+}
+
+export const fetchPhysicalStatus = async (projectId: string, characterNames: string[], branchId: string = 'main'): Promise<PhysicalStatus[]> => {
+    const response = await fetch(`${API_BASE}/graph/${projectId}/physical-status?names=${encodeURIComponent(characterNames.join(','))}&branchId=${branchId}`);
+    if (!response.ok) throw new Error('Failed to fetch physical status');
+    return response.json();
+};
+
+/**
+ * Task 2.1 & 2.2: Fetch pending foreshadowing hooks
+ */
+export const fetchUnresolvedForeshadowing = async (projectId: string, branchId: string = 'main'): Promise<KnowledgeTriple[]> => {
+    const response = await fetch(`${API_BASE}/graph/${projectId}/foreshadowing?branchId=${branchId}`);
+    if (!response.ok) throw new Error('Failed to fetch foreshadowing');
+    return response.json();
+};
+
+/**
+ * Task 2.2: Merge a sandbox branch into the main branch
+ */
+export const mergeBranchApi = async (projectId: string, branchId: string): Promise<void> => {
+    const response = await fetch(`${API_BASE}/graph/${projectId}/merge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ branchId }),
+    });
+    if (!response.ok) throw new Error('Failed to merge branch');
+};
+

@@ -280,16 +280,43 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                                         “{echo.reason}”
                                     </div>
 
-                                    {/* NEW: Display Triples */}
+                                    {/* NEW: Display Triples with Weight & Trajectory */}
                                     {echo.triples && echo.triples.length > 0 && (
                                         <div className="mt-3 flex flex-wrap gap-2">
                                             {echo.triples.map((t, i) => (
-                                                <div key={i} className="flex items-center gap-1 bg-muse-900/40 border border-muse-500/20 px-2 py-1 rounded text-[10px] text-muse-200">
-                                                    <span className="font-bold opacity-70">{t.subject}</span>
-                                                    <ArrowRight size={10} className="text-muse-500" />
-                                                    <span className="text-muse-400">[{t.relation}]</span>
-                                                    <ArrowRight size={10} className="text-muse-500" />
-                                                    <span className="font-bold opacity-70">{t.object}</span>
+                                                <div key={i} className="flex flex-col gap-1 bg-slate-900/80 border border-muse-500/20 p-2 rounded text-[10px]">
+                                                    <div className="flex items-center gap-1 text-muse-200">
+                                                        <span className="font-bold opacity-70">{t.subject}</span>
+                                                        <ArrowRight size={10} className="text-muse-500" />
+                                                        <span className="text-muse-400">[{t.relation}]</span>
+                                                        <ArrowRight size={10} className="text-muse-500" />
+                                                        <span className="font-bold opacity-70">{t.object}</span>
+                                                    </div>
+
+                                                    {/* Quantitative Feedback */}
+                                                    {(t.weight !== undefined || t.trajectory) && (
+                                                        <div className="flex items-center gap-2 border-t border-slate-800 mt-1 pt-1">
+                                                            {t.weight !== undefined && (
+                                                                <div className="flex items-center gap-1.5 flex-1" title={`强度: ${t.weight}`}>
+                                                                    <div className="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden">
+                                                                        <div
+                                                                            className={`h-full rounded-full ${t.weight > 70 ? 'bg-rose-500' : t.weight > 40 ? 'bg-amber-500' : 'bg-blue-500'}`}
+                                                                            style={{ width: `${t.weight}%` }}
+                                                                        />
+                                                                    </div>
+                                                                    <span className="text-[8px] text-slate-500 font-mono">{t.weight}</span>
+                                                                </div>
+                                                            )}
+                                                            {t.trajectory && (
+                                                                <span className={`text-[8px] px-1 rounded font-bold uppercase ${t.trajectory === 'rising' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                                        t.trajectory === 'falling' ? 'bg-rose-500/20 text-rose-400' :
+                                                                            'bg-slate-700 text-slate-400'
+                                                                    }`}>
+                                                                    {t.trajectory === 'rising' ? '↑' : t.trajectory === 'falling' ? '↓' : '→'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>

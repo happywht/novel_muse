@@ -5,7 +5,13 @@ export interface KnowledgeTriple {
     subject: string;
     relation: string;
     object: string;
+    weight?: number;
+    trajectory?: string;
+    isForeshadowing?: boolean; // NEW Task 2.1
+    status?: 'OPEN' | 'RESOLVED' | 'ABANDONED';
 }
+
+import { PhysicalStatus } from './apiService';
 
 export interface LogicConflict {
     type: 'LOCATION_MISMATCH' | 'RELATIONSHIP_CONFLICT' | 'FACTUAL_INCONSISTENCY';
@@ -759,7 +765,9 @@ export const generateSceneFromIngredients = async (
     rollingSummary?: string, // NEW: Global Story Arc
     activeChapterId?: string, // NEW: Optional active chapter ID
     twistHook?: string, // NEW: Optional Twist Hook (Direction Three)
-    graphContext?: string // NEW: Optional Knowledge Graph subgraph
+    graphContext?: string, // NEW: Optional Knowledge Graph subgraph
+    physicalStatus: PhysicalStatus[] = [], // NEW Task 1.2: Logic Anchors
+    unresolvedForeshadowing: KnowledgeTriple[] = [] // NEW Task 2.1: Chekhov's Gun
 ): Promise<string> => {
     const ai = await getAIClient();
 
@@ -821,6 +829,27 @@ export const generateSceneFromIngredients = async (
         graphContext // NEW: Targeted subgraph context
     );
     context += tieredContext;
+
+    // --- NEW Task 1.2: Physical Logic Anchors ---
+    if (physicalStatus && physicalStatus.length > 0) {
+        context += `【🔒 逻辑锚点: 角色目前状态 (Logic Anchors)】\n`;
+        context += `注意：以下事实由系统图谱强制提供，如有冲突必须以下文为准，严禁无交代瞬移或复活：\n`;
+        physicalStatus.forEach(ps => {
+            const statusStr = ps.isDead ? '已死亡' : `${ps.state}`;
+            context += `- [${ps.name}]: 目前位于 [${ps.location}]，生理/精神状态：[${statusStr}]\n`;
+        });
+        context += `\n`;
+    }
+
+    // --- NEW Task 2.1: Chekhov's Gun (Foreshadowing) ---
+    if (unresolvedForeshadowing && unresolvedForeshadowing.length > 0) {
+        context += `【🎭 契诃夫之枪: 未回收的伏笔 (Chekhov's Gun)】\n`;
+        context += `注意：以下是之前章节埋下的悬念或钩子，请尽量在本次创作中推进、提及或回收（填坑）：\n`;
+        unresolvedForeshadowing.forEach(uf => {
+            context += `- [${uf.subject}] ${uf.relation} [${uf.object}]\n`;
+        });
+        context += `\n`;
+    }
 
     // 3. Stage (Specific Location)
     if (activeLocation) {
@@ -1765,18 +1794,23 @@ export const extractKnowledgeTriples = async (
     content: string
 ): Promise<KnowledgeTriple[]> => {
     const prompt = `
-你是一位精通逻辑分析的小说编辑。你的任务是从给定的【正文内容】中提取核心的人物位置、人物关系和重大事实三元组。
+你是一位精通逻辑分析的小说编辑。你的任务是从给定的【正文内容】中提取核心的人物位置、人物关系和重大事实三元组，并评估关系的强度与趋势。
 
 【提取要求】：
 1. 重点提取“A 在 B 地”、“A 与 B 是 C 关系”、“A 拥有 B 物品”等事实。
 2. 保持 Subject 和 Object 为简短的名称（如角色名、地点名）。
-3. Relation 尽量使用简练的词汇（如：“位于”、“在”、“仇恨”、“爱”、“拥有”）。
+3. Relation 尽量使用简亮词汇（如：“位于”、“在”、“仇恨”、“爱”、“拥有”）。
+4. **新增量化评价**：
+   - **weight**: 数值 0-100，代表关系的强度或事实的重要性。例如，“深爱”为 95，“点头之交”为 20。
+   - **trajectory**: 趋势分析，取值范围：["rising", "falling", "stable"]。
+   - **isForeshadowing**: 布尔值。如果该事实/关系是一个**伏笔**或未解的悬念（如：获得了神秘道具、听到了莫名巨响、立下了未完成的契约），请设为 true。
+   - **status**: 伏笔初始状态，取值：["OPEN", "RESOLVED", "ABANDONED"]。默认为 "OPEN"。
 
 【格式要求】：
 必须返回一个纯 JSON 数组，格式如下：
 [
-  {"subject": "角色A", "relation": "位于", "object": "地点B"},
-  {"subject": "角色A", "relation": "爱", "object": "角色B"}
+  {"subject": "角色A", "relation": "位于", "object": "地点B", "weight": 100, "trajectory": "stable", "isForeshadowing": false, "status": "OPEN"},
+  {"subject": "余烬", "relation": "持有", "object": "锈迹斑斑的铜匙", "weight": 70, "trajectory": "stable", "isForeshadowing": true, "status": "OPEN"}
 ]
 
 正文内容：

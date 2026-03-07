@@ -163,12 +163,30 @@ export const syncProjectToGraph = async (projectData: any): Promise<void> => {
                                 `MATCH (s {projectId: $projectId}) WHERE (s.name = $subject OR s.title = $subject)
                                  MATCH (o {projectId: $projectId}) WHERE (o.name = $object OR o.title = $object)
                                  MERGE (s)-[r:${relType}]->(o)
-                                 ON CREATE SET r.sourceEchoId = $echoId`,
+                                 ON CREATE SET 
+                                    r.sourceEchoId = $echoId, 
+                                    r.weight = $weight, 
+                                    r.trajectory = $trajectory,
+                                    r.isForeshadowing = $isForeshadowing,
+                                    r.status = $status,
+                                    r.branchId = $branchId,
+                                    r.createdAt = timestamp()
+                                 ON MATCH SET 
+                                    r.weight = $weight, 
+                                    r.trajectory = $trajectory,
+                                    r.isForeshadowing = $isForeshadowing,
+                                    r.status = $status,
+                                    r.branchId = $branchId`,
                                 {
                                     projectId,
                                     subject: triple.subject,
                                     object: triple.object,
-                                    echoId: echo.id
+                                    echoId: echo.id,
+                                    weight: triple.weight || 50,
+                                    trajectory: triple.trajectory || 'stable',
+                                    isForeshadowing: !!triple.isForeshadowing,
+                                    status: triple.status || 'OPEN',
+                                    branchId: triple.branchId || echo.branchId || 'main'
                                 }
                             );
                         } catch (err) {
@@ -411,6 +429,10 @@ export interface KnowledgeTriple {
     subject: string;
     relation: string;
     object: string;
+    weight?: number;
+    trajectory?: string;
+    isForeshadowing?: boolean; // NEW Task 2.1
+    status?: 'OPEN' | 'RESOLVED' | 'ABANDONED';
 }
 
 export interface LogicConflict {
@@ -491,7 +513,8 @@ export const verifyLogicConflicts = async (
  */
 export const getRelatedSubgraph = async (
     projectId: string,
-    anchorNames: string[]
+    anchorNames: string[],
+    branchId: string = 'main'
 ): Promise<string> => {
     const d = getDriver();
     const session = d.session();
@@ -501,8 +524,9 @@ export const getRelatedSubgraph = async (
             `MATCH (n {projectId: $projectId})
              WHERE n.name IN $anchors OR n.title IN $anchors
              OPTIONAL MATCH (n)-[r]-(m {projectId: $projectId})
+             WHERE r.branchId IS NULL OR r.branchId = 'main' OR r.branchId = $branchId
              RETURN n, r, m, startNode(r) = n AS isOutgoing`,
-            { projectId, anchors: anchorNames }
+            { projectId, anchors: anchorNames, branchId }
         );
 
         if (result.records.length === 0) return "";
@@ -649,3 +673,114 @@ export const inferNarrativeInsights = async (
         await session.close();
     }
 };
+
+/**
+ * NEW Task 1.2: Get physical status (location, health, state) for a set of character names
+ */
+export interface PhysicalStatus {
+    name: string;
+    location: string;
+    state: string;
+    isDead: boolean;
+}
+
+export const getPhysicalStatus = async (
+    projectId: string,
+    characterNames: string[],
+    branchId: string = 'main'
+): Promise<PhysicalStatus[]> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        const result = await session.run(
+            `MATCH (c:Character {projectId: $projectId})
+             WHERE (c.branchId IS NULL OR c.branchId = 'main' OR c.branchId = $branchId)
+             AND c.name IN $names
+             OPTIONAL MATCH (c)-[r:LOCATED_IN]->(l:WorldSetting)
+             WHERE (r.branchId IS NULL OR r.branchId = 'main' OR r.branchId = $branchId)
+             AND (l.branchId IS NULL OR l.branchId = 'main' OR l.branchId = $branchId)
+             RETURN c.name as name,
+                    l.title as location,
+                    c.state as state,
+                    c.isDead as isDead`,
+            { projectId, names: characterNames, branchId }
+        );
+        // Note: For Task 2.2, if status changes are in relationships, we might need a more complex query here.
+        // For now, these are node properties, so they are shared. Character state branching might need future refactoring.
+
+        return result.records.map(record => ({
+            name: record.get('name'),
+            location: record.get('location') || '未知地点',
+            state: record.get('state') || '正常',
+            isDead: record.get('isDead') === true
+        }));
+    } catch (err) {
+        console.error("Failed to fetch physical status:", err);
+        return [];
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * Task 2.1: Fetch pending foreshadowing hooks for a project
+ */
+export const getUnresolvedForeshadowing = async (projectId: string, branchId: string = 'main'): Promise<KnowledgeTriple[]> => {
+    if (!driver) return [];
+    const session = driver.session();
+    try {
+        const result = await session.run(
+            `MATCH (s {projectId: $projectId})-[r]->(o {projectId: $projectId})
+             WHERE r.isForeshadowing = true AND r.status = 'OPEN'
+             AND (r.branchId IS NULL OR r.branchId = 'main' OR r.branchId = $branchId)
+             RETURN s.name as subjectS, s.title as subjectT, 
+                    type(r) as relation, 
+                    o.name as objectS, o.title as objectT,
+                    r.weight as weight, r.trajectory as trajectory,
+                    r.status as status`,
+            { projectId, branchId }
+        );
+
+        return result.records.map(record => ({
+            subject: record.get('subjectS') || record.get('subjectT'),
+            relation: record.get('relation'),
+            object: record.get('objectS') || record.get('objectT'),
+            weight: record.get('weight'),
+            trajectory: record.get('trajectory'),
+            isForeshadowing: true,
+            status: record.get('status')
+        }));
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * Task 2.2: Merge a sandbox branch into the main branch
+ * Transitions all nodes/edges from branchId to 'main'
+ */
+export const mergeBranch = async (projectId: string, branchId: string): Promise<void> => {
+    if (!driver || branchId === 'main') return;
+    const session = driver.session();
+    try {
+        // Update all nodes in this branch
+        await session.run(
+            `MATCH (n {projectId: $projectId, branchId: $branchId})
+             SET n.branchId = 'main'`,
+            { projectId, branchId }
+        );
+
+        // Update all relationships in this branch
+        await session.run(
+            `MATCH ()-[r {projectId: $projectId, branchId: $branchId}]->()
+             SET r.branchId = 'main'`,
+            { projectId, branchId }
+        );
+
+        console.log(`🌿 Merged graph branch '${branchId}' into 'main' for project ${projectId}`);
+    } finally {
+        await session.close();
+    }
+};
+

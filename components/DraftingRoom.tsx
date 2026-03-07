@@ -1,7 +1,7 @@
 ﻿import React, { useState } from 'react';
-import { ProjectState, Character, WorldSetting, Draft, Chapter, StateChangeRecommendation, Echo } from '../types';
+import { ProjectState, Character, WorldSetting, Draft, Chapter, StateChangeRecommendation, Echo, KnowledgeTriple } from '../types';
 import { generateSceneFromIngredients, analyzeStateChanges, PacingMode, polishDraft, PolishMode, extractEchoesFromText, summarizeChapter, extractKnowledgeTriples, verifyLogicConflicts, LogicConflict, generateTwistHooks, buildTieredMemory, rewriteLocalText, rewritePlot } from '../services/geminiService';
-import { fetchRelatedSubgraph, fetchNarrativeInsights } from '../services/apiService';
+import { fetchRelatedSubgraph, fetchNarrativeInsights, fetchPhysicalStatus, fetchUnresolvedForeshadowing, mergeBranchApi } from '../services/apiService';
 
 export interface NarrativeInsight {
     type: 'ALLIANCE_POTENTIAL' | 'CONFLICT_WARNING' | 'SECRET_CONNECTION' | 'FACTION_SHIFT';
@@ -99,6 +99,11 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     const [isAuditingLogic, setIsAuditingLogic] = useState(false);
     const [logicConflicts, setLogicConflicts] = useState<LogicConflict[]>([]);
 
+    // Task 2.2: Branching Sandbox State
+    const [activeBranchId, setActiveBranchId] = useState<string>(project.activeBranchId || 'main');
+    const [availableBranches, setAvailableBranches] = useState<string[]>(project.availableBranches || ['main']);
+    const [isMergingBranch, setIsMergingBranch] = useState(false);
+
     // Twist Agent State
     const [isGeneratingTwists, setIsGeneratingTwists] = useState(false);
     const [suggestedTwists, setSuggestedTwists] = useState<string[]>([]);
@@ -108,11 +113,28 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     const [narrativeInsights, setNarrativeInsights] = useState<NarrativeInsight[]>([]);
     const [isFetchingInsights, setIsFetchingInsights] = useState(false);
 
+    // Foreshadowing State (Task 2.1)
+    const [pendingForeshadowing, setPendingForeshadowing] = useState<KnowledgeTriple[]>([]);
+    const [isFetchingForeshadowing, setIsFetchingForeshadowing] = useState(false);
+
+    const handleFetchForeshadowing = async () => {
+        if (!useBackend) return;
+        setIsFetchingForeshadowing(true);
+        try {
+            const data = await fetchUnresolvedForeshadowing(project.id, activeBranchId);
+            setPendingForeshadowing(data);
+        } catch (err) {
+            console.error("Failed to fetch foreshadowing:", err);
+        } finally {
+            setIsFetchingForeshadowing(false);
+        }
+    };
+
     const handleFetchInsights = async () => {
         if (!useBackend) return;
         setIsFetchingInsights(true);
         try {
-            const data = await fetchNarrativeInsights(project.id);
+            const data = await fetchNarrativeInsights(project.id, activeBranchId);
             setNarrativeInsights(data);
         } catch (err) {
             console.error("Failed to fetch insights:", err);
@@ -120,6 +142,33 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
             setIsFetchingInsights(false);
         }
     };
+
+    const handleMergeBranch = async () => {
+        if (!useBackend || activeBranchId === 'main') return;
+
+        const confirmMerge = window.confirm(`确定要将分歧 "${activeBranchId}" 中的所有图谱变更合并至主线吗？\n警告：这可能会覆盖主线中的关系。`);
+        if (!confirmMerge) return;
+
+        setIsMergingBranch(true);
+        try {
+            await mergeBranchApi(project.id, activeBranchId);
+            // After merge, switch back to main
+            setActiveBranchId('main');
+            updateProject({ activeBranchId: 'main' });
+            alert(`🌿 已成功将 "${activeBranchId}" 的图谱模型合并至主线。`);
+
+            // Refresh insights and foreshadowing
+            handleFetchForeshadowing();
+            handleFetchInsights();
+        } catch (err) {
+            console.error("Failed to merge branch:", err);
+            alert("合并失败，请检查后端连接。");
+        } finally {
+            setIsMergingBranch(false);
+        }
+    };
+
+
 
     // Auto-fetch chapter content when selected
     React.useEffect(() => {
@@ -142,9 +191,17 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
 
                 // Switch to Forge view just in case
                 setViewMode('FORGE');
+                handleFetchForeshadowing(); // Refresh foreshadowing when a new node is selected
             }
         }
     }, [activePlotNodeId, project.plotNodes, setActivePlotNodeId]);
+
+    // Initial fetch for foreshadowing
+    React.useEffect(() => {
+        if (useBackend) {
+            handleFetchForeshadowing();
+        }
+    }, [useBackend]);
 
     // NEW: Handle bridge from Chapter Outliner
     React.useEffect(() => {
@@ -247,19 +304,35 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
 
             const povCharName = povCharId ? (project.characters || []).find(c => c.id === povCharId)?.name : undefined;
 
-            // NEW: Fetch Targeted Subgraph Context
+            // NEW Task 2.1: Fetch targeted subgraph, physical status, and unresolved foreshadowing in parallel
             let graphContext = undefined;
+            let physicalStatus = [];
+            let unresolvedForeshadowing = [];
+
             if (useBackend) {
                 const anchors = [
                     ...activeCharacters.map(c => c.name),
                     ...(activeLocation ? [activeLocation.title] : [])
                 ];
-                if (anchors.length > 0) {
-                    try {
-                        graphContext = await fetchRelatedSubgraph(project.id, anchors);
-                    } catch (err) {
-                        console.warn("Graph context fetch failed, falling back to basic memory:", err);
+                try {
+                    const promises: Promise<any>[] = [
+                        fetchUnresolvedForeshadowing(project.id, activeBranchId)
+                    ];
+
+                    if (anchors.length > 0) {
+                        promises.push(fetchRelatedSubgraph(project.id, anchors, activeBranchId));
+                        promises.push(fetchPhysicalStatus(project.id, anchors, activeBranchId));
                     }
+
+                    const results = await Promise.all(promises);
+                    unresolvedForeshadowing = results[0]; // First promise is always foreshadowing
+
+                    if (anchors.length > 0) {
+                        graphContext = results[1]; // Second is subgraph if anchors exist
+                        physicalStatus = results[2]; // Third is physical status if anchors exist
+                    }
+                } catch (err) {
+                    console.warn("Graph/Physical/Foreshadowing fetch failed:", err);
                 }
             }
 
@@ -278,7 +351,9 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                 rollingSummary,
                 activeChapterId || undefined,
                 activeTwist || undefined,
-                graphContext // NEW: Targeted subgraph context
+                graphContext, // Targeted subgraph context
+                physicalStatus, // NEW Task 1.2: Physical Logic Anchors
+                unresolvedForeshadowing // NEW Task 2.1: Chekhov's Gun
             );
 
             // Format raw text with line breaks into HTML paragraphs for Tiptap
@@ -665,15 +740,103 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                             </div>
                         )}
 
-                        {/* Step 1: Plot Beat */}
-                        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 space-y-4">
+                        {/* Task 2.2: What-If Branching Sandbox */}
+                        <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 shadow-xl mb-4">
+                            <div className="flex items-center justify-between mb-3 text-muse-300 font-bold">
+                                <div className="flex items-center gap-2">
+                                    <GitCommit size={18} className="text-amber-500" />
+                                    <h3>分歧沙盘 (What-If Sandbox)</h3>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        const name = prompt("输入新分支名称 (例如: '主角黑化', '全员存活'):");
+                                        if (name) {
+                                            const newBranches = [...availableBranches, name];
+                                            setAvailableBranches(newBranches);
+                                            setActiveBranchId(name);
+                                            updateProject({ availableBranches: newBranches, activeBranchId: name });
+                                        }
+                                    }}
+                                    className="text-[10px] bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-300 flex items-center gap-1"
+                                >
+                                    <Plus size={12} /> 新分歧
+                                </button>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {availableBranches.map(branch => (
+                                    <button
+                                        key={branch}
+                                        onClick={() => {
+                                            setActiveBranchId(branch);
+                                            updateProject({ activeBranchId: branch });
+                                            // Auto-refresh context when switching branches
+                                            handleFetchForeshadowing();
+                                            handleFetchInsights();
+                                        }}
+                                        className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all border ${activeBranchId === branch
+                                            ? 'bg-amber-600/20 border-amber-500 text-amber-200 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                                            : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-600'
+                                            }`}
+                                    >
+                                        {branch === 'main' ? '🌐 主线剧情 (Main)' : `🌱 ${branch}`}
+                                    </button>
+                                ))}
+                            </div>
+                            {activeBranchId !== 'main' && (
+                                <div className="flex items-center justify-between mt-2 border-t border-slate-700/50 pt-2">
+                                    <p className="text-[9px] text-amber-500/70 italic">
+                                        当前处于分歧模式。
+                                    </p>
+                                    <button
+                                        onClick={handleMergeBranch}
+                                        disabled={isMergingBranch}
+                                        className="text-[10px] bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded flex items-center gap-1 transition-all"
+                                    >
+                                        {isMergingBranch ? <Loader2 size={10} className="animate-spin" /> : <GitCommit size={10} />}
+                                        合并至主线
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Narrative Insights Panel (Phase 4 Display) */}
+                        {narrativeInsights.length > 0 && (
+                            <div className="bg-purple-900/20 border border-purple-500/20 rounded-xl p-3 mb-4 animate-in slide-in-from-top-2 duration-300">
+                                <div className="flex justify-between items-center mb-2">
+                                    <div className="flex items-center gap-2 text-purple-300 text-[11px] font-bold">
+                                        <Brain size={14} />
+                                        <span>图谱叙事洞察 ({narrativeInsights.length} 条)</span>
+                                    </div>
+                                    <button onClick={() => setNarrativeInsights([])} className="text-purple-500 hover:text-purple-400"><X size={12} /></button>
+                                </div>
+                                <div className="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                                    {narrativeInsights.map((insight, idx) => (
+                                        <div key={idx} className="bg-slate-900/50 p-2 rounded border border-purple-500/10 group hover:border-purple-500/30 transition-all cursor-pointer" onClick={() => setPlotBeat(prev => prev + (prev ? '\n\n' : '') + `[洞察: ${insight.description}]`)}>
+                                            <div className="flex justify-between items-start">
+                                                <span className={`text-[9px] px-1 rounded ${insight.type === 'CONFLICT_WARNING' ? 'bg-red-500/20 text-red-400' :
+                                                    insight.type === 'ALLIANCE_POTENTIAL' ? 'bg-green-500/20 text-green-400' :
+                                                        'bg-blue-500/20 text-blue-400'
+                                                    }`}>{insight.type}</span>
+                                                <span className="text-[9px] text-slate-500 uppercase">{insight.logic}</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-300 mt-1 leading-relaxed">{insight.description}</p>
+                                            <div className="flex flex-wrap gap-1 mt-1 font-mono text-[8px] text-slate-500">
+                                                {insight.involvedEntities.map((e, i) => <span key={i} className="bg-slate-800 px-1 rounded">{e}</span>)}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Step 1: Plot Beat Area */}
+                        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 space-y-4 mb-4">
                             <div className="flex items-center justify-between text-muse-300 font-bold">
                                 <div className="flex items-center gap-2">
                                     <Zap size={18} />
-                                    <h3>1. 设定情节目标 (Beat)</h3>
+                                    <h3>1. 设定情节目标 (Plot Beat)</h3>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    {/* Phase 4: Graph Insights Button */}
                                     <button
                                         onClick={handleFetchInsights}
                                         disabled={isFetchingInsights || !useBackend}
@@ -684,7 +847,6 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                                         <span>图谱洞察</span>
                                     </button>
 
-                                    {/* Twist Agent Button */}
                                     <button
                                         onClick={handleGenerateTwists}
                                         disabled={isGeneratingTwists || !useBackend}
@@ -697,36 +859,14 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                                 </div>
                             </div>
 
-                            {/* Narrative Insights Panel (Phase 4 Display) */}
-                            {narrativeInsights.length > 0 && (
-                                <div className="bg-purple-900/20 border border-purple-500/20 rounded-xl p-3 animate-in slide-in-from-top-2 duration-300">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <div className="flex items-center gap-2 text-purple-300 text-[11px] font-bold">
-                                            <Brain size={14} />
-                                            <span>图谱叙事洞察 ({narrativeInsights.length} 条)</span>
-                                        </div>
-                                        <button onClick={() => setNarrativeInsights([])} className="text-purple-500 hover:text-purple-400"><X size={12} /></button>
-                                    </div>
-                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
-                                        {narrativeInsights.map((insight, idx) => (
-                                            <div key={idx} className="bg-slate-900/50 p-2 rounded border border-purple-500/10 group hover:border-purple-500/30 transition-all cursor-pointer" onClick={() => setPlotBeat(prev => prev + (prev ? '\n\n' : '') + `[洞察: ${insight.description}]`)}>
-                                                <div className="flex justify-between items-start">
-                                                    <span className={`text-[9px] px-1 rounded ${insight.type === 'CONFLICT_WARNING' ? 'bg-red-500/20 text-red-400' :
-                                                            insight.type === 'ALLIANCE_POTENTIAL' ? 'bg-green-500/20 text-green-400' :
-                                                                'bg-blue-500/20 text-blue-400'
-                                                        }`}>{insight.type}</span>
-                                                    <span className="text-[9px] text-slate-500 uppercase">{insight.logic}</span>
-                                                </div>
-                                                <p className="text-[10px] text-slate-300 mt-1 leading-relaxed">{insight.description}</p>
-                                                <div className="flex flex-wrap gap-1 mt-1 font-mono text-[8px] text-slate-500">
-                                                    {insight.involvedEntities.map((e, i) => <span key={i} className="bg-slate-800 px-1 rounded">{e}</span>)}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                            <textarea
+                                value={plotBeat}
+                                onChange={(e) => setPlotBeat(e.target.value)}
+                                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-1 focus:ring-muse-500 outline-none resize-none h-24"
+                                placeholder="例如：主角在废弃地铁站遭遇赏金猎人，双方发生激烈枪战，最终主角负伤逃脱..."
+                            />
 
+                            {/* Twist Suggestions Display */}
                             {suggestedTwists.length > 0 && (
                                 <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
                                     <div className="flex items-center gap-2 text-indigo-400 text-[11px] font-bold mb-1">
@@ -747,12 +887,45 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                                 </div>
                             )}
 
-                            <textarea
-                                value={plotBeat}
-                                onChange={(e) => setPlotBeat(e.target.value)}
-                                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-1 focus:ring-muse-500 outline-none resize-none h-24"
-                                placeholder="例如：主角在废弃地铁站遭遇赏金猎人，双方发生激烈枪战，最终主角负伤逃脱..."
-                            />
+                            {/* Task 2.1: Foreshadowing Display */}
+                            {pendingForeshadowing.length > 0 && (
+                                <div className="bg-indigo-900/20 border border-indigo-500/20 rounded-xl p-3 animate-in slide-in-from-top-2 duration-300">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <div className="flex items-center gap-2 text-indigo-300 text-[11px] font-bold">
+                                            <Sparkles size={14} className="text-indigo-400" />
+                                            <span>契诃夫之枪: 待回收伏笔 ({pendingForeshadowing.length})</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={handleFetchForeshadowing}
+                                                className="text-indigo-500 hover:text-indigo-400"
+                                                title="刷新伏笔"
+                                            >
+                                                <RefreshCw size={12} className={isFetchingForeshadowing ? "animate-spin" : ""} />
+                                            </button>
+                                            <button onClick={() => setPendingForeshadowing([])} className="text-indigo-500 hover:text-indigo-400">
+                                                <X size={12} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
+                                        {pendingForeshadowing.map((hook, idx) => (
+                                            <div
+                                                key={idx}
+                                                className="bg-slate-900/50 p-2 rounded border border-indigo-500/10 group hover:border-indigo-500/30 transition-all cursor-pointer"
+                                                onClick={() => setPlotBeat(prev => prev + (prev ? '\n\n' : '') + `[填坑: ${hook.subject} ${hook.relation} ${hook.object}]`)}
+                                            >
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[10px] text-indigo-200">
+                                                        <span className="text-indigo-500">HOOK:</span> {hook.subject} {hook.relation} {hook.object}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <p className="text-[9px] text-slate-500 mt-2 italic text-center">点击伏笔卡片将其快捷加入情节目标</p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Step 2: Cast Selection */}

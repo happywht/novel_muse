@@ -2,7 +2,8 @@ import { Router, Request, Response } from 'express';
 import {
     getProjectGraph, findPath, getNeighbors, syncProjectToGraph,
     createEdge, verifyLogicConflicts, getRelatedSubgraph,
-    inferNarrativeInsights
+    inferNarrativeInsights, getPhysicalStatus, getUnresolvedForeshadowing,
+    mergeBranch
 } from '../services/neo4jService';
 
 const router = Router();
@@ -54,18 +55,35 @@ router.get('/:projectId/path', async (req: Request, res: Response) => {
     }
 });
 
-// GET /api/graph/:projectId/subgraph?anchors=A,B - Get relevant subgraph for context
+// GET /api/graph/:projectId/subgraph?anchors=A,B&branchId=main - Get relevant subgraph for context
 router.get('/:projectId/subgraph', async (req: Request, res: Response) => {
-    const { anchors } = req.query;
+    const { anchors, branchId } = req.query;
     if (!anchors) {
         res.status(400).json({ error: 'Missing anchors query parameter' });
         return;
     }
     const anchorList = (anchors as string).split(',');
     try {
-        const subgraph = await getRelatedSubgraph(req.params.projectId as string, anchorList);
+        const subgraph = await getRelatedSubgraph(req.params.projectId as string, anchorList, branchId as string);
         res.json({ subgraph });
     } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/graph/:projectId/physical-status?anchors=A,B&branchId=main - Get physical status of entities
+router.get('/:projectId/physical-status', async (req: Request, res: Response) => {
+    const { anchors, branchId } = req.query;
+    if (!anchors) {
+        res.status(400).json({ error: 'Missing anchors query parameter' });
+        return;
+    }
+    const anchorList = (anchors as string).split(',');
+    try {
+        const status = await getPhysicalStatus(req.params.projectId as string, anchorList, branchId as string);
+        res.json(status);
+    } catch (err: any) {
+        console.error('Physical status error:', err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -109,6 +127,34 @@ router.post('/:projectId/sync', async (req: Request, res: Response) => {
         res.json({ success: true });
     } catch (err: any) {
         console.error('Graph sync error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Task 2.1 & 2.2: Get unresolved foreshadowing
+router.get('/:projectId/foreshadowing', async (req, res) => {
+    try {
+        const branchId = req.query.branchId as string;
+        const foreshadowing = await getUnresolvedForeshadowing(req.params.projectId as string, branchId);
+        res.json(foreshadowing);
+    } catch (error: any) {
+        console.error("Foreshadowing fetch error:", error);
+        res.status(500).json({ error: "Failed to fetch foreshadowing" });
+    }
+});
+
+// POST /api/graph/:projectId/merge - Merge a sandbox branch into main
+router.post('/:projectId/merge', async (req: Request, res: Response) => {
+    try {
+        const { branchId } = req.body;
+        if (!branchId || branchId === 'main') {
+            res.status(400).json({ error: 'Valid branchId required' });
+            return;
+        }
+        await mergeBranch(req.params.projectId as string, branchId);
+        res.json({ success: true });
+    } catch (err: any) {
+        console.error('Branch merge error:', err);
         res.status(500).json({ error: err.message });
     }
 });
