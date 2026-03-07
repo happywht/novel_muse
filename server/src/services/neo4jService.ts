@@ -152,6 +152,30 @@ export const syncProjectToGraph = async (projectData: any): Promise<void> => {
                         projectId,
                     }
                 );
+
+                // NEW: Process associated structural triples
+                if (echo.triples && Array.isArray(echo.triples)) {
+                    for (const triple of echo.triples) {
+                        // Sanitize relation type for Cypher (parameterized types aren't supported)
+                        const relType = triple.relation.replace(/[^A-Z0-9_]/gi, '').toUpperCase() || 'RELATED_TO';
+                        try {
+                            await session.run(
+                                `MATCH (s {projectId: $projectId}) WHERE (s.name = $subject OR s.title = $subject)
+                                 MATCH (o {projectId: $projectId}) WHERE (o.name = $object OR o.title = $object)
+                                 MERGE (s)-[r:${relType}]->(o)
+                                 ON CREATE SET r.sourceEchoId = $echoId`,
+                                {
+                                    projectId,
+                                    subject: triple.subject,
+                                    object: triple.object,
+                                    echoId: echo.id
+                                }
+                            );
+                        } catch (err) {
+                            console.warn(`Failed to sync triple ${triple.subject}-[:${relType}]->${triple.object}:`, err);
+                        }
+                    }
+                }
             }
         }
 
@@ -457,6 +481,86 @@ export const verifyLogicConflicts = async (
         }
 
         return conflicts;
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * NEW: Graph-Driven Context - Retrieve a relevant subgraph for scene generation
+ */
+export const getRelatedSubgraph = async (
+    projectId: string,
+    anchorNames: string[]
+): Promise<string> => {
+    const d = getDriver();
+    const session = d.session();
+    try {
+        // Find nodes matching anchors and all their 1-hop relationships
+        const result = await session.run(
+            `MATCH (n {projectId: $projectId})
+             WHERE n.name IN $anchors OR n.title IN $anchors
+             OPTIONAL MATCH (n)-[r]-(m {projectId: $projectId})
+             RETURN n, r, m, startNode(r) = n AS isOutgoing`,
+            { projectId, anchors: anchorNames }
+        );
+
+        if (result.records.length === 0) return "";
+
+        const entitiesStr: string[] = [];
+        const relationshipsStr: string[] = [];
+        const seenEntityIds = new Set<string>();
+        const seenRelationIds = new Set<string>();
+
+        for (const record of result.records) {
+            const n = record.get('n');
+            const r = record.get('r');
+            const m = record.get('m');
+            const isOutgoing = record.get('isOutgoing');
+
+            // Process Primary Node (n)
+            if (!seenEntityIds.has(n.properties.id)) {
+                const name = n.properties.name || n.properties.title;
+                const desc = n.properties.description || n.properties.content || "";
+                entitiesStr.push(`[${name}]: ${desc.slice(0, 300)}${desc.length > 300 ? '...' : ''}`);
+                seenEntityIds.add(n.properties.id);
+            }
+
+            // Process Relationship and Neighbor (m)
+            if (r && m) {
+                const rId = r.identity.toString();
+                if (!seenRelationIds.has(rId)) {
+                    const nName = n.properties.name || n.properties.title;
+                    const mName = m.properties.name || m.properties.title;
+                    const type = r.type;
+
+                    if (isOutgoing) {
+                        relationshipsStr.push(`(${nName}) -[${type}]-> (${mName})`);
+                    } else {
+                        relationshipsStr.push(`(${mName}) -[${type}]-> (${nName})`);
+                    }
+                    seenRelationIds.add(rId);
+
+                    // Also add neighbor summary if it's a character or major setting
+                    if (!seenEntityIds.has(m.properties.id)) {
+                        const mDesc = m.properties.description || m.properties.content || "";
+                        entitiesStr.push(`[${mName}]: ${mDesc.slice(0, 150)}${mDesc.length > 150 ? '...' : ''}`);
+                        seenEntityIds.add(m.properties.id);
+                    }
+                }
+            }
+        }
+
+        if (entitiesStr.length === 0) return "";
+
+        let output = "=== KNOWLEDGE GRAPH CONTEXT ===\\n\\n";
+        output += "RELEVANT ENTITIES:\\n" + entitiesStr.join('\\n') + "\\n\\n";
+        output += "RELATIONSHIPS:\\n" + relationshipsStr.join('\\n');
+
+        return output;
+    } catch (err) {
+        console.error("Failed to query subgraph:", err);
+        return "";
     } finally {
         await session.close();
     }

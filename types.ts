@@ -108,6 +108,7 @@ export interface Echo {
   reason: string;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'PREDICTION' | 'ARCHIVED';
   timestamp: number;
+  triples?: { subject: string; relation: string; object: string }[]; // NEW: Structural changes associated with this echo
 }
 
 export interface StateChangeRecommendation {

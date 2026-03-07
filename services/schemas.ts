@@ -101,6 +101,11 @@ export const AiEchoSchema = z.object({
     targetType: z.enum(['CHARACTER', 'WORLD']).default('CHARACTER'),
     description: z.string().default(''),
     reason: z.string().default(''),
+    triples: z.array(z.object({
+        subject: z.string(),
+        relation: z.string(),
+        object: z.string()
+    })).optional(),
 });
 
 export const AiEchoArraySchema = z.array(AiEchoSchema);

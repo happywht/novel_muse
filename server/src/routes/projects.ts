@@ -160,6 +160,7 @@ router.get('/:id', async (req: Request, res: Response) => {
                 description: e.description,
                 reason: e.reason,
                 status: e.status as any,
+                triples: e.triples ? JSON.parse(e.triples) : undefined, // NEW: Parse triples JSON
                 timestamp: Number(e.timestamp),
             })),
             timeline: project.timeline.map((t: any) => ({
@@ -400,6 +401,7 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                         description: e.description,
                         reason: e.reason,
                         status: e.status || 'PENDING',
+                        triples: e.triples ? JSON.stringify(e.triples) : null, // NEW: Stringify triples JSON
                         timestamp: BigInt(e.timestamp),
                         projectId: id,
                     }))

@@ -111,6 +111,7 @@ model Echo {
   description String   @db.LongText
   reason      String   @db.LongText
   status      String   @default("PENDING")
+  triples     String?  @db.LongText // NEW: JSON blob for associated triples
   timestamp   BigInt
   projectId   String
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)

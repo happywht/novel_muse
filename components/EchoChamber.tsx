@@ -3,7 +3,7 @@ import { ProjectState, Character, WorldSetting, Echo } from '../types';
 import {
     X, Activity, Clock, User, Globe, Sparkles,
     Filter, Zap, PlayCircle, Brain, CheckCircle,
-    Trash2, ChevronRight, Inbox, History, Search, Loader2
+    Trash2, ChevronRight, Inbox, History, Search, Loader2, ArrowRight
 } from 'lucide-react';
 import { deduceWorldConsequences, consolidateMemory } from '../services/geminiService';
 
@@ -279,6 +279,21 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                                     <div className="mt-2 text-xs text-slate-500 border-l-2 border-slate-800 pl-3 py-1 italic">
                                         “{echo.reason}”
                                     </div>
+
+                                    {/* NEW: Display Triples */}
+                                    {echo.triples && echo.triples.length > 0 && (
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            {echo.triples.map((t, i) => (
+                                                <div key={i} className="flex items-center gap-1 bg-muse-900/40 border border-muse-500/20 px-2 py-1 rounded text-[10px] text-muse-200">
+                                                    <span className="font-bold opacity-70">{t.subject}</span>
+                                                    <ArrowRight size={10} className="text-muse-500" />
+                                                    <span className="text-muse-400">[{t.relation}]</span>
+                                                    <ArrowRight size={10} className="text-muse-500" />
+                                                    <span className="font-bold opacity-70">{t.object}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {selectedEchoId === echo.id && (

@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getProjectGraph, findPath, getNeighbors, syncProjectToGraph, createEdge, verifyLogicConflicts } from '../services/neo4jService';
+import { getProjectGraph, findPath, getNeighbors, syncProjectToGraph, createEdge, verifyLogicConflicts, getRelatedSubgraph } from '../services/neo4jService';
 
 const router = Router();
 
@@ -34,6 +34,22 @@ router.get('/:projectId/path', async (req: Request, res: Response) => {
     try {
         const path = await findPath(req.params.projectId as string, from as string, to as string);
         res.json(path);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/graph/:projectId/subgraph?anchors=A,B - Get relevant subgraph for context
+router.get('/:projectId/subgraph', async (req: Request, res: Response) => {
+    const { anchors } = req.query;
+    if (!anchors) {
+        res.status(400).json({ error: 'Missing anchors query parameter' });
+        return;
+    }
+    const anchorList = (anchors as string).split(',');
+    try {
+        const subgraph = await getRelatedSubgraph(req.params.projectId as string, anchorList);
+        res.json({ subgraph });
     } catch (err: any) {
         res.status(500).json({ error: err.message });
     }

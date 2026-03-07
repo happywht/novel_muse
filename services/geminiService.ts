@@ -137,7 +137,8 @@ export const buildTieredMemory = (
     plotOutline?: string,
     characters: Character[] = [],
     worldSettings: WorldSetting[] = [],
-    echoes: Echo[] = []
+    echoes: Echo[] = [],
+    graphContext?: string // NEW: Optional specific Knowledge Graph subgraph
 ): string => {
     let context = "";
 
@@ -146,6 +147,11 @@ export const buildTieredMemory = (
     const previousChapters = sortedChapters.filter(c => c.order < currentChapterOrder);
 
     // --- L3: Long-term anchors ---
+    if (graphContext) {
+        context += "【🧠 L3+: 核心知识图谱片段 (Knowledge Graph Subgraph)】\n";
+        context += graphContext + "\n\n";
+    }
+
     context += "【📌 L3: 长期战略锚点 (Long-term Anchors)】\n";
     if (plotOutline) {
         context += `1. [核心剧情大纲]: ${plotOutline}\n`;
@@ -752,7 +758,8 @@ export const generateSceneFromIngredients = async (
     povName?: string, // NEW: Explicit POV lock
     rollingSummary?: string, // NEW: Global Story Arc
     activeChapterId?: string, // NEW: Optional active chapter ID
-    twistHook?: string // NEW: Optional Twist Hook (Direction Three)
+    twistHook?: string, // NEW: Optional Twist Hook (Direction Three)
+    graphContext?: string // NEW: Optional Knowledge Graph subgraph
 ): Promise<string> => {
     const ai = await getAIClient();
 
@@ -810,7 +817,8 @@ export const generateSceneFromIngredients = async (
         project.plotOutline || "",
         activeCharacters,
         allWorldSettings,
-        activeEchoes
+        activeEchoes,
+        graphContext // NEW: Targeted subgraph context
     );
     context += tieredContext;
 
@@ -1119,7 +1127,20 @@ export const extractEchoesFromText = async (
                 targetName: { type: Type.STRING, description: "Name of the character or world setting affected" },
                 targetType: { type: Type.STRING, description: "CHARACTER or WORLD" },
                 description: { type: Type.STRING, description: "What happened? (Concise, e.g., 'Lost left arm', 'Obtained the Magic Sword')" },
-                reason: { type: Type.STRING, description: "Why is this significant?" }
+                reason: { type: Type.STRING, description: "Why is this significant?" },
+                triples: {
+                    type: Type.ARRAY,
+                    description: "Structural changes (triples) for Knowledge Graph integration",
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            subject: { type: Type.STRING, description: "Short entity name" },
+                            relation: { type: Type.STRING, description: "Short relation keyword (e.g., '位于', '持有', '仇恨', '爱')" },
+                            object: { type: Type.STRING, description: "Short target entity name" }
+                        },
+                        required: ["subject", "relation", "object"]
+                    }
+                }
             },
             required: ["targetName", "targetType", "description", "reason"]
         }
@@ -1139,8 +1160,9 @@ export const extractEchoesFromText = async (
     1. **只提取重大变更**: 忽略琐碎的对话或动作。只关注状态改变（受伤、获得物品、关系破裂、死亡）、重大秘密揭露、或世界规则的变动。
     2. **关联现有实体**: 尽量将事件关联到上述列表中的【角色】或【世界设定】。
     3. **客观描述**: 描述必须是客观的事实陈述。
+    4. **结构化三元组 (Triples)**: 对于每一个重大变更，尝试将其进一步拆解为“主体-关系-客体”的结构化三元组，以便后续存入知识图谱。例如：“林青在京城遭遇伏击” -> \`[{"subject": "林青", "relation": "位于", "object": "京城"}]\`。
 
-    请输出 JSON 格式的事件列表。如果没有重大事件，返回空数组。
+    请输出 JSON 格式的事件及三元组列表。如果没有重大事件，返回空数组。
     `;
 
     try {
@@ -1180,7 +1202,8 @@ export const extractEchoesFromText = async (
                         description: item.description,
                         reason: item.reason,
                         status: 'PENDING', // Auto-extracted echoes start as PENDING
-                        timestamp: Date.now()
+                        timestamp: Date.now(),
+                        triples: item.triples // NEW: Store the associated triples
                     });
                 }
             }

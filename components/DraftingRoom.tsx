@@ -1,6 +1,7 @@
 ﻿import React, { useState } from 'react';
 import { ProjectState, Character, WorldSetting, Draft, Chapter, StateChangeRecommendation, Echo } from '../types';
 import { generateSceneFromIngredients, analyzeStateChanges, PacingMode, polishDraft, PolishMode, extractEchoesFromText, summarizeChapter, extractKnowledgeTriples, verifyLogicConflicts, LogicConflict, generateTwistHooks, buildTieredMemory, rewriteLocalText, rewritePlot } from '../services/geminiService';
+import { fetchRelatedSubgraph } from '../services/apiService';
 import { Loader } from './Loader';
 import { PenTool, MapPin, Users, Zap, Plus, FileText, Trash2, Clipboard, Save, RefreshCw, GitCommit, ArrowRight, Check, Globe, Book, Archive, Layout, Sidebar, X, User, Wand2, Gauge, Flame, Feather, Eye, Clapperboard, Brain, ScanSearch, Sparkles, AlertTriangle, Cloud, CloudOff, Loader2 } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -222,6 +223,22 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
 
             const povCharName = povCharId ? (project.characters || []).find(c => c.id === povCharId)?.name : undefined;
 
+            // NEW: Fetch Targeted Subgraph Context
+            let graphContext = undefined;
+            if (useBackend) {
+                const anchors = [
+                    ...activeCharacters.map(c => c.name),
+                    ...(activeLocation ? [activeLocation.title] : [])
+                ];
+                if (anchors.length > 0) {
+                    try {
+                        graphContext = await fetchRelatedSubgraph(project.id, anchors);
+                    } catch (err) {
+                        console.warn("Graph context fetch failed, falling back to basic memory:", err);
+                    }
+                }
+            }
+
             const result = await generateSceneFromIngredients(
                 project.genre,
                 plotBeat,
@@ -236,7 +253,8 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                 povCharName,
                 rollingSummary,
                 activeChapterId || undefined,
-                activeTwist || undefined
+                activeTwist || undefined,
+                graphContext // NEW: Targeted subgraph context
             );
 
             // Format raw text with line breaks into HTML paragraphs for Tiptap

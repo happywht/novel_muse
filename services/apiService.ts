@@ -126,3 +126,12 @@ export const createEdgeApi = async (projectId: string, sourceId: string, targetI
     });
     if (!res.ok) throw new Error(`Failed to create edge: ${res.statusText}`);
 };
+
+/** Fetch relevant subgraph for scene generation context */
+export const fetchRelatedSubgraph = async (projectId: string, anchors: string[]): Promise<string> => {
+    const anchorsQuery = encodeURIComponent(anchors.join(','));
+    const res = await fetch(`${API_BASE}/graph/${projectId}/subgraph?anchors=${anchorsQuery}`);
+    if (!res.ok) throw new Error(`Failed to fetch subgraph: ${res.statusText}`);
+    const data = await res.json();
+    return data.subgraph;
+};
