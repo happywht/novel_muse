@@ -1,7 +1,22 @@
 import { Router, Request, Response } from 'express';
-import { getProjectGraph, findPath, getNeighbors, syncProjectToGraph, createEdge, verifyLogicConflicts, getRelatedSubgraph } from '../services/neo4jService';
+import {
+    getProjectGraph, findPath, getNeighbors, syncProjectToGraph,
+    createEdge, verifyLogicConflicts, getRelatedSubgraph,
+    inferNarrativeInsights
+} from '../services/neo4jService';
 
 const router = Router();
+
+// GET /api/graph/:projectId/insights - Get narrative insights
+router.get('/:projectId/insights', async (req: Request, res: Response) => {
+    try {
+        const insights = await inferNarrativeInsights(req.params.projectId as string);
+        res.json(insights);
+    } catch (err: any) {
+        console.error('Narrative insights error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
 
 // GET /api/graph/:projectId - Get full graph for a project
 router.get('/:projectId', async (req: Request, res: Response) => {

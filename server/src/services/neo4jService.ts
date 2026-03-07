@@ -565,3 +565,87 @@ export const getRelatedSubgraph = async (
         await session.close();
     }
 };
+
+/**
+ * NEW Phase 4: Infer narrative insights (Indirect relations, faction dynamics)
+ */
+export interface NarrativeInsight {
+    type: 'ALLIANCE_POTENTIAL' | 'CONFLICT_WARNING' | 'SECRET_CONNECTION' | 'FACTION_SHIFT';
+    description: string;
+    involvedEntities: string[];
+    logic: string;
+}
+
+export const inferNarrativeInsights = async (
+    projectId: string
+): Promise<NarrativeInsight[]> => {
+    const d = getDriver();
+    const session = d.session();
+    const insights: NarrativeInsight[] = [];
+
+    try {
+        // 1. Enemy of my Enemy (Alliance Potential)
+        const enemiesOfEnemies = await session.run(
+            `MATCH (a:Character {projectId: $projectId})-[:ENEMY_OF]->(c:Character {projectId: $projectId})<-[:ENEMY_OF]-(b:Character {projectId: $projectId})
+             WHERE id(a) < id(b)
+             AND NOT (a)-[:ENEMY_OF]-(b)
+             AND NOT (a)-[:ALLY_OF]-(b)
+             RETURN a.name as nameA, b.name as nameB, c.name as commonEnemy`,
+            { projectId }
+        );
+
+        enemiesOfEnemies.records.forEach(r => {
+            insights.push({
+                type: 'ALLIANCE_POTENTIAL',
+                description: `${r.get('nameA')} 和 ${r.get('nameB')} 都视 ${r.get('commonEnemy')} 为敌。这种共同的威胁可能促使 them 达成暂时的结盟。`,
+                involvedEntities: [r.get('nameA'), r.get('nameB'), r.get('commonEnemy')],
+                logic: 'Enemy of my enemy'
+            });
+        });
+
+        // 2. Love Triangle / Relationship Conflict (Conflict Warning)
+        const triangles = await session.run(
+            `MATCH (a:Character {projectId: $projectId})-[:LOVES]->(c:Character {projectId: $projectId})<-[:LOVES]-(b:Character {projectId: $projectId})
+             WHERE id(a) < id(b)
+             RETURN a.name as nameA, b.name as nameB, c.name as objective`,
+            { projectId }
+        );
+
+        triangles.records.forEach(r => {
+            insights.push({
+                type: 'CONFLICT_WARNING',
+                description: `${r.get('nameA')} 和 ${r.get('nameB')} 都倾慕 ${r.get('objective')}。这可能会演变成激烈的冲突或嫉妒引发的背叛。`,
+                involvedEntities: [r.get('nameA'), r.get('nameB'), r.get('objective')],
+                logic: 'Relationship Triangle'
+            });
+        });
+
+        // 3. Hidden Network (Secret Connection)
+        const hiddenLinks = await session.run(
+            `MATCH (a:Character {projectId: $projectId}), (b:Character {projectId: $projectId})
+             WHERE id(a) < id(b)
+             AND NOT (a)--(b)
+             MATCH (a)--(common)--(b)
+             WITH a, b, count(common) as depth
+             WHERE depth >= 2
+             RETURN a.name as nameA, b.name as nameB, depth`,
+            { projectId }
+        );
+
+        hiddenLinks.records.forEach(r => {
+            insights.push({
+                type: 'SECRET_CONNECTION',
+                description: `${r.get('nameA')} 和 ${r.get('nameB')} 虽然目前没有直接交集，但他们共享 ${r.get('depth')} 个共同关系。这暗示他们之间可能存在未被察觉的隐秘联系。`,
+                involvedEntities: [r.get('nameA'), r.get('nameB')],
+                logic: 'High-density shared neighborhood'
+            });
+        });
+
+        return insights;
+    } catch (err) {
+        console.error("Narrative inference failed:", err);
+        return [];
+    } finally {
+        await session.close();
+    }
+};

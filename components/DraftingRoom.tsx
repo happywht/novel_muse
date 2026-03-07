@@ -1,7 +1,14 @@
 ﻿import React, { useState } from 'react';
 import { ProjectState, Character, WorldSetting, Draft, Chapter, StateChangeRecommendation, Echo } from '../types';
 import { generateSceneFromIngredients, analyzeStateChanges, PacingMode, polishDraft, PolishMode, extractEchoesFromText, summarizeChapter, extractKnowledgeTriples, verifyLogicConflicts, LogicConflict, generateTwistHooks, buildTieredMemory, rewriteLocalText, rewritePlot } from '../services/geminiService';
-import { fetchRelatedSubgraph } from '../services/apiService';
+import { fetchRelatedSubgraph, fetchNarrativeInsights } from '../services/apiService';
+
+export interface NarrativeInsight {
+    type: 'ALLIANCE_POTENTIAL' | 'CONFLICT_WARNING' | 'SECRET_CONNECTION' | 'FACTION_SHIFT';
+    description: string;
+    involvedEntities: string[];
+    logic: string;
+}
 import { Loader } from './Loader';
 import { PenTool, MapPin, Users, Zap, Plus, FileText, Trash2, Clipboard, Save, RefreshCw, GitCommit, ArrowRight, Check, Globe, Book, Archive, Layout, Sidebar, X, User, Wand2, Gauge, Flame, Feather, Eye, Clapperboard, Brain, ScanSearch, Sparkles, AlertTriangle, Cloud, CloudOff, Loader2 } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
@@ -96,6 +103,23 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     const [isGeneratingTwists, setIsGeneratingTwists] = useState(false);
     const [suggestedTwists, setSuggestedTwists] = useState<string[]>([]);
     const [activeTwist, setActiveTwist] = useState<string>('');
+
+    // Narrative Insights State (Phase 4)
+    const [narrativeInsights, setNarrativeInsights] = useState<NarrativeInsight[]>([]);
+    const [isFetchingInsights, setIsFetchingInsights] = useState(false);
+
+    const handleFetchInsights = async () => {
+        if (!useBackend) return;
+        setIsFetchingInsights(true);
+        try {
+            const data = await fetchNarrativeInsights(project.id);
+            setNarrativeInsights(data);
+        } catch (err) {
+            console.error("Failed to fetch insights:", err);
+        } finally {
+            setIsFetchingInsights(false);
+        }
+    };
 
     // Auto-fetch chapter content when selected
     React.useEffect(() => {
@@ -642,36 +666,87 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                         )}
 
                         {/* Step 1: Plot Beat */}
-                        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                            <div className="flex items-center justify-between mb-3 text-muse-300 font-bold">
+                        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 space-y-4">
+                            <div className="flex items-center justify-between text-muse-300 font-bold">
                                 <div className="flex items-center gap-2">
                                     <Zap size={18} />
                                     <h3>1. 设定情节目标 (Beat)</h3>
                                 </div>
-                                <button
-                                    onClick={handleGenerateTwists}
-                                    disabled={isGeneratingTwists}
-                                    className="flex items-center gap-1 text-[10px] bg-muse-900/40 hover:bg-muse-800 text-muse-300 px-2 py-1 rounded border border-muse-500/30 transition-all"
-                                    title="生成灵感反转"
-                                >
-                                    {isGeneratingTwists ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                                    灵感跳跃
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    {/* Phase 4: Graph Insights Button */}
+                                    <button
+                                        onClick={handleFetchInsights}
+                                        disabled={isFetchingInsights || !useBackend}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all ${isFetchingInsights ? 'bg-purple-900/50 text-purple-300' : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20'}`}
+                                        title="图谱洞察: 基于知识图谱推理潜在冲突与盟友"
+                                    >
+                                        {isFetchingInsights ? <Loader2 size={12} className="animate-spin" /> : <Brain size={12} />}
+                                        <span>图谱洞察</span>
+                                    </button>
+
+                                    {/* Twist Agent Button */}
+                                    <button
+                                        onClick={handleGenerateTwists}
+                                        disabled={isGeneratingTwists || !useBackend}
+                                        className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all ${isGeneratingTwists ? 'bg-indigo-900/50 text-indigo-300' : 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20'}`}
+                                        title="灵感跳跃 (Twist)"
+                                    >
+                                        {isGeneratingTwists ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                                        <span>灵感跳跃</span>
+                                    </button>
+                                </div>
                             </div>
 
-                            {suggestedTwists.length > 0 && (
-                                <div className="mb-3 space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    {suggestedTwists.map((twist, idx) => (
-                                        <div
-                                            key={idx}
-                                            onClick={() => setActiveTwist(activeTwist === twist ? '' : twist)}
-                                            className={`text-[11px] p-2 rounded border cursor-pointer transition-all ${activeTwist === twist ? 'bg-muse-700/50 border-muse-400 text-white shadow-lg' : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:border-muse-600/50'}`}
-                                        >
-                                            {twist}
+                            {/* Narrative Insights Panel (Phase 4 Display) */}
+                            {narrativeInsights.length > 0 && (
+                                <div className="bg-purple-900/20 border border-purple-500/20 rounded-xl p-3 animate-in slide-in-from-top-2 duration-300">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <div className="flex items-center gap-2 text-purple-300 text-[11px] font-bold">
+                                            <Brain size={14} />
+                                            <span>图谱叙事洞察 ({narrativeInsights.length} 条)</span>
                                         </div>
-                                    ))}
+                                        <button onClick={() => setNarrativeInsights([])} className="text-purple-500 hover:text-purple-400"><X size={12} /></button>
+                                    </div>
+                                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1 custom-scrollbar">
+                                        {narrativeInsights.map((insight, idx) => (
+                                            <div key={idx} className="bg-slate-900/50 p-2 rounded border border-purple-500/10 group hover:border-purple-500/30 transition-all cursor-pointer" onClick={() => setPlotBeat(prev => prev + (prev ? '\n\n' : '') + `[洞察: ${insight.description}]`)}>
+                                                <div className="flex justify-between items-start">
+                                                    <span className={`text-[9px] px-1 rounded ${insight.type === 'CONFLICT_WARNING' ? 'bg-red-500/20 text-red-400' :
+                                                            insight.type === 'ALLIANCE_POTENTIAL' ? 'bg-green-500/20 text-green-400' :
+                                                                'bg-blue-500/20 text-blue-400'
+                                                        }`}>{insight.type}</span>
+                                                    <span className="text-[9px] text-slate-500 uppercase">{insight.logic}</span>
+                                                </div>
+                                                <p className="text-[10px] text-slate-300 mt-1 leading-relaxed">{insight.description}</p>
+                                                <div className="flex flex-wrap gap-1 mt-1 font-mono text-[8px] text-slate-500">
+                                                    {insight.involvedEntities.map((e, i) => <span key={i} className="bg-slate-800 px-1 rounded">{e}</span>)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
+
+                            {suggestedTwists.length > 0 && (
+                                <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="flex items-center gap-2 text-indigo-400 text-[11px] font-bold mb-1">
+                                        <Sparkles size={14} />
+                                        <span>灵感反转建议</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {suggestedTwists.map((twist, idx) => (
+                                            <div
+                                                key={idx}
+                                                onClick={() => setActiveTwist(activeTwist === twist ? '' : twist)}
+                                                className={`text-[11px] p-2 rounded border cursor-pointer transition-all ${activeTwist === twist ? 'bg-muse-700/50 border-muse-400 text-white shadow-lg' : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:border-muse-600/50'}`}
+                                            >
+                                                {twist}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             <textarea
                                 value={plotBeat}
                                 onChange={(e) => setPlotBeat(e.target.value)}
