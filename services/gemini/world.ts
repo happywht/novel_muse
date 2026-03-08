@@ -12,6 +12,7 @@ import {
     getInstructionWithSettings, getModelName
 } from "./core";
 import { formatContext } from "./helpers";
+import { fetchRelatedSubgraph } from "../apiService";
 
 /**
  * Image generation for characters
@@ -423,6 +424,8 @@ export const consolidateMemory = async (
  * Deduce world consequences based on recent echoes
  */
 export const deduceWorldConsequences = async (
+    projectId: string,
+    branchId: string,
     recentEchoes: Echo[],
     characters: Character[],
     worldSettings: WorldSetting[],
@@ -431,13 +434,22 @@ export const deduceWorldConsequences = async (
     if (recentEchoes.length === 0) return [];
 
     const contextStr = formatContext(characters, worldSettings, recentEchoes);
-    const triggers = recentEchoes
-        .filter(e => e.status === 'ACCEPTED')
-        .slice(-5)
-        .map(e => `- ${e.description} (${e.targetName})`)
-        .join('\n');
+    const triggerEchoes = recentEchoes.filter(e => e.status === 'ACCEPTED').slice(-5);
+    const triggers = triggerEchoes.map(e => `- ${e.description} (${e.targetName})`).join('\n');
 
     if (!triggers) return [];
+
+    // Fetch related graph subgraph context based on the triggers
+    const anchors = triggerEchoes.map(e => e.targetName);
+    let graphContext = "";
+    if (anchors.length > 0) {
+        try {
+            graphContext = await fetchRelatedSubgraph(projectId, anchors, branchId);
+            console.log("🦋 Butterfly Effect - Fetched Graph Context:", graphContext);
+        } catch (e) {
+            console.warn("Could not fetch graph context for butterfly effect", e);
+        }
+    }
 
     const responseSchema = {
         type: Type.ARRAY,
@@ -455,22 +467,27 @@ export const deduceWorldConsequences = async (
 
     const prompt = `
     你是一个全知全能的世界模拟器（World Engine）。
-    你的任务是基于【最近发生的事件】（Triggers），推演它们对【世界】和【人物】产生的**连锁反应**（Consequences）。
+    你的任务是基于【最近发生的事件】（Triggers）和【动态知识图谱】（Knowledge Graph），推演它们对【世界】和【人物】产生的**连锁反应**（Consequences）。
 
     小说类型: ${genre}
 
+    【活跃实体状态概览】:
     ${contextStr}
+
+    ${graphContext ? `【动态知识图谱关联网络 (Knowledge Graph)】:\n${graphContext}\n` : ''}
 
     【最近发生的事件 (Triggers)】:
     ${triggers}
 
     【推演规则】:
     1. **蝴蝶效应**: 一个小事件可能引发大变动（例如：国王遇刺 -> 继承人争夺战 -> 内战爆发）。
-    2. **符合逻辑**: 推演必须符合世界观设定（例如：如果魔法依赖水晶，水晶破碎会导致魔法失效）。
-    3. **制造冲突**: 预测的结果应该为故事增加张力和冲突。
-    4. **具体**: 不要模糊地说“局势紧张”，要说“北方公爵集结军队”。
+    2. **图谱联动 (重要)**: 务必利用上方提供的【动态知识图谱】中的人物关系（仇恨、亲情、从属）或地理归属，去寻找连锁反应的导火索。
+    3. **符合逻辑**: 推演必须符合世界观设定。
+    4. **制造冲突**: 预测的结果应该为故事增加张力和冲突。
+    5. **具体**: 不要模糊地说“局势紧张”，要说“北方公爵集结军队”。
+    6. **强制中文输出**: 你的 JSON 结果中的所有内容（包括 \`suggestedUpdate\`, \`reason\` 等字段）必须使用纯正的中文，绝对不要输出英文。
 
-    请输出 JSON 格式的【未来预测】。
+    请严格按照 JSON 格式输出【未来预测】。
     `;
 
     try {

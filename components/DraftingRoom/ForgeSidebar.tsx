@@ -5,6 +5,7 @@ import {
     PenTool, Trash2, AlertTriangle, Sidebar
 } from 'lucide-react';
 import { ProjectState, Character, WorldSetting, Draft, KnowledgeTriple, NarrativeInsight } from '../../types';
+import { ContinuityBanner } from '../panels/ContinuityBanner';
 
 interface ForgeSidebarProps {
     project: ProjectState;
@@ -59,6 +60,7 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
         availableBranches,
         handleCreateBranch,
         handleSwitchBranch,
+        handleDeleteBranch,
         logicConflicts,
         setLogicConflicts,
     } = actions;
@@ -103,17 +105,29 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
                 </div>
                 <div className="flex flex-wrap gap-2">
                     {availableBranches.map(branch => (
-                        <button
-                            key={branch}
-                            onClick={() => handleSwitchBranch(branch)}
-                            className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all border ${
-                                activeBranchId === branch
+                        <div key={branch} className="relative group flex items-stretch">
+                            <button
+                                onClick={() => handleSwitchBranch(branch)}
+                                className={`px-3 py-1 rounded-l-md text-[10px] font-bold transition-all border border-r-0 ${activeBranchId === branch
                                     ? 'bg-amber-600/20 border-amber-500 text-amber-200 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
-                                    : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-600'
-                            }`}
-                        >
-                            {branch === 'main' ? '🌐 主线剧情' : `🌱 ${branch}`}
-                        </button>
+                                    : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-600 group-hover:bg-slate-800'
+                                    } ${branch === 'main' ? 'rounded-r-md border-r' : ''}`}
+                            >
+                                {branch === 'main' ? '🌐 主线剧情' : `🌱 ${branch}`}
+                            </button>
+                            {branch !== 'main' && (
+                                <button
+                                    onClick={(e) => handleDeleteBranch(e, branch)}
+                                    className={`px-1.5 py-1 rounded-r-md border border-l-0 transition-colors flex items-center justify-center ${activeBranchId === branch
+                                        ? 'bg-amber-600/20 border-amber-500 text-amber-400/50 hover:text-amber-300 hover:bg-amber-500/30'
+                                        : 'bg-slate-900 border-slate-800 text-slate-600 hover:text-red-400 hover:bg-red-900/30'
+                                        }`}
+                                    title="删除该分歧 (内容将被丢弃)"
+                                >
+                                    <X size={10} />
+                                </button>
+                            )}
+                        </div>
                     ))}
                 </div>
                 {activeBranchId !== 'main' && (
@@ -131,6 +145,11 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
                         </button>
                     </div>
                 )}
+            </div>
+
+            {/* Continuity Gap Warnings */}
+            <div className="mb-4">
+                <ContinuityBanner project={project} activeChapterId={actions.activeChapterId} />
             </div>
 
             {/* Narrative Insights Panel (Phase 4 Display) */}
@@ -182,7 +201,7 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
                             disabled={isFetchingInsights || !useBackend}
                             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all ${isFetchingInsights ? 'bg-purple-900/50 text-purple-300' : 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20'
                                 }`}
-                            title="图谱洞察: 基于知识图谱推理潜在冲突与盟友"
+                            title="图谱洞察: 基于目前世界观中的角色互动与情报，由AI推断潜在的矛盾或冲突爆发点"
                         >
                             {isFetchingInsights ? <Loader2 size={12} className="animate-spin" /> : <Brain size={12} />}
                             <span>图谱洞察</span>
@@ -190,10 +209,9 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
 
                         <button
                             onClick={handleGenerateTwists}
-                            disabled={isGeneratingTwists || !useBackend}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all ${isGeneratingTwists ? 'bg-indigo-900/50 text-indigo-300' : 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20'
-                                }`}
-                            title="灵感跳跃 (Twist)"
+                            disabled={isGeneratingTwists || !useBackend || !plotBeat.trim()}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-medium transition-all ${isGeneratingTwists ? 'bg-indigo-900/50 text-indigo-300' : 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/20'} ${!plotBeat.trim() ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title={!plotBeat.trim() ? "请先在下方输入前提情节目标，AI才可发散反转可能" : "灵感跳跃: 基于现有情节目标，由AI提供意外转折的演变建议"}
                         >
                             {isGeneratingTwists ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                             <span>灵感跳跃</span>

@@ -48,31 +48,28 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
             <div className="absolute top-4 right-4 z-20 flex bg-slate-800 rounded-lg p-1 border border-slate-700">
                 <button
                     onClick={() => actions.setViewMode('FORGE')}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-all ${
-                        actions.viewMode === 'FORGE' ? 'bg-muse-600 text-white shadow' : 'text-slate-400 hover:text-white'
-                    }`}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-all ${actions.viewMode === 'FORGE' ? 'bg-muse-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                        }`}
                 >
                     ✍️ 自动工坊
                 </button>
                 <button
                     onClick={() => actions.setViewMode('MANUSCRIPT')}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-all ${
-                        actions.viewMode === 'MANUSCRIPT' ? 'bg-muse-600 text-white shadow' : 'text-slate-400 hover:text-white'
-                    }`}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-all ${actions.viewMode === 'MANUSCRIPT' ? 'bg-muse-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                        }`}
                 >
                     📖 正文归档
                 </button>
             </div>
 
-            {/* Logic Conflict / Continuity Warnings */}
-            <ContinuityBanner project={project} activeChapterId={activeChapterId} />
-
             {/* Sidebar Controls */}
-            <ForgeSidebar
-                actions={actions}
-                project={project}
-                activeBranchId={project.activeBranchId || 'main'}
-            />
+            {actions.viewMode === 'FORGE' && (
+                <ForgeSidebar
+                    actions={actions}
+                    project={project}
+                    activeBranchId={project.activeBranchId || 'main'}
+                />
+            )}
 
             {/* Main Creative Area */}
             <main className="flex-1 flex flex-col h-full bg-slate-900/50 relative">

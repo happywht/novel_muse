@@ -117,11 +117,10 @@ export const ForgeEditor: React.FC<ForgeEditorProps> = ({
                         <div className="w-px h-6 bg-slate-700 mx-1"></div>
                         <button
                             onClick={() => setShowReference(!showReference)}
-                            className={`text-xs px-3 py-1.5 rounded border transition-colors flex items-center gap-1 font-medium ${
-                                showReference
+                            className={`text-xs px-3 py-1.5 rounded border transition-colors flex items-center gap-1 font-medium ${showReference
                                     ? 'bg-purple-900 text-purple-200 border-purple-500'
                                     : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-                            }`}
+                                }`}
                             title="打开设定参考侧边栏"
                         >
                             <Sidebar size={12} />

@@ -17,6 +17,7 @@ export const DraftEditor: React.FC<DraftEditorProps> = ({ content, onChange, onR
     // We use a local state to track if the editor is currently focused
     // to prevent cursor jumping when external updates happen
     const [isFocused, setIsFocused] = useState(false);
+    const [customInstruction, setCustomInstruction] = useState('');
 
     const editor = useEditor({
         extensions: [
@@ -37,7 +38,7 @@ export const DraftEditor: React.FC<DraftEditorProps> = ({ content, onChange, onR
         onBlur: () => setIsFocused(false),
         editorProps: {
             attributes: {
-                class: 'prose prose-invert prose-lg max-w-none font-serif leading-loose text-slate-300 min-h-[500px] outline-none',
+                class: 'prose prose-invert prose-lg w-full max-w-none font-serif leading-loose text-slate-300 min-h-[500px] outline-none',
             },
         },
     });
@@ -79,34 +80,52 @@ export const DraftEditor: React.FC<DraftEditorProps> = ({ content, onChange, onR
                 <BubbleMenu
                     editor={editor}
                     options={{ placement: 'top' }}
-                    className="flex bg-slate-800 shadow-2xl border border-slate-600 rounded-lg overflow-hidden animate-fade-in divide-x divide-slate-700/50"
+                    className="flex flex-col bg-slate-800 shadow-2xl border border-slate-600 rounded-lg overflow-hidden animate-fade-in"
                 >
-                    <button
-                        onClick={() => handleActionClick('让这段描写更加生动、有画面感，增加感官细节')}
-                        disabled={isProcessing}
-                        className="px-3 py-2 text-xs font-bold text-emerald-400 hover:bg-slate-700 flex items-center gap-1 transition-colors disabled:opacity-50"
-                    >
-                        <Wand2 size={12} /> 润色细节
-                    </button>
-                    <button
-                        onClick={() => handleActionClick('将这段内容扩写，增加更多心理活动或环境渲染')}
-                        disabled={isProcessing}
-                        className="px-3 py-2 text-xs font-bold text-sky-400 hover:bg-slate-700 flex items-center gap-1 transition-colors disabled:opacity-50"
-                    >
-                        <Sparkles size={12} /> 扩写
-                    </button>
-                    <button
-                        onClick={() => handleActionClick('用简洁有力的语言精简这段文字，加快节奏')}
-                        disabled={isProcessing}
-                        className="px-3 py-2 text-xs font-bold text-amber-500 hover:bg-slate-700 flex items-center gap-1 transition-colors disabled:opacity-50"
-                    >
-                        <Feather size={12} /> 精简
-                    </button>
-                    {isProcessing && (
-                        <div className="px-3 py-2 flex items-center justify-center bg-slate-900/50">
-                            <RefreshCw size={14} className="animate-spin text-muse-400" />
-                        </div>
-                    )}
+                    <div className="flex divide-x divide-slate-700/50 border-b border-slate-700/50">
+                        <button
+                            onClick={() => handleActionClick('让这段描写更加生动、有画面感，增加感官细节')}
+                            disabled={isProcessing}
+                            className="px-3 py-2 text-xs font-bold text-emerald-400 hover:bg-slate-700 flex items-center gap-1 transition-colors disabled:opacity-50"
+                        >
+                            <Wand2 size={12} /> 细节润色
+                        </button>
+                        <button
+                            onClick={() => handleActionClick('将这段内容扩写，增加更多心理活动或环境渲染')}
+                            disabled={isProcessing}
+                            className="px-3 py-2 text-xs font-bold text-sky-400 hover:bg-slate-700 flex items-center gap-1 transition-colors disabled:opacity-50"
+                        >
+                            <Sparkles size={12} /> 扩写
+                        </button>
+                        <button
+                            onClick={() => handleActionClick('用简洁有力的语言精简这段文字，加快节奏')}
+                            disabled={isProcessing}
+                            className="px-3 py-2 text-xs font-bold text-amber-500 hover:bg-slate-700 flex items-center gap-1 transition-colors disabled:opacity-50"
+                        >
+                            <Feather size={12} /> 精简
+                        </button>
+                        {isProcessing && (
+                            <div className="px-3 py-2 flex items-center justify-center bg-slate-900/50">
+                                <RefreshCw size={14} className="animate-spin text-muse-400" />
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex items-center px-2 py-1.5 bg-slate-900/50">
+                        <input
+                            type="text"
+                            value={customInstruction}
+                            onChange={(e) => setCustomInstruction(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && customInstruction.trim() !== '') {
+                                    handleActionClick(customInstruction.trim());
+                                    setCustomInstruction('');
+                                }
+                            }}
+                            disabled={isProcessing}
+                            placeholder="或输入自定义指令 (回车执行)..."
+                            className="w-full bg-transparent text-xs text-slate-300 outline-none placeholder:text-slate-500"
+                        />
+                    </div>
                 </BubbleMenu>
             )}
 

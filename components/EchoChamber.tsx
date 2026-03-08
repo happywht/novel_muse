@@ -31,7 +31,7 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                 if (viewFilter === 'PENDING') {
                     return e.status === 'PENDING' || e.status === 'PREDICTION';
                 } else {
-                    return e.status === 'ACCEPTED' || e.status === 'REJECTED' || e.status === 'ARCHIVED';
+                    return e.status === 'ACCEPTED' || e.status === 'ARCHIVED';
                 }
             })
             .sort((a, b) => b.timestamp - a.timestamp);
@@ -58,7 +58,7 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
     const entityHistory = useMemo(() => {
         if (!effectiveTargetId) return [];
         return project.echoes
-            .filter(e => e.targetId === effectiveTargetId)
+            .filter(e => e.targetId === effectiveTargetId && e.status !== 'REJECTED')
             .sort((a, b) => b.timestamp - a.timestamp);
     }, [project.echoes, effectiveTargetId]);
 
@@ -85,6 +85,8 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
         setIsDeducing(true);
         try {
             const recommendations = await deduceWorldConsequences(
+                project.id,
+                project.activeBranchId || 'main',
                 project.echoes,
                 project.characters,
                 project.worldSettings,
@@ -309,8 +311,8 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                                                             )}
                                                             {t.trajectory && (
                                                                 <span className={`text-[8px] px-1 rounded font-bold uppercase ${t.trajectory === 'rising' ? 'bg-emerald-500/20 text-emerald-400' :
-                                                                        t.trajectory === 'falling' ? 'bg-rose-500/20 text-rose-400' :
-                                                                            'bg-slate-700 text-slate-400'
+                                                                    t.trajectory === 'falling' ? 'bg-rose-500/20 text-rose-400' :
+                                                                        'bg-slate-700 text-slate-400'
                                                                     }`}>
                                                                     {t.trajectory === 'rising' ? '↑' : t.trajectory === 'falling' ? '↓' : '→'}
                                                                 </span>

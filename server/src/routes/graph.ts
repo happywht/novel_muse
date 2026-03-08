@@ -71,14 +71,14 @@ router.get('/:projectId/subgraph', async (req: Request, res: Response) => {
     }
 });
 
-// GET /api/graph/:projectId/physical-status?anchors=A,B&branchId=main - Get physical status of entities
+// GET /api/graph/:projectId/physical-status?names=A,B&branchId=main - Get physical status of entities
 router.get('/:projectId/physical-status', async (req: Request, res: Response) => {
-    const { anchors, branchId } = req.query;
-    if (!anchors) {
-        res.status(400).json({ error: 'Missing anchors query parameter' });
+    const { names, branchId } = req.query;
+    if (!names) {
+        res.status(400).json({ error: 'Missing names query parameter' });
         return;
     }
-    const anchorList = (anchors as string).split(',');
+    const anchorList = (names as string).split(',');
     try {
         const status = await getPhysicalStatus(req.params.projectId as string, anchorList, branchId as string);
         res.json(status);

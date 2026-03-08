@@ -1,5 +1,5 @@
 import React from 'react';
-import { Book, Trash2, PenTool, RefreshCw, Clipboard, Check, Save, FileText } from 'lucide-react';
+import { Book, Trash2, PenTool, RefreshCw, Clipboard, Check, Save, FileText, Cloud } from 'lucide-react';
 import { ProjectState } from '../../types';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 
@@ -34,10 +34,22 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({
         <div className="w-full flex h-full gap-6 pt-10">
             {/* Left: Chapter List */}
             <div className="w-1/4 bg-slate-800/50 border border-slate-700 rounded-xl flex flex-col overflow-hidden">
-                <div className="p-4 border-b border-slate-700 bg-slate-900/50">
+                <div className="p-4 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
                     <h3 className="font-bold text-white flex items-center gap-2">
                         <Book size={18} className="text-muse-400" /> 正文目录
                     </h3>
+                    <button
+                        onClick={() => {
+                            if (activeChapterId) {
+                                fetchChapterContent(activeChapterId);
+                            }
+                        }}
+                        className={`text-xs px-2 py-1 rounded border transition-colors flex items-center gap-1 ${isLoading ? 'bg-indigo-900/50 text-indigo-300 border-indigo-500/30 cursor-not-allowed' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white'}`}
+                        title="从数据库拉取当前选中章节内容"
+                        disabled={!activeChapterId || isLoading}
+                    >
+                        <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} /> 同步
+                    </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-1">
                     {(project.chapters || []).length === 0 && (
@@ -50,8 +62,8 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({
                                 key={chapter.id}
                                 onClick={() => setActiveChapterId(chapter.id)}
                                 className={`p-3 rounded-lg cursor-pointer transition-colors group relative ${activeChapterId === chapter.id
-                                        ? 'bg-muse-900/50 text-muse-200 border border-muse-500/30'
-                                        : 'text-slate-300 hover:bg-slate-700/50 border border-transparent'
+                                    ? 'bg-muse-900/50 text-muse-200 border border-muse-500/30'
+                                    : 'text-slate-300 hover:bg-slate-700/50 border border-transparent'
                                     }`}
                             >
                                 <div className="flex justify-between items-center mb-1">
@@ -60,6 +72,16 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({
                                 </div>
                                 <h4 className="font-medium text-sm truncate pr-6">{chapter.title}</h4>
 
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        fetchChapterContent(chapter.id);
+                                    }}
+                                    className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-500 hover:text-sky-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                                    title="从云端同步此章"
+                                >
+                                    <Cloud size={14} />
+                                </button>
                                 <button
                                     onClick={(e) => handleDeleteChapter(e, chapter.id)}
                                     className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"

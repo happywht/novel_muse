@@ -166,7 +166,8 @@ export const useDraftingActions = ({
         if (!plotBeat || !useBackend) return;
         setIsGeneratingTwists(true);
         try {
-            const twists = await generateTwistHooks(plotBeat, project.creativeSettings);
+            const context = project.chapters.slice(-3).map(c => c.content || c.summary).join('\\n\\n');
+            const twists = await generateTwistHooks(context, plotBeat);
             setSuggestedTwists(twists);
         } catch (err) {
             console.error(err);
@@ -457,6 +458,19 @@ export const useDraftingActions = ({
         handleFetchInsights();
     };
 
+    const handleDeleteBranch = (e: React.MouseEvent, branchId: string) => {
+        e.stopPropagation();
+        if (branchId === 'main') return;
+        if (confirm(`确定要删除分歧 "${branchId}" 吗？该分支下未合并的专属数据将丢失。此操作无法撤销。`)) {
+            const newBranches = availableBranches.filter(b => b !== branchId);
+            setAvailableBranches(newBranches);
+            updateProject({ availableBranches: newBranches });
+            if (activeBranchId === branchId) {
+                handleSwitchBranch('main');
+            }
+        }
+    };
+
     // Logic Audit Handlers
     const triggerLogicAudit = async (content: string) => {
         if (!useBackend) return;
@@ -524,6 +538,7 @@ export const useDraftingActions = ({
         availableBranches,
         handleCreateBranch,
         handleSwitchBranch,
+        handleDeleteBranch,
 
         // Logic Audit
         isAuditingLogic,
