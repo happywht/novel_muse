@@ -206,6 +206,14 @@ export const buildPromptContent = (
 
     if (creativeSettings) {
         instruction += `\n\n【当前总体设定】\n- 核心风格: ${profile === 'WEB_NOVEL' ? '精品网文/爽文' : '传统文学/严肃文学'}\n- 叙事基调: ${creativeSettings.tone}\n- 文字风格: ${creativeSettings.style}\n- 目标受众: ${creativeSettings.targetAudience}`;
+
+        if (creativeSettings.styleTags && creativeSettings.styleTags.length > 0) {
+            instruction += `\n- 微观技法倾向: [${creativeSettings.styleTags.join('], [')}]`;
+        }
+
+        if (creativeSettings.referenceText && creativeSettings.referenceText.trim() !== '') {
+            instruction += `\n\n【最高优先级·笔迹无缝模仿参考】\n请严格分析并模仿以下文本的句式长短、词汇偏好、标点习惯和整体行文节奏，在接下来的创作中保持与此高度一致：\n"""\n${creativeSettings.referenceText}\n"""`;
+        }
     }
 
     return instruction;

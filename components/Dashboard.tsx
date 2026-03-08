@@ -32,7 +32,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject }) 
         setTimeout(() => setToast(null), 3000);
     };
 
-    const handleUpdateSettings = (key: keyof CreativeSettings, value: string | number) => {
+    const handleUpdateSettings = (key: keyof CreativeSettings, value: string | number | string[]) => {
         updateProject({
             creativeSettings: {
                 ...project.creativeSettings,
@@ -40,6 +40,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject }) 
             }
         });
     };
+
+    const toggleStyleTag = (tag: string) => {
+        const currentTags = project.creativeSettings.styleTags || [];
+        const newTags = currentTags.includes(tag)
+            ? currentTags.filter(t => t !== tag)
+            : [...currentTags, tag];
+        handleUpdateSettings('styleTags', newTags);
+    };
+
+    const PREDEFINED_STYLES = project.creativeSettings.promptProfile === 'WEB_NOVEL'
+        ? ['短句断句', '直接干脆', '对话密集', '侧重表情', '轻松吐槽', '杀伐果断']
+        : ['词藻华丽', '极简白描', '电影镜头', '心理测写', '动作剥析', '留白艺术'];
+
 
     const handleBrainstorm = async () => {
         if (!brainstormInput.trim()) return;
@@ -376,13 +389,39 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject }) 
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-[10px] font-medium text-slate-500 mb-2 uppercase tracking-wider">文字风格</label>
+                                <label className="block text-[10px] font-medium text-slate-500 mb-2 uppercase tracking-wider">文字风格与微观技法</label>
+                                <div className="flex flex-wrap gap-2 mb-3">
+                                    {PREDEFINED_STYLES.map(tag => (
+                                        <button
+                                            key={tag}
+                                            onClick={() => toggleStyleTag(tag)}
+                                            className={`text-[10px] px-2.5 py-1 rounded border transition-colors ${(project.creativeSettings.styleTags || []).includes(tag)
+                                                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                                                    : 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:border-slate-500'
+                                                }`}
+                                        >
+                                            {tag}
+                                        </button>
+                                    ))}
+                                </div>
                                 <input
                                     type="text"
                                     value={project.creativeSettings.style}
                                     onChange={(e) => handleUpdateSettings('style', e.target.value)}
                                     className="w-full bg-slate-900/60 border border-slate-700/50 rounded-lg p-2 text-sm text-white focus:ring-1 focus:ring-amber-500/40 outline-none placeholder-slate-600"
-                                    placeholder="例如：华丽辞藻、极简主义..."
+                                    placeholder="其他自定义风格描述..."
+                                />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className="block text-[10px] font-medium text-slate-500 mb-2 uppercase tracking-wider">
+                                    Few-Shot 笔迹对齐 (最高优先级参考)
+                                </label>
+                                <textarea
+                                    value={project.creativeSettings.referenceText || ''}
+                                    onChange={(e) => handleUpdateSettings('referenceText', e.target.value)}
+                                    className="w-full bg-slate-900/60 border border-slate-700/50 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-amber-500/40 outline-none placeholder-slate-600 custom-scrollbar resize-none"
+                                    rows={3}
+                                    placeholder="粘贴一段您最满意的原文（300字以内）。AI 将在生成正文时，无缝模仿这段文字的句式长短、标点习惯和描写倾向。"
                                 />
                             </div>
                             <div>

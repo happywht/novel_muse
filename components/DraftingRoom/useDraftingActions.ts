@@ -72,6 +72,11 @@ export const useDraftingActions = ({
     const [editingContent, setEditingContent] = React.useState('');
     const [isLoading, setIsLoading] = React.useState(false);
 
+    // Local Scene Style Palette Overrides
+    const [localStyleTags, setLocalStyleTags] = React.useState<string[]>([]);
+    const [localReferenceText, setLocalReferenceText] = React.useState<string>('');
+
+
     // Phase 5 States
     const [factions, setFactions] = React.useState<any[]>([]);
     const [isFetchingFactions, setIsFetchingFactions] = React.useState(false);
@@ -88,6 +93,13 @@ export const useDraftingActions = ({
     // Logic Audit State
     const [isAuditingLogic, setIsAuditingLogic] = React.useState(false);
     const [logicConflicts, setLogicConflicts] = React.useState<any[]>([]);
+
+    // Computed Settings
+    const effectiveCreativeSettings = {
+        ...project.creativeSettings,
+        styleTags: localStyleTags.length > 0 ? localStyleTags : project.creativeSettings.styleTags,
+        referenceText: localReferenceText.trim() !== '' ? localReferenceText : project.creativeSettings.referenceText
+    };
 
     // Effects for Bridge and Initialization
     React.useEffect(() => {
@@ -237,7 +249,7 @@ export const useDraftingActions = ({
 
             const result = await generateSceneFromIngredients(
                 project.genre, plotBeat, activeCharacters, activeLocation, project.worldSettings || [],
-                project.creativeSettings, previousContext, pacing, project.echoes || [],
+                effectiveCreativeSettings, previousContext, pacing, project.echoes || [],
                 targetWordCount, povCharName, rollingSummary, activeChapterId || undefined,
                 activeTwist || undefined, graphContext, physicalStatus, unresolvedForeshadowing
             );
@@ -261,7 +273,7 @@ export const useDraftingActions = ({
         setIsPolishing(true);
         setShowPolishMenu(false);
         try {
-            const result = await polishDraft(generatedContent, mode, project.creativeSettings);
+            const result = await polishDraft(generatedContent, mode, effectiveCreativeSettings);
             setGeneratedContent(result);
             const activeCharacters = (project.characters || []).filter(c => selectedChars.includes(c.id));
             triggerStateAnalysis(result, activeCharacters);
@@ -276,7 +288,7 @@ export const useDraftingActions = ({
         setIsLocalRewriting(true);
         try {
             const rewrittenText = await rewriteLocalText(
-                project.genre, targetText, contextBefore, contextAfter, instruction, project.creativeSettings
+                project.genre, targetText, contextBefore, contextAfter, instruction, effectiveCreativeSettings
             );
             applyRewrite(rewrittenText);
         } catch (e) {
@@ -601,6 +613,10 @@ export const useDraftingActions = ({
         isEditingManuscript, setIsEditingManuscript,
         editingContent, setEditingContent,
         isLoading,
+
+        // Local Style Overrides
+        localStyleTags, setLocalStyleTags,
+        localReferenceText, setLocalReferenceText,
 
         // Phase 5
         factions, isFetchingFactions, handleFetchFactions: handleFetchFactionsLocal,

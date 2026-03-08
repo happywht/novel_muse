@@ -416,6 +416,44 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
                                 className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-muse-500"
                             />
                         </div>
+
+                        {/* Phase 5: Local Scene Palette */}
+                        <div className="space-y-3 pt-3 mt-3 border-t border-slate-700">
+                            <div className="flex justify-between items-center text-amber-300/80 mb-1">
+                                <h3 className="text-xs font-bold flex items-center gap-1">
+                                    <Sparkles size={14} className="text-amber-400" /> 场景专属调色盘
+                                </h3>
+                                <span className="text-[9px] px-1.5 py-0.5 border border-amber-500/20 bg-amber-500/10 rounded text-amber-400">临时覆盖</span>
+                            </div>
+                            <div>
+                                <label className="block text-[9px] font-medium text-slate-500 mb-1.5 uppercase tracking-wider">临时特写技法</label>
+                                <div className="flex flex-wrap gap-1.5 mb-1">
+                                    {['战斗高燃', '极快节奏', '细腻心理', '恐怖氛围', '动作切片', '插科打诨'].map(tag => (
+                                        <button
+                                            key={tag}
+                                            onClick={() => actions.setLocalStyleTags((prev: string[]) => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])}
+                                            className={`text-[9px] px-2 py-0.5 rounded border transition-colors ${actions.localStyleTags?.includes(tag)
+                                                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                                                    : 'bg-slate-900/60 border-slate-700/50 text-slate-400 hover:border-slate-500'
+                                                }`}
+                                        >
+                                            {tag}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-[9px] font-medium text-slate-500 mb-1.5 uppercase tracking-wider">
+                                    场景范文注入 (Few-Shot)
+                                </label>
+                                <textarea
+                                    value={actions.localReferenceText}
+                                    onChange={(e) => actions.setLocalReferenceText(e.target.value)}
+                                    className="w-full bg-slate-900/50 border border-slate-700 rounded-lg p-2 text-amber-100/80 text-[10px] focus:ring-1 focus:ring-amber-500/50 outline-none custom-scrollbar resize-none min-h-[60px]"
+                                    placeholder="输入一段经典的场景描写，AI 将在本次生成中全力模仿它的句式、节奏和情绪..."
+                                />
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>

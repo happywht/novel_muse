@@ -79,7 +79,9 @@ export interface CreativeSettings {
   style: string;     // e.g., "Descriptive", "Concise", "Poetic"
   creativity: number; // 0.0 to 1.0 (Temperature)
   targetAudience: string;
-  promptProfile?: PromptProfile; // NEW: Choice of prompt pack
+  promptProfile?: PromptProfile; // Choice of prompt pack
+  styleTags?: string[]; // NEW: Micro tag selectors
+  referenceText?: string; // NEW: Few-Shot reference text
 }
 
 export interface WorldGenConfig {
