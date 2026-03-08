@@ -46,6 +46,13 @@ export const fetchChapter = async (projectId: string, chapterId: string): Promis
     return res.json();
 };
 
+/** Fetch all non-empty chapter contents for a project */
+export const fetchChaptersContent = async (projectId: string): Promise<{ id: string, content: string }[]> => {
+    const res = await fetch(`${API_BASE}/projects/${projectId}/chapters-content`);
+    if (!res.ok) throw new Error(`Failed to fetch chapters content: ${res.statusText}`);
+    return res.json();
+};
+
 /** Create a new project on the backend */
 export const createProject = async (): Promise<{ id: string; title: string }> => {
     const res = await fetch(`${API_BASE}/projects`, { method: 'POST' });

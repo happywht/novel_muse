@@ -212,6 +212,28 @@ router.get('/:id/chapters/:chapterId', async (req: Request, res: Response) => {
 });
 
 // ============================================
+// GET /api/projects/:id/chapters-content - Fetch all non-empty chapter contents
+// ============================================
+router.get('/:id/chapters-content', async (req: Request, res: Response) => {
+    try {
+        const chapters = await prisma.chapter.findMany({
+            where: {
+                projectId: req.params.id as string,
+                content: { not: "" }
+            },
+            select: {
+                id: true,
+                content: true
+            }
+        });
+
+        res.json(chapters);
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
 // POST /api/projects - Create new project
 // ============================================
 router.post('/', async (_req: Request, res: Response) => {

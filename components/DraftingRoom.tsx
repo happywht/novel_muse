@@ -23,6 +23,7 @@ interface DraftingRoomProps {
 
 export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProject }) => {
     const fetchChapterContent = useProjectStore(state => state.fetchChapterContent);
+    const fetchAllChaptersContent = useProjectStore(state => state.fetchAllChaptersContent);
     const activePlotNodeId = useProjectStore(state => state.activePlotNodeId);
     const setActivePlotNodeId = useProjectStore(state => state.setActivePlotNodeId);
     const activeChapterId = useProjectStore(state => state.activeChapterId);
@@ -89,6 +90,7 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                         setEditingContent={actions.setEditingContent}
                         updateProject={updateProject}
                         fetchChapterContent={fetchChapterContent}
+                        fetchAllChaptersContent={fetchAllChaptersContent}
                         handleDeleteChapter={actions.handleDeleteChapter}
                         isLoading={actions.isLoading}
                     />

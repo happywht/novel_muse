@@ -10,7 +10,7 @@
 
 import { create } from 'zustand';
 import { AppSection, ProjectState, WorldGenConfig } from '../types';
-import { isBackendAvailable, fetchProjectList, fetchProject, syncProject, patchProject, deleteProjectApi, fetchChapter } from '../services/apiService';
+import { isBackendAvailable, fetchProjectList, fetchProject, syncProject, patchProject, deleteProjectApi, fetchChapter, fetchChaptersContent } from '../services/apiService';
 import { storageService, STORAGE_KEYS } from '../services/storageService';
 
 // ============================================================
@@ -92,6 +92,7 @@ interface ProjectStore {
     syncToBackend: () => void;
     loadFromPersistentStorage: () => Promise<void>;
     fetchChapterContent: (chapterId: string) => Promise<void>;
+    fetchAllChaptersContent: () => Promise<void>;
     updateChapterSummary: (chapterId: string, summary: string) => Promise<void>;
     forceSync: () => Promise<void>;
 }
@@ -378,6 +379,34 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
             }
         } catch (err) {
             console.error('Failed to fetch chapter content:', err);
+        } finally {
+            set({ isLoading: false });
+        }
+    },
+
+    fetchAllChaptersContent: async () => {
+        const { project, useBackend } = get();
+        if (!useBackend) return;
+
+        set({ isLoading: true });
+        try {
+            const contents = await fetchChaptersContent(project.id);
+            if (contents && contents.length > 0) {
+                // Map the fetched contents back to the project chapters
+                const contentMap = new Map(contents.map(i => [i.id, i.content]));
+
+                set((state) => ({
+                    project: {
+                        ...state.project,
+                        chapters: state.project.chapters.map(c => ({
+                            ...c,
+                            content: contentMap.get(c.id) ?? c.content
+                        }))
+                    }
+                }));
+            }
+        } catch (err) {
+            console.error('Failed to fetch bulk chapters content:', err);
         } finally {
             set({ isLoading: false });
         }

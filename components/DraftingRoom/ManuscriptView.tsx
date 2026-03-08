@@ -13,6 +13,7 @@ interface ManuscriptViewProps {
     setEditingContent: (content: string) => void;
     updateProject: (data: Partial<ProjectState>) => void;
     fetchChapterContent: (id: string) => void;
+    fetchAllChaptersContent: () => void;
     handleDeleteChapter: (e: React.MouseEvent, id: string) => void;
     isLoading: boolean;
 }
@@ -27,6 +28,7 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({
     setEditingContent,
     updateProject,
     fetchChapterContent,
+    fetchAllChaptersContent,
     handleDeleteChapter,
     isLoading
 }) => {
@@ -40,13 +42,11 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({
                     </h3>
                     <button
                         onClick={() => {
-                            if (activeChapterId) {
-                                fetchChapterContent(activeChapterId);
-                            }
+                            fetchAllChaptersContent();
                         }}
                         className={`text-xs px-2 py-1 rounded border transition-colors flex items-center gap-1 ${isLoading ? 'bg-indigo-900/50 text-indigo-300 border-indigo-500/30 cursor-not-allowed' : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700 hover:text-white'}`}
-                        title="从数据库拉取当前选中章节内容"
-                        disabled={!activeChapterId || isLoading}
+                        title="从数据库拉取所有正文内容"
+                        disabled={isLoading}
                     >
                         <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} /> 同步
                     </button>
