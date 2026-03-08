@@ -1,17 +1,7 @@
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { Character, WorldSetting, CreativeSettings, StateChangeRecommendation, Echo, PlotNode, Chapter } from "../types";
+import { Character, WorldSetting, CreativeSettings, StateChangeRecommendation, Echo, PlotNode, Chapter, KnowledgeTriple, PhysicalStatus } from "../types";
 
-export interface KnowledgeTriple {
-    subject: string;
-    relation: string;
-    object: string;
-    weight?: number;
-    trajectory?: string;
-    isForeshadowing?: boolean; // NEW Task 2.1
-    status?: 'OPEN' | 'RESOLVED' | 'ABANDONED';
-}
 
-import { PhysicalStatus } from './apiService';
 
 export interface LogicConflict {
     type: 'LOCATION_MISMATCH' | 'RELATIONSHIP_CONFLICT' | 'FACTUAL_INCONSISTENCY';

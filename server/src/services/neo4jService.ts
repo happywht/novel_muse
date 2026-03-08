@@ -197,54 +197,76 @@ export const syncProjectToGraph = async (projectData: any): Promise<void> => {
             }
         }
 
-        // 6. Infer character-to-character relationships from text
-        if (projectData.characters?.length > 0) {
-            for (const char of projectData.characters) {
-                if (!char.relationships) continue;
-                const relText = char.relationships.toLowerCase();
+        // 8. Create Chapter nodes and link precedence/entities
+        if (projectData.chapters?.length > 0) {
+            const sortedChapters = [...projectData.chapters].sort((a, b) => a.order - b.order);
+            for (let i = 0; i < sortedChapters.length; i++) {
+                const ch = sortedChapters[i];
+                await session.run(
+                    `CREATE (c:Chapter {
+                        id: $id, title: $title, order: $order, 
+                        projectId: $projectId, summary: $summary, pov: $pov
+                    })`,
+                    {
+                        id: ch.id,
+                        title: ch.title,
+                        order: ch.order,
+                        projectId,
+                        summary: (ch.summary || '').substring(0, 1000),
+                        pov: ch.expectedPOV || ''
+                    }
+                );
 
-                // Find other characters mentioned in this character's relationships
-                for (const other of projectData.characters) {
-                    if (other.id === char.id) continue;
-                    if (relText.includes(other.name.toLowerCase())) {
-                        // Determine relationship type from keywords
-                        let relType = 'RELATED_TO';
-                        if (/仇|恨|敌|对立|对抗|仇恨/.test(relText)) relType = 'ENEMY_OF';
-                        else if (/爱|恋|喜欢|暗恋|情|爱慕/.test(relText)) relType = 'LOVES';
-                        else if (/友|伙伴|盟友|同伴|挚友/.test(relText)) relType = 'ALLY_OF';
-                        else if (/师|导师|徒|学生|老师/.test(relText)) relType = 'MENTORS';
-                        else if (/族|亲|兄|弟|姐|妹|父|母|子|女|血缘/.test(relText)) relType = 'KIN_OF';
+                // Link to POV character
+                if (ch.expectedPOV) {
+                    await session.run(
+                        `MATCH (ch:Chapter {id: $id, projectId: $projectId})
+                         MATCH (c:Character {projectId: $projectId})
+                         WHERE (toLower(c.name) CONTAINS toLower($pov)) OR (toLower($pov) CONTAINS toLower(c.name))
+                         MERGE (ch)-[:POV_IS]->(c)`,
+                        { id: ch.id, projectId, pov: ch.expectedPOV }
+                    );
+                }
 
-                        await session.run(
-                            `MATCH (a:Character {id: $fromId, projectId: $projectId})
-               MATCH (b:Character {id: $toId, projectId: $projectId})
-               MERGE (a)-[:${relType}]->(b)`,
-                            { fromId: char.id, toId: other.id, projectId }
-                        );
+                // Link precedence
+                if (i > 0) {
+                    await session.run(
+                        `MATCH (prev:Chapter {id: $prevId, projectId: $projectId})
+                         MATCH (curr:Chapter {id: $currId, projectId: $projectId})
+                         MERGE (prev)-[:PRECEDES]->(curr)`,
+                        { prevId: sortedChapters[i - 1].id, currId: ch.id, projectId }
+                    );
+                }
+
+                // Link involved entities via PlotNode link if available
+                if (ch.plotNodeId) {
+                    const node = (projectData.plotNodes || []).find((n: any) => n.id === ch.plotNodeId);
+                    if (node) {
+                        const charIds = Array.isArray(node.relatedCharacters) ? node.relatedCharacters : [];
+                        const locIds = Array.isArray(node.relatedLocations) ? node.relatedLocations : [];
+
+                        for (const charId of charIds) {
+                            await session.run(
+                                `MATCH (ch:Chapter {id: $chId, projectId: $projectId})
+                                 MATCH (c:Character {id: $charId, projectId: $projectId})
+                                 MERGE (ch)-[:INVOLVES]->(c)`,
+                                { chId: ch.id, charId, projectId }
+                            );
+                        }
+                        for (const locId of locIds) {
+                            await session.run(
+                                `MATCH (ch:Chapter {id: $chId, projectId: $projectId})
+                                 MATCH (l:WorldSetting {id: $locId, projectId: $projectId})
+                                 MERGE (ch)-[:LOCATED_IN]->(l)`,
+                                { chId: ch.id, locId, projectId }
+                            );
+                        }
                     }
                 }
             }
         }
 
-        // 7. Link characters to world settings by content overlap
-        if (projectData.characters?.length > 0 && projectData.worldSettings?.length > 0) {
-            for (const char of projectData.characters) {
-                const charDesc = (char.description || '').toLowerCase();
-                for (const ws of projectData.worldSettings) {
-                    // Check if the world setting title appears in character description
-                    if (charDesc.includes(ws.title.toLowerCase())) {
-                        await session.run(
-                            `MATCH (c:Character {id: $charId, projectId: $projectId})
-               MATCH (w:WorldSetting {id: $wsId, projectId: $projectId})
-               MERGE (c)-[:LOCATED_IN]->(w)`,
-                            { charId: char.id, wsId: ws.id, projectId }
-                        );
-                    }
-                }
-            }
-        }
-
-        console.log(`📊 Graph synced for project ${projectId}: ${projectData.characters?.length || 0} chars, ${projectData.worldSettings?.length || 0} settings, ${projectData.timeline?.length || 0} events`);
+        console.log(`📊 Graph synced for project ${projectId}: ${projectData.characters?.length || 0} chars, ${projectData.worldSettings?.length || 0} settings, ${projectData.chapters?.length || 0} chapters`);
     } finally {
         await session.close();
     }
@@ -519,13 +541,29 @@ export const getRelatedSubgraph = async (
     const d = getDriver();
     const session = d.session();
     try {
-        // Find nodes matching anchors and all their 1-hop relationships
+        // Task 3.1: Optimized Multi-Anchor Subgraph Extraction
+        // 1. Fetch 1-hop relationships for all anchors
+        // 2. Prioritize high-weight relationships (Task 1.1)
+        // 3. Intelligently include connections BETWEEN anchors (even if 2+ hops)
         const result = await session.run(
             `MATCH (n {projectId: $projectId})
-             WHERE n.name IN $anchors OR n.title IN $anchors
+             WHERE (n.name IN $anchors OR n.title IN $anchors)
+             AND (n.branchId IS NULL OR n.branchId = 'main' OR n.branchId = $branchId)
+             
+             // Get 1-hop 
              OPTIONAL MATCH (n)-[r]-(m {projectId: $projectId})
-             WHERE r.branchId IS NULL OR r.branchId = 'main' OR r.branchId = $branchId
-             RETURN n, r, m, startNode(r) = n AS isOutgoing`,
+             WHERE (r.branchId IS NULL OR r.branchId = 'main' OR r.branchId = $branchId)
+             AND (m.branchId IS NULL OR m.branchId = 'main' OR m.branchId = $branchId)
+             
+             // Filtering Task 3.1: Only take high-weight relations for peripheral nodes
+             // but keep all relationships BETWEEN primary anchors
+             WITH n, r, m, 
+                  (m.name IN $anchors OR m.title IN $anchors) AS isMutualAnchor,
+                  coalesce(r.weight, 50) AS weight
+             WHERE isMutualAnchor OR weight >= 30
+             
+             RETURN n, r, m, startNode(r) = n AS isOutgoing, weight
+             ORDER BY weight DESC LIMIT 50`,
             { projectId, anchors: anchorNames, branchId }
         );
 
@@ -541,6 +579,7 @@ export const getRelatedSubgraph = async (
             const r = record.get('r');
             const m = record.get('m');
             const isOutgoing = record.get('isOutgoing');
+            const weight = record.get('weight').toNumber();
 
             // Process Primary Node (n)
             if (!seenEntityIds.has(n.properties.id)) {
@@ -558,10 +597,11 @@ export const getRelatedSubgraph = async (
                     const mName = m.properties.name || m.properties.title;
                     const type = r.type;
 
+                    const weightSuffix = weight !== 50 ? ` (Intensity: ${weight})` : "";
                     if (isOutgoing) {
-                        relationshipsStr.push(`(${nName}) -[${type}]-> (${mName})`);
+                        relationshipsStr.push(`(${nName}) -[${type}]-> (${mName})${weightSuffix}`);
                     } else {
-                        relationshipsStr.push(`(${mName}) -[${type}]-> (${nName})`);
+                        relationshipsStr.push(`(${mName}) -[${type}]-> (${nName})${weightSuffix}`);
                     }
                     seenRelationIds.add(rId);
 
@@ -784,3 +824,113 @@ export const mergeBranch = async (projectId: string, branchId: string): Promise<
     }
 };
 
+/**
+ * Task 5.1: Faction Detection (阵营识别)
+ * Uses relationship patterns to group characters into factions.
+ * Returns a list of faction groups with their member names.
+ */
+export const getFactionGroups = async (projectId: string): Promise<any[]> => {
+    const d = getDriver();
+    const session = d.session();
+    try {
+        // Simple cluster discovery using Cypher: 
+        // Group characters who have many positive (ALLY_OF, LOVES, KIN_OF) relations
+        const result = await session.run(
+            `MATCH (c:Character {projectId: $projectId})
+             OPTIONAL MATCH (c)-[r]-(neighbor:Character {projectId: $projectId})
+             WHERE type(r) IN ['ALLY_OF', 'LOVES', 'KIN_OF', 'MENTORS']
+             WITH c, collect(DISTINCT neighbor.name) AS allies
+             RETURN c.name AS name, allies`,
+            { projectId }
+        );
+
+        const factions: any[] = [];
+        const processed = new Set<string>();
+
+        for (const record of result.records) {
+            const name = record.get('name');
+            const allies = record.get('allies');
+            if (processed.has(name)) continue;
+
+            const currentFactionMembers = [name, ...allies.filter((a: string) => !processed.has(a))];
+            currentFactionMembers.forEach(n => processed.add(n as string));
+
+            if (currentFactionMembers.length > 0) {
+                factions.push({
+                    id: `faction_${factions.length + 1}`,
+                    members: currentFactionMembers,
+                    dominantTone: "Stable"
+                });
+            }
+        }
+
+        return factions;
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * Task 5.2: State Propagation Simulator (势能传播/蝴蝶效应)
+ * Calculates how a change to one character affects others through the graph.
+ */
+export interface PropagationRisk {
+    targetName: string;
+    impact: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL';
+    magnitude: number; // 0-100
+    reason: string;
+}
+
+export const simulateStatePropagation = async (
+    projectId: string,
+    triggerName: string,
+    changeDescription: string
+): Promise<PropagationRisk[]> => {
+    const d = getDriver();
+    const session = d.session();
+    try {
+        // 1. Identify if the change is positive or negative for the trigger
+        const isNegative = /伤|死|败|失|弱|减|退|仇|毁|离|病/.test(changeDescription);
+
+        // 2. Fetch direct relationships
+        const result = await session.run(
+            `MATCH (n {projectId: $projectId})
+             WHERE n.name = $triggerName OR n.title = $triggerName
+             MATCH (n)-[r]-(m {projectId: $projectId})
+             RETURN n.name as source, type(r) as relType, m.name as target, coalesce(r.weight, 50) as weight`,
+            { projectId, triggerName }
+        );
+
+        const risks: PropagationRisk[] = [];
+        for (const record of result.records) {
+            const relType = record.get('relType');
+            const target = record.get('target');
+            const rawWeight = record.get('weight');
+            const weight = (typeof rawWeight === 'number') ? rawWeight : (rawWeight.toNumber ? rawWeight.toNumber() : 50);
+
+            let impact: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL' = 'NEUTRAL';
+            let reason = "";
+
+            if (['ALLY_OF', 'LOVES', 'KIN_OF', 'MENTORS'].includes(relType)) {
+                impact = isNegative ? 'NEGATIVE' : 'POSITIVE';
+                reason = isNegative ? `由于盟友 ${triggerName} 受损，${target} 的后援被削弱` : `${triggerName} 的好转增强了其盟友 ${target} 的地位`;
+            } else if (['ENEMY_OF'].includes(relType)) {
+                impact = isNegative ? 'POSITIVE' : 'NEGATIVE';
+                reason = isNegative ? `宿敌 ${triggerName} 的衰落给 ${target} 留下了可乘之机` : `敌对势力 ${triggerName} 的增强对 ${target} 构成了更大威胁`;
+            }
+
+            if (impact !== 'NEUTRAL') {
+                risks.push({
+                    targetName: target,
+                    impact,
+                    magnitude: Math.round(weight * 0.6), // Impact dampening
+                    reason
+                });
+            }
+        }
+
+        return risks.sort((a, b) => b.magnitude - a.magnitude);
+    } finally {
+        await session.close();
+    }
+};

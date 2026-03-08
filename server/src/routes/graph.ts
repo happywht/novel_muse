@@ -3,7 +3,7 @@ import {
     getProjectGraph, findPath, getNeighbors, syncProjectToGraph,
     createEdge, verifyLogicConflicts, getRelatedSubgraph,
     inferNarrativeInsights, getPhysicalStatus, getUnresolvedForeshadowing,
-    mergeBranch
+    mergeBranch, getFactionGroups, simulateStatePropagation
 } from '../services/neo4jService';
 
 const router = Router();
@@ -155,6 +155,33 @@ router.post('/:projectId/merge', async (req: Request, res: Response) => {
         res.json({ success: true });
     } catch (err: any) {
         console.error('Branch merge error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/graph/:projectId/factions - Get character factions
+router.get('/:projectId/factions', async (req: Request, res: Response) => {
+    try {
+        const factions = await getFactionGroups(req.params.projectId as string);
+        res.json(factions);
+    } catch (err: any) {
+        console.error('Fetch factions error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/graph/:projectId/propagate - Simulate butterfly effect
+router.post('/:projectId/propagate', async (req: Request, res: Response) => {
+    try {
+        const { triggerName, changeDescription } = req.body;
+        if (!triggerName) {
+            res.status(400).json({ error: 'triggerName required' });
+            return;
+        }
+        const risks = await simulateStatePropagation(req.params.projectId as string, triggerName, changeDescription || "");
+        res.json(risks);
+    } catch (err: any) {
+        console.error('Propagation simulation error:', err);
         res.status(500).json({ error: err.message });
     }
 });

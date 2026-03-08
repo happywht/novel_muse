@@ -1,8 +1,7 @@
-/**
- * API Service Layer
- * Handles communication between the React frontend and the Express backend.
- * Falls back to localStorage when the backend is unavailable.
- */
+import {
+    ProjectState, Character, WorldSetting, Draft, Chapter, Echo,
+    KnowledgeTriple, Faction, PropagationRisk, PhysicalStatus
+} from '../types';
 
 const API_BASE = 'http://localhost:3001/api';
 
@@ -83,8 +82,6 @@ export const deleteProjectApi = async (id: string): Promise<void> => {
 // ============================================
 // Graph API
 // ============================================
-
-import { ProjectState, Character, WorldSetting, Draft, Chapter, Echo, KnowledgeTriple } from '../types';
 export interface GraphNode {
     id: string;
     label: string;
@@ -142,13 +139,6 @@ export const fetchNarrativeInsights = async (projectId: string, branchId: string
     return await response.json();
 };
 
-export interface PhysicalStatus {
-    name: string;
-    location: string;
-    state: string;
-    isDead: boolean;
-}
-
 export const fetchPhysicalStatus = async (projectId: string, characterNames: string[], branchId: string = 'main'): Promise<PhysicalStatus[]> => {
     const response = await fetch(`${API_BASE}/graph/${projectId}/physical-status?names=${encodeURIComponent(characterNames.join(','))}&branchId=${branchId}`);
     if (!response.ok) throw new Error('Failed to fetch physical status');
@@ -176,3 +166,20 @@ export const mergeBranchApi = async (projectId: string, branchId: string): Promi
     if (!response.ok) throw new Error('Failed to merge branch');
 };
 
+// Task 5.1: Fetch faction groups
+export const fetchFactions = async (projectId: string): Promise<Faction[]> => {
+    const response = await fetch(`${API_BASE}/graph/${projectId}/factions`);
+    if (!response.ok) return [];
+    return await response.json();
+};
+
+// Task 5.2: Simulate state propagation (Butterfly Effect)
+export const simulatePropagation = async (projectId: string, triggerName: string, changeDescription: string): Promise<PropagationRisk[]> => {
+    const response = await fetch(`${API_BASE}/graph/${projectId}/propagate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ triggerName, changeDescription })
+    });
+    if (!response.ok) return [];
+    return await response.json();
+};

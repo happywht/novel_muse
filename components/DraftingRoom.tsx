@@ -1,7 +1,7 @@
 ﻿import React, { useState } from 'react';
-import { ProjectState, Character, WorldSetting, Draft, Chapter, StateChangeRecommendation, Echo, KnowledgeTriple } from '../types';
+import { ProjectState, Character, WorldSetting, Draft, Chapter, StateChangeRecommendation, Echo, KnowledgeTriple, Faction, PropagationRisk } from '../types';
 import { generateSceneFromIngredients, analyzeStateChanges, PacingMode, polishDraft, PolishMode, extractEchoesFromText, summarizeChapter, extractKnowledgeTriples, verifyLogicConflicts, LogicConflict, generateTwistHooks, buildTieredMemory, rewriteLocalText, rewritePlot } from '../services/geminiService';
-import { fetchRelatedSubgraph, fetchNarrativeInsights, fetchPhysicalStatus, fetchUnresolvedForeshadowing, mergeBranchApi } from '../services/apiService';
+import { fetchRelatedSubgraph, fetchNarrativeInsights, fetchPhysicalStatus, fetchUnresolvedForeshadowing, mergeBranchApi, fetchFactions, simulatePropagation } from '../services/apiService';
 
 export interface NarrativeInsight {
     type: 'ALLIANCE_POTENTIAL' | 'CONFLICT_WARNING' | 'SECRET_CONNECTION' | 'FACTION_SHIFT';
@@ -51,6 +51,146 @@ const ContinuityBanner: React.FC<{ project: ProjectState, activeChapterId: strin
     }
 
     return null;
+};
+
+/**
+ * Task 5.2: Butterfly Effect Preview Panel
+ */
+const ButterflyPanel: React.FC<{
+    risks: PropagationRisk[],
+    isLoading: boolean,
+    onClose: () => void
+}> = ({ risks, isLoading, onClose }) => {
+    return (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-[100] p-6 animate-in fade-in duration-300">
+            <div className="bg-slate-900 w-full max-w-2xl border border-muse-500/30 rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
+                <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Zap className="text-muse-400" size={18} />
+                        <h2 className="text-lg font-bold text-slate-100">蝴蝶效应预演 (Butterfly Effect Preview)</h2>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                    {isLoading ? (
+                        <div className="flex flex-col items-center justify-center py-12 gap-4">
+                            <RefreshCw className="text-muse-500 animate-spin" size={32} />
+                            <p className="text-slate-400 animate-pulse">正在利用图谱势能传播算法预测影响趋势...</p>
+                        </div>
+                    ) : risks.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500">
+                            没有检测到显著的连带影响。
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {risks.map((risk, i) => (
+                                <div key={i} className={`p-3 rounded-xl border flex flex-col gap-2 ${risk.impact === 'POSITIVE' ? 'bg-emerald-900/20 border-emerald-500/30' :
+                                    risk.impact === 'NEGATIVE' ? 'bg-rose-900/20 border-rose-500/30' :
+                                        'bg-slate-800/50 border-slate-700'
+                                    }`}>
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-bold text-slate-200">{risk.targetName}</span>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${risk.impact === 'POSITIVE' ? 'bg-emerald-500 text-emerald-950' :
+                                            risk.impact === 'NEGATIVE' ? 'bg-rose-500 text-rose-950' :
+                                                'bg-slate-500 text-slate-950'
+                                            }`}>
+                                            {risk.impact === 'POSITIVE' ? '正面' : risk.impact === 'NEGATIVE' ? '负面' : '中性'}
+                                        </span>
+                                    </div>
+                                    <div className="w-full bg-black/30 h-1.5 rounded-full overflow-hidden">
+                                        <div
+                                            className={`h-full transition-all duration-1000 ${risk.impact === 'POSITIVE' ? 'bg-emerald-500' :
+                                                risk.impact === 'NEGATIVE' ? 'bg-rose-500' :
+                                                    'bg-slate-500'
+                                                }`}
+                                            style={{ width: `${Math.max(10, risk.magnitude)}%` }}
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 leading-relaxed italic line-clamp-3">"{risk.reason}"</p>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="p-4 border-t border-slate-800 flex justify-end">
+                    <button onClick={onClose} className="px-6 py-2 bg-muse-600 hover:bg-muse-500 text-white rounded-xl font-bold transition-all transform active:scale-95 shadow-lg shadow-muse-900/20">
+                        已查阅
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+/**
+ * Task 5.1: Faction Dynamics Panel
+ */
+const FactionPanel: React.FC<{
+    factions: Faction[],
+    isLoading: boolean,
+    onClose: () => void
+}> = ({ factions, isLoading, onClose }) => {
+    return (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-[100] p-6 animate-in fade-in duration-300">
+            <div className="bg-slate-900 w-full max-w-2xl border border-indigo-500/30 rounded-2xl shadow-2xl flex flex-col max-h-[80vh]">
+                <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Users className="text-indigo-400" size={18} />
+                        <h2 className="text-lg font-bold text-slate-100">势力版图 (Faction Dynamics)</h2>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400">
+                        <X size={20} />
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                    {isLoading ? (
+                        <div className="flex flex-col items-center justify-center py-12 gap-4">
+                            <RefreshCw className="text-indigo-500 animate-spin" size={32} />
+                            <p className="text-slate-400">正在通过关系权重计算势力聚类...</p>
+                        </div>
+                    ) : factions.length === 0 ? (
+                        <div className="text-center py-12 text-slate-500">
+                            暂无势力划分，可能是角色间关系较为疏离。
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {factions.map((faction, j) => (
+                                <div key={j} className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h3 className="text-sm font-bold text-indigo-300">阵营 {j + 1}</h3>
+                                        <span className="text-[10px] text-slate-500 uppercase tracking-widest">{faction.members.length} 成员</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {faction.members.map((member, k) => (
+                                            <span key={k} className="bg-indigo-900/30 text-indigo-200 px-3 py-1 rounded-full text-xs border border-indigo-500/20">
+                                                {member}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    {faction.dominantTone && (
+                                        <div className="mt-3 pt-3 border-t border-slate-700/50">
+                                            <p className="text-[10px] text-slate-500">势力特征：<span className="text-slate-300">{faction.dominantTone}</span></p>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="p-4 border-t border-slate-800 flex justify-end">
+                    <button onClick={onClose} className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition-all transform active:scale-95 shadow-lg shadow-indigo-900/20">
+                        了解
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProject }) => {
@@ -113,9 +253,16 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     const [narrativeInsights, setNarrativeInsights] = useState<NarrativeInsight[]>([]);
     const [isFetchingInsights, setIsFetchingInsights] = useState(false);
 
-    // Foreshadowing State (Task 2.1)
     const [pendingForeshadowing, setPendingForeshadowing] = useState<KnowledgeTriple[]>([]);
     const [isFetchingForeshadowing, setIsFetchingForeshadowing] = useState(false);
+
+    // Task 5.1 & 5.2: Faction Dynamics State
+    const [factions, setFactions] = useState<Faction[]>([]);
+    const [isFetchingFactions, setIsFetchingFactions] = useState(false);
+    const [propagationRisks, setPropagationRisks] = useState<PropagationRisk[]>([]);
+    const [isSimulatingPropagation, setIsSimulatingPropagation] = useState(false);
+    const [showButterflyPanel, setShowButterflyPanel] = useState(false);
+    const [showFactionPanel, setShowFactionPanel] = useState(false);
 
     const handleFetchForeshadowing = async () => {
         if (!useBackend) return;
@@ -140,6 +287,34 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
             console.error("Failed to fetch insights:", err);
         } finally {
             setIsFetchingInsights(false);
+        }
+    };
+
+    const handleFetchFactions = async () => {
+        if (!useBackend) return;
+        setIsFetchingFactions(true);
+        try {
+            const data = await fetchFactions(project.id);
+            setFactions(data);
+        } catch (err) {
+            console.error("Failed to fetch factions:", err);
+        } finally {
+            setIsFetchingFactions(false);
+        }
+    };
+
+    const handleSimulatePropagation = async (triggerName: string, changeDescription: string) => {
+        if (!useBackend || !triggerName) return;
+        setIsSimulatingPropagation(true);
+        setPropagationRisks([]);
+        setShowButterflyPanel(true);
+        try {
+            const data = await simulatePropagation(project.id, triggerName, changeDescription);
+            setPropagationRisks(data);
+        } catch (err) {
+            console.error("Failed to simulate propagation:", err);
+        } finally {
+            setIsSimulatingPropagation(false);
         }
     };
 
@@ -1043,6 +1218,18 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                             )}
                         </div>
 
+                        {/* Phase 5: Faction Dynamics Button */}
+                        {useBackend && (
+                            <button
+                                onClick={() => { handleFetchFactions(); setShowFactionPanel(true); }}
+                                disabled={isFetchingFactions}
+                                className="w-full bg-indigo-900/30 hover:bg-indigo-800/40 text-indigo-300 py-2 rounded-xl font-bold border border-indigo-500/20 flex items-center justify-center gap-2 transition-all text-sm mt-2 disabled:opacity-50"
+                            >
+                                {isFetchingFactions ? <RefreshCw size={14} className="animate-spin" /> : <Users size={14} />}
+                                势力版图
+                            </button>
+                        )}
+
                         {/* Action Button */}
                         <button
                             onClick={handleGenerate}
@@ -1195,6 +1382,13 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                                                         <p className="text-muse-300 text-xs mt-1">{echo.description}</p>
                                                     </div>
                                                     <div className="flex gap-1 shrink-0">
+                                                        <button
+                                                            onClick={() => handleSimulatePropagation(echo.targetName, echo.description)}
+                                                            title="蝴蝶效应预演"
+                                                            className="text-muse-400 hover:text-muse-300 p-1"
+                                                        >
+                                                            <Zap size={14} />
+                                                        </button>
                                                         <button onClick={() => handleAddEcho(echo)} className="text-emerald-500 hover:text-emerald-400 p-1"><Check size={14} /></button>
                                                         <button onClick={() => setExtractedEchoes(prev => prev.filter(e => e.id !== echo.id))} className="text-slate-500 hover:text-red-400 p-1"><X size={14} /></button>
                                                     </div>
@@ -1391,6 +1585,23 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                         )}
                     </div>
                 </div>
+            )}
+            {/* Phase 5: Butterfly Effect Panel */}
+            {showButterflyPanel && (
+                <ButterflyPanel
+                    risks={propagationRisks}
+                    isLoading={isSimulatingPropagation}
+                    onClose={() => setShowButterflyPanel(false)}
+                />
+            )}
+
+            {/* Phase 5: Factions Panel */}
+            {showFactionPanel && (
+                <FactionPanel
+                    factions={factions}
+                    isLoading={isFetchingFactions}
+                    onClose={() => setShowFactionPanel(false)}
+                />
             )}
         </div>
     );

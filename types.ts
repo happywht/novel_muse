@@ -145,6 +145,26 @@ export interface TimelineEvent {
   type: 'SCENE' | 'BACKGROUND' | 'ECHO';
 }
 
+export interface Faction {
+  id: string;
+  members: string[]; // Names of characters
+  dominantTone?: string;
+}
+
+export interface PropagationRisk {
+  targetName: string;
+  impact: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL';
+  magnitude: number; // 0-100
+  reason: string;
+}
+
+export interface PhysicalStatus {
+  name: string;
+  location: string;
+  state: string;
+  isDead: boolean;
+}
+
 export interface ProjectState {
   id: string; // Unique ID for persistence
   lastModified: number;
