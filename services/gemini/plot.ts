@@ -1,0 +1,421 @@
+import { Type } from "@google/genai";
+import {
+    Character, WorldSetting, CreativeSettings, Echo, PlotNode,
+    Chapter
+} from "../../types";
+import {
+    safeParseAiJson, AiPlotNodeArraySchema, AiPlotRhythmArraySchema as SchemaPlotRhythm,
+    AiChapterOutlineArraySchema
+} from "../schemas";
+import {
+    getAIClient, executeModelTask, getInstructionWithSettings, getModelName
+} from "./core";
+import { formatContext, filterRelevantSettings } from "./helpers";
+
+export interface PlotRhythmPoint {
+    beat: string;
+    tension: number;
+    description: string;
+}
+
+/**
+ * Generate plot outline from context and premise
+ */
+export const generatePlotFromContext = async (
+    premise: string,
+    genre: string,
+    characters: Character[],
+    worldSettings: WorldSetting[],
+    settings?: CreativeSettings,
+    template?: string,
+    echoes: Echo[] = []
+): Promise<{ title: string; content: string }[]> => {
+    const queryContext = `${premise} ${template || ''} ${characters.map(c => c.name).join(' ')}`;
+    const relevantSettings = filterRelevantSettings(worldSettings, queryContext, 15);
+
+    let contextStr = "【登场角色 (Cast)】\n";
+    if (characters.length > 0) {
+        characters.forEach(c => {
+            const charEchoes = echoes.filter(e => e.targetId === c.id && e.status === 'ACCEPTED').sort((a, b) => a.timestamp - b.timestamp);
+            contextStr += `- ${c.name} (${c.role}): ${c.description} (关系: ${c.relationships})\n`;
+            if (charEchoes.length > 0) {
+                contextStr += `  ⚡ [当前状态变更]: ${charEchoes.map(e => e.description).join('; ')}\n`;
+            }
+        });
+    } else {
+        contextStr += "尚未设定。\n";
+    }
+
+    contextStr += "\n【高相关度世界观法则 (Deep Lore Context)】\n";
+    if (relevantSettings.length > 0) {
+        const categories = Array.from(new Set(relevantSettings.map(w => w.category)));
+        categories.forEach(cat => {
+            const items = relevantSettings.filter(w => w.category === cat);
+            if (items.length > 0) {
+                contextStr += `[${cat}]:\n`;
+                items.forEach(w => contextStr += `  - ${w.title}: ${w.content.slice(0, 500)}${w.content.length > 500 ? '...' : ''}\n`);
+            }
+        });
+    } else {
+        contextStr += "无特别约束设定。\n";
+    }
+
+    const instruction = getInstructionWithSettings('plot_weaving', settings);
+
+    let taskRequirement = `
+  任务要求：
+  1. 结合人物的性格缺陷和目标，设计引发剧情的激励事件。
+  2. 利用【高相关度世界观法则】制造专属设定的障碍、谜题和转折。
+  3. 确保角色关系随着剧情推进而发生变化。
+  4. **整合【当前状态变更】**：剧情发展必须考虑角色当前的状态（如伤病、道具、已发生的事件）。`;
+
+    if (template) {
+        taskRequirement += `\n\n【关键要求】请严格按照以下经典故事结构模版进行填充和创作：\n${template}`;
+    } else {
+        taskRequirement += `\n\n请生成一个包含 "起、承、转、合" 或 "分章/分幕" 结构的详细大纲。`;
+    }
+
+    const prompt = `
+  小说类型: ${genre}
+  核心梗概: ${premise}
+  
+  ${contextStr}
+  
+  ${taskRequirement}
+  
+  请直接输出大纲内容。
+  
+  **重要输出格式要求**：
+  你必须返回一个符合以下 JSON 结构的数组：
+  [
+    { "title": "情节标题", "content": "该情节点的详细描述..." },
+    ...
+  ]
+  禁止包含任何开场白或解释文字。
+  `;
+
+    try {
+        const responseText = await executeModelTask(
+            'generatePlot',
+            instruction,
+            prompt,
+            'gemini-3-pro-preview',
+            0.6,
+            AiPlotNodeArraySchema,
+            4096
+        );
+
+        const result = safeParseAiJson(responseText, AiPlotNodeArraySchema, "Plot Generation");
+        return result || [];
+    } catch (error) {
+        console.error("Gemini Plot Generation Error:", error);
+        throw error;
+    }
+};
+
+/**
+ * Rewrite plot based on feedback
+ */
+export const rewritePlot = async (
+    currentPlot: string,
+    directive: string,
+    genre: string,
+    characters: Character[],
+    worldSettings: WorldSetting[],
+    settings?: CreativeSettings,
+    echoes: Echo[] = []
+): Promise<{ title: string; content: string }[]> => {
+    const contextStr = formatContext(characters, worldSettings, echoes);
+    const instruction = getInstructionWithSettings('plot_weaving', settings);
+
+    const prompt = `
+    你是一个天才的剧情架构师。
+    你的任务是根据【修改指令】对现有的【剧情大纲】进行局部或全局的优化。
+    
+    小说类型: ${genre}
+    
+    ${contextStr}
+    
+    【当前剧情大纲】:
+    ${currentPlot}
+    
+    【修改指令/诊断反馈】:
+    ${directive}
+    
+    任务要求：
+    1. **精准落实指令**：针对指令（或诊断反馈）指出需要修复的地方进行精准修改。
+    2. **最小变动原则**：禁止进行无关的重写。凡是指令未涉及的部分，应尽可能保持原有的文字、结构和逻辑不变。
+    3. **保持连贯性**：修改后的剧情必须与角色设定和世界观保持高度的一致性。
+    4. **意志遵从度**：你的目标是执行“微创手术”修复问题，严禁自作主张大改大纲基调。
+    
+    **重要输出格式要求**：
+    你必须返回一个符合以下 JSON 结构的数组：
+    [
+      { "title": "情节标题", "content": "该情节点的详细描述..." },
+      ...
+    ]
+    禁止包含任何开场白或解释文字。
+    `;
+
+    try {
+        const responseText = await executeModelTask(
+            'rewritePlot',
+            instruction,
+            prompt,
+            'gemini-3-pro-preview',
+            0.3,
+            AiPlotNodeArraySchema,
+            4096
+        );
+
+        const result = safeParseAiJson(responseText, AiPlotNodeArraySchema, "Plot Rewrite");
+        return result || [];
+    } catch (e) {
+        console.error("Gemini Plot Rewrite Error:", e);
+        throw e;
+    }
+};
+
+/**
+ * Analyze plot rhythm and tension
+ */
+export const analyzePlotRhythm = async (plotOutline: string): Promise<PlotRhythmPoint[]> => {
+    const responseSchema = {
+        type: Type.ARRAY,
+        items: {
+            type: Type.OBJECT,
+            properties: {
+                beat: { type: Type.STRING, description: "章节名称或关键情节点 (e.g., '第一章', '激励事件')" },
+                tension: { type: Type.NUMBER, description: "该点的剧情张力值 (0-100)，0为平静，100为最高潮" },
+                description: { type: Type.STRING, description: "简短描述该点的剧情内容" }
+            },
+            required: ["beat", "tension", "description"]
+        }
+    };
+
+    const prompt = `
+    请分析以下小说大纲的剧情节奏和张力起伏。
+    将大纲拆解为关键的剧情点（Beat），并评估每个点的张力值（Tension Level）。
+    
+    【评分标准】
+    0-20: 平静、铺垫、日常
+    21-40: 小波澜、伏笔、对话
+    41-60: 冲突升级、阻碍出现
+    61-80: 重大转折、危机、战斗
+    81-100: 终极高潮、生死攸关、核心揭秘
+
+    【剧情大纲】:
+    ${plotOutline}
+
+    请输出 JSON 格式的分析结果，包含至少 5-10 个关键点。
+    `;
+
+    try {
+        const responseText = await executeModelTask(
+            'analyzePlotRhythm',
+            '',
+            prompt,
+            await getModelName('flash'),
+            0.2,
+            responseSchema
+        );
+
+        const parsed = safeParseAiJson(responseText, SchemaPlotRhythm, 'analyzePlotRhythm');
+        return parsed ?? [];
+    } catch (e) {
+        console.error("Rhythm Analysis Error", e);
+        return [];
+    }
+};
+
+/**
+ * Split large plot node into detailed chapter outlines (Chapter Fission)
+ */
+export const splitPlotNodeIntoChapters = async (
+    genre: string,
+    fullPlotSummary: string,
+    targetNode: PlotNode,
+    characters: Character[],
+    worldSettings: WorldSetting[],
+    settings?: CreativeSettings,
+    echoes: Echo[] = [],
+    fissionCount: number | 'AUTO' = 'AUTO'
+): Promise<{ title: string; summary: string; expectedPOV: string; beats?: { type: string; description: string }[] }[]> => {
+    const contextStr = formatContext(characters, worldSettings, echoes);
+    const instruction = getInstructionWithSettings('plot_fission', settings);
+    const countInstruction = fissionCount === 'AUTO' ? '2-3 个' : `${fissionCount} 个`;
+
+    const prompt = `
+    小说类型: ${genre}
+    项目全剧情概览: ${fullPlotSummary}
+    
+    ${contextStr}
+    
+    【当前需要拆解的情节节点 (Plot Beat)】:
+    标题: ${targetNode.title}
+    具体内容: ${targetNode.content}
+    
+    任务：
+    请将这个中观维度的“情节节点”进一步细化分解为 ${countInstruction} 具体的“章节细纲”。
+    你要确保：
+    1. 每一章都有明确的【标题】。
+    2. 提供详尽的【章节细纲 (Summary)】，描述本章的核心反转、关键对话或动作，为后续正文协作提供充足依据。
+    3. 指定合适的【视角人物 (Expected POV)】。
+    4. 确保拆分后的章节在逻辑上紧密承接全书概览，且具有戏剧张力。
+    
+    **重要输出格式要求**：
+    你必须返回一个符合以下 JSON 结构的数组：
+    [
+      { 
+        "title": "章节标题", 
+        "summary": "本章核心目标概览", 
+        "expectedPOV": "视角人物姓名",
+        "beats": [
+          { "type": "CONTENT/ACTION/DIALOGUE/TWIST", "description": "具体场景节拍描述" },
+          ...
+        ]
+      },
+      ...
+    ]
+    
+    【Beats 说明】：
+    - 每个章节必须包含 3-5 个具体的场景节拍。
+    - 类型 include: CONTENT(铺垫/描写), ACTION(动作/事件), DIALOGUE(关键对话), TWIST(转折/悬念)。
+    
+    禁止包含任何开场白或解释文字。
+    `;
+
+    try {
+        const responseText = await executeModelTask(
+            'splitPlotNodeIntoChapters',
+            instruction,
+            prompt,
+            await getModelName('pro'),
+            settings?.creativity || 0.85,
+            AiChapterOutlineArraySchema
+        );
+
+        const result = safeParseAiJson(responseText, AiChapterOutlineArraySchema, "Chapter Fission");
+        return result || [];
+    } catch (e) {
+        console.error("Gemini Chapter Fission Error:", e);
+        throw e;
+    }
+};
+
+/**
+ * Regenerate a single chapter outline
+ */
+export const regenerateChapterOutline = async (
+    genre: string,
+    fullPlotSummary: string,
+    targetNode: PlotNode,
+    chapterToRewrite: Chapter,
+    previousChapter: Chapter | null,
+    nextChapter: Chapter | null,
+    characters: Character[],
+    worldSettings: WorldSetting[],
+    settings?: CreativeSettings,
+    echoes: Echo[] = []
+): Promise<{ title: string; summary: string; expectedPOV: string; beats?: { type: string; description: string }[] } | null> => {
+    const contextStr = formatContext(characters, worldSettings, echoes);
+    const instruction = getInstructionWithSettings('plot_fission', settings);
+
+    const prompt = `
+    小说类型: ${genre}
+    项目全剧情概览: ${fullPlotSummary}
+    
+    ${contextStr}
+    
+    【所属的情节节点 (Plot Beat)】:
+    标题: ${targetNode.title}
+    具体内容: ${targetNode.content}
+
+    ${previousChapter ? `【上一章细纲】:\n标题: ${previousChapter.title}\n内容: ${previousChapter.summary}\n` : ''}
+    ${nextChapter ? `【下一章细纲】:\n标题: ${nextChapter.title}\n内容: ${nextChapter.summary}\n` : ''}
+    
+    【当前需要重写的章节细纲】:
+    标题: ${chapterToRewrite.title}
+    原内容: ${chapterToRewrite.summary}
+    原视角: ${chapterToRewrite.expectedPOV}
+    
+    任务：
+    请结合上下文节点，**单独重写**这个章节的细纲。
+    你要确保：
+    1. 提供详尽的【章节细纲 (Summary)】，描述本章的核心反转、关键对话或动作，修复原有问题。
+    2. 确保它能完美衔接上一章和下一章的剧情，同时符合所属的情节节点目标。
+    3. 保留原标题和视角人物（也可根据剧情需要适当调整优化）。
+    
+    **重要输出格式要求**：
+    你必须返回一个**仅仅包含这一个章节**的 JSON 数组结构：
+    [
+      { 
+        "title": "章节标题", 
+        "summary": "本章核心目标概览", 
+        "expectedPOV": "视角人物姓名",
+        "beats": [
+          { "type": "CONTENT/ACTION/DIALOGUE/TWIST", "description": "具体场景节拍描述" },
+          ...
+        ]
+      }
+    ]
+    禁止包含任何开场白或解释文字。
+    `;
+
+    try {
+        const responseText = await executeModelTask(
+            'regenerateChapterOutline',
+            instruction,
+            prompt,
+            await getModelName('pro'),
+            settings?.creativity || 0.85,
+            AiChapterOutlineArraySchema
+        );
+
+        const result = safeParseAiJson(responseText, AiChapterOutlineArraySchema, "Chapter Regeneration");
+        return result && result.length > 0 ? result[0] : null;
+    } catch (e) {
+        console.error("Gemini Chapter Regeneration Error:", e);
+        throw e;
+    }
+};
+
+/**
+ * Twist Agent - Inspiration Jumps
+ */
+export const generateTwistHooks = async (
+    context: string,
+    plotBeat: string
+): Promise<string[]> => {
+    const prompt = `
+你是一位顶级的小说策划大师。基于当前的【故事背景/记忆】和即将发生的【情节目标】，请提供 3 个极具张力的“情节勾子”或“反转灵感”。
+
+【灵感要求】：
+1. 逻辑自洽：反转要出人意料，但情理之中。
+2. 戏剧性：能够瞬间拉升剧情张力或改变角色关系。
+3. 风格匹配：根据故事背景（玄幻、都市、悬疑等）调整反转风格。
+
+【故事背景/记忆】：
+${context.slice(-3000)}
+
+【情节目标】：
+${plotBeat}
+
+请直接返回 3 条灵感，每条占一行，以数字开头（如 1. ...）。不要包含多余的废话。
+    `;
+
+    try {
+        const responseText = await executeModelTask(
+            'generateTwistHooks',
+            '',
+            prompt,
+            await getModelName('pro'),
+            0.9
+        );
+
+        return responseText.split('\n').filter(line => /^\d\./.test(line.trim())).map(line => line.replace(/^\d\.\s*/, '').trim());
+    } catch (error) {
+        console.error("Failed to generate twist hooks:", error);
+        return [];
+    }
+};

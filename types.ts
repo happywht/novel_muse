@@ -187,3 +187,21 @@ export interface ProjectState {
   activeBranchId?: string; // NEW Task 2.2: Track current active sandbox branch
   availableBranches?: string[]; // NEW Task 2.2: List of all sandbox branches
 }
+
+export interface NarrativeInsight {
+  type: 'ALLIANCE_POTENTIAL' | 'CONFLICT_WARNING' | 'SECRET_CONNECTION' | 'FACTION_SHIFT';
+  description: string;
+  involvedEntities: string[];
+  logic: string;
+}
+
+export type PolishMode = 'SENSORY' | 'CINEMATIC' | 'PSYCHOLOGICAL' | 'MINIMALIST' | 'WEB_MEME';
+
+export type ViewMode = 'FORGE' | 'MANUSCRIPT';
+
+export interface LogicConflict {
+  type: 'LOCATION_MISMATCH' | 'RELATIONSHIP_CONFLICT' | 'FACTUAL_INCONSISTENCY';
+  description: string;
+  truthInGraph: string;
+  extractedFact: string;
+}

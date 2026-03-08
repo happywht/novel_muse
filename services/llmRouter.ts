@@ -14,9 +14,10 @@ export type LLMTaskType =
     | 'generatePlot'
     | 'rewritePlot'
     | 'expandScene'
-    | 'expandLore'
+    | 'expandWorldLore'
     | 'polishDraft'
     | 'generateText'
+    | 'rewriteLocalText'
     | 'deduceWorldConsequences'
     | 'splitPlotNodeIntoChapters'
     | 'auditChapterPlan'
@@ -49,9 +50,10 @@ export const getProviderForTask = (task: LLMTaskType): Provider => {
 
         // Gemini 3 Flash: High speed, low cost execution & creativity
         case 'expandScene':                     // 基础正文扩写
-        case 'expandLore':                      // 世界观词条润色
+        case 'expandWorldLore':                  // 世界观词条润色
         case 'polishDraft':                     // 片段润色
         case 'generateText':                    // 基础对话生成
+        case 'rewriteLocalText':                // 局部改写
         case 'analyzePlotRhythm':               // 简单的节奏张力提取 (Flash可胜任)
         case 'summarizeChapter':                // 章节摘要生成 (L2记忆)
         case 'extractKnowledgeTriples':         // 知识三元组提取 (Direction One)
