@@ -87,6 +87,7 @@ export const AiWorldSettingArraySchema = z.array(AiWorldSettingSchema);
 
 // --- State Changes (analyzeStateChanges, deduceWorldConsequences) ---
 export const AiStateChangeSchema = z.object({
+    targetId: z.string().optional(), // NEW: Explicit ID resolution
     targetName: z.string().min(1),
     targetType: z.enum(['CHARACTER', 'WORLD']).default('CHARACTER'),
     suggestedUpdate: z.string().default(''),
@@ -97,6 +98,7 @@ export const AiStateChangeArraySchema = z.array(AiStateChangeSchema);
 
 // --- Echoes (extractEchoesFromText) ---
 export const AiEchoSchema = z.object({
+    targetId: z.string().optional(), // NEW: Explicit ID resolution
     targetName: z.string().min(1),
     targetType: z.enum(['CHARACTER', 'WORLD']).default('CHARACTER'),
     description: z.string().default(''),
@@ -123,6 +125,9 @@ export const AiPlotRhythmArraySchema = z.array(AiPlotRhythmSchema);
 export const AiPlotNodeSchema = z.object({
     title: z.string().min(1, '情节标题不能为空'),
     content: z.string().default(''),
+    beatTag: z.enum(['INCITING_INCIDENT', 'PLOT_POINT_1', 'MIDPOINT', 'PLOT_POINT_2', 'CLIMAX', 'RESOLUTION', 'OTHER']).optional(),
+    relatedCharacters: z.array(z.string()).optional(), // List of Character IDs
+    relatedLocations: z.array(z.string()).optional(),  // List of WorldSetting IDs
 });
 
 export const AiPlotNodeArraySchema = z.array(AiPlotNodeSchema);

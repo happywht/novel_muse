@@ -113,6 +113,27 @@ export const formatContext = (characters: Character[], worldSettings: WorldSetti
 };
 
 /**
+ * NEW: Formats a lookup table of entities (Characters and WorldSettings) 
+ * for the AI to precisely resolve IDs instead of relying on fuzzy name matching.
+ */
+export const formatEntityLookupTable = (characters: Character[], worldSettings: WorldSetting[]) => {
+    let output = "=== ENTITY LOOKUP TABLE (ID MAPPING) ===\n";
+    output += "ID | Name/Title | Type\n";
+    output += "---|---|---\n";
+
+    characters.forEach(c => {
+        output += `${c.id} | ${c.name} | CHARACTER\n`;
+    });
+
+    worldSettings.forEach(w => {
+        output += `${w.id} | ${w.title} | WORLD\n`;
+    });
+
+    output += "========================================\n";
+    return output;
+};
+
+/**
  * NEW: Tiered Memory System (L1/L2/L3)
  * L1: Recent full text (Last 1-2 chapters)
  * L2: Medium-term summaries (Last 10 chapters)

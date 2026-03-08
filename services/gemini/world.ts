@@ -11,7 +11,7 @@ import {
     getAIClient, retryOperation, executeModelTask,
     getInstructionWithSettings, getModelName
 } from "./core";
-import { formatContext } from "./helpers";
+import { formatContext, formatEntityLookupTable } from "./helpers";
 import { fetchRelatedSubgraph } from "../apiService";
 
 /**
@@ -196,7 +196,8 @@ export const analyzeStateChanges = async (
         items: {
             type: Type.OBJECT,
             properties: {
-                targetName: { type: Type.STRING, description: "Name of the character or world setting" },
+                targetId: { type: Type.STRING, description: "The ID of the character or world setting from the lookup table" },
+                targetName: { type: Type.STRING, description: "Name/Title of the entity" },
                 targetType: { type: Type.STRING, description: "CHARACTER or WORLD" },
                 suggestedUpdate: { type: Type.STRING, description: "Specifically what changed (e.g., 'Lost an arm', 'Village destroyed'). Keep it concise." },
                 reason: { type: Type.STRING, description: "Quote from the text justifying this change." }
@@ -205,19 +206,22 @@ export const analyzeStateChanges = async (
         }
     };
 
-    const worldList = allWorldSettings.map(w => `${w.title} (${w.category})`).join(', ');
+    const lookupTable = formatEntityLookupTable(activeCharacters, allWorldSettings);
     const instruction = getInstructionWithSettings('echo_analysis');
     const prompt = `
     阅读以下小说片段，分析是否发生了对【人物状态】或【世界环境】有**永久性或重大影响**的事件。
     只有当发生重大变更（如：受伤、死亡、获得重要道具、关系决裂、地点损毁、物品丢失）时才生成记录。
     如果只是普通的对话或移动，请不要生成记录。
 
-    【追踪目标】:
-    人物: ${activeCharacters.map(c => c.name).join(', ')}
-    世界/地点: ${worldList}
-
     【待分析文本】:
     ${sceneContent}
+
+    【可在以下实体中匹配】:
+    ${lookupTable}
+
+    【要求】:
+    1. 必须根据提供的 ID 映射表返回正确的 targetId（如果能匹配到）。
+    2. 如果实体不在表中但确有变动，请尝试猜测其 targetName 但 targetId 留空。
     `;
 
     try {
@@ -235,16 +239,20 @@ export const analyzeStateChanges = async (
         const result: StateChangeRecommendation[] = [];
 
         for (const item of raw) {
-            let id = '';
-            if (item.targetType === 'CHARACTER') {
-                const char = activeCharacters.find(c => c.name.includes(item.targetName) || item.targetName.includes(c.name));
-                if (char) id = char.id;
-            } else if (item.targetType === 'WORLD') {
-                let setting = allWorldSettings.find(w => w.title === item.targetName);
-                if (!setting) {
-                    setting = allWorldSettings.find(w => w.title.includes(item.targetName) || item.targetName.includes(w.title));
+            let id = item.targetId || ''; // Favor AI returned ID
+
+            // Fallback: If AI didn't provide ID or it's invalid, try fuzzy match
+            if (!id) {
+                if (item.targetType === 'CHARACTER') {
+                    const char = activeCharacters.find(c => c.name.includes(item.targetName) || item.targetName.includes(c.name));
+                    if (char) id = char.id;
+                } else if (item.targetType === 'WORLD') {
+                    let setting = allWorldSettings.find(w => w.title === item.targetName);
+                    if (!setting) {
+                        setting = allWorldSettings.find(w => w.title.includes(item.targetName) || item.targetName.includes(w.title));
+                    }
+                    if (setting) id = setting.id;
                 }
-                if (setting) id = setting.id;
             }
 
             if (id) {
@@ -275,12 +283,14 @@ export const extractEchoesFromText = async (
     if (!text || text.length < 100) return [];
 
     const contextStr = formatContext(characters, worldSettings, []);
+    const lookupTable = formatEntityLookupTable(characters, worldSettings);
 
     const responseSchema = {
         type: Type.ARRAY,
         items: {
             type: Type.OBJECT,
             properties: {
+                targetId: { type: Type.STRING, description: "The ID of the character or world setting from the lookup table" },
                 targetName: { type: Type.STRING, description: "Name of the character or world setting affected" },
                 targetType: { type: Type.STRING, description: "CHARACTER or WORLD" },
                 description: { type: Type.STRING, description: "What happened? (Concise, e.g., 'Lost left arm', 'Obtained the Magic Sword')" },
@@ -307,17 +317,17 @@ export const extractEchoesFromText = async (
     你是一个文学评论家和设定分析师。
     请阅读以下小说正文片段，分析其中是否发生了**具有持久影响**的关键事件（Fate Echoes）。
 
-    【现有实体列表】:
-    ${contextStr}
+    【可在以下实体中寻找关联】:
+    ${lookupTable}
 
     【小说正文片段】:
     ${text.substring(0, 15000)} ... (截取部分)
 
     【提取规则】:
     1. **只提取重大变更**: 忽略琐碎的对话或动作。只关注状态改变（受伤、获得物品、关系破裂、死亡）、重大秘密揭露、或世界规则的变动。
-    2. **关联现有实体**: 尽量将事件关联到上述列表中的【角色】或【世界设定】。
+    2. **精准关联**: 尽量将事件关联到上述映射表中的实体，并返回正确的 targetId。
     3. **客观描述**: 描述必须是客观的事实陈述。
-    4. **结构化三元组 (Triples)**: 对于每一个重大变更，尝试将其进一步拆解为“主体-关系-客体”的结构化三元组，以便后续存入知识图谱。例如：“林青在京城遭遇伏击” -> \`[{"subject": "林青", "relation": "位于", "object": "京城"}]\`。
+    4. **结构化三元组 (Triples)**: 对于每一个重大变更，尝试将其进一步拆解为“主体-关系-客体”的结构化三元组。例如：“林青在京城遭遇伏击” -> \`[{"subject": "林青", "relation": "位于", "object": "京城"}]\`。
 
     请输出 JSON 格式的事件及三元组列表。如果没有重大事件，返回空数组。
     `;
@@ -337,16 +347,19 @@ export const extractEchoesFromText = async (
         const result: Echo[] = [];
 
         for (const item of raw) {
-            let id = '';
-            if (item.targetType === 'CHARACTER') {
-                const char = characters.find(c => c.name.includes(item.targetName) || item.targetName.includes(c.name));
-                if (char) id = char.id;
-            } else if (item.targetType === 'WORLD') {
-                let setting = worldSettings.find(w => w.title === item.targetName);
-                if (!setting) {
-                    setting = worldSettings.find(w => w.title.includes(item.targetName) || item.targetName.includes(w.title));
+            let id = item.targetId || ''; // Favor AI returned ID
+
+            if (!id) {
+                if (item.targetType === 'CHARACTER') {
+                    const char = characters.find(c => c.name.includes(item.targetName) || item.targetName.includes(c.name));
+                    if (char) id = char.id;
+                } else if (item.targetType === 'WORLD') {
+                    let setting = worldSettings.find(w => w.title === item.targetName);
+                    if (!setting) {
+                        setting = worldSettings.find(w => w.title.includes(item.targetName) || item.targetName.includes(w.title));
+                    }
+                    if (setting) id = setting.id;
                 }
-                if (setting) id = setting.id;
             }
 
             if (id) {
@@ -434,6 +447,7 @@ export const deduceWorldConsequences = async (
     if (recentEchoes.length === 0) return [];
 
     const contextStr = formatContext(characters, worldSettings, recentEchoes);
+    const lookupTable = formatEntityLookupTable(characters, worldSettings);
     const triggerEchoes = recentEchoes.filter(e => e.status === 'ACCEPTED').slice(-5);
     const triggers = triggerEchoes.map(e => `- ${e.description} (${e.targetName})`).join('\n');
 
@@ -456,6 +470,7 @@ export const deduceWorldConsequences = async (
         items: {
             type: Type.OBJECT,
             properties: {
+                targetId: { type: Type.STRING, description: "The ID of the character or world setting from the lookup table" },
                 targetName: { type: Type.STRING, description: "Name of the character or world setting affected" },
                 targetType: { type: Type.STRING, description: "CHARACTER or WORLD" },
                 suggestedUpdate: { type: Type.STRING, description: "The predicted consequence (e.g., 'Civil war breaks out', 'Character X seeks revenge')" },
@@ -471,21 +486,19 @@ export const deduceWorldConsequences = async (
 
     小说类型: ${genre}
 
-    【活跃实体状态概览】:
-    ${contextStr}
-
-    ${graphContext ? `【动态知识图谱关联网络 (Knowledge Graph)】:\n${graphContext}\n` : ''}
-
     【最近发生的事件 (Triggers)】:
     ${triggers}
 
+    【可在以下实体中寻找受影响对象】:
+    ${lookupTable}
+
     【推演规则】:
     1. **蝴蝶效应**: 一个小事件可能引发大变动（例如：国王遇刺 -> 继承人争夺战 -> 内战爆发）。
-    2. **图谱联动 (重要)**: 务必利用上方提供的【动态知识图谱】中的人物关系（仇恨、亲情、从属）或地理归属，去寻找连锁反应的导火索。
-    3. **符合逻辑**: 推演必须符合世界观设定。
-    4. **制造冲突**: 预测的结果应该为故事增加张力和冲突。
-    5. **具体**: 不要模糊地说“局势紧张”，要说“北方公爵集结军队”。
-    6. **强制中文输出**: 你的 JSON 结果中的所有内容（包括 \`suggestedUpdate\`, \`reason\` 等字段）必须使用纯正的中文，绝对不要输出英文。
+    2. **实体匹配**: 务必从提供的映射表中选择受影响的实体，并返回正确的 targetId。
+    3. **图谱联动 (重要)**: 务必利用上方提供的【动态知识图谱】中的人物关系（仇恨、亲情、从属）或地理归属，去寻找连锁反应的导火索。
+    4. **符合逻辑**: 推演必须符合世界观设定。
+    5. **制造冲突**: 预测的结果应该为故事增加张力和冲突。
+    6. **强制中文输出**: 你的 JSON 结果中的所有内容必须使用纯正的中文。
 
     请严格按照 JSON 格式输出【未来预测】。
     `;
@@ -505,16 +518,19 @@ export const deduceWorldConsequences = async (
         const result: StateChangeRecommendation[] = [];
 
         for (const item of raw) {
-            let id = '';
-            if (item.targetType === 'CHARACTER') {
-                const char = characters.find(c => c.name.includes(item.targetName) || item.targetName.includes(c.name));
-                if (char) id = char.id;
-            } else if (item.targetType === 'WORLD') {
-                let setting = worldSettings.find(w => w.title === item.targetName);
-                if (!setting) {
-                    setting = worldSettings.find(w => w.title.includes(item.targetName) || item.targetName.includes(w.title));
+            let id = item.targetId || '';
+
+            if (!id) {
+                if (item.targetType === 'CHARACTER') {
+                    const char = characters.find(c => c.name.includes(item.targetName) || item.targetName.includes(c.name));
+                    if (char) id = char.id;
+                } else if (item.targetType === 'WORLD') {
+                    let setting = worldSettings.find(w => w.title === item.targetName);
+                    if (!setting) {
+                        setting = worldSettings.find(w => w.title.includes(item.targetName) || item.targetName.includes(w.title));
+                    }
+                    if (setting) id = setting.id;
                 }
-                if (setting) id = setting.id;
             }
 
             if (id) {

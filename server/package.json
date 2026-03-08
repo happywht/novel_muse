@@ -11,7 +11,7 @@
         "db:studio": "prisma studio"
     },
     "dependencies": {
-        "@google/genai": "^1.44.0",
+        "@google/generative-ai": "^0.24.1",
         "@prisma/client": "^6.5.0",
         "cors": "^2.8.5",
         "dotenv": "^17.3.1",

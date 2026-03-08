@@ -10,7 +10,7 @@ import {
 import {
     getAIClient, executeModelTask, getInstructionWithSettings, getModelName
 } from "./core";
-import { formatContext, filterRelevantSettings } from "./helpers";
+import { formatContext, filterRelevantSettings, formatEntityLookupTable } from "./helpers";
 
 export interface PlotRhythmPoint {
     beat: string;
@@ -29,7 +29,7 @@ export const generatePlotFromContext = async (
     settings?: CreativeSettings,
     template?: string,
     echoes: Echo[] = []
-): Promise<{ title: string; content: string }[]> => {
+): Promise<PlotNode[]> => {
     const queryContext = `${premise} ${template || ''} ${characters.map(c => c.name).join(' ')}`;
     const relevantSettings = filterRelevantSettings(worldSettings, queryContext, 15);
 
@@ -60,6 +60,7 @@ export const generatePlotFromContext = async (
         contextStr += "无特别约束设定。\n";
     }
 
+    const lookupTable = formatEntityLookupTable(characters, relevantSettings);
     const instruction = getInstructionWithSettings('plot_weaving', settings);
 
     let taskRequirement = `
@@ -67,10 +68,11 @@ export const generatePlotFromContext = async (
   1. 结合人物的性格缺陷和目标，设计引发剧情的激励事件。
   2. 利用【高相关度世界观法则】制造专属设定的障碍、谜题和转折。
   3. 确保角色关系随着剧情推进而发生变化。
-  4. **整合【当前状态变更】**：剧情发展必须考虑角色当前的状态（如伤病、道具、已发生的事件）。`;
+  4. **整合【当前状态变更】**：剧情发展必须考虑角色当前的状态（如伤病、道具、已发生的事件）。
+  5. **结构化元数据**：为每个情节点分配一个叙事标签（beatTag），并精准关联涉及的实体 ID。`;
 
     if (template) {
-        taskRequirement += `\n\n【关键要求】请严格按照以下经典故事结构模版进行填充和创作：\n${template}`;
+        taskRequirement += `\n\n【关键要求】请严格按照以下经典故事结构模版进行填充 and 创作：\n${template}`;
     } else {
         taskRequirement += `\n\n请生成一个包含 "起、承、转、合" 或 "分章/分幕" 结构的详细大纲。`;
     }
@@ -80,6 +82,9 @@ export const generatePlotFromContext = async (
   核心梗概: ${premise}
   
   ${contextStr}
+
+  【实体表 (Entity Mapping Table)】:
+  ${lookupTable}
   
   ${taskRequirement}
   
@@ -88,7 +93,13 @@ export const generatePlotFromContext = async (
   **重要输出格式要求**：
   你必须返回一个符合以下 JSON 结构的数组：
   [
-    { "title": "情节标题", "content": "该情节点的详细描述..." },
+    {
+      "title": "情节标题",
+      "content": "该情节点的详细描述...",
+      "beatTag": "INCITING_INCIDENT" | "PLOT_POINT_1" | "MIDPOINT" | "PLOT_POINT_2" | "CLIMAX" | "RESOLUTION" | "OTHER",
+      "relatedCharacters": ["ID1", "ID2"],
+      "relatedLocations": ["ID3"]
+    },
     ...
   ]
   禁止包含任何开场白或解释文字。
@@ -124,8 +135,9 @@ export const rewritePlot = async (
     worldSettings: WorldSetting[],
     settings?: CreativeSettings,
     echoes: Echo[] = []
-): Promise<{ title: string; content: string }[]> => {
+): Promise<PlotNode[]> => {
     const contextStr = formatContext(characters, worldSettings, echoes);
+    const lookupTable = formatEntityLookupTable(characters, worldSettings);
     const instruction = getInstructionWithSettings('plot_weaving', settings);
 
     const prompt = `
@@ -135,6 +147,9 @@ export const rewritePlot = async (
     小说类型: ${genre}
     
     ${contextStr}
+
+    【实体表 (Entity Mapping Table)】:
+    ${lookupTable}
     
     【当前剧情大纲】:
     ${currentPlot}
@@ -144,14 +159,20 @@ export const rewritePlot = async (
     
     任务要求：
     1. **精准落实指令**：针对指令（或诊断反馈）指出需要修复的地方进行精准修改。
-    2. **最小变动原则**：禁止进行无关的重写。凡是指令未涉及的部分，应尽可能保持原有的文字、结构和逻辑不变。
-    3. **保持连贯性**：修改后的剧情必须与角色设定和世界观保持高度的一致性。
-    4. **意志遵从度**：你的目标是执行“微创手术”修复问题，严禁自作主张大改大纲基调。
+    2. **最小变动原则**：禁止进行无关的重写。凡是指令未涉及的部分，应尽可能保持原有的文字、结构 and 逻辑不变。
+    3. **元数据对齐**：务必保留或根据新情节更新 beatTag, relatedCharacters, relatedLocations 等元数据字段。
+    4. **保持连贯性**：修改后的剧情必须与角色设定和世界观保持高度的一致性。
     
     **重要输出格式要求**：
     你必须返回一个符合以下 JSON 结构的数组：
     [
-      { "title": "情节标题", "content": "该情节点的详细描述..." },
+      {
+        "title": "情节标题",
+        "content": "该情节点的详细描述...",
+        "beatTag": "...",
+        "relatedCharacters": ["ID1"],
+        "relatedLocations": ["ID2"]
+      },
       ...
     ]
     禁止包含任何开场白或解释文字。
@@ -203,7 +224,7 @@ export const analyzePlotRhythm = async (plotOutline: string): Promise<PlotRhythm
     41-60: 冲突升级、阻碍出现
     61-80: 重大转折、危机、战斗
     81-100: 终极高潮、生死攸关、核心揭秘
-
+    
     【剧情大纲】:
     ${plotOutline}
 
@@ -240,7 +261,7 @@ export const splitPlotNodeIntoChapters = async (
     settings?: CreativeSettings,
     echoes: Echo[] = [],
     fissionCount: number | 'AUTO' = 'AUTO'
-): Promise<{ title: string; summary: string; expectedPOV: string; beats?: { type: string; description: string }[] }[]> => {
+): Promise<{ title: string; summary: string; expectedPOV: string; beats?: any[] }[]> => {
     const contextStr = formatContext(characters, worldSettings, echoes);
     const instruction = getInstructionWithSettings('plot_fission', settings);
     const countInstruction = fissionCount === 'AUTO' ? '2-3 个' : `${fissionCount} 个`;
@@ -295,8 +316,18 @@ export const splitPlotNodeIntoChapters = async (
             AiChapterOutlineArraySchema
         );
 
-        const result = safeParseAiJson(responseText, AiChapterOutlineArraySchema, "Chapter Fission");
-        return result || [];
+        const raw = safeParseAiJson(responseText, AiChapterOutlineArraySchema, "Chapter Fission");
+        if (!raw) return [];
+
+        // Map to include IDs and initialized beat states
+        return raw.map(ch => ({
+            ...ch,
+            beats: ch.beats?.map(b => ({
+                ...b,
+                id: Math.random().toString(36).substr(2, 9),
+                isCompleted: false
+            }))
+        }));
     } catch (e) {
         console.error("Gemini Chapter Fission Error:", e);
         throw e;
@@ -317,7 +348,7 @@ export const regenerateChapterOutline = async (
     worldSettings: WorldSetting[],
     settings?: CreativeSettings,
     echoes: Echo[] = []
-): Promise<{ title: string; summary: string; expectedPOV: string; beats?: { type: string; description: string }[] } | null> => {
+): Promise<{ title: string; summary: string; expectedPOV: string; beats?: any[] } | null> => {
     const contextStr = formatContext(characters, worldSettings, echoes);
     const instruction = getInstructionWithSettings('plot_fission', settings);
 
@@ -372,8 +403,20 @@ export const regenerateChapterOutline = async (
             AiChapterOutlineArraySchema
         );
 
-        const result = safeParseAiJson(responseText, AiChapterOutlineArraySchema, "Chapter Regeneration");
-        return result && result.length > 0 ? result[0] : null;
+        const raw = safeParseAiJson(responseText, AiChapterOutlineArraySchema, "Chapter Regeneration");
+        const result = raw && raw.length > 0 ? raw[0] : null;
+
+        if (result) {
+            return {
+                ...result,
+                beats: result.beats?.map(b => ({
+                    ...b,
+                    id: Math.random().toString(36).substr(2, 9),
+                    isCompleted: false
+                }))
+            };
+        }
+        return null;
     } catch (e) {
         console.error("Gemini Chapter Regeneration Error:", e);
         throw e;
