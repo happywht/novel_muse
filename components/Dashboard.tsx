@@ -41,19 +41,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject }) 
         });
     };
 
-    const toggleStyleTag = (tag: string) => {
-        const currentTags = project.creativeSettings.styleTags || [];
-        const newTags = currentTags.includes(tag)
-            ? currentTags.filter(t => t !== tag)
-            : [...currentTags, tag];
-        handleUpdateSettings('styleTags', newTags);
-    };
-
-    const PREDEFINED_STYLES = project.creativeSettings.promptProfile === 'WEB_NOVEL'
-        ? ['短句断句', '直接干脆', '对话密集', '侧重表情', '轻松吐槽', '杀伐果断']
-        : ['词藻华丽', '极简白描', '电影镜头', '心理测写', '动作剥析', '留白艺术'];
-
-
     const handleBrainstorm = async () => {
         if (!brainstormInput.trim()) return;
         setIsGenerating(true);
@@ -332,288 +319,175 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject }) 
                         />
                     </div>
 
-                    {/* Creative Compass */}
-                    <div className="bg-slate-800/40 rounded-xl border border-slate-700/60 p-5">
-                        <div className="flex items-center gap-2 mb-4">
-                            <Sliders size={16} className="text-amber-400" />
-                            <h3 className="font-semibold text-white text-sm">创作罗盘</h3>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div className="md:col-span-2">
-                                <label className="block text-[10px] font-medium text-slate-500 mb-3 uppercase tracking-wider">AI 创作模型 (Prompt Pack)</label>
-                                <div className="grid grid-cols-2 gap-3">
+                    {/* Right: Actions (2/5) */}
+                    <div className="lg:col-span-2 space-y-5">
+                        {/* AI Brainstorm */}
+                        <div className="bg-gradient-to-br from-amber-900/15 to-slate-900 rounded-xl border border-amber-500/20 p-5 flex flex-col min-h-[280px]">
+                            <div className="flex items-center gap-2 mb-3 text-amber-300 text-xs font-semibold uppercase tracking-wider">
+                                <Sparkles size={14} />
+                                <span>AI 灵感火花</span>
+                            </div>
+
+                            {!suggestion && !isGenerating && (
+                                <div className="flex-1 flex flex-col justify-center">
+                                    <textarea
+                                        value={brainstormInput}
+                                        onChange={(e) => setBrainstormInput(e.target.value)}
+                                        className="w-full bg-slate-950/40 border border-amber-500/15 rounded-lg p-3 text-sm text-slate-200 focus:ring-1 focus:ring-amber-400/40 outline-none resize-none mb-3"
+                                        rows={3}
+                                        placeholder="例如：一个能通过与鬼魂对话破案的侦探..."
+                                    />
                                     <button
-                                        onClick={() => handleUpdateSettings('promptProfile', 'WEB_NOVEL')}
-                                        className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all ${project.creativeSettings.promptProfile === 'WEB_NOVEL' ? 'bg-amber-500/20 border-amber-500/50 text-amber-200' : 'bg-slate-900/60 border-slate-700/50 text-slate-500 hover:border-slate-600'}`}
+                                        onClick={handleBrainstorm}
+                                        className="w-full bg-amber-600/80 hover:bg-amber-500 text-white py-2 rounded-lg transition-colors font-medium text-sm flex items-center justify-center gap-2"
                                     >
-                                        <Zap size={18} className={project.creativeSettings.promptProfile === 'WEB_NOVEL' ? 'text-amber-400 mb-1' : 'text-slate-600 mb-1'} />
-                                        <span className="text-sm font-bold">精品网文模式</span>
-                                        <span className="text-[10px] opacity-60">爽感爆发 / 对话驱动 / 节奏极快</span>
-                                    </button>
-                                    <button
-                                        onClick={() => handleUpdateSettings('promptProfile', 'LITERARY')}
-                                        className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all ${project.creativeSettings.promptProfile === 'LITERARY' ? 'bg-sky-500/20 border-sky-500/50 text-sky-200' : 'bg-slate-900/60 border-slate-700/50 text-slate-500 hover:border-slate-600'}`}
-                                    >
-                                        <BookOpen size={18} className={project.creativeSettings.promptProfile === 'LITERARY' ? 'text-sky-400 mb-1' : 'text-slate-600 mb-1'} />
-                                        <span className="text-sm font-bold">传统文学模式</span>
-                                        <span className="text-[10px] opacity-60">文笔细腻 / 环境描写 / 情感共鸣</span>
+                                        <Zap size={14} /> 点燃灵感
                                     </button>
                                 </div>
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-medium text-slate-500 mb-2 uppercase tracking-wider">叙事基调</label>
-                                <div className="grid grid-cols-3 gap-1.5">
-                                    {['黑暗', '幽默', '史诗', '悬疑', '治愈', '平衡'].map(tone => (
+                            )}
+
+                            {isGenerating && (
+                                <div className="flex-1 flex items-center justify-center">
+                                    <Loader text="缪斯女神正在思考..." />
+                                </div>
+                            )}
+
+                            {suggestion && !isGenerating && (
+                                <div className="flex-1 overflow-y-auto max-h-[300px] pr-1 custom-scrollbar flex flex-col">
+                                    <div className="bg-slate-950/40 rounded-lg p-3 text-sm flex-1 mb-3">
+                                        <MarkdownRenderer content={suggestion} />
+                                    </div>
+                                    <div className="flex gap-2 shrink-0">
                                         <button
-                                            key={tone}
-                                            onClick={() => handleUpdateSettings('tone', tone)}
-                                            className={`text-xs py-1.5 rounded-lg border transition-all ${project.creativeSettings.tone === tone ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-slate-900/60 text-slate-400 border-slate-700/50 hover:border-slate-600'}`}
+                                            onClick={() => setSuggestion('')}
+                                            className="flex-1 bg-slate-700/60 hover:bg-slate-600 text-white py-1.5 rounded-lg text-xs transition-colors"
                                         >
-                                            {tone}
+                                            清除
                                         </button>
-                                    ))}
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-medium text-slate-500 mb-2 uppercase tracking-wider">创意温度: {project.creativeSettings.creativity}</label>
-                                <input
-                                    type="range"
-                                    min="0.1" max="1.0" step="0.1"
-                                    value={project.creativeSettings.creativity}
-                                    onChange={(e) => handleUpdateSettings('creativity', parseFloat(e.target.value))}
-                                    className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                                />
-                                <div className="flex justify-between text-[9px] text-slate-600 mt-1">
-                                    <span>严谨保守</span>
-                                    <span>天马行空</span>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-medium text-slate-500 mb-2 uppercase tracking-wider">文字风格与微观技法</label>
-                                <div className="flex flex-wrap gap-2 mb-3">
-                                    {PREDEFINED_STYLES.map(tag => (
                                         <button
-                                            key={tag}
-                                            onClick={() => toggleStyleTag(tag)}
-                                            className={`text-[10px] px-2.5 py-1 rounded border transition-colors ${(project.creativeSettings.styleTags || []).includes(tag)
-                                                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
-                                                    : 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:border-slate-500'
-                                                }`}
+                                            onClick={handleSaveIdea}
+                                            className="flex-1 bg-amber-700/80 hover:bg-amber-600 text-white py-1.5 rounded-lg text-xs transition-colors font-medium flex items-center justify-center gap-1"
                                         >
-                                            {tag}
+                                            <Target size={12} /> 采纳此创意
                                         </button>
-                                    ))}
-                                </div>
-                                <input
-                                    type="text"
-                                    value={project.creativeSettings.style}
-                                    onChange={(e) => handleUpdateSettings('style', e.target.value)}
-                                    className="w-full bg-slate-900/60 border border-slate-700/50 rounded-lg p-2 text-sm text-white focus:ring-1 focus:ring-amber-500/40 outline-none placeholder-slate-600"
-                                    placeholder="其他自定义风格描述..."
-                                />
-                            </div>
-                            <div className="md:col-span-2">
-                                <label className="block text-[10px] font-medium text-slate-500 mb-2 uppercase tracking-wider">
-                                    Few-Shot 笔迹对齐 (最高优先级参考)
-                                </label>
-                                <textarea
-                                    value={project.creativeSettings.referenceText || ''}
-                                    onChange={(e) => handleUpdateSettings('referenceText', e.target.value)}
-                                    className="w-full bg-slate-900/60 border border-slate-700/50 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-amber-500/40 outline-none placeholder-slate-600 custom-scrollbar resize-none"
-                                    rows={3}
-                                    placeholder="粘贴一段您最满意的原文（300字以内）。AI 将在生成正文时，无缝模仿这段文字的句式长短、标点习惯和描写倾向。"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-[10px] font-medium text-slate-500 mb-2 uppercase tracking-wider">目标受众</label>
-                                <input
-                                    type="text"
-                                    value={project.creativeSettings.targetAudience}
-                                    onChange={(e) => handleUpdateSettings('targetAudience', e.target.value)}
-                                    className="w-full bg-slate-900/60 border border-slate-700/50 rounded-lg p-2 text-sm text-white focus:ring-1 focus:ring-amber-500/40 outline-none placeholder-slate-600"
-                                    placeholder="例如：青少年、硬科幻迷..."
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Right: Actions (2/5) */}
-                <div className="lg:col-span-2 space-y-5">
-                    {/* AI Brainstorm */}
-                    <div className="bg-gradient-to-br from-amber-900/15 to-slate-900 rounded-xl border border-amber-500/20 p-5 flex flex-col min-h-[280px]">
-                        <div className="flex items-center gap-2 mb-3 text-amber-300 text-xs font-semibold uppercase tracking-wider">
-                            <Sparkles size={14} />
-                            <span>AI 灵感火花</span>
-                        </div>
-
-                        {!suggestion && !isGenerating && (
-                            <div className="flex-1 flex flex-col justify-center">
-                                <textarea
-                                    value={brainstormInput}
-                                    onChange={(e) => setBrainstormInput(e.target.value)}
-                                    className="w-full bg-slate-950/40 border border-amber-500/15 rounded-lg p-3 text-sm text-slate-200 focus:ring-1 focus:ring-amber-400/40 outline-none resize-none mb-3"
-                                    rows={3}
-                                    placeholder="例如：一个能通过与鬼魂对话破案的侦探..."
-                                />
-                                <button
-                                    onClick={handleBrainstorm}
-                                    className="w-full bg-amber-600/80 hover:bg-amber-500 text-white py-2 rounded-lg transition-colors font-medium text-sm flex items-center justify-center gap-2"
-                                >
-                                    <Zap size={14} /> 点燃灵感
-                                </button>
-                            </div>
-                        )}
-
-                        {isGenerating && (
-                            <div className="flex-1 flex items-center justify-center">
-                                <Loader text="缪斯女神正在思考..." />
-                            </div>
-                        )}
-
-                        {suggestion && !isGenerating && (
-                            <div className="flex-1 overflow-y-auto max-h-[300px] pr-1 custom-scrollbar flex flex-col">
-                                <div className="bg-slate-950/40 rounded-lg p-3 text-sm flex-1 mb-3">
-                                    <MarkdownRenderer content={suggestion} />
-                                </div>
-                                <div className="flex gap-2 shrink-0">
-                                    <button
-                                        onClick={() => setSuggestion('')}
-                                        className="flex-1 bg-slate-700/60 hover:bg-slate-600 text-white py-1.5 rounded-lg text-xs transition-colors"
-                                    >
-                                        清除
-                                    </button>
-                                    <button
-                                        onClick={handleSaveIdea}
-                                        className="flex-1 bg-amber-700/80 hover:bg-amber-600 text-white py-1.5 rounded-lg text-xs transition-colors font-medium flex items-center justify-center gap-1"
-                                    >
-                                        <Target size={12} /> 采纳此创意
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Kickstart */}
-                    <div className="bg-slate-800/40 rounded-xl border border-slate-700/60 p-5 relative overflow-hidden">
-                        <div className="relative z-10">
-                            {!isKickstarting ? (
-                                <div className="text-center space-y-3">
-                                    <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center border border-indigo-500/20">
-                                        <Rocket className="text-indigo-400" size={22} />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-white font-bold text-sm">一键创世纪</h3>
-                                        <p className="text-[11px] text-slate-400 mt-1 max-w-[240px] mx-auto">
-                                            深度生成 6 位角色 + 10 条世界观 + 完整大纲
-                                        </p>
-                                    </div>
-                                    <button
-                                        onClick={requestKickstart}
-                                        disabled={!project.premise}
-                                        className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white px-5 py-2 rounded-xl font-medium text-sm transition-all shadow-lg shadow-indigo-900/30 flex items-center gap-2 mx-auto"
-                                    >
-                                        ✨ 启动
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="space-y-4 animate-fade-in">
-                                    {/* Step indicators */}
-                                    <div className="flex items-center gap-2">
-                                        {[
-                                            { step: 1, label: '角色', icon: '👤' },
-                                            { step: 2, label: '世界', icon: '🌍' },
-                                            { step: 3, label: '大纲', icon: '📈' },
-                                        ].map((s, idx) => (
-                                            <React.Fragment key={s.step}>
-                                                <div className={`flex-1 flex flex-col items-center gap-1 transition-all duration-500 ${kickstartStep >= s.step ? 'opacity-100' : 'opacity-30'}`}>
-                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all duration-500 ${kickstartStep > s.step ? 'bg-emerald-500/20 text-emerald-400' :
-                                                        kickstartStep === s.step ? 'bg-indigo-500/20 text-indigo-400 animate-pulse' :
-                                                            'bg-slate-800 text-slate-600'
-                                                        }`}>
-                                                        {kickstartStep > s.step ? <CheckCircle size={16} /> : s.icon}
-                                                    </div>
-                                                    <span className="text-[9px] text-slate-500">{s.label}</span>
-                                                </div>
-                                                {idx < 2 && (
-                                                    <div className={`w-8 h-0.5 rounded-full transition-all duration-500 ${kickstartStep > s.step ? 'bg-emerald-500/40' : 'bg-slate-800'}`} />
-                                                )}
-                                            </React.Fragment>
-                                        ))}
-                                    </div>
-                                    <div className="flex items-center gap-2 justify-center text-sm text-white">
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                        <span className="text-xs">{kickstartStatus}</span>
                                     </div>
                                 </div>
                             )}
                         </div>
-                        <div className="absolute inset-0 bg-gradient-to-r from-indigo-900/0 via-indigo-500/[0.03] to-indigo-900/0 pointer-events-none" />
+
+                        {/* Kickstart */}
+                        <div className="bg-slate-800/40 rounded-xl border border-slate-700/60 p-5 relative overflow-hidden">
+                            <div className="relative z-10">
+                                {!isKickstarting ? (
+                                    <div className="text-center space-y-3">
+                                        <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 flex items-center justify-center border border-indigo-500/20">
+                                            <Rocket className="text-indigo-400" size={22} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-white font-bold text-sm">一键创世纪</h3>
+                                            <p className="text-[11px] text-slate-400 mt-1 max-w-[240px] mx-auto">
+                                                深度生成 6 位角色 + 10 条世界观 + 完整大纲
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={requestKickstart}
+                                            disabled={!project.premise}
+                                            className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white px-5 py-2 rounded-xl font-medium text-sm transition-all shadow-lg shadow-indigo-900/30 flex items-center gap-2 mx-auto"
+                                        >
+                                            ✨ 启动
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4 animate-fade-in">
+                                        {/* Step indicators */}
+                                        <div className="flex items-center gap-2">
+                                            {[
+                                                { step: 1, label: '角色', icon: '👤' },
+                                                { step: 2, label: '世界', icon: '🌍' },
+                                                { step: 3, label: '大纲', icon: '📈' },
+                                            ].map((s, idx) => (
+                                                <React.Fragment key={s.step}>
+                                                    <div className={`flex-1 flex flex-col items-center gap-1 transition-all duration-500 ${kickstartStep >= s.step ? 'opacity-100' : 'opacity-30'}`}>
+                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all duration-500 ${kickstartStep > s.step ? 'bg-emerald-500/20 text-emerald-400' :
+                                                            kickstartStep === s.step ? 'bg-indigo-500/20 text-indigo-400 animate-pulse' :
+                                                                'bg-slate-800 text-slate-600'
+                                                            }`}>
+                                                            {kickstartStep > s.step ? <CheckCircle size={16} /> : s.icon}
+                                                        </div>
+                                                        <span className="text-[9px] text-slate-500">{s.label}</span>
+                                                    </div>
+                                                    {idx < 2 && (
+                                                        <div className={`w-8 h-0.5 rounded-full transition-all duration-500 ${kickstartStep > s.step ? 'bg-emerald-500/40' : 'bg-slate-800'}`} />
+                                                    )}
+                                                </React.Fragment>
+                                            ))}
+                                        </div>
+                                        <div className="flex items-center gap-2 justify-center text-sm text-white">
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                            <span className="text-xs">{kickstartStatus}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="absolute inset-0 bg-gradient-to-r from-indigo-900/0 via-indigo-500/[0.03] to-indigo-900/0 pointer-events-none" />
+                        </div>
                     </div>
                 </div>
+
+                {/* Confirmation Modal */}
+                {showConfirmModal && (
+                    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+                        <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl transform transition-all scale-100">
+                            <div className="flex justify-between items-start mb-4">
+                                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                    <Rocket className="text-indigo-400" size={24} />
+                                    启动深度创世纪？
+                                </h3>
+                                <button onClick={() => setShowConfirmModal(false)} className="text-slate-500 hover:text-white transition-colors">
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <div className="text-slate-300 text-sm leading-relaxed mb-6 space-y-3 bg-slate-800/50 p-4 rounded-lg border border-slate-700/50">
+                                <p className="font-medium text-slate-200">这将基于您的<strong className="text-muse-300">创作罗盘</strong>设置，进行深度初始化：</p>
+                                <ul className="space-y-1 ml-1">
+                                    <li className="flex items-start gap-2">
+                                        <span className="text-indigo-400 mt-0.5">•</span>
+                                        <span>生成 <strong>6 位</strong> 核心角色 (主角/反派/导师/配角)</span>
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                        <span className="text-indigo-400 mt-0.5">•</span>
+                                        <span>逐项生成 <strong>5 大类</strong> 世界观设定 (每类 2-3 条)</span>
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                        <span className="text-indigo-400 mt-0.5">•</span>
+                                        <span>基于以上庞大内容，推演<strong>完整剧情大纲</strong></span>
+                                    </li>
+                                </ul>
+                                <p className="text-xs text-amber-400/80 pt-2 border-t border-slate-700/50 mt-2 flex items-center gap-1">
+                                    <AlertCircle size={12} />
+                                    <span>全过程可能需要 1-2 分钟，请勿关闭页面。</span>
+                                </p>
+                            </div>
+
+                            <div className="flex gap-3 justify-end">
+                                <button
+                                    onClick={() => setShowConfirmModal(false)}
+                                    className="px-4 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-sm font-medium"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    onClick={executeKickstart}
+                                    className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-lg shadow-indigo-900/50 text-sm flex items-center gap-2"
+                                >
+                                    确认启动 <ArrowRight size={14} />
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
-
-            {/* Confirmation Modal */}
-            {showConfirmModal && (
-                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 shadow-2xl transform transition-all scale-100">
-                        <div className="flex justify-between items-start mb-4">
-                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                <Rocket className="text-indigo-400" size={24} />
-                                启动深度创世纪？
-                            </h3>
-                            <button onClick={() => setShowConfirmModal(false)} className="text-slate-500 hover:text-white transition-colors">
-                                <X size={20} />
-                            </button>
-                        </div>
-
-                        <div className="text-slate-300 text-sm leading-relaxed mb-6 space-y-3 bg-slate-800/50 p-4 rounded-lg border border-slate-700/50">
-                            <p className="font-medium text-slate-200">这将基于您的<strong className="text-muse-300">创作罗盘</strong>设置，进行深度初始化：</p>
-                            <ul className="space-y-1 ml-1">
-                                <li className="flex items-start gap-2">
-                                    <span className="text-indigo-400 mt-0.5">•</span>
-                                    <span>生成 <strong>6 位</strong> 核心角色 (主角/反派/导师/配角)</span>
-                                </li>
-                                <li className="flex items-start gap-2">
-                                    <span className="text-indigo-400 mt-0.5">•</span>
-                                    <span>逐项生成 <strong>5 大类</strong> 世界观设定 (每类 2-3 条)</span>
-                                </li>
-                                <li className="flex items-start gap-2">
-                                    <span className="text-indigo-400 mt-0.5">•</span>
-                                    <span>基于以上庞大内容，推演<strong>完整剧情大纲</strong></span>
-                                </li>
-                            </ul>
-                            <p className="text-xs text-amber-400/80 pt-2 border-t border-slate-700/50 mt-2 flex items-center gap-1">
-                                <AlertCircle size={12} />
-                                <span>全过程可能需要 1-2 分钟，请勿关闭页面。</span>
-                            </p>
-                        </div>
-
-                        <div className="flex gap-3 justify-end">
-                            <button
-                                onClick={() => setShowConfirmModal(false)}
-                                className="px-4 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-sm font-medium"
-                            >
-                                取消
-                            </button>
-                            <button
-                                onClick={executeKickstart}
-                                className="px-5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-lg shadow-indigo-900/50 text-sm flex items-center gap-2"
-                            >
-                                确认启动 <ArrowRight size={14} />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Toast Notification */}
-            {toast && (
-                <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-50 transition-all animate-fade-in font-medium text-sm flex items-center gap-2 border ${toast.type === 'error' ? 'bg-red-500/10 border-red-500/50 text-red-200' : 'bg-emerald-500/10 border-emerald-500/50 text-emerald-200'}`}>
-                    {toast.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
-                    <span>{toast.msg}</span>
-                </div>
-            )}
         </div>
     );
 };

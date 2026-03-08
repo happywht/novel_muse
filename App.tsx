@@ -13,7 +13,7 @@ import { FolderOpen, Plus, Trash2, Save, X, Check, Download, Upload, Database, H
 import { SettingsPanel } from './components/SettingsPanel';
 import { KnowledgeGraph } from './components/KnowledgeGraph';
 import { PromptTuner } from './components/PromptTuner';
-import { WritingStats } from './components/WritingStats';
+import { CreativeCompassView } from './components/CreativeCompassView';
 import { ProjectLobby } from './components/ProjectLobby';
 import { useProjectStore, INITIAL_PROJECT } from './store/useProjectStore';
 import { storageService, STORAGE_KEYS } from './services/storageService';
@@ -245,8 +245,8 @@ const App: React.FC = () => {
               <KnowledgeGraph projectId={project.id} useBackend={useBackend} projectData={project} updateProject={updateProject} />
             </div>
           )}
-          {activeSection === AppSection.STATS && (
-            <WritingStats project={project} />
+          {activeSection === AppSection.CREATIVE_COMPASS && (
+            <CreativeCompassView project={project} updateProject={updateProject} />
           )}
         </main>
       </div>

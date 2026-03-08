@@ -116,8 +116,12 @@ export const generatePlotFromContext = async (
             4096
         );
 
-        const result = safeParseAiJson(responseText, AiPlotNodeArraySchema, "Plot Generation");
-        return result || [];
+        const result = safeParseAiJson(responseText, AiPlotNodeArraySchema, "Plot Generation") || [];
+        return result.map((p: any, index: number) => ({
+            ...p,
+            id: Date.now().toString() + Math.random(),
+            order: index
+        })) as PlotNode[];
     } catch (error) {
         console.error("Gemini Plot Generation Error:", error);
         throw error;
@@ -189,8 +193,12 @@ export const rewritePlot = async (
             4096
         );
 
-        const result = safeParseAiJson(responseText, AiPlotNodeArraySchema, "Plot Rewrite");
-        return result || [];
+        const result = safeParseAiJson(responseText, AiPlotNodeArraySchema, "Plot Rewrite") || [];
+        return result.map((p: any, index: number) => ({
+            ...p,
+            id: Date.now().toString() + Math.random(),
+            order: index
+        })) as PlotNode[];
     } catch (e) {
         console.error("Gemini Plot Rewrite Error:", e);
         throw e;

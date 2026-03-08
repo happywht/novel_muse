@@ -92,14 +92,14 @@ export interface WorldGenConfig {
 export enum AppSection {
   LOBBY = 'LOBBY',
   DASHBOARD = 'DASHBOARD',
+  CREATIVE_COMPASS = 'CREATIVE_COMPASS', // NEW: Extracted from Dashboard
   WORLD = 'WORLD',
   CHARACTERS = 'CHARACTERS',
   PLOT = 'PLOT',
-  OUTLINER = 'OUTLINER', // NEW: Chapter fission section
+  OUTLINER = 'OUTLINER',
   DRAFTING = 'DRAFTING',
   ECHOES = 'ECHOES',
-  GRAPH = 'GRAPH',
-  STATS = 'STATS'
+  GRAPH = 'GRAPH'
 }
 
 /**

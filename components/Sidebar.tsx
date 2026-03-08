@@ -37,6 +37,16 @@ const NAV_ITEMS: NavItem[] = [
         activeGlow: 'shadow-amber-500/20',
     },
     {
+        // NEW: Extracted Creative Compass
+        id: AppSection.CREATIVE_COMPASS,
+        label: '创作罗盘 Compass',
+        shortLabel: '罗盘',
+        icon: Wand2, // Reusing wand for now, or use Compass if it existed.
+        color: 'text-orange-400',
+        bgColor: 'bg-orange-500/15',
+        activeGlow: 'shadow-orange-500/20',
+    },
+    {
         id: AppSection.WORLD,
         label: '万象织机 World',
         shortLabel: '世界',
@@ -98,16 +108,7 @@ const NAV_ITEMS: NavItem[] = [
         color: 'text-indigo-400',
         bgColor: 'bg-indigo-500/15',
         activeGlow: 'shadow-indigo-500/20',
-    },
-    {
-        id: AppSection.STATS,
-        label: '创作数据 Stats',
-        shortLabel: '数据',
-        icon: BarChart3,
-        color: 'text-lime-400',
-        bgColor: 'bg-lime-500/15',
-        activeGlow: 'shadow-lime-500/20',
-    },
+    }
 ];
 
 interface ToolItem {
