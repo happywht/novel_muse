@@ -1,4 +1,5 @@
 import { getDriver } from './client';
+import { graphLlm } from './llm';
 
 /**
  * Sync: Push project data from MySQL into Neo4j
@@ -33,6 +34,32 @@ export const syncProjectToGraph = async (projectData: any): Promise<void> => {
                         projectId,
                     }
                 );
+            }
+
+            // [P0] NEW: Extract and sync structured character relationships via AI
+            try {
+                const extractedRelations = await graphLlm.extractCharacterRelationships(projectData.characters);
+                if (extractedRelations.length > 0) {
+                    for (const rel of extractedRelations) {
+                        const relType = rel.relation.replace(/[^A-Z0-9_]/gi, '').toUpperCase() || 'RELATED_TO';
+                        await session.run(
+                            `MATCH (s:Character {projectId: $projectId, name: $subject})
+                             MATCH (o:Character {projectId: $projectId, name: $object})
+                             MERGE (s)-[r:${relType}]->(o)
+                             ON CREATE SET r.weight = $weight, r.reason = $reason, r.source = 'AI_EXTRACTED'`,
+                            {
+                                projectId,
+                                subject: rel.subject,
+                                object: rel.object,
+                                weight: rel.weight || 50,
+                                reason: rel.reason || ''
+                            }
+                        );
+                    }
+                    console.log(`🧠 AI extracted ${extractedRelations.length} character relationships for project ${projectId}`);
+                }
+            } catch (aiErr) {
+                console.warn("⚠️ AI Relationship Extraction failed during sync, skipping structural edges.", aiErr);
             }
         }
 

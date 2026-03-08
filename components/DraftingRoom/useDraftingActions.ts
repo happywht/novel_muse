@@ -1,4 +1,5 @@
 import React from 'react';
+import { useProjectStore } from '../../store/useProjectStore';
 import {
     ProjectState, Character, WorldSetting, Draft, Echo,
     KnowledgeTriple, NarrativeInsight, PolishMode, ViewMode
@@ -6,7 +7,7 @@ import {
 import {
     generateSceneFromIngredients, polishDraft, rewriteLocalText,
     analyzeStateChanges, generateTwistHooks, extractKnowledgeTriples,
-    verifyLogicConflicts
+    verifyLogicConflicts, summarizeChapter
 } from '../../services/geminiService';
 import {
     fetchUnresolvedForeshadowing, fetchRelatedSubgraph,
@@ -57,6 +58,7 @@ export const useDraftingActions = ({
     const [isLocalRewriting, setIsLocalRewriting] = React.useState(false);
     const [isAnalyzingState, setIsAnalyzingState] = React.useState(false);
     const [isExtracting, setIsExtracting] = React.useState(false);
+    const [localPlotNodeId, setLocalPlotNodeId] = React.useState<string | null>(null);
     const [extractedEchoes, setExtractedEchoes] = React.useState<Echo[]>([]);
     const [suggestedTwists, setSuggestedTwists] = React.useState<string[]>([]);
     const [isGeneratingTwists, setIsGeneratingTwists] = React.useState(false);
@@ -95,6 +97,7 @@ export const useDraftingActions = ({
                 setPlotBeat(node.content);
                 setSelectedChars(node.relatedCharacters || []);
                 setSelectedLocationId(node.relatedLocations?.[0] || '');
+                setLocalPlotNodeId(node.id);
                 setActivePlotNodeId(null);
                 setViewMode('FORGE');
                 handleFetchForeshadowing();
@@ -370,33 +373,105 @@ export const useDraftingActions = ({
 
     const handleCommitToManuscript = async () => {
         if (!generatedContent) return;
-        const index = prompt("确定要采纳此草稿吗？请输入章节序号 (1, 2, 3...) 或回车新增最后一章", (project.chapters?.length + 1).toString());
-        if (index === null) return;
+
+        // 智能推断目标章节
+        // 1. 优先使用当前正在编辑的章节
+        let targetChapter = activeChapterId ? project.chapters.find(c => c.id === activeChapterId) : null;
+
+        // 2. 其次查看当前情节节点是否已关联章节 (针对从大纲跳转过来的情况)
+        if (!targetChapter && localPlotNodeId) {
+            targetChapter = project.chapters.find(c => c.plotNodeId === localPlotNodeId);
+        }
+
+        let order: number;
+        let chapterIdToUpdate: string | null = null;
+
+        if (targetChapter) {
+            if (!confirm(`确定要将此内容采纳至 [第 ${targetChapter.order} 章: ${targetChapter.title}] 吗？`)) return;
+            order = targetChapter.order;
+            chapterIdToUpdate = targetChapter.id;
+        } else {
+            const index = prompt("该草稿未关联到特定章节。请输入章节序号 (1, 2, 3...) 或回车新增最后一章", (project.chapters?.length + 1).toString());
+            if (index === null) return;
+            order = parseInt(index) || (project.chapters?.length + 1);
+
+            // 检查输入的序号是否已存在，如果存在则进入更新模式
+            const conflict = project.chapters.find(c => c.order === order);
+            if (conflict) {
+                if (!confirm(`第 ${order} 章已存在，是否覆盖该章内容？`)) return;
+                chapterIdToUpdate = conflict.id;
+                targetChapter = conflict; // Set targetChapter if found via index
+            }
+        }
 
         setIsSaving(true);
+        const newChapterId = Date.now().toString();
         try {
-            const order = parseInt(index) || (project.chapters?.length + 1);
-            const title = plotBeat.slice(0, 30) || `第 ${order} 章`;
+            // 决定标题：如果已有章节且标题不是默认的“第x章”，则保留原标题；否则使用情节摘要的前30个字
+            let title = (targetChapter && !targetChapter.title.startsWith('第'))
+                ? targetChapter.title
+                : (plotBeat.slice(0, 30) || `第 ${order} 章`);
+
             const content = generatedContent;
 
-            const newChapter = {
-                id: Date.now().toString(),
-                title,
-                content,
-                order,
-                lastModified: Date.now(),
-                summary: plotBeat,
-                expectedPOV: povCharId ? (project.characters.find(c => c.id === povCharId)?.name) : undefined,
-                plotNodeId: activePlotNodeId || undefined
-            };
+            // 智能摘要：在后台生成真正的剧情摘要，而不是简单复用情节目标
+            let summary = plotBeat; // 初始使用情节目标作为兜底
+            try {
+                // 如果启用了后端，异步获取一个 AI 总结的摘要
+                if (useBackend && content) {
+                    console.log("Generating silent summary...");
+                    summarizeChapter(title, content, project.creativeSettings).then(aiSummary => {
+                        if (aiSummary && aiSummary !== "摘要生成失败。") {
+                            // 再次更新项目以填入真正的摘要
+                            const finalChapters = useProjectStore.getState().project.chapters.map(c =>
+                                (c.id === (chapterIdToUpdate || newChapterId)) ? { ...c, summary: aiSummary } : c
+                            );
+                            updateProject({ chapters: finalChapters });
+                            if (useBackend) patchProject(project.id, { chapters: finalChapters });
+                        }
+                    });
+                }
+            } catch (sumErr) {
+                console.warn("Silent summary generation failed", sumErr);
+            }
 
-            const updatedChapters = [...(project.chapters || []), newChapter];
+            let updatedChapters;
+            if (chapterIdToUpdate) {
+                // 更新现有章节 (保持 ID 不变)
+                updatedChapters = project.chapters.map(c => c.id === chapterIdToUpdate ? {
+                    ...c,
+                    title,
+                    content,
+                    summary,
+                    lastModified: Date.now(),
+                    plotNodeId: localPlotNodeId || c.plotNodeId // 保留或更新关联关系
+                } : c);
+            } else {
+                // 新增章节
+                const newChapter = {
+                    id: newChapterId,
+                    title,
+                    content,
+                    order,
+                    lastModified: Date.now(),
+                    summary,
+                    expectedPOV: povCharId ? (project.characters.find(c => c.id === povCharId)?.name) : undefined,
+                    plotNodeId: localPlotNodeId || undefined
+                };
+                updatedChapters = [...(project.chapters || []), newChapter].sort((a, b) => a.order - b.order);
+            }
+
             updateProject({ chapters: updatedChapters });
             if (useBackend) await patchProject(project.id, { chapters: updatedChapters });
 
             alert("已成功采纳至正文！");
             setViewMode('MANUSCRIPT');
-            setActiveChapterId(newChapter.id);
+            if (chapterIdToUpdate) setActiveChapterId(chapterIdToUpdate);
+            else {
+                // 如果是新增的，找到刚加进那个
+                const justAdded = updatedChapters.find(c => c.order === order);
+                if (justAdded) setActiveChapterId(justAdded.id);
+            }
         } finally {
             setIsSaving(false);
         }

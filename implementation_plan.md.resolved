@@ -1,0 +1,60 @@
+# Data Schema Optimization Plan
+
+Based on the Schema Audit, the most critical gap is that character relationships (stored as plain text) are not being synced into the Neo4j Knowledge Graph. This severely limits the intelligence of the "Butterfly Effect" engine.
+
+## Objective
+Convert free-text character relationships into structured [KnowledgeTriple](file:///d:/%E5%AE%B6%E5%BA%AD/%E5%89%AF%E4%B8%9A%E6%8E%A2%E7%B4%A2/%E5%B0%8F%E8%AF%B4%E9%A1%B9%E7%9B%AE/%E5%B0%8F%E8%AF%B4%E5%BC%80%E9%A2%98/remix_-muse_-%E5%B0%8F%E8%AF%B4%E6%9E%B6%E6%9E%84%E5%B8%88_022302/types.ts#106-116) edges and inject them into the Neo4j graph automatically during project synchronization.
+
+## Proposed Changes
+
+### P0: 抽取人物关系落库图谱 (Edge Generation)
+**目标**：将自由文本的人际关系转化为 Neo4j 中的有向边，为蝴蝶效应推演提供脉络。
+#### [NEW] `services/gemini/graph.ts` (AI 抽取接口)
+- 编写 `extractRelationshipsFromText(characterName, relationshipsText, existingEntities)`。
+- **Prompt**：基于文本提取由 `subject`, `relation`, `object` 组成的三元组 JSON。
+
+#### [MODIFY] [services/schemas.ts](file:///d:/%E5%AE%B6%E5%BA%AD/%E5%89%AF%E4%B8%9A%E6%8E%A2%E7%B4%A2/%E5%B0%8F%E8%AF%B4%E9%A1%B9%E7%9B%AE/%E5%B0%8F%E8%AF%B4%E5%BC%80%E9%A2%98/remix_-muse_-%E5%B0%8F%E8%AF%B4%E6%9E%B6%E6%9E%84%E5%B8%88_022302/services/schemas.ts)
+- 增补 `AiKnowledgeTripleArraySchema` 专门处理关系抽取结果。
+
+#### [MODIFY] [server/src/services/graph/sync.ts](file:///d:/%E5%AE%B6%E5%BA%AD/%E5%89%AF%E4%B8%9A%E6%8E%A2%E7%B4%A2/%E5%B0%8F%E8%AF%B4%E9%A1%B9%E7%9B%AE/%E5%B0%8F%E8%AF%B4%E5%BC%80%E9%A2%98/remix_-muse_-%E5%B0%8F%E8%AF%B4%E6%9E%B6%E6%9E%84%E5%B8%88_022302/server/src/services/graph/sync.ts)
+- 在 [syncProjectToGraph](file:///d:/%E5%AE%B6%E5%BA%AD/%E5%89%AF%E4%B8%9A%E6%8E%A2%E7%B4%A2/%E5%B0%8F%E8%AF%B4%E9%A1%B9%E7%9B%AE/%E5%B0%8F%E8%AF%B4%E5%BC%80%E9%A2%98/remix_-muse_-%E5%B0%8F%E8%AF%B4%E6%9E%B6%E6%9E%84%E5%B8%88_022302/server/src/services/graph/sync.ts#3-234) 时，如果角色的人际关系文本不为空，调用抽取接口，并通过 Cypher `MERGE (s)-[r:RELATION]->(o)` 落边。
+
+---
+
+### P1: 增强事件实体的 ID 精准关联 (ID Resolution)
+**目标**：解决大模型生成别名导致无法匹配实体，事件被丢弃的问题。
+#### [MODIFY] [services/schemas.ts](file:///d:/%E5%AE%B6%E5%BA%AD/%E5%89%AF%E4%B8%9A%E6%8E%A2%E7%B4%A2/%E5%B0%8F%E8%AF%B4%E9%A1%B9%E7%9B%AE/%E5%B0%8F%E8%AF%B4%E5%BC%80%E9%A2%98/remix_-muse_-%E5%B0%8F%E8%AF%B4%E6%9E%B6%E6%9E%84%E5%B8%88_022302/services/schemas.ts)
+- 更新 `AiStateChangeSchema` 和 `AiEchoSchema`，新增要求返回 `targetId`。
+#### [MODIFY] [services/gemini/world.ts](file:///d:/%E5%AE%B6%E5%BA%AD/%E5%89%AF%E4%B8%9A%E6%8E%A2%E7%B4%A2/%E5%B0%8F%E8%AF%B4%E9%A1%B9%E7%9B%AE/%E5%B0%8F%E8%AF%B4%E5%BC%80%E9%A2%98/remix_-muse_-%E5%B0%8F%E8%AF%B4%E6%9E%B6%E6%9E%84%E5%B8%88_022302/services/gemini/world.ts)
+- [analyzeStateChanges](file:///d:/%E5%AE%B6%E5%BA%AD/%E5%89%AF%E4%B8%9A%E6%8E%A2%E7%B4%A2/%E5%B0%8F%E8%AF%B4%E9%A1%B9%E7%9B%AE/%E5%B0%8F%E8%AF%B4%E5%BC%80%E9%A2%98/remix_-muse_-%E5%B0%8F%E8%AF%B4%E6%9E%B6%E6%9E%84%E5%B8%88_022302/services/gemini/world.ts#184-266) / [extractEchoesFromText](file:///d:/%E5%AE%B6%E5%BA%AD/%E5%89%AF%E4%B8%9A%E6%8E%A2%E7%B4%A2/%E5%B0%8F%E8%AF%B4%E9%A1%B9%E7%9B%AE/%E5%B0%8F%E8%AF%B4%E5%BC%80%E9%A2%98/remix_-muse_-%E5%B0%8F%E8%AF%B4%E6%9E%B6%E6%9E%84%E5%B8%88_022302/services/gemini/world.ts#267-372) / [deduceWorldConsequences](file:///d:/%E5%AE%B6%E5%BA%AD/%E5%89%AF%E4%B8%9A%E6%8E%A2%E7%B4%A2/%E5%B0%8F%E8%AF%B4%E9%A1%B9%E7%9B%AE/%E5%B0%8F%E8%AF%B4%E5%BC%80%E9%A2%98/remix_-muse_-%E5%B0%8F%E8%AF%B4%E6%9E%B6%E6%9E%84%E5%B8%88_022302/services/gemini/world.ts#423-536) 的 Prompt 中，不仅传入名称，还需传入 `[ID] 名称` 的映射表。
+- 强制模型直接输出对应的 `targetId`，免去后端的字符串 `.includes()` 猜测。
+
+---
+
+### P2: 补全大纲节点的高阶元数据 (Plot Node Metadata)
+**目标**：让 AI 在生成小说大纲时，不仅生成纯文本，还能提前为每个节点打标签、关联人物和地点。
+#### [MODIFY] [services/schemas.ts](file:///d:/%E5%AE%B6%E5%BA%AD/%E5%89%AF%E4%B8%9A%E6%8E%A2%E7%B4%A2/%E5%B0%8F%E8%AF%B4%E9%A1%B9%E7%9B%AE/%E5%B0%8F%E8%AF%B4%E5%BC%80%E9%A2%98/remix_-muse_-%E5%B0%8F%E8%AF%B4%E6%9E%B6%E6%9E%84%E5%B8%88_022302/services/schemas.ts)
+- 更新 `AiPlotNodeSchema`，增加可选数组 `relatedCharacterNames`, `relatedLocationNames` 以及 `beatTag` (如 'INCITING_INCIDENT', 'CLIMAX')。
+#### [MODIFY] [services/gemini/plot.ts](file:///d:/%E5%AE%B6%E5%BA%AD/%E5%89%AF%E4%B8%9A%E6%8E%A2%E7%B4%A2/%E5%B0%8F%E8%AF%B4%E9%A1%B9%E7%9B%AE/%E5%B0%8F%E8%AF%B4%E5%BC%80%E9%A2%98/remix_-muse_-%E5%B0%8F%E8%AF%B4%E6%9E%B6%E6%9E%84%E5%B8%88_022302/services/gemini/plot.ts)
+- 在 [generatePlotFromContext](file:///d:/%E5%AE%B6%E5%BA%AD/%E5%89%AF%E4%B8%9A%E6%8E%A2%E7%B4%A2/%E5%B0%8F%E8%AF%B4%E9%A1%B9%E7%9B%AE/%E5%B0%8F%E8%AF%B4%E5%BC%80%E9%A2%98/remix_-muse_-%E5%B0%8F%E8%AF%B4%E6%9E%B6%E6%9E%84%E5%B8%88_022302/services/gemini/plot.ts#21-115) 中要求大模型同步规划出每个节点涉及的人和地点，并在后端组装时将名字翻译回真实的 UUID 存入 `relatedCharacters` 和 `relatedLocations` 字段。
+
+---
+
+### P3: 修复杂项缺失 (Chapter Beats ID)
+**目标**：前端 React 渲染警告修复。
+#### [MODIFY] [services/gemini/plot.ts](file:///d:/%E5%AE%B6%E5%BA%AD/%E5%89%AF%E4%B8%9A%E6%8E%A2%E7%B4%A2/%E5%B0%8F%E8%AF%B4%E9%A1%B9%E7%9B%AE/%E5%B0%8F%E8%AF%B4%E5%BC%80%E9%A2%98/remix_-muse_-%E5%B0%8F%E8%AF%B4%E6%9E%B6%E6%9E%84%E5%B8%88_022302/services/gemini/plot.ts)
+- 在 [splitPlotNodeIntoChapters](file:///d:/%E5%AE%B6%E5%BA%AD/%E5%89%AF%E4%B8%9A%E6%8E%A2%E7%B4%A2/%E5%B0%8F%E8%AF%B4%E9%A1%B9%E7%9B%AE/%E5%B0%8F%E8%AF%B4%E5%BC%80%E9%A2%98/remix_-muse_-%E5%B0%8F%E8%AF%B4%E6%9E%B6%E6%9E%84%E5%B8%88_022302/services/gemini/plot.ts#231-305) 返回的数据体中，后端遍历 `beats` 数组，主动为每个 `beat` 附加一个随机生成的 `UUID` id 和 `isCompleted: false` 的初始状态，再打包返回给前端持久化。
+### Frontend
+- No UI changes are strictly required, preserving the smooth UX of free-text input for the author.
+- The intelligence upgrade happens entirely under the hood.
+
+---
+
+## Verification Plan
+
+### Manual Verification
+1. Open a test project and add relationships text to a character (e.g., "张三: 仇恨李四，暗恋王五").
+2. Trigger a full project sync.
+3. Observe the backend logs to ensure `extractRelationshipsFromText` is called and parses the triples successfully.
+4. Open the Neo4j Browser (or use the frontend Graph view) to verify that directed edges (e.g., `HATES`, `LOVES`) now exist between the Character nodes.
+5. Trigger a "Butterfly Effect" simulation that impacts one of the characters; verify that the AI prompt includes the newly created relationship edges in the Neo4j context string.
