@@ -21,10 +21,15 @@ model Project {
   style            String    @default("")
   creativity       Float     @default(0.7)
   targetAudience   String    @default("")
+  promptProfile    String?   @default("WEB_NOVEL") // NEW: Choice of prompt pack
 
   // World Gen Config
   detailLevel      String    @default("Standard")
   focus            String    @default("Balanced")
+
+  // Sandbox Branches
+  activeBranchId   String?   // NEW Task 2.2: Track current active sandbox branch
+  availableBranches String?  @db.LongText // NEW Task 2.2: JSON array of branches
 
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -81,6 +86,7 @@ model Draft {
   content          String   @db.LongText
   relatedPlotPoint String?  @db.LongText
   lastModified     BigInt
+  branchId         String?  // NEW Task 2.2: Identify which branch this draft belongs to
   projectId        String
   project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -113,6 +119,7 @@ model Echo {
   status      String   @default("PENDING")
   triples     String?  @db.LongText // NEW: JSON blob for associated triples
   timestamp   BigInt
+  branchId    String?  // NEW Task 2.2
   projectId   String
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 

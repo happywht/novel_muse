@@ -9,6 +9,7 @@ import { useDraftingActions } from './DraftingRoom/useDraftingActions';
 import { ForgeSidebar } from './DraftingRoom/ForgeSidebar';
 import { ForgeEditor } from './DraftingRoom/ForgeEditor';
 import { ManuscriptView } from './DraftingRoom/ManuscriptView';
+import { ReferenceSidebar } from './DraftingRoom/ReferenceSidebar';
 
 // Extracted Panels
 import { ContinuityBanner } from './panels/ContinuityBanner';
@@ -43,6 +44,26 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
 
     return (
         <div className="flex h-full bg-[#0f172a] text-slate-200 overflow-hidden relative">
+            {/* View Mode Switcher */}
+            <div className="absolute top-4 right-4 z-20 flex bg-slate-800 rounded-lg p-1 border border-slate-700">
+                <button
+                    onClick={() => actions.setViewMode('FORGE')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-all ${
+                        actions.viewMode === 'FORGE' ? 'bg-muse-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                    }`}
+                >
+                    ✍️ 自动工坊
+                </button>
+                <button
+                    onClick={() => actions.setViewMode('MANUSCRIPT')}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-2 transition-all ${
+                        actions.viewMode === 'MANUSCRIPT' ? 'bg-muse-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                    }`}
+                >
+                    📖 正文归档
+                </button>
+            </div>
+
             {/* Logic Conflict / Continuity Warnings */}
             <ContinuityBanner project={project} activeChapterId={activeChapterId} />
 
@@ -93,6 +114,13 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                     onClose={() => actions.setShowFactionPanel(false)}
                 />
             )}
+
+            {/* Omniscient Reference Sidebar */}
+            <ReferenceSidebar
+                project={project}
+                showReference={actions.showReference}
+                onClose={() => actions.setShowReference(false)}
+            />
         </div>
     );
 };

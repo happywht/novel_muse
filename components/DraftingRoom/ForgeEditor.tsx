@@ -2,7 +2,7 @@ import React from 'react';
 import {
     FileText, Cloud, Loader2, Wand2, Eye, Clapperboard,
     Brain, Feather, Zap, Clipboard, Save, Check, ScanSearch,
-    Sparkles, RefreshCw, X
+    Sparkles, RefreshCw, X, Sidebar
 } from 'lucide-react';
 import { Echo, PolishMode, ProjectState } from '../../types';
 import { DraftEditor } from './DraftEditor';
@@ -37,6 +37,8 @@ export const ForgeEditor: React.FC<ForgeEditorProps> = ({
         setExtractedEchoes,
         handleSimulatePropagation,
         handleAddEcho,
+        showReference,
+        setShowReference,
     } = actions;
     return (
         <div className="w-2/3 flex flex-col gap-4 pt-10">
@@ -111,6 +113,18 @@ export const ForgeEditor: React.FC<ForgeEditorProps> = ({
                             title="将此草稿转为正式正文，AI 在下次生成时将参考它"
                         >
                             <Check size={12} /> 采纳
+                        </button>
+                        <div className="w-px h-6 bg-slate-700 mx-1"></div>
+                        <button
+                            onClick={() => setShowReference(!showReference)}
+                            className={`text-xs px-3 py-1.5 rounded border transition-colors flex items-center gap-1 font-medium ${
+                                showReference
+                                    ? 'bg-purple-900 text-purple-200 border-purple-500'
+                                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                            }`}
+                            title="打开设定参考侧边栏"
+                        >
+                            <Sidebar size={12} />
                         </button>
                     </div>
                 </div>

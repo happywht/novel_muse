@@ -2,7 +2,7 @@ import React from 'react';
 import {
     GitCommit, Brain, X, Zap, Sparkles, RefreshCw,
     Loader2, Users, Plus, Eye, MapPin, Gauge, FileText,
-    PenTool, Trash2
+    PenTool, Trash2, AlertTriangle, Sidebar
 } from 'lucide-react';
 import { ProjectState, Character, WorldSetting, Draft, KnowledgeTriple, NarrativeInsight } from '../../types';
 
@@ -56,19 +56,71 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
         activeDraftId,
         loadDraft,
         deleteDraft,
+        availableBranches,
+        handleCreateBranch,
+        handleSwitchBranch,
+        logicConflicts,
+        setLogicConflicts,
     } = actions;
     return (
         <div className="w-1/3 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar pt-10 pb-10">
-            {/* Project/Branch Status Indicator */}
-            <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                        分支: {activeBranchId}
-                    </span>
+            {/* Logic Conflict Alerts */}
+            {logicConflicts.length > 0 && (
+                <div className="bg-red-900/20 border border-red-500/50 p-4 rounded-xl space-y-3 animate-pulse mb-4">
+                    <div className="flex items-center gap-2 text-red-400 font-bold text-sm">
+                        <AlertTriangle size={18} />
+                        发现故事逻辑冲突
+                    </div>
+                    <div className="space-y-2">
+                        {logicConflicts.map((c, i) => (
+                            <div key={i} className="text-xs text-red-200/80 bg-red-900/30 p-2 rounded border border-red-500/20">
+                                {c.description}
+                            </div>
+                        ))}
+                    </div>
+                    <button
+                        onClick={() => setLogicConflicts([])}
+                        className="text-[10px] text-red-400 hover:text-red-300 underline"
+                    >
+                        忽略所有警告
+                    </button>
+                </div>
+            )}
+
+            {/* Task 2.2: What-If Branching Sandbox */}
+            <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 shadow-xl mb-4">
+                <div className="flex items-center justify-between mb-3 text-muse-300 font-bold">
+                    <div className="flex items-center gap-2">
+                        <GitCommit size={18} className="text-amber-500" />
+                        <h3>分歧沙盘 (What-If Sandbox)</h3>
+                    </div>
+                    <button
+                        onClick={handleCreateBranch}
+                        className="text-[10px] bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-300 flex items-center gap-1"
+                    >
+                        <Plus size={12} /> 新分歧
+                    </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                    {availableBranches.map(branch => (
+                        <button
+                            key={branch}
+                            onClick={() => handleSwitchBranch(branch)}
+                            className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all border ${
+                                activeBranchId === branch
+                                    ? 'bg-amber-600/20 border-amber-500 text-amber-200 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
+                                    : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-600'
+                            }`}
+                        >
+                            {branch === 'main' ? '🌐 主线剧情' : `🌱 ${branch}`}
+                        </button>
+                    ))}
                 </div>
                 {activeBranchId !== 'main' && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between mt-2 border-t border-slate-700/50 pt-2">
+                        <p className="text-[9px] text-amber-500/70 italic">
+                            当前处于分歧模式
+                        </p>
                         <button
                             onClick={handleMergeBranch}
                             disabled={isMergingBranch}

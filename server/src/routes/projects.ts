@@ -99,11 +99,14 @@ router.get('/:id', async (req: Request, res: Response) => {
                 style: project.style,
                 creativity: project.creativity,
                 targetAudience: project.targetAudience,
+                promptProfile: (project as any).promptProfile || undefined,
             },
             worldGenConfig: {
                 detailLevel: project.detailLevel,
                 focus: project.focus,
             },
+            activeBranchId: (project as any).activeBranchId || undefined,
+            availableBranches: (project as any).availableBranches ? JSON.parse((project as any).availableBranches) : undefined,
             characters: project.characters.map((c: any) => ({
                 id: c.id,
                 name: c.name,
@@ -131,6 +134,7 @@ router.get('/:id', async (req: Request, res: Response) => {
                 content: d.content,
                 relatedPlotPoint: d.relatedPlotPoint || undefined,
                 lastModified: Number(d.lastModified),
+                branchId: d.branchId || undefined,
             })),
             chapters: project.chapters.map((ch: any) => ({
                 id: ch.id,
@@ -160,8 +164,9 @@ router.get('/:id', async (req: Request, res: Response) => {
                 description: e.description,
                 reason: e.reason,
                 status: e.status as any,
-                triples: e.triples ? JSON.parse(e.triples) : undefined, // NEW: Parse triples JSON
+                triples: e.triples ? JSON.parse(e.triples) : undefined,
                 timestamp: Number(e.timestamp),
+                branchId: e.branchId || undefined,
             })),
             timeline: project.timeline.map((t: any) => ({
                 id: t.id,
@@ -248,8 +253,11 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                     style: data.creativeSettings?.style || '',
                     creativity: Number(data.creativeSettings?.creativity ?? 0.7),
                     targetAudience: data.creativeSettings?.targetAudience || '',
+                    promptProfile: data.creativeSettings?.promptProfile || 'WEB_NOVEL',
                     detailLevel: data.worldGenConfig?.detailLevel || 'Standard',
                     focus: data.worldGenConfig?.focus || 'Balanced',
+                    activeBranchId: data.activeBranchId || null,
+                    availableBranches: data.availableBranches ? JSON.stringify(data.availableBranches) : null,
                     customPrompts: JSON.stringify(data.customPrompts || {}),
                 },
                 update: {
@@ -262,8 +270,11 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                     style: data.creativeSettings?.style || '',
                     creativity: Number(data.creativeSettings?.creativity ?? 0.7),
                     targetAudience: data.creativeSettings?.targetAudience || '',
+                    promptProfile: data.creativeSettings?.promptProfile || 'WEB_NOVEL',
                     detailLevel: data.worldGenConfig?.detailLevel || 'Standard',
                     focus: data.worldGenConfig?.focus || 'Balanced',
+                    activeBranchId: data.activeBranchId || null,
+                    availableBranches: data.availableBranches ? JSON.stringify(data.availableBranches) : null,
                     customPrompts: JSON.stringify(data.customPrompts || {}),
                 },
             });
@@ -333,6 +344,7 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                         content: d.content,
                         relatedPlotPoint: d.relatedPlotPoint || null,
                         lastModified: BigInt(d.lastModified),
+                        branchId: d.branchId || null,
                         projectId: id,
                     }))
                 });
@@ -401,8 +413,9 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                         description: e.description,
                         reason: e.reason,
                         status: e.status || 'PENDING',
-                        triples: e.triples ? JSON.stringify(e.triples) : null, // NEW: Stringify triples JSON
+                        triples: e.triples ? JSON.stringify(e.triples) : null,
                         timestamp: BigInt(e.timestamp),
+                        branchId: e.branchId || null,
                         projectId: id,
                     }))
                 });
@@ -460,6 +473,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
             if (data.creativeSettings.style !== undefined) updateData.style = data.creativeSettings.style;
             if (data.creativeSettings.creativity !== undefined) updateData.creativity = Number(data.creativeSettings.creativity);
             if (data.creativeSettings.targetAudience !== undefined) updateData.targetAudience = data.creativeSettings.targetAudience;
+            if (data.creativeSettings.promptProfile !== undefined) updateData.promptProfile = data.creativeSettings.promptProfile;
         }
 
         // World Gen Config (flattened in DB)
@@ -467,6 +481,10 @@ router.patch('/:id', async (req: Request, res: Response) => {
             if (data.worldGenConfig.detailLevel !== undefined) updateData.detailLevel = data.worldGenConfig.detailLevel;
             if (data.worldGenConfig.focus !== undefined) updateData.focus = data.worldGenConfig.focus;
         }
+
+        // Sandbox Details
+        if (data.activeBranchId !== undefined) updateData.activeBranchId = data.activeBranchId;
+        if (data.availableBranches !== undefined) updateData.availableBranches = data.availableBranches ? JSON.stringify(data.availableBranches) : null;
 
         if (data.customPrompts !== undefined) {
             updateData.customPrompts = JSON.stringify(data.customPrompts);

@@ -5,7 +5,8 @@ import {
 } from '../../types';
 import {
     generateSceneFromIngredients, polishDraft, rewriteLocalText,
-    analyzeStateChanges, generateTwistHooks
+    analyzeStateChanges, generateTwistHooks, extractKnowledgeTriples,
+    verifyLogicConflicts
 } from '../../services/geminiService';
 import {
     fetchUnresolvedForeshadowing, fetchRelatedSubgraph,
@@ -40,6 +41,7 @@ export const useDraftingActions = ({
     // UI State
     const [viewMode, setViewMode] = React.useState<ViewMode>('FORGE');
     const [plotBeat, setPlotBeat] = React.useState('');
+    const [showReference, setShowReference] = React.useState(false);
     const [selectedChars, setSelectedChars] = React.useState<string[]>([]);
     const [selectedLocationId, setSelectedLocationId] = React.useState('');
     const [generatedContent, setGeneratedContent] = React.useState('');
@@ -75,6 +77,15 @@ export const useDraftingActions = ({
     const [showButterflyPanel, setShowButterflyPanel] = React.useState(false);
     const [propagationRisks, setPropagationRisks] = React.useState<any[]>([]);
     const [isSimulatingPropagation, setIsSimulatingPropagation] = React.useState(false);
+
+    // Task 2.2: Branching Sandbox State
+    const [availableBranches, setAvailableBranches] = React.useState<string[]>(
+        project.availableBranches || ['main']
+    );
+
+    // Logic Audit State
+    const [isAuditingLogic, setIsAuditingLogic] = React.useState(false);
+    const [logicConflicts, setLogicConflicts] = React.useState<any[]>([]);
 
     // Effects for Bridge and Initialization
     React.useEffect(() => {
@@ -232,6 +243,8 @@ export const useDraftingActions = ({
             setActiveDraftId(null);
 
             triggerStateAnalysis(result, activeCharacters);
+            // 自动触发逻辑审计
+            triggerLogicAudit(result);
         } catch (e) {
             alert("生成失败");
         } finally {
@@ -424,6 +437,50 @@ export const useDraftingActions = ({
         }
     };
 
+    // Task 2.2: Branch Sandbox Handlers
+    const handleCreateBranch = () => {
+        const name = prompt("输入新分支名称 (例如: '主角黑化', '全员存活'):");
+        if (name) {
+            const newBranches = [...availableBranches, name];
+            setAvailableBranches(newBranches);
+            updateProject({ availableBranches: newBranches, activeBranchId: name });
+            // 切换到新分支后刷新上下文
+            handleFetchForeshadowing();
+            handleFetchInsights();
+        }
+    };
+
+    const handleSwitchBranch = (branchId: string) => {
+        updateProject({ activeBranchId: branchId });
+        // 分支切换时自动刷新伏笔和洞察
+        handleFetchForeshadowing();
+        handleFetchInsights();
+    };
+
+    // Logic Audit Handlers
+    const triggerLogicAudit = async (content: string) => {
+        if (!useBackend) return;
+        setIsAuditingLogic(true);
+        setLogicConflicts([]);
+        try {
+            const triples = await extractKnowledgeTriples(content);
+            if (triples.length > 0) {
+                const conflicts = await verifyLogicConflicts(project.id, triples);
+                setLogicConflicts(conflicts);
+            }
+        } catch (e) {
+            console.error("Logic Audit failed:", e);
+        } finally {
+            setIsAuditingLogic(false);
+        }
+    };
+
+    const handleVerifyLogic = () => {
+        if (generatedContent) {
+            triggerLogicAudit(generatedContent);
+        }
+    };
+
     return {
         // State
         viewMode, setViewMode,
@@ -462,6 +519,20 @@ export const useDraftingActions = ({
         showButterflyPanel, setShowButterflyPanel,
         propagationRisks, isSimulatingPropagation,
         handleSimulatePropagation: handleSimulatePropagationLocal,
+
+        // Task 2.2: Branching Sandbox
+        availableBranches,
+        handleCreateBranch,
+        handleSwitchBranch,
+
+        // Logic Audit
+        isAuditingLogic,
+        logicConflicts,
+        setLogicConflicts,
+        handleVerifyLogic,
+
+        // Reference Sidebar
+        showReference, setShowReference,
 
         // Handlers
         handleGenerate,
