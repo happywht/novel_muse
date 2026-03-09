@@ -6,6 +6,7 @@ import {
     executeModelTask, getInstructionWithSettings, getModelName
 } from "./core";
 import { formatContext } from "./helpers";
+import { API_BASE } from "../apiService";
 
 /**
  * Deep plot auditing for logic and pacing
@@ -179,7 +180,7 @@ export const verifyLogicConflicts = async (
     if (triples.length === 0) return [];
 
     try {
-        const response = await fetch('/api/graph/verify-logic', {
+        const response = await fetch(`${API_BASE}/graph/verify-logic`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ projectId, triples })

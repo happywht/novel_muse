@@ -3,7 +3,7 @@ import {
     KnowledgeTriple, Faction, PropagationRisk, PhysicalStatus
 } from '../types';
 
-const API_BASE = 'http://localhost:3001/api';
+export const API_BASE = 'http://localhost:3001/api';
 
 interface ProjectSummary {
     id: string;

@@ -41,7 +41,7 @@ export const ForgeEditor: React.FC<ForgeEditorProps> = ({
         setShowReference,
     } = actions;
     return (
-        <div className="w-2/3 flex flex-col gap-4 pt-10">
+        <div className="flex flex-col gap-4 pt-10">
             <div className="flex-1 bg-slate-900 rounded-xl border border-slate-800 flex flex-col relative overflow-hidden">
                 <div className="p-4 border-b border-slate-800 bg-slate-950/50 flex justify-between items-center z-20 relative">
                     <h2 className="font-serif font-bold text-lg text-white flex items-center gap-2">
@@ -118,8 +118,8 @@ export const ForgeEditor: React.FC<ForgeEditorProps> = ({
                         <button
                             onClick={() => setShowReference(!showReference)}
                             className={`text-xs px-3 py-1.5 rounded border transition-colors flex items-center gap-1 font-medium ${showReference
-                                    ? 'bg-purple-900 text-purple-200 border-purple-500'
-                                    : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                                ? 'bg-purple-900 text-purple-200 border-purple-500'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
                                 }`}
                             title="打开设定参考侧边栏"
                         >

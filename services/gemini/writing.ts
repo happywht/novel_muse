@@ -63,25 +63,25 @@ export const generateSceneFromIngredients = async (
     if (profile === 'WEB_NOVEL') {
         switch (pacing) {
             case 'SLOW_BURN':
-                pacingInstruction = "【节奏控制: 心理拉扯/慢热】重点在于角色博弈、对峙和期待感经营。不要写景物！";
+                pacingInstruction = "【节奏控制: 心理拉扯/慢热】重点在于角色博弈、对峙和期待感经营。切忌流水账式的环境描写，应以暗流涌动的互动为主。";
                 break;
             case 'CLIMAX':
-                pacingInstruction = "【节奏控制: 热血爆发/高潮】进入高强度反转或冲突爆发，全对话驱动，营造极致爽感。";
+                pacingInstruction = "【节奏控制: 热血爆发/高潮】进入高强度反转或冲突爆发，全动作与对话驱动，营造极致爽感。绝不拖泥带水。";
                 break;
             default:
-                pacingInstruction = "【节奏控制: 稳定爽快】稳步推进主线冲突。";
+                pacingInstruction = "【节奏控制: 稳定爽快】稳步推进主线冲突，信息密度要高。";
                 break;
         }
     } else {
         switch (pacing) {
             case 'SLOW_BURN':
-                pacingInstruction = "【节奏控制: 铺垫/慢热】大量环境描写、心理活动和细节刻画。";
+                pacingInstruction = "【节奏控制: 铺垫/慢热】侧重人物心理活动、细微的神态刻画，通过白描建立情绪铺垫，而非生硬地堆砌景物。";
                 break;
             case 'CLIMAX':
-                pacingInstruction = "【节奏控制: 高潮/爆发】短促有力的句子，专注动作、冲突和直接反应。";
+                pacingInstruction = "【节奏控制: 高潮/爆发】短促有力的句子，专注动作、直接反应与核心冲突。";
                 break;
             default:
-                pacingInstruction = "【节奏控制: 平衡推进】保持叙事流畅，平衡对话、动作 and 描写。";
+                pacingInstruction = "【节奏控制: 平衡推进】保持叙事流畅，自然地交织对话、动作与心理活动。";
                 break;
         }
     }
@@ -179,8 +179,14 @@ export const generateSceneFromIngredients = async (
     ${plotBeat}
     
     请根据以上要素，撰写一段约 ${targetWordCount} 字的小说正文片段。
-    【重要字数要求】：请务必拓展细节、对话和环境描写，撑起框架，使最终生成的字数严格逼近 ${targetWordCount} 字的规模，避免干瘪或敷衍。
-    请直接开始正文，不需要标题或概述。
+    
+    【🚨 质量与网文调性红线（绝对禁止）】：
+    1. **拒绝套路化开局**：绝对不要以“天气、风景、光线”（如“云梦泽的雾浓得化不开”、“阳光透过树叶的缝隙”）作为本段正文的开头。请**直接以人物的动作、核心冲突或极具张力的台词切入**！
+    2. **拒绝好莱坞式说教结尾**：绝对不要在片段末尾加上类似“而这，只是一个开始”、“这将是属于他的时代”、“命运的齿轮开始转动”等假大空的总结性/史诗感旁白。
+    3. **断章美学**：如果这是一章的结束，请让它停在一个**悬念、未解的危机、或者一句出人意料的话**上，做到戛然而止，不要主动去圆满收尾。
+    
+    【指令】：
+    请务必拓展真实的互动细节和动作，撑起框架，使真实情节密度支撑起字数要求。直接开始正文，不要输出任何标题、概述或解释文字。
     `;
 
     try {

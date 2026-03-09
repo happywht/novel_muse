@@ -8,6 +8,22 @@ import {
 
 const router = Router();
 
+// POST /api/graph/verify-logic - Audit triples against ground truth (MUST BE BEFORE /:projectId routes)
+router.post('/verify-logic', async (req: Request, res: Response) => {
+    const { projectId, triples } = req.body;
+    if (!projectId || !triples) {
+        res.status(400).json({ error: 'Missing projectId or triples' });
+        return;
+    }
+    try {
+        const conflicts = await verifyLogicConflicts(projectId, triples);
+        res.json(conflicts);
+    } catch (err: any) {
+        console.error('Logic verify error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // GET /api/graph/:projectId/insights - Get narrative insights
 router.get('/:projectId/insights', async (req: Request, res: Response) => {
     try {
@@ -107,22 +123,6 @@ router.post('/:projectId/edge', async (req: Request, res: Response) => {
         res.json({ success: true });
     } catch (err: any) {
         console.error('Edge creation error:', err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// POST /api/graph/verify-logic - Audit triples against ground truth
-router.post('/verify-logic', async (req: Request, res: Response) => {
-    const { projectId, triples } = req.body;
-    if (!projectId || !triples) {
-        res.status(400).json({ error: 'Missing projectId or triples' });
-        return;
-    }
-    try {
-        const conflicts = await verifyLogicConflicts(projectId, triples);
-        res.json(conflicts);
-    } catch (err: any) {
-        console.error('Logic verify error:', err);
         res.status(500).json({ error: err.message });
     }
 });
