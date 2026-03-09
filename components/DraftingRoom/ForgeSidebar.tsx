@@ -43,8 +43,8 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
         setShowAdvancedParams,
         povCharId,
         setPovCharId,
-        selectedLocationId,
-        setSelectedLocationId,
+        selectedSettingIds,
+        toggleSettingSelection,
         pacing,
         setPacing,
         targetWordCount,
@@ -352,18 +352,24 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
                         {/* Location Selection */}
                         <div className="space-y-2">
                             <h3 className="text-xs text-slate-400 font-bold flex items-center gap-1">
-                                <MapPin size={14} /> 强制锚定场景维度 (Location)
+                                <MapPin size={14} /> 强制锚定场景/设定 (Active Settings)
                             </h3>
-                            <select
-                                value={selectedLocationId}
-                                onChange={(e) => setSelectedLocationId(e.target.value)}
-                                className="w-full bg-slate-900/50 border border-slate-700 rounded-lg p-2 text-slate-300 text-xs focus:ring-1 focus:ring-muse-500 outline-none"
-                            >
-                                <option value="">-- 无 (由 AI 自主决定) --</option>
-                                {(project.worldSettings || []).map(w => (
-                                    <option key={w.id} value={w.id}>[{w.category}] {w.title}</option>
+                            <div className="flex flex-wrap gap-2">
+                                {(project.worldSettings || []).length === 0 && <p className="text-xs text-slate-500">暂无设定，请去灵魂熔炉创建。</p>}
+                                {(project.worldSettings || []).map(setting => (
+                                    <button
+                                        key={setting.id}
+                                        onClick={() => toggleSettingSelection(setting.id)}
+                                        className={`px-3 py-1.5 rounded-full text-xs border transition-all flex items-center gap-1 ${selectedSettingIds?.includes(setting.id)
+                                            ? 'bg-muse-600 border-muse-500 text-white'
+                                            : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:border-slate-500'
+                                            }`}
+                                    >
+                                        {selectedSettingIds?.includes(setting.id) && <Plus size={10} className="rotate-45" />}
+                                        <span className="opacity-50 mr-1">[{setting.category}]</span> {setting.title}
+                                    </button>
                                 ))}
-                            </select>
+                            </div>
                         </div>
 
                         {/* Pacing Control */}
@@ -433,8 +439,8 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
                                             key={tag}
                                             onClick={() => actions.setLocalStyleTags((prev: string[]) => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])}
                                             className={`text-[9px] px-2 py-0.5 rounded border transition-colors ${actions.localStyleTags?.includes(tag)
-                                                    ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
-                                                    : 'bg-slate-900/60 border-slate-700/50 text-slate-400 hover:border-slate-500'
+                                                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                                                : 'bg-slate-900/60 border-slate-700/50 text-slate-400 hover:border-slate-500'
                                                 }`}
                                         >
                                             {tag}

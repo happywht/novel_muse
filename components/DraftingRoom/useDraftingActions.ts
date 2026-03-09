@@ -44,7 +44,7 @@ export const useDraftingActions = ({
     const [plotBeat, setPlotBeat] = React.useState('');
     const [showReference, setShowReference] = React.useState(false);
     const [selectedChars, setSelectedChars] = React.useState<string[]>([]);
-    const [selectedLocationId, setSelectedLocationId] = React.useState('');
+    const [selectedSettingIds, setSelectedSettingIds] = React.useState<string[]>([]);
     const [generatedContent, setGeneratedContent] = React.useState('');
     const [isGenerating, setIsGenerating] = React.useState(false);
     const [isSaving, setIsSaving] = React.useState(false);
@@ -108,7 +108,7 @@ export const useDraftingActions = ({
             if (node) {
                 setPlotBeat(node.content);
                 setSelectedChars(node.relatedCharacters || []);
-                setSelectedLocationId(node.relatedLocations?.[0] || '');
+                setSelectedSettingIds(node.relatedLocations || []);
                 setLocalPlotNodeId(node.id);
                 setActivePlotNodeId(null);
                 setViewMode('FORGE');
@@ -134,7 +134,7 @@ export const useDraftingActions = ({
                     const node = project.plotNodes.find(n => n.id === chapter.plotNodeId);
                     if (node) {
                         setSelectedChars(node.relatedCharacters || []);
-                        setSelectedLocationId(node.relatedLocations?.[0] || '');
+                        setSelectedSettingIds(node.relatedLocations || []);
                     }
                 }
             }
@@ -149,6 +149,10 @@ export const useDraftingActions = ({
     // Handlers
     const toggleCharSelection = (id: string) => {
         setSelectedChars(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
+    };
+
+    const toggleSettingSelection = (id: string) => {
+        setSelectedSettingIds(prev => prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]);
     };
 
     const handleFetchForeshadowing = async () => {
@@ -214,7 +218,7 @@ export const useDraftingActions = ({
         setExtractedEchoes([]);
         try {
             const activeCharacters = (project.characters || []).filter(c => selectedChars.includes(c.id));
-            const activeLocation = (project.worldSettings || []).find(w => w.id === selectedLocationId) || null;
+            const activeSettings = (project.worldSettings || []).filter(w => selectedSettingIds.includes(w.id));
 
             const sortedChapters = [...project.chapters].sort((a, b) => a.order - b.order);
             const currentIndex = sortedChapters.findIndex(c => c.id === activeChapterId);
@@ -233,7 +237,7 @@ export const useDraftingActions = ({
             let unresolvedForeshadowing = [];
 
             if (useBackend) {
-                const anchors = [...activeCharacters.map(c => c.name), ...(activeLocation ? [activeLocation.title] : [])];
+                const anchors = [...activeCharacters.map(c => c.name), ...activeSettings.map(s => s.title)];
                 const promises: Promise<any>[] = [fetchUnresolvedForeshadowing(project.id, activeBranchId)];
                 if (anchors.length > 0) {
                     promises.push(fetchRelatedSubgraph(project.id, anchors, activeBranchId));
@@ -248,7 +252,7 @@ export const useDraftingActions = ({
             }
 
             const result = await generateSceneFromIngredients(
-                project.genre, plotBeat, activeCharacters, activeLocation, project.worldSettings || [],
+                project.genre, plotBeat, activeCharacters, activeSettings, project.worldSettings || [],
                 effectiveCreativeSettings, previousContext, pacing, project.echoes || [],
                 targetWordCount, povCharName, rollingSummary, activeChapterId || undefined,
                 activeTwist || undefined, graphContext, physicalStatus, unresolvedForeshadowing
@@ -587,7 +591,7 @@ export const useDraftingActions = ({
         viewMode, setViewMode,
         plotBeat, setPlotBeat,
         selectedChars, toggleCharSelection,
-        selectedLocationId, setSelectedLocationId,
+        selectedSettingIds, toggleSettingSelection,
         generatedContent, setGeneratedContent,
         isGenerating,
         isSaving,

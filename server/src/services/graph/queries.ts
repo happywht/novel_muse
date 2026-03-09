@@ -9,8 +9,10 @@ export interface PhysicalStatus {
 
 /**
  * Get the full graph for a project
+ * @param projectId Project ID
+ * @param includeTypes Optional list of node labels to include (e.g., ['Character', 'WorldSetting'])
  */
-export const getProjectGraph = async (projectId: string): Promise<{
+export const getProjectGraph = async (projectId: string, includeTypes?: string[]): Promise<{
     nodes: any[];
     edges: any[];
 }> => {
@@ -18,11 +20,17 @@ export const getProjectGraph = async (projectId: string): Promise<{
     const session = d.session();
 
     try {
+        // Build the where clause for labels if provided
+        const labelFilter = (includeTypes && includeTypes.length > 0)
+            ? `AND any(label IN labels(n) WHERE label IN $includeTypes)`
+            : '';
+
         // Get all nodes
         const nodesResult = await session.run(
             `MATCH (n {projectId: $projectId})
-       RETURN n, labels(n) as labels`,
-            { projectId }
+             WHERE 1=1 ${labelFilter}
+             RETURN n, labels(n) as labels`,
+            { projectId, includeTypes }
         );
 
         const nodes = nodesResult.records.map(record => {
@@ -36,11 +44,13 @@ export const getProjectGraph = async (projectId: string): Promise<{
             };
         });
 
-        // Get all relationships
+        // Get only edges between included nodes
+        const nodeIds = nodes.map(n => n.id);
         const edgesResult = await session.run(
             `MATCH (a {projectId: $projectId})-[r]->(b {projectId: $projectId})
-       RETURN a.id as source, b.id as target, type(r) as relType, properties(r) as props`,
-            { projectId }
+             WHERE a.id IN $nodeIds AND b.id IN $nodeIds
+             RETURN a.id as source, b.id as target, type(r) as relType, properties(r) as props`,
+            { projectId, nodeIds }
         );
 
         const edges = edgesResult.records.map(record => ({

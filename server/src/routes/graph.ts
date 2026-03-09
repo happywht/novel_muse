@@ -19,10 +19,17 @@ router.get('/:projectId/insights', async (req: Request, res: Response) => {
     }
 });
 
-// GET /api/graph/:projectId - Get full graph for a project
+// GET /api/graph/:projectId - Get full graph for a project with optional filtering
 router.get('/:projectId', async (req: Request, res: Response) => {
     try {
-        const graph = await getProjectGraph(req.params.projectId as string);
+        const { types } = req.query;
+        let includeTypes: string[] | undefined = undefined;
+
+        if (types && typeof types === 'string') {
+            includeTypes = types.split(',').filter(t => t.trim().length > 0);
+        }
+
+        const graph = await getProjectGraph(req.params.projectId as string, includeTypes);
         res.json(graph);
     } catch (err: any) {
         console.error('Graph fetch error:', err);

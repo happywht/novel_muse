@@ -108,9 +108,13 @@ export interface GraphData {
     edges: GraphEdge[];
 }
 
-/** Fetch the full knowledge graph for a project */
-export const fetchGraph = async (projectId: string): Promise<GraphData> => {
-    const res = await fetch(`${API_BASE}/graph/${projectId}`);
+/** Fetch the knowledge graph for a project with optional filtering */
+export const fetchGraph = async (projectId: string, types?: string[]): Promise<GraphData> => {
+    const url = types && types.length > 0
+        ? `${API_BASE}/graph/${projectId}?types=${encodeURIComponent(types.join(','))}`
+        : `${API_BASE}/graph/${projectId}`;
+
+    const res = await fetch(url);
     if (!res.ok) throw new Error(`Failed to fetch graph: ${res.statusText}`);
     return res.json();
 };

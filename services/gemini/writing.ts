@@ -42,7 +42,7 @@ export const generateSceneFromIngredients = async (
     genre: string,
     plotBeat: string,
     activeCharacters: Character[],
-    activeLocation: WorldSetting | null,
+    activeSettings: WorldSetting[],
     allWorldSettings: WorldSetting[],
     settings?: CreativeSettings,
     previousStoryContext?: string,
@@ -129,16 +129,19 @@ export const generateSceneFromIngredients = async (
         context += `\n`;
     }
 
-    if (activeLocation) {
-        const locEchoes = activeEchoes.filter(e => e.targetId === activeLocation.id).sort((a, b) => a.timestamp - b.timestamp);
-        context += `【当前场景地点 (Stage)】\n[${activeLocation.category}] ${activeLocation.title}: ${activeLocation.content}\n`;
-        if (locEchoes.length > 0) {
-            context += `⚡ [环境变更]: ${locEchoes.map(e => e.description).join('; ')}\n`;
-        }
+    if (activeSettings && activeSettings.length > 0) {
+        context += `【当前锚定世界设定/场景 (Active Settings)】\n`;
+        activeSettings.forEach(setting => {
+            const locEchoes = activeEchoes.filter(e => e.targetId === setting.id).sort((a, b) => a.timestamp - b.timestamp);
+            context += `- [${setting.category}] ${setting.title}: ${setting.content}\n`;
+            if (locEchoes.length > 0) {
+                context += `  ⚡ [环境/设定变更]: ${locEchoes.map(e => e.description).join('; ')}\n`;
+            }
+        });
         context += "\n";
     }
 
-    const otherSettings = allWorldSettings.filter(w => !activeLocation || w.id !== activeLocation.id);
+    const otherSettings = allWorldSettings.filter(w => !activeSettings || !activeSettings.find(s => s.id === w.id));
     const queryContextForRAG = `${plotBeat} ${previousStoryContext || ''} ${activeCharacters.map(c => c.name).join(' ')}`;
     const relevantSettings = filterRelevantSettings(otherSettings, queryContextForRAG, 20);
 

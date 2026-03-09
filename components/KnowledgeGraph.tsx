@@ -15,6 +15,16 @@ const NODE_COLORS: Record<string, { bg: string; border: string; text: string }> 
     WorldSetting: { bg: '#3b82f6', border: '#60a5fa', text: '#eff6ff' },
     Event: { bg: '#f59e0b', border: '#fbbf24', text: '#fffbeb' },
     Echo: { bg: '#06b6d4', border: '#22d3ee', text: '#ecfeff' },
+    Chapter: { bg: '#10b981', border: '#34d399', text: '#f0fdf4' }, // Emerald for Chapters
+    PlotNode: { bg: '#ec4899', border: '#f472b6', text: '#fdf2f8' }, // Pink for Plot
+};
+
+const LAYER_LABELS: Record<string, string> = {
+    Character: '角色',
+    WorldSetting: '设定',
+    Chapter: '大纲章节',
+    Event: '时间线',
+    Echo: '预测回响'
 };
 
 const REL_LABELS: Record<string, string> = {
@@ -26,8 +36,11 @@ const REL_LABELS: Record<string, string> = {
     KIN_OF: '血缘',
     LOCATED_IN: '位于',
     INVOLVED_IN: '参与',
+    INVOLVES: '包含/出场',
     HAS_ECHO: '回响',
     CAUSED: '导致',
+    PRECEDES: '前置于',
+    POV_IS: '视角角色'
 };
 
 interface SimNode extends GraphNode {
@@ -54,6 +67,10 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
     const dragNode = useRef<SimNode | null>(null);
     const lastMouse = useRef({ x: 0, y: 0 });
 
+    // Filtering Lenses
+    const [activeLayers, setActiveLayers] = useState<string[]>(['Character', 'WorldSetting']);
+    const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
+
     const loadGraph = useCallback(async () => {
         if (!useBackend) {
             setError('知识图谱需要后端服务 (MySQL + Neo4j) 运行中。');
@@ -62,9 +79,11 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
         setLoading(true);
         setError('');
         try {
-            const data = await fetchGraph(projectId);
+            const data = await fetchGraph(projectId, activeLayers);
             if (data.nodes.length === 0) {
-                setError('图谱为空。请先创建角色、世界设定或时间线事件，保存后数据将自动同步到图数据库。');
+                setError('当前图层为空。请确保已选中有效图层，或先同步项目数据。');
+                setNodes([]);
+                setEdges([]);
                 setLoading(false);
                 return;
             }
@@ -94,7 +113,27 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
 
     useEffect(() => {
         loadGraph();
-    }, [loadGraph]);
+    }, [loadGraph, activeLayers]);
+
+    // Graph filtering and Focus Mode
+    const displayNodes = nodes.filter(n => {
+        if (focusNodeId) {
+            // Include center node and its 1-degree neighbors
+            const isCenter = n.id === focusNodeId;
+            const isNeighbor = edges.some(e =>
+                (e.source === focusNodeId && e.target === n.id) ||
+                (e.target === focusNodeId && e.source === n.id)
+            );
+            return isCenter || isNeighbor;
+        }
+        return true;
+    });
+
+    const displayEdges = edges.filter(e => {
+        const sourceExists = displayNodes.some(n => n.id === e.source);
+        const targetExists = displayNodes.some(n => n.id === e.target);
+        return sourceExists && targetExists;
+    });
 
     // Force simulation
     useEffect(() => {
@@ -113,8 +152,8 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
             const cy = height / 2;
 
             // Apply forces
-            for (let i = 0; i < nodes.length; i++) {
-                const a = nodes[i];
+            for (let i = 0; i < displayNodes.length; i++) {
+                const a = displayNodes[i];
                 if (dragNode.current && dragNode.current.id === a.id) continue;
 
                 // Center gravity
@@ -122,8 +161,8 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
                 a.vy += (cy - a.y) * centerGravity;
 
                 // Repulsion between all nodes
-                for (let j = i + 1; j < nodes.length; j++) {
-                    const b = nodes[j];
+                for (let j = i + 1; j < displayNodes.length; j++) {
+                    const b = displayNodes[j];
                     let dx = a.x - b.x;
                     let dy = a.y - b.y;
                     let dist = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -141,9 +180,9 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
             }
 
             // Attraction along edges
-            for (const edge of edges) {
-                const a = nodes.find(n => n.id === edge.source);
-                const b = nodes.find(n => n.id === edge.target);
+            for (const edge of displayEdges) {
+                const a = displayNodes.find(n => n.id === edge.source);
+                const b = displayNodes.find(n => n.id === edge.target);
                 if (!a || !b) continue;
 
                 let dx = b.x - a.x;
@@ -162,7 +201,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
             }
 
             // Update positions
-            for (const node of nodes) {
+            for (const node of displayNodes) {
                 if (dragNode.current && dragNode.current.id === node.id) continue;
                 node.vx *= damping;
                 node.vy *= damping;
@@ -170,13 +209,13 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
                 node.y += node.vy;
             }
 
-            setNodes([...nodes]);
+            setNodes([...nodes]); // Keep raw nodes state for persistence but simulate only visible
             animRef.current = requestAnimationFrame(simulate);
         };
 
         animRef.current = requestAnimationFrame(simulate);
         return () => cancelAnimationFrame(animRef.current);
-    }, [nodes.length, edges.length]);
+    }, [nodes.length, displayNodes.length, displayEdges.length]);
 
     // Canvas rendering
     useEffect(() => {
@@ -202,9 +241,9 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
         ctx.scale(zoom, zoom);
 
         // Draw edges
-        for (const edge of edges) {
-            const a = nodes.find(n => n.id === edge.source);
-            const b = nodes.find(n => n.id === edge.target);
+        for (const edge of displayEdges) {
+            const a = displayNodes.find(n => n.id === edge.source);
+            const b = displayNodes.find(n => n.id === edge.target);
             if (!a || !b) continue;
 
             const isHighlighted = selectedNode && (selectedNode.id === a.id || selectedNode.id === b.id);
@@ -241,7 +280,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
         }
 
         // Draw nodes
-        for (const node of nodes) {
+        for (const node of displayNodes) {
             const colors = NODE_COLORS[node.type] || NODE_COLORS.Character;
             const isSelected = selectedNode?.id === node.id;
             const isHovered = hoveredNode?.id === node.id;
@@ -276,14 +315,14 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
             ctx.fillText(label, node.x, node.y);
 
             // Type badge
-            const typeLabels: Record<string, string> = { Character: '角色', WorldSetting: '设定', Event: '事件', Echo: '回响' };
+            const typeLabels: Record<string, string> = { Character: '角色', WorldSetting: '设定', Event: '事件', Echo: '回响', Chapter: '章节' };
             ctx.font = '8px sans-serif';
             ctx.fillStyle = colors.text + 'aa';
             ctx.fillText(typeLabels[node.type] || node.type, node.x, node.y + r + 12);
         }
 
         ctx.restore();
-    }, [nodes, edges, selectedNode, hoveredNode, zoom, pan]);
+    }, [displayNodes, displayEdges, selectedNode, hoveredNode, zoom, pan]);
 
     // Edge drawing state
     const [drawingEdgeFrom, setDrawingEdgeFrom] = useState<SimNode | null>(null);
@@ -301,13 +340,27 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
     };
 
     const findNodeAt = (mx: number, my: number): SimNode | null => {
-        for (let i = nodes.length - 1; i >= 0; i--) {
-            const n = nodes[i];
+        // Search in displayNodes only
+        for (let i = displayNodes.length - 1; i >= 0; i--) {
+            const n = displayNodes[i];
             const dx = mx - n.x;
             const dy = my - n.y;
             if (dx * dx + dy * dy < n.radius * n.radius) return n;
         }
         return null;
+    };
+
+    const handleDoubleClick = (e: React.MouseEvent) => {
+        const pos = getMousePos(e);
+        const node = findNodeAt(pos.x, pos.y);
+
+        if (node) {
+            // Toggle Focus Mode
+            setFocusNodeId(prev => prev === node.id ? null : node.id);
+            setSelectedNode(node);
+        } else {
+            setFocusNodeId(null);
+        }
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
@@ -410,7 +463,26 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
                         {nodes.length} 节点 · {edges.length} 关系
                     </span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1.5 bg-slate-950/50 px-2 py-1 rounded border border-slate-700/50">
+                        {Object.entries(LAYER_LABELS).map(([key, label]) => (
+                            <label key={key} className="flex items-center gap-1.5 cursor-pointer px-1.5 hover:bg-slate-800 rounded transition-colors group">
+                                <input
+                                    type="checkbox"
+                                    checked={activeLayers.includes(key)}
+                                    onChange={(e) => {
+                                        if (e.target.checked) setActiveLayers(prev => [...prev, key]);
+                                        else setActiveLayers(prev => prev.filter(l => l !== key));
+                                    }}
+                                    className="w-3 h-3 rounded border-slate-700 text-muse-500 focus:ring-muse-500 bg-slate-900"
+                                />
+                                <span className={`text-[10px] font-bold ${activeLayers.includes(key) ? 'text-slate-200' : 'text-slate-500 group-hover:text-slate-400'}`}>
+                                    {label}
+                                </span>
+                            </label>
+                        ))}
+                    </div>
+                    <div className="h-4 w-[1px] bg-slate-800" />
                     <button onClick={() => setZoom(z => Math.min(3, z + 0.2))} className="p-1 text-slate-400 hover:text-white" title="放大">
                         <ZoomIn size={16} />
                     </button>
@@ -425,6 +497,14 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
                     </button>
                 </div>
             </div>
+
+            {/* Focus Mode Toast */}
+            {focusNodeId && (
+                <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-muse-600/90 backdrop-blur-md text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-xl border border-muse-400/30 z-20 flex items-center gap-2 animate-bounce-subtle">
+                    <span>已开启聚光灯模式 (双击空白处取消)</span>
+                    <button onClick={() => setFocusNodeId(null)} className="hover:bg-white/20 rounded-full p-0.5"><Maximize2 size={12} /></button>
+                </div>
+            )}
 
             {/* Canvas area */}
             <div ref={containerRef} className="flex-1 relative">
@@ -450,16 +530,18 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
                     onWheel={handleWheel}
+                    onDoubleClick={handleDoubleClick}
                 />
             </div>
 
             {/* Legend (Moved to bottom left absolute) */}
-            <div className="absolute bottom-4 left-4 flex flex-col gap-2 p-3 bg-slate-900/80 backdrop-blur-sm border border-slate-700/50 rounded-lg pointer-events-none z-10">
+            <div className="absolute bottom-4 left-4 flex flex-col gap-2 p-3 bg-slate-900/80 backdrop-blur-sm border border-slate-700/50 rounded-lg pointer-events-none z-10 transition-opacity">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 border-b border-slate-800 pb-1">图例 · 图层</div>
                 {Object.entries(NODE_COLORS).map(([type, colors]) => (
-                    <div key={type} className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: colors.bg, border: `1px solid ${colors.border}` }} />
-                        <span className="text-xs text-slate-300 font-medium tracking-wide">
-                            {{ Character: '角色', WorldSetting: '设定', Event: '事件', Echo: '回响' }[type]}
+                    <div key={type} className={`flex items-center gap-2 transition-opacity ${activeLayers.includes(type) ? 'opacity-100' : 'opacity-30'}`}>
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors.bg, border: `1px solid ${colors.border}` }} />
+                        <span className="text-[11px] text-slate-300 font-medium tracking-wide">
+                            {LAYER_LABELS[type] || type}
                         </span>
                     </div>
                 ))}
