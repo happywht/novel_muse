@@ -1,10 +1,36 @@
 import { getDriver } from './client';
 import { graphLlm } from './llm';
 
+const syncLocks = new Map<string, Promise<void>>();
+
 /**
  * Sync: Push project data from MySQL into Neo4j
  */
 export const syncProjectToGraph = async (projectData: any): Promise<void> => {
+    const projectId = projectData.id;
+
+    // Mutex lock to prevent duplicate nodes from concurrent frontend requests
+    if (syncLocks.has(projectId)) {
+        try {
+            await syncLocks.get(projectId);
+        } catch (e) {
+            // Ignore previous errors to try again
+        }
+    }
+
+    const syncPromise = doSyncProject(projectData);
+    syncLocks.set(projectId, syncPromise);
+
+    try {
+        await syncPromise;
+    } finally {
+        if (syncLocks.get(projectId) === syncPromise) {
+            syncLocks.delete(projectId);
+        }
+    }
+};
+
+const doSyncProject = async (projectData: any): Promise<void> => {
     const d = getDriver();
     const session = d.session();
 
@@ -225,10 +251,33 @@ export const syncProjectToGraph = async (projectData: any): Promise<void> => {
                     );
                 }
 
-                // Link involved entities via PlotNode link if available
+                // 9. Create PlotNode and Link involved entities via PlotNode link if available
                 if (ch.plotNodeId) {
                     const node = (projectData.plotNodes || []).find((n: any) => n.id === ch.plotNodeId);
                     if (node) {
+                        // Create the PlotNode itself in Neo4j
+                        await session.run(
+                            `MERGE (pn:PlotNode {id: $id, projectId: $projectId})
+                             ON CREATE SET pn.title = $title, pn.type = $type, pn.description = $description, pn.status = $status
+                             ON MATCH SET pn.title = $title, pn.type = $type, pn.description = $description, pn.status = $status`,
+                            {
+                                id: node.id,
+                                projectId,
+                                title: node.title || 'Unknown Plot Beat',
+                                type: node.type || 'MAIN',
+                                description: (node.description || '').substring(0, 500),
+                                status: node.status || 'DRAFT'
+                            }
+                        );
+
+                        // Link Chapter to PlotNode
+                        await session.run(
+                            `MATCH (ch:Chapter {id: $chId, projectId: $projectId})
+                             MATCH (pn:PlotNode {id: $pnId, projectId: $projectId})
+                             MERGE (ch)-[:IMPLEMENTS]->(pn)`,
+                            { chId: ch.id, pnId: node.id, projectId }
+                        );
+
                         const charIds = Array.isArray(node.relatedCharacters) ? node.relatedCharacters : [];
                         const locIds = Array.isArray(node.relatedLocations) ? node.relatedLocations : [];
 
@@ -239,6 +288,14 @@ export const syncProjectToGraph = async (projectData: any): Promise<void> => {
                                  MERGE (ch)-[:INVOLVES]->(c)`,
                                 { chId: ch.id, charId, projectId }
                             );
+
+                            // Also link PlotNode to Character
+                            await session.run(
+                                `MATCH (pn:PlotNode {id: $pnId, projectId: $projectId})
+                                 MATCH (c:Character {id: $charId, projectId: $projectId})
+                                 MERGE (pn)-[:INVOLVES]->(c)`,
+                                { pnId: node.id, charId, projectId }
+                            );
                         }
                         for (const locId of locIds) {
                             await session.run(
@@ -247,13 +304,21 @@ export const syncProjectToGraph = async (projectData: any): Promise<void> => {
                                  MERGE (ch)-[:LOCATED_IN]->(l)`,
                                 { chId: ch.id, locId, projectId }
                             );
+
+                            // Also link PlotNode to Location
+                            await session.run(
+                                `MATCH (pn:PlotNode {id: $pnId, projectId: $projectId})
+                                 MATCH (l:WorldSetting {id: $locId, projectId: $projectId})
+                                 MERGE (pn)-[:LOCATED_IN]->(l)`,
+                                { pnId: node.id, locId, projectId }
+                            );
                         }
                     }
                 }
             }
         }
 
-        console.log(`📊 Graph synced for project ${projectId}: ${projectData.characters?.length || 0} chars, ${projectData.worldSettings?.length || 0} settings, ${projectData.chapters?.length || 0} chapters`);
+        console.log(`📊 Graph synced for project ${projectId}: ${projectData.characters?.length || 0} chars, ${projectData.worldSettings?.length || 0} settings, ${projectData.chapters?.length || 0} chapters, ${projectData.plotNodes?.length || 0} plot nodes`);
     } finally {
         await session.close();
     }

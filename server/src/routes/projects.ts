@@ -517,14 +517,6 @@ router.patch('/:id', async (req: Request, res: Response) => {
             data: updateData
         });
 
-        // Fire-and-forget Neo4j sync if metadata changed
-        // We only sync if there's enough data to build a project context
-        if (updateData.title || updateData.premise) {
-            syncProjectToGraph({ ...project, ...data }).catch(err =>
-                console.warn('Graph sync skipped (PATCH):', err.message)
-            );
-        }
-
         res.json({ success: true, id: project.id });
     } catch (err: any) {
         console.error('Patch sync error:', err);

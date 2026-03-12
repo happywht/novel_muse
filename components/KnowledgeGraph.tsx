@@ -24,7 +24,8 @@ const LAYER_LABELS: Record<string, string> = {
     WorldSetting: '设定',
     Chapter: '大纲章节',
     Event: '时间线',
-    Echo: '预测回响'
+    Echo: '预测回响',
+    PlotNode: '情节卡片'
 };
 
 const REL_LABELS: Record<string, string> = {
@@ -427,10 +428,18 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
         isDragging.current = false;
     };
 
-    const handleWheel = (e: React.WheelEvent) => {
-        e.preventDefault();
-        setZoom(prev => Math.max(0.3, Math.min(3, prev - e.deltaY * 0.001)));
-    };
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const handleWheelNative = (e: WheelEvent) => {
+            e.preventDefault();
+            setZoom(prev => Math.max(0.3, Math.min(3, prev - e.deltaY * 0.001)));
+        };
+
+        canvas.addEventListener('wheel', handleWheelNative, { passive: false });
+        return () => canvas.removeEventListener('wheel', handleWheelNative);
+    }, []);
 
     const resetView = () => {
         setZoom(1);
@@ -529,7 +538,6 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={handleMouseUp}
-                    onWheel={handleWheel}
                     onDoubleClick={handleDoubleClick}
                 />
             </div>
