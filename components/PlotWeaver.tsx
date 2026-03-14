@@ -32,6 +32,7 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
     const [draftNodeContent, setDraftNodeContent] = useState<string | null>(null);
     const [iterationFeedback, setIterationFeedback] = useState('');
     const [showEntitySelector, setShowEntitySelector] = useState<{ id: string, type: 'CHARACTER' | 'LOCATION' } | null>(null);
+    const [showConflictConfigurator, setShowConflictConfigurator] = useState<string | null>(null);
 
     // Confirmation Action State
     const [pendingAction, setPendingAction] = useState<{ type: 'GENERATE' | 'RESTORE', data?: any } | null>(null);
@@ -228,6 +229,7 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                                         draftNodeContent={draftNodeContent}
                                         iterationFeedback={iterationFeedback}
                                         showEntitySelector={showEntitySelector}
+                                        showConflictConfigurator={showConflictConfigurator}
                                         isIterating={ai.isIterating}
                                         project={project}
                                         setFocusedNodeId={setFocusedNodeId}
@@ -241,6 +243,7 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                                         setEditingNodeId={setEditingNodeId}
                                         setIterationFeedback={setIterationFeedback}
                                         setShowEntitySelector={setShowEntitySelector}
+                                        setShowConflictConfigurator={setShowConflictConfigurator}
                                         toggleEntityRelation={toggleEntityRelation}
                                     />
                                 ))}

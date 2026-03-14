@@ -128,6 +128,13 @@ export const AiPlotNodeSchema = z.object({
     beatTag: z.enum(['INCITING_INCIDENT', 'PLOT_POINT_1', 'MIDPOINT', 'PLOT_POINT_2', 'CLIMAX', 'RESOLUTION', 'OTHER']).optional(),
     relatedCharacters: z.array(z.string()).optional(), // List of Character IDs
     relatedLocations: z.array(z.string()).optional(),  // List of WorldSetting IDs
+    // NEW: 修罗场冲突场景元数据
+    conflictScenario: z.object({
+        type: z.enum(['CONFRONTATION', 'CLIMAX', 'TWIST']).nullable().optional(),
+        participants: z.array(z.string()).optional(), // 参与角色ID数组
+        stakes: z.string().optional(), // 赌注/冲突核心
+        intensity: z.number().min(1).max(10).optional(), // 1-10强度等级
+    }).optional(),
 });
 
 export const AiPlotNodeArraySchema = z.array(AiPlotNodeSchema);

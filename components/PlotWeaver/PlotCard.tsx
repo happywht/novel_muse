@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X, Sparkles, RotateCcw, Check, User, Globe, Wand2, Zap, Flag, ChevronDown, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Sparkles, RotateCcw, Check, User, Globe, Wand2, Zap, Flag, ChevronDown, Loader2, Swords } from 'lucide-react';
 import { PlotNode, ProjectState, BeatTag } from '../../types';
 import { BEAT_TAGS } from './constants';
 
@@ -11,6 +11,7 @@ interface PlotCardProps {
     draftNodeContent: string | null;
     iterationFeedback: string;
     showEntitySelector: { id: string, type: 'CHARACTER' | 'LOCATION' } | null;
+    showConflictConfigurator: string | null;
     isIterating: boolean;
     project: ProjectState;
     setFocusedNodeId: (id: string | null) => void;
@@ -24,6 +25,7 @@ interface PlotCardProps {
     setEditingNodeId: (id: string | null) => void;
     setIterationFeedback: (feedback: string) => void;
     setShowEntitySelector: (selector: { id: string, type: 'CHARACTER' | 'LOCATION' } | null) => void;
+    setShowConflictConfigurator: (id: string | null) => void;
     toggleEntityRelation: (nodeId: string, entityId: string, type: 'CHARACTER' | 'LOCATION') => void;
 }
 
@@ -35,6 +37,7 @@ export const PlotCard: React.FC<PlotCardProps> = ({
     draftNodeContent,
     iterationFeedback,
     showEntitySelector,
+    showConflictConfigurator,
     isIterating,
     project,
     setFocusedNodeId,
@@ -48,6 +51,7 @@ export const PlotCard: React.FC<PlotCardProps> = ({
     setEditingNodeId,
     setIterationFeedback,
     setShowEntitySelector,
+    setShowConflictConfigurator,
     toggleEntityRelation
 }) => {
     const isFocused = focusedNodeId === node.id;
@@ -56,9 +60,28 @@ export const PlotCard: React.FC<PlotCardProps> = ({
 
     const currentBeat = BEAT_TAGS.find(t => t.id === node.beatTag);
 
+    // 实时更新强度滑块显示值
+    useEffect(() => {
+        if (showConflictConfigurator === node.id) {
+            const slider = document.getElementById(`intensity-${node.id}`) as HTMLInputElement;
+            const valueDisplay = document.getElementById(`intensity-value-${node.id}`);
+            if (slider && valueDisplay) {
+                const updateValue = () => {
+                    valueDisplay.textContent = slider.value;
+                };
+                slider.addEventListener('input', updateValue);
+                return () => slider.removeEventListener('input', updateValue);
+            }
+        }
+    }, [showConflictConfigurator, node.id]);
+
     return (
         <div
-            className={`bg-slate-900/50 border rounded-2xl p-6 transition-all duration-300 group relative ${isFocused ? 'border-muse-500 shadow-2xl shadow-muse-900/10' : 'border-slate-800 opacity-60 grayscale-[0.5] hover:opacity-100 hover:grayscale-0 hover:border-slate-700'}`}
+            className={`bg-slate-900/50 border rounded-2xl p-6 transition-all duration-300 group relative ${
+                isFocused ? 'border-muse-500 shadow-2xl shadow-muse-900/10' : 
+                node.conflictScenario ? 'border-red-800 shadow-lg shadow-red-900/20 animate-pulse' :
+                'border-slate-800 opacity-60 grayscale-[0.5] hover:opacity-100 hover:grayscale-0 hover:border-slate-700'
+            }`}
             onFocus={() => setFocusedNodeId(node.id)}
             onBlur={() => setFocusedNodeId(null)}
             tabIndex={0}
@@ -129,6 +152,27 @@ export const PlotCard: React.FC<PlotCardProps> = ({
                 placeholder="描述这段剧情的发生、冲突与转折..."
             />
 
+            {/* 修罗场强度指示器 */}
+            {node.conflictScenario && (
+                <div className="mt-2 flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                        <Swords size={12} className="text-red-500" />
+                        <span className="text-[10px] text-red-400 font-bold">
+                            强度 {node.conflictScenario.intensity}/10
+                        </span>
+                    </div>
+                    <div className="flex-1 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                            className="h-full bg-gradient-to-r from-red-500 to-red-600 rounded-full transition-all duration-500"
+                            style={{ width: `${(node.conflictScenario.intensity / 10) * 100}%` }}
+                        />
+                    </div>
+                    <span className="text-[10px] text-slate-500 truncate max-w-[120px]">
+                        {node.conflictScenario.stakes}
+                    </span>
+                </div>
+            )}
+
             {/* Iterative Drafting Zone (Stage B) */}
             {isEditing && (
                 <div className="mt-4 p-4 bg-muse-900/10 border border-muse-500/30 rounded-xl animate-fade-in">
@@ -186,6 +230,17 @@ export const PlotCard: React.FC<PlotCardProps> = ({
                         >
                             <Globe size={10} /> {node.relatedLocations?.length || 0}
                         </button>
+                        <button
+                            onClick={() => setShowConflictConfigurator(showConflictConfigurator === node.id ? null : node.id)}
+                            className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded transition-colors ${
+                                node.conflictScenario ? 'bg-red-600 text-white hover:bg-red-700' : 
+                                showConflictConfigurator === node.id ? 'bg-muse-600 text-white' : 
+                                'bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-muse-400'
+                            }`}
+                            title={node.conflictScenario ? `修罗场: ${node.conflictScenario.stakes}` : "配置修罗场冲突"}
+                        >
+                            <Swords size={10} /> {node.conflictScenario ? '修罗场' : '冲突'}
+                        </button>
                     </div>
                     <div className="flex gap-2">
                         <button
@@ -204,6 +259,157 @@ export const PlotCard: React.FC<PlotCardProps> = ({
                         </button>
                     </div>
                 </div>
+
+                {/* Conflict Configurator Panel */}
+                {showConflictConfigurator === node.id && (
+                    <div className="p-3 bg-slate-950 border border-red-800/50 rounded-lg animate-fade-in relative">
+                        <div className="flex justify-between items-center mb-3">
+                            <span className="text-[10px] font-bold text-red-500 uppercase flex items-center gap-1">
+                                <Swords size={10} /> 修罗场配置
+                            </span>
+                            <button onClick={() => setShowConflictConfigurator(null)} className="text-slate-600 hover:text-slate-300"><X size={10} /></button>
+                        </div>
+                        
+                        {/* 参与角色（只读，基于relatedCharacters） */}
+                        <div className="mb-3">
+                            <label className="block text-[10px] text-slate-500 mb-1">参与角色</label>
+                            <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto custom-scrollbar p-1 bg-slate-900 rounded">
+                                {node.relatedCharacters && node.relatedCharacters.length >= 2 ? (
+                                    node.relatedCharacters.map(charId => {
+                                        const character = project.characters.find(c => c.id === charId);
+                                        return character ? (
+                                            <span key={charId} className="text-[10px] px-2 py-1 rounded-full bg-red-900/30 border border-red-800 text-red-300">
+                                                {character.name}
+                                            </span>
+                                        ) : null;
+                                    })
+                                ) : (
+                                    <p className="text-[10px] text-slate-600 italic">请选择至少2个角色（点击上方"用户"按钮）</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* 冲突核心赌注 */}
+                        <div className="mb-3">
+                            <label className="block text-[10px] text-slate-500 mb-1">冲突核心赌注</label>
+                            <input
+                                type="text"
+                                placeholder="例如：王位继承权、商业控制权、爱情归属、家族荣誉..."
+                                defaultValue={node.conflictScenario?.stakes || ''}
+                                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:border-red-500 outline-none"
+                                id={`stakes-${node.id}`}
+                            />
+                        </div>
+
+                        {/* 冲突强度滑块 */}
+                        <div className="mb-3">
+                            <label className="block text-[10px] text-slate-500 mb-1">冲突强度</label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="range"
+                                    min="1"
+                                    max="10"
+                                    defaultValue={node.conflictScenario?.intensity || 7}
+                                    className="flex-1 h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer slider-red"
+                                    id={`intensity-${node.id}`}
+                                />
+                                <span className="text-[10px] text-slate-400 w-4 text-center" id={`intensity-value-${node.id}`}>
+                                    {node.conflictScenario?.intensity || 7}
+                                </span>
+                            </div>
+                            <div className="flex justify-between text-[9px] text-slate-600 mt-1">
+                                <span>微妙博弈</span>
+                                <span>暗流涌动</span>
+                                <span>激烈对峙</span>
+                                <span>生死对决</span>
+                            </div>
+                        </div>
+
+                        {/* 冲突类型选择 */}
+                        <div className="mb-3">
+                            <label className="block text-[10px] text-slate-500 mb-1">冲突类型</label>
+                            <select
+                                defaultValue={node.conflictScenario?.type || 'CONFRONTATION'}
+                                className="w-full bg-slate-900 border border-slate-800 rounded px-2 py-1 text-xs text-slate-200 focus:border-red-500 outline-none"
+                                id={`conflict-type-${node.id}`}
+                            >
+                                <option value="CONFRONTATION">正面对峙（争吵、辩论、谈判）</option>
+                                <option value="CLIMAX">高潮冲突（决定性时刻）</option>
+                                <option value="TWIST">反转冲突（真相揭露或背叛）</option>
+                            </select>
+                        </div>
+
+                        {/* 操作按钮 */}
+                        <div className="flex justify-end gap-2">
+                            <button
+                                onClick={() => setShowConflictConfigurator(null)}
+                                className="px-3 py-1 rounded-lg text-slate-500 hover:text-slate-300 text-[10px]"
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const stakes = (document.getElementById(`stakes-${node.id}`) as HTMLInputElement)?.value || '';
+                                    const intensity = parseInt((document.getElementById(`intensity-${node.id}`) as HTMLInputElement)?.value || '7');
+                                    const type = (document.getElementById(`conflict-type-${node.id}`) as HTMLSelectElement)?.value as 'CONFRONTATION' | 'CLIMAX' | 'TWIST';
+                                    
+                                    if (node.relatedCharacters && node.relatedCharacters.length >= 2 && stakes.trim()) {
+                                        handleUpdateCard(node.id, {
+                                            conflictScenario: {
+                                                type,
+                                                participants: node.relatedCharacters,
+                                                stakes: stakes.trim(),
+                                                intensity
+                                            }
+                                        });
+                                        setShowConflictConfigurator(null);
+                                    } else {
+                                        alert('请确保已选择至少2个角色，并填写冲突核心赌注');
+                                    }
+                                }}
+                                disabled={!node.relatedCharacters || node.relatedCharacters.length < 2}
+                                className="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-[10px] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                保存配置
+                            </button>
+                            {node.relatedCharacters && node.relatedCharacters.length >= 2 && (
+                                <button
+                                    onClick={async () => {
+                                        // 生成修罗场场景
+                                        const { generateConflictScenario } = await import('../../services/gemini/shuraField');
+                                        try {
+                                            const selectedChars = project.characters.filter(c => node.relatedCharacters?.includes(c.id));
+                                            const result = await generateConflictScenario(
+                                                selectedChars,
+                                                node.content,
+                                                project.genre,
+                                                project.characters,
+                                                project.worldSettings,
+                                                project.creativeSettings
+                                            );
+                                            
+                                            // 更新节点内容
+                                            handleUpdateCard(node.id, {
+                                                content: result.plotNode.content,
+                                                conflictScenario: result.plotNode.conflictScenario,
+                                                beatTag: result.plotNode.beatTag || node.beatTag
+                                            });
+                                            
+                                            setShowConflictConfigurator(null);
+                                            alert('修罗场场景生成成功！');
+                                        } catch (error) {
+                                            console.error('生成修罗场失败:', error);
+                                            alert('生成失败，请检查角色设定是否完整');
+                                        }
+                                    }}
+                                    className="px-3 py-1 bg-muse-600 hover:bg-muse-500 text-white rounded-lg text-[10px] font-bold"
+                                >
+                                    AI 生成场景
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 {/* Quick Entity Selector Panel */}
                 {showEntitySelector?.id === node.id && (

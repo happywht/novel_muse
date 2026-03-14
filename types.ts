@@ -2,6 +2,8 @@
 
 export type BeatTag = 'INCITING_INCIDENT' | 'PLOT_POINT_1' | 'MIDPOINT' | 'PLOT_POINT_2' | 'CLIMAX' | 'RESOLUTION' | 'OTHER' | null;
 
+export type ConflictType = 'CONFRONTATION' | 'CLIMAX' | 'TWIST' | null;
+
 export interface PlotNode {
   id: string;
   title: string;
@@ -10,6 +12,13 @@ export interface PlotNode {
   beatTag?: BeatTag; // NEW: Narrative milestone tag
   relatedCharacters?: string[]; // IDs
   relatedLocations?: string[]; // IDs
+  // NEW: 修罗场冲突场景元数据
+  conflictScenario?: {
+    type: ConflictType;
+    participants: string[]; // 参与角色ID数组
+    stakes: string; // 赌注/冲突核心
+    intensity: number; // 1-10强度等级
+  };
 }
 
 export interface Message {
