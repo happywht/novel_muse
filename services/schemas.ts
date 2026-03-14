@@ -50,6 +50,30 @@ export function safeParseAiJson<T>(
         return null;
     }
 
+    // Step 2.5: Data sanitization for known AI quirks
+    // Clean beatTag values that don't match our enum
+    if (label === 'Plot Rewrite' || label === 'Plot Generation') {
+        const sanitizeBeatTag = (obj: any): any => {
+            if (Array.isArray(obj)) {
+                return obj.map(sanitizeBeatTag);
+            } else if (obj && typeof obj === 'object') {
+                const sanitized: any = {};
+                for (const [key, value] of Object.entries(obj)) {
+                    if (key === 'beatTag' && typeof value === 'string') {
+                        const validBeatTags = ['INCITING_INCIDENT', 'PLOT_POINT_1', 'MIDPOINT', 'PLOT_POINT_2', 'CLIMAX', 'RESOLUTION', 'OTHER'];
+                        sanitized[key] = validBeatTags.includes(value) ? value : 'OTHER';
+                    } else {
+                        sanitized[key] = sanitizeBeatTag(value);
+                    }
+                }
+                return sanitized;
+            }
+            return obj;
+        };
+        
+        rawObj = sanitizeBeatTag(rawObj);
+    }
+
     // Step 3: Validate with Zod (safeParse never throws)
     const result = schema.safeParse(rawObj);
     if (result.success) {

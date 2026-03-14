@@ -70,6 +70,7 @@ export const generatePlotFromContext = async (
   3. 确保角色关系随着剧情推进而发生变化。
   4. **整合【当前状态变更】**：剧情发展必须考虑角色当前的状态（如伤病、道具、已发生的事件）。
   5. **结构化元数据**：为每个情节点分配一个叙事标签（beatTag），并精准关联涉及的实体 ID。
+     **严格约束**：beatTag只能从以下枚举值中选择，不能自定义其他值：INCITING_INCIDENT, PLOT_POINT_1, MIDPOINT, PLOT_POINT_2, CLIMAX, RESOLUTION, OTHER
   6. **修罗场识别**：对于涉及2个或以上角色正面冲突、对峙或博弈的情节，自动识别为"冲突场景"，
      明确标注冲突类型（CONFRONTATION对峙/CLIMAX高潮/TWIST反转）、参与角色、冲突核心赌注和强度等级（1-10）。`;
 
