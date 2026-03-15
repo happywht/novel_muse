@@ -379,6 +379,26 @@ export const PlotCard: React.FC<PlotCardProps> = ({
                                         const { generateConflictScenario } = await import('../../services/gemini/shuraField');
                                         try {
                                             const selectedChars = project.characters.filter(c => node.relatedCharacters?.includes(c.id));
+                                            
+                                            // 添加详细日志
+                                            console.log('[修罗场] 节点相关角色ID:', node.relatedCharacters);
+                                            console.log('[修罗场] 项目中的角色总数:', project.characters.length);
+                                            console.log('[修罗场] 匹配到的角色:', selectedChars.map(c => ({id: c.id, name: c.name})));
+                                            console.log('[修罗场] 匹配到的角色数量:', selectedChars.length);
+                                            
+                                            if (selectedChars.length < 2) {
+                                                const missingIds = node.relatedCharacters?.filter(id => !project.characters.find(c => c.id === id)) || [];
+                                                alert(`生成失败：在项目中只找到 ${selectedChars.length} 个有效角色。\n\n缺失的角色ID: ${missingIds.join(', ')}\n\n请检查相关角色是否已被删除或ID是否匹配。`);
+                                                return;
+                                            }
+                                            
+                                            // 检查角色完整性
+                                            const incompleteChars = selectedChars.filter(c => !c.name || !c.description);
+                                            if (incompleteChars.length > 0) {
+                                                alert(`生成失败：以下角色信息不完整（缺少名称或描述）：\n${incompleteChars.map(c => c.name || '未命名角色').join('\n')}`);
+                                                return;
+                                            }
+                                            
                                             const result = await generateConflictScenario(
                                                 selectedChars,
                                                 node.content,
@@ -399,7 +419,7 @@ export const PlotCard: React.FC<PlotCardProps> = ({
                                             alert('修罗场场景生成成功！');
                                         } catch (error) {
                                             console.error('生成修罗场失败:', error);
-                                            alert('生成失败，请检查角色设定是否完整');
+                                            alert(`生成失败: ${error instanceof Error ? error.message : '未知错误'}`);
                                         }
                                     }}
                                     className="px-3 py-1 bg-muse-600 hover:bg-muse-500 text-white rounded-lg text-[10px] font-bold"
