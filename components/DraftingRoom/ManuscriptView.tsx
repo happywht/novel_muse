@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { Book, Trash2, PenTool, RefreshCw, Clipboard, Check, Save, FileText, Cloud } from 'lucide-react';
 import { ProjectState } from '../../types';
 import { MarkdownRenderer } from '../MarkdownRenderer';
@@ -32,11 +32,62 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({
     handleDeleteChapter,
     isLoading
 }) => {
+    // 独立的滚动控制ref
+    const leftScrollRef = React.useRef<HTMLDivElement>(null);
+    const rightScrollRef = React.useRef<HTMLDivElement>(null);
+    
+    // 保存左侧滚动位置，防止切换章节时丢失
+    React.useEffect(() => {
+        const saveScrollPosition = () => {
+            if (leftScrollRef.current) {
+                sessionStorage.setItem('manuscript-left-scroll', leftScrollRef.current.scrollTop.toString());
+            }
+        };
+        
+        const leftElement = leftScrollRef.current;
+        if (leftElement) {
+            leftElement.addEventListener('scroll', saveScrollPosition);
+            
+            // 恢复滚动位置
+            const savedPosition = sessionStorage.getItem('manuscript-left-scroll');
+            if (savedPosition) {
+                leftElement.scrollTop = parseInt(savedPosition, 10);
+            }
+        }
+        
+        return () => {
+            if (leftElement) {
+                leftElement.removeEventListener('scroll', saveScrollPosition);
+            }
+        };
+    }, []);
+    
+    // 当切换章节时，保持左侧滚动位置不变
+    const handleChapterSelect = (chapterId: string) => {
+        const leftElement = leftScrollRef.current;
+        let currentScrollTop = 0;
+        
+        // 保存当前左侧滚动位置
+        if (leftElement) {
+            currentScrollTop = leftElement.scrollTop;
+        }
+        
+        // 设置新的active章节
+        setActiveChapterId(chapterId);
+        
+        // 恢复左侧滚动位置（延迟执行，等待React更新）
+        setTimeout(() => {
+            if (leftElement) {
+                leftElement.scrollTop = currentScrollTop;
+            }
+        }, 0);
+    };
+
     return (
-        <div className="w-full flex h-full gap-6 pt-10">
+        <div className="w-full flex gap-6 pt-10 overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
             {/* Left: Chapter List */}
-            <div className="w-1/4 bg-slate-800/50 border border-slate-700 rounded-xl flex flex-col overflow-hidden">
-                <div className="p-4 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
+            <div className="w-1/4 bg-slate-800/50 border border-slate-700 rounded-xl flex flex-col overflow-hidden shrink-0">
+                <div className="p-4 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center shrink-0">
                     <h3 className="font-bold text-white flex items-center gap-2">
                         <Book size={18} className="text-muse-400" /> 正文目录
                     </h3>
@@ -51,7 +102,14 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({
                         <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} /> 同步
                     </button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                <div 
+                    ref={leftScrollRef}
+                    className="flex-1 overflow-y-auto p-2 space-y-1"
+                    onScroll={(e) => {
+                        // 阻止事件冒泡，防止触发任何父级滚动同步
+                        e.stopPropagation();
+                    }}
+                >
                     {(project.chapters || []).length === 0 && (
                         <p className="text-slate-500 text-xs p-4 text-center">暂无正文章节。请去工坊采纳草稿。</p>
                     )}
@@ -60,7 +118,7 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({
                         .map((chapter, idx) => (
                             <div
                                 key={chapter.id}
-                                onClick={() => setActiveChapterId(chapter.id)}
+                                onClick={() => handleChapterSelect(chapter.id)}
                                 className={`p-3 rounded-lg cursor-pointer transition-colors group relative ${activeChapterId === chapter.id
                                     ? 'bg-muse-900/50 text-muse-200 border border-muse-500/30'
                                     : 'text-slate-300 hover:bg-slate-700/50 border border-transparent'
@@ -95,7 +153,7 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({
             </div>
 
             {/* Right: Reader */}
-            <div className="w-3/4 bg-slate-900 rounded-xl border border-slate-800 flex flex-col overflow-hidden">
+            <div className="flex-1 bg-slate-900 rounded-xl border border-slate-800 flex flex-col overflow-hidden min-w-0">
                 {activeChapterId ? (
                     (() => {
                         const chapter = (project.chapters || []).find(c => c.id === activeChapterId);
@@ -105,7 +163,7 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({
 
                         return (
                             <>
-                                <div className="p-6 border-b border-slate-800 bg-slate-950/30 flex justify-between items-end">
+                                <div className="p-6 border-b border-slate-800 bg-slate-950/30 flex justify-between items-end shrink-0">
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3">
                                             <h2 className="text-3xl font-serif font-bold text-white">{chapter.title}</h2>
@@ -182,7 +240,14 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex-1 overflow-y-auto custom-scrollbar prose prose-invert prose-lg max-w-none font-serif leading-loose text-slate-300 relative">
+                                <div 
+                                    ref={rightScrollRef}
+                                    className="flex-1 overflow-y-auto custom-scrollbar prose prose-invert prose-lg max-w-none font-serif leading-loose text-slate-300 relative"
+                                    onScroll={(e) => {
+                                        // 阻止事件冒泡，防止触发任何父级滚动同步
+                                        e.stopPropagation();
+                                    }}
+                                >
                                     {isEditingManuscript ? (
                                         <div className="h-full flex flex-col p-8 bg-slate-950/20">
                                             <textarea
