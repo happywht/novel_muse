@@ -27,7 +27,9 @@ export type LLMTaskType =
     | 'summarizeChapter'
     | 'extractKnowledgeTriples'
     | 'inspectLogicConflicts'
-    | 'generateTwistHooks';
+    | 'generateTwistHooks'
+    | 'generateConflictScenario'
+    | 'generateAIBalanceSuggestions';
 
 // A strict rule-based router based on the MAS report
 export const getProviderForTask = (task: LLMTaskType): Provider => {

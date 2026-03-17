@@ -1,7 +1,7 @@
 import { GenerateContentResponse } from "@google/genai";
 import {
     Character, WorldSetting, CreativeSettings, Echo, Chapter,
-    PhysicalStatus, KnowledgeTriple, PolishMode
+    PhysicalStatus, KnowledgeTriple, PolishMode, PlotNode
 } from "../../types";
 import { useProjectStore } from "../../store/useProjectStore";
 import {

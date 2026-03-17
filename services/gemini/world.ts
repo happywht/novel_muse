@@ -1,4 +1,4 @@
-import { Type } from "@google/genai";
+import { Type, GenerateContentResponse } from "@google/genai";
 import {
     Character, WorldSetting, CreativeSettings, Echo,
     StateChangeRecommendation

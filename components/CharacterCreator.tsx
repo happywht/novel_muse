@@ -4,7 +4,7 @@ import { generateText, generateCharacterImage, chatWithPersona } from '../servic
 import { Loader } from './Loader';
 import { User, Plus, Trash2, Camera, Sparkles, HeartHandshake, MessageCircle, X, Send, GitCommit, Check, Edit2, Save, Search, Palette, RotateCcw, AlertCircle, CheckCircle } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
-import { VirtualList } from '../VirtualList';
+import { VirtualList } from './VirtualList';
 
 interface CharacterCreatorProps {
     project: ProjectState;

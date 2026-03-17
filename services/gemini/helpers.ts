@@ -30,7 +30,7 @@ export const filterRelevantSettings = (
 
     // Tokenize query for better matching (if browser supports Intl.Segmenter)
     let queryTokens: string[] = [];
-    const intlWithSegmenter = Intl as IntlWithSegmenter;
+    const intlWithSegmenter = Intl as unknown as IntlWithSegmenter;
     if (typeof Intl !== 'undefined' && intlWithSegmenter.Segmenter) {
         const segmenter = new intlWithSegmenter.Segmenter('zh', { granularity: 'word' });
         queryTokens = [...segmenter.segment(safeQuery)]

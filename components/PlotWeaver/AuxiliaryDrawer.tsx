@@ -147,42 +147,38 @@ export const AuxiliaryDrawer: React.FC<AuxiliaryDrawerProps> = ({
                                     ))}
                                 </div>
                             )}
-                        </div>
-                    </>
-                )}
-
-                                   )}
-
-                    {/* 冲突场景可视化面板 */}
-                    <div className="mt-8">
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-2 text-muse-400 font-bold text-sm uppercase tracking-wider">
-                                <BarChart3 size={16} /> 冲突场景可视化分析
                             </div>
-                            <button
-                                onClick={() => setShowConflictVisualization(!showConflictVisualization)}
-                                className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
-                                    showConflictVisualization 
-                                        ? 'bg-muse-600 text-white' 
-                                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-                                }`}
-                            >
-                                {showConflictVisualization ? '隐藏分析' : '显示分析'}
-                            </button>
-                        </div>
-                        
-                        {showConflictVisualization && (
-                            <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-4">
-                                <ConflictVisualization
-                                    plotNodes={project.plotNodes}
-                                    chapters={project.chapters}
-                                    characters={project.characters}
-                                />
+
+                        {/* 冲突场景可视化面板 */}
+                        <div className="mt-8">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2 text-muse-400 font-bold text-sm uppercase tracking-wider">
+                                    <BarChart3 size={16} /> 冲突场景可视化分析
+                                </div>
+                                <button
+                                    onClick={() => setShowConflictVisualization(!showConflictVisualization)}
+                                    className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                                        showConflictVisualization
+                                            ? 'bg-muse-600 text-white'
+                                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                                    }`}
+                                >
+                                    {showConflictVisualization ? '隐藏分析' : '显示分析'}
+                                </button>
                             </div>
-                        )}
-                    </div>
-                </>
-            )}
+
+                            {showConflictVisualization && (
+                                <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-4">
+                                    <ConflictVisualization
+                                        plotNodes={project.plotNodes}
+                                        chapters={project.chapters}
+                                        characters={project.characters}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                        </>
+                    )}
 
             {/* Global Loading Overlay for Right Panels */}
             {isAnalyzing && (
@@ -192,18 +188,18 @@ export const AuxiliaryDrawer: React.FC<AuxiliaryDrawerProps> = ({
             )}
         </div>
 
-            {/* Bottom Footer Action */}
-            {activeTab === 'ANALYSIS' && (
-                <div className="p-4 border-t border-slate-800 bg-slate-900/80 backdrop-blur-md">
-                    <button
-                        onClick={handleAnalyze}
-                        disabled={isAnalyzing || project.plotNodes.length === 0}
-                        className="w-full bg-muse-600 hover:bg-muse-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-xl shadow-muse-900/20"
-                    >
-                        <Activity size={18} /> 重新分析 (Analysis)
-                    </button>
-                </div>
-            )}
-        </div>
-    );
+        {/* Bottom Footer Action */}
+        {activeTab === 'ANALYSIS' && (
+            <div className="p-4 border-t border-slate-800 bg-slate-900/80 backdrop-blur-md">
+                <button
+                    onClick={handleAnalyze}
+                    disabled={isAnalyzing || project.plotNodes.length === 0}
+                    className="w-full bg-muse-600 hover:bg-muse-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 disabled:opacity-50 transition-all shadow-xl shadow-muse-900/20"
+                >
+                    <Activity size={18} /> 重新分析 (Analysis)
+                </button>
+            </div>
+        )}
+    </div>
+);
 };

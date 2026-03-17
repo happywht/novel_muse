@@ -130,29 +130,35 @@ ${plotContext}
 
         // AI返回的是数组，但我们只需要第一个元素
         const result = safeParseAiJson(responseText, AiPlotNodeArraySchema, "Conflict Scenario Generation") || [];
-        
+
         if (result.length === 0) {
             throw new Error("AI未能生成有效的修罗场场景");
         }
 
-        const plotNode = result[0];
-        
-        // 确保有ID和order
-        plotNode.id = Date.now().toString() + Math.random();
-        plotNode.order = 0;
+        const rawNode = result[0];
 
-        // 确保conflictScenario数据完整
-        if (!plotNode.conflictScenario) {
-            plotNode.conflictScenario = {
-                type: 'CONFRONTATION',
-                participants: selectedCharacters.map(c => c.id),
-                stakes: '未知赌注',
-                intensity: intensityLevel
-            };
-        }
+        // 确保conflictScenario数据完整，所有字段都必须有值
+        const conflictScenario: ConflictScenario = {
+            type: rawNode.conflictScenario?.type || 'CONFRONTATION',
+            participants: rawNode.conflictScenario?.participants || selectedCharacters.map(c => c.id),
+            stakes: rawNode.conflictScenario?.stakes || '未知赌注',
+            intensity: rawNode.conflictScenario?.intensity || intensityLevel
+        };
+
+        // 构建完整的 PlotNode 对象
+        const plotNode: PlotNode = {
+            id: Date.now().toString() + Math.random(),
+            title: rawNode.title,
+            content: rawNode.content || '',
+            order: 0,
+            beatTag: rawNode.beatTag,
+            relatedCharacters: rawNode.relatedCharacters,
+            relatedLocations: rawNode.relatedLocations,
+            conflictScenario
+        };
 
         return {
-            scenario: plotNode.conflictScenario,
+            scenario: conflictScenario,
             plotNode
         };
 

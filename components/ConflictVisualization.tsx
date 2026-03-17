@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PlotNode, Chapter, Character } from '../types';
-import { generateConflictVisualization, ConflictVisualizationReport, getConflictIntensityColor, getConflictTypeLabel, getConflictPatternDescription } from '../services/conflictVisualization';
+import { generateConflictVisualization, ConflictVisualizationReport, getConflictIntensityColor, getConflictTypeLabel, getConflictPatternDescription, determinePrimaryConflictType } from '../services/conflictVisualization';
 import { Zap, Flame, Users, Activity, Target, AlertCircle } from 'lucide-react';
 
 interface ConflictVisualizationProps {

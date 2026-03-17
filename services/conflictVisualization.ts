@@ -371,7 +371,7 @@ function extractConflictType(node: PlotNode): 'inner' | 'interpersonal' | 'exter
 /**
  * 确定主要冲突类型
  */
-function determinePrimaryConflictType(
+export function determinePrimaryConflictType(
   conflicts: PlotNode[]
 ): 'inner' | 'interpersonal' | 'external' {
   const types = conflicts.map(extractConflictType);

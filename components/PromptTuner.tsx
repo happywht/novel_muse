@@ -15,6 +15,7 @@ interface PromptTunerProps {
 
 export const PromptTuner: React.FC<PromptTunerProps> = ({ onClose }) => {
     // 切片化订阅
+    const project = useProjectStore(state => state.project);
     const customPrompts = useProjectStore(state => state.project.customPrompts);
     const updateProject = useProjectStore(state => state.updateProject);
     

@@ -12,6 +12,7 @@ export interface PlotNode {
   beatTag?: BeatTag; // NEW: Narrative milestone tag
   relatedCharacters?: string[]; // IDs
   relatedLocations?: string[]; // IDs
+  relatedChapters?: string[]; // IDs of related chapters
   // NEW: 修罗场冲突场景元数据
   conflictScenario?: {
     type: ConflictType;
@@ -79,6 +80,7 @@ export interface Chapter {
   order: number;
   lastModified: number;
   beats?: ChapterBeat[]; // NEW: For granular scene planning
+  metadata?: Array<{key: string, value: string}>; // Chapter metadata like POV
 }
 
 export type PromptProfile = 'LITERARY' | 'WEB_NOVEL';

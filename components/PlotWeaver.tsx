@@ -8,7 +8,7 @@ import { PlotToolbar } from './PlotWeaver/PlotToolbar';
 import { PlotCard } from './PlotWeaver/PlotCard';
 import { AuxiliaryDrawer } from './PlotWeaver/AuxiliaryDrawer';
 import { usePlotWeaverAI } from '../hooks/usePlotWeaverAI';
-import { VirtualList } from '../VirtualList';
+import { VirtualList } from './VirtualList';
 
 interface PlotWeaverProps {
     project: ProjectState;
@@ -219,49 +219,51 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                 <div className="flex-1 relative overflow-hidden bg-slate-900/30 rounded-3xl border border-slate-800/50 p-6 shadow-inner">
                     <div className="flex-1 overflow-y-auto custom-scrollbar p-1 pb-20 h-full">
                         {project.plotNodes.length > 0 ? (
-                            <VirtualList
-                                items={sortedNodes}
-                                itemHeight={120}
-                                height={window.innerHeight - 250}
-                                className="space-y-4"
-                                renderItem={(node, idx) => (
-                                    <PlotCard
-                                        key={node.id}
-                                        node={node}
-                                        idx={idx}
-                                        focusedNodeId={focusedNodeId}
-                                        editingNodeId={editingNodeId}
-                                        draftNodeContent={draftNodeContent}
-                                        iterationFeedback={iterationFeedback}
-                                        showEntitySelector={showEntitySelector}
-                                        showConflictConfigurator={showConflictConfigurator}
-                                        isIterating={ai.isIterating}
-                                        project={project}
-                                        setFocusedNodeId={setFocusedNodeId}
-                                        handleUpdateCard={handleUpdateCard}
-                                        handleRemoveCard={handleRemoveCard}
-                                        handleGenerateNodeAI={(id) => ai.handleGenerateNodeAI(id, setEditingNodeId, setDraftNodeContent)}
-                                        handleQuickDraft={handleQuickDraft}
-                                        handleIterateNode={() => ai.handleIterateNode(editingNodeId!, iterationFeedback, draftNodeContent!, setDraftNodeContent)}
-                                        handleAcceptDraftNode={handleAcceptDraftNode}
-                                        setDraftNodeContent={setDraftNodeContent}
-                                        setEditingNodeId={setEditingNodeId}
-                                        setIterationFeedback={setIterationFeedback}
-                                        setShowEntitySelector={setShowEntitySelector}
-                                        setShowConflictConfigurator={setShowConflictConfigurator}
-                                        toggleEntityRelation={toggleEntityRelation}
-                                    />
-                                )}
-                            />
-                            <button
-                                onClick={handleAddCard}
-                                className="w-full py-8 border-2 border-dashed border-slate-800 rounded-xl text-slate-600 hover:text-muse-400 hover:border-muse-500/50 hover:bg-muse-500/5 transition-all flex flex-col items-center gap-2 group"
-                            >
-                                <div className="w-10 h-10 rounded-full border-2 border-slate-800 group-hover:border-muse-500/50 flex items-center justify-center">
-                                    <Plus size={20} />
-                                </div>
-                                <span className="text-sm font-medium">添加新情节卡片</span>
-                            </button>
+                            <>
+                                <VirtualList
+                                    items={sortedNodes}
+                                    itemHeight={120}
+                                    height={window.innerHeight - 250}
+                                    className="space-y-4"
+                                    renderItem={(node, idx) => (
+                                        <PlotCard
+                                            key={node.id}
+                                            node={node}
+                                            idx={idx}
+                                            focusedNodeId={focusedNodeId}
+                                            editingNodeId={editingNodeId}
+                                            draftNodeContent={draftNodeContent}
+                                            iterationFeedback={iterationFeedback}
+                                            showEntitySelector={showEntitySelector}
+                                            showConflictConfigurator={showConflictConfigurator}
+                                            isIterating={ai.isIterating}
+                                            project={project}
+                                            setFocusedNodeId={setFocusedNodeId}
+                                            handleUpdateCard={handleUpdateCard}
+                                            handleRemoveCard={handleRemoveCard}
+                                            handleGenerateNodeAI={(id) => ai.handleGenerateNodeAI(id, setEditingNodeId, setDraftNodeContent)}
+                                            handleQuickDraft={handleQuickDraft}
+                                            handleIterateNode={() => ai.handleIterateNode(editingNodeId!, iterationFeedback, draftNodeContent!, setDraftNodeContent)}
+                                            handleAcceptDraftNode={handleAcceptDraftNode}
+                                            setDraftNodeContent={setDraftNodeContent}
+                                            setEditingNodeId={setEditingNodeId}
+                                            setIterationFeedback={setIterationFeedback}
+                                            setShowEntitySelector={setShowEntitySelector}
+                                            setShowConflictConfigurator={setShowConflictConfigurator}
+                                            toggleEntityRelation={toggleEntityRelation}
+                                        />
+                                    )}
+                                />
+                                <button
+                                    onClick={handleAddCard}
+                                    className="w-full py-8 border-2 border-dashed border-slate-800 rounded-xl text-slate-600 hover:text-muse-400 hover:border-muse-500/50 hover:bg-muse-500/5 transition-all flex flex-col items-center gap-2 group"
+                                >
+                                    <div className="w-10 h-10 rounded-full border-2 border-slate-800 group-hover:border-muse-500/50 flex items-center justify-center">
+                                        <Plus size={20} />
+                                    </div>
+                                    <span className="text-sm font-medium">添加新情节卡片</span>
+                                </button>
+                            </>
                         ) : (
                             <div className="flex flex-col items-center justify-center h-full text-center space-y-6 py-12">
                                 <div className="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center text-slate-600">

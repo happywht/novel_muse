@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Chapter, Character, PlotNode } from '../types';
 import { analyzeChapterBalance, generateOptimizationSuggestions, BalanceReport, OptimizationSuggestion } from '../services/chapterBalanceAlgorithm';
-import { BarChart, LineChart, PieChart, RadarChart } from './charts';
 import { Wand2, AlertCircle, CheckCircle, Info, TrendingUp, Users, BookOpen, Zap } from 'lucide-react';
 
 interface ChapterBalanceAnalyzerProps {
@@ -18,7 +17,7 @@ export const ChapterBalanceAnalyzer: React.FC<ChapterBalanceAnalyzerProps> = ({
   onApplySuggestion
 }) => {
   const [report] = useState(() => analyzeChapterBalance(chapters, characters, plotNodes));
-  const [suggestions] = useState(() => generateOptimizationSuggestions(report));
+  const [suggestions] = useState(() => generateOptimizationSuggestions(report, chapters, characters));
   const [selectedTab, setSelectedTab] = useState<'overview' | 'wordcount' | 'conflict' | 'characters' | 'pov' | 'suggestions'>('overview');
   const [selectedSuggestion, setSelectedSuggestion] = useState<OptimizationSuggestion | null>(null);
 
@@ -491,103 +490,3 @@ export const ChapterBalanceAnalyzer: React.FC<ChapterBalanceAnalyzerProps> = ({
   );
 };
 
-// 图表组件（简化版本，实际项目中使用完整图表库）
-const BarChart = ({ data, height = 200 }: { data: Array<{ label: string; value: number; color?: string }>; height?: number }) => (
-  <div className="w-full" style={{ height: `${height}px` }}>
-    <div className="flex items-end gap-2 h-full p-4">
-      {data.map((item, idx) => (
-        <div key={idx} className="flex-1 flex flex-col items-center">
-          <div 
-            className={`w-full ${item.color || 'bg-muse-500'} rounded-t transition-all`}
-            style={{ height: `${(item.value / Math.max(...data.map(d => d.value))) * 80}%` }}
-          />
-          <span className="text-xs text-slate-400 mt-1">{item.label}</span>
-        </div>
-      ))}
-    </div>
-  </div>
-);
-
-const LineChart = ({ data }: { data: Array<{ x: string; y: number }> }) => (
-  <div className="w-full h-48 p-4">
-    <div className="relative w-full h-full">
-      <svg className="absolute inset-0 w-full h-full">
-        <polyline
-          fill="none"
-          stroke="#8b5cf6"
-          strokeWidth="2"
-          points={data.map((point, idx) => {
-            const x = (idx / (data.length - 1)) * 100;
-            const y = 100 - (point.y / Math.max(...data.map(d => d.y))) * 100;
-            return `${x},${y}`;
-          }).join(' ')}
-        />
-      </svg>
-    </div>
-  </div>
-);
-
-const PieChart = ({ data }: { data: Array<{ label: string; value: number; color: string }> }) => {
-  const total = data.reduce((sum, item) => sum + item.value, 0);
-  return (
-    <div className="w-48 h-48 mx-auto">
-      <svg viewBox="0 0 100 100" className="w-full h-full">
-        {data.map((item, idx) => {
-          const startAngle = data.slice(0, idx).reduce((sum, d) => sum + (d.value / total) * 360, 0);
-          const endAngle = startAngle + (item.value / total) * 360;
-          const largeArcFlag = (item.value / total) * 360 > 180 ? 1 : 0;
-          const x1 = 50 + 35 * Math.cos((startAngle - 90) * Math.PI / 180);
-          const y1 = 50 + 35 * Math.sin((startAngle - 90) * Math.PI / 180);
-          const x2 = 50 + 35 * Math.cos((endAngle - 90) * Math.PI / 180);
-          const y2 = 50 + 35 * Math.sin((endAngle - 90) * Math.PI / 180);
-          
-          return (
-            <path
-              key={idx}
-              d={`M 50 50 L ${x1} ${y1} A 35 35 0 ${largeArcFlag} 1 ${x2} ${y2} Z`}
-              fill={item.color}
-              stroke="white"
-              strokeWidth="0.5"
-            />
-          );
-        })}
-      </svg>
-    </div>
-  );
-};
-
-const RadarChart = ({ data }: { data: Array<{ label: string; value: number; max: number }> }) => (
-  <div className="w-48 h-48 mx-auto">
-    <svg viewBox="0 0 100 100" className="w-full h-full">
-      {/* Grid */}
-      {[0.25, 0.5, 0.75, 1].map((r, idx) => (
-        <polygon
-          key={idx}
-          points={data.map((_, i) => {
-            const angle = (i / data.length) * 360 - 90;
-            const x = 50 + 35 * r * Math.cos(angle * Math.PI / 180);
-            const y = 50 + 35 * r * Math.sin(angle * Math.PI / 180);
-            return `${x},${y}`;
-          }).join(' ')}
-          fill="none"
-          stroke="#64748b"
-          strokeWidth="0.5"
-        />
-      ))}
-      
-      {/* Data */}
-      <polygon
-        points={data.map((item, idx) => {
-          const angle = (idx / data.length) * 360 - 90;
-          const value = (item.value / item.max) * 35;
-          const x = 50 + value * Math.cos(angle * Math.PI / 180);
-          const y = 50 + value * Math.sin(angle * Math.PI / 180);
-          return `${x},${y}`;
-        }).join(' ')}
-        fill="rgba(139, 92, 246, 0.3)"
-        stroke="#8b5cf6"
-        strokeWidth="1"
-      />
-    </svg>
-  </div>
-);

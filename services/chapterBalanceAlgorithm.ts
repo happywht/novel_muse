@@ -498,7 +498,9 @@ function generateWeaknesses(score: number, metrics: ChapterMetrics[]): string[] 
  * 生成优化建议
  */
 export function generateOptimizationSuggestions(
-  report: BalanceReport
+  report: BalanceReport,
+  chapters: Chapter[],
+  characters: Character[]
 ): OptimizationSuggestion[] {
   const suggestions: OptimizationSuggestion[] = [];
   

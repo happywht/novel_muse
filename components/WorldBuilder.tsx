@@ -4,7 +4,7 @@ import { generateText, expandWorldLore } from '../services/geminiService';
 import { Loader } from './Loader';
 import { Globe, Plus, Trash2, Map, Shield, Users, Scroll, BookPlus, AlertCircle, CheckCircle, Settings2, Eye, Cpu, BookOpen, GitCommit, Check, Edit2, Save, X, Search, Info, RefreshCw } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
-import { VirtualList } from '../VirtualList';
+import { VirtualList } from './VirtualList';
 
 interface WorldBuilderProps {
     project: ProjectState;
