@@ -68,9 +68,17 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
     const dragNode = useRef<SimNode | null>(null);
     const lastMouse = useRef({ x: 0, y: 0 });
 
-    // Filtering Lenses
-    const [activeLayers, setActiveLayers] = useState<string[]>(['Character', 'WorldSetting']);
+    // Filtering Lenses - 默认启用所有图层
+    const [activeLayers, setActiveLayers] = useState<string[]>([
+        'Character', 
+        'WorldSetting', 
+        'Event', 
+        'Echo', 
+        'Chapter', 
+        'PlotNode'
+    ]);
     const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
+    const [fullStats, setFullStats] = useState({ nodes: 0, edges: 0 });
 
     const loadGraph = useCallback(async () => {
         if (!useBackend) {
@@ -94,6 +102,9 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
             const height = containerRef.current?.clientHeight || 600;
             const cx = width / 2;
             const cy = height / 2;
+
+            // 计算全量统计数据（不过滤）
+            setFullStats({ nodes: data.nodes.length, edges: data.edges.length });
 
             const simNodes: SimNode[] = data.nodes.map((n, i) => ({
                 ...n,
@@ -469,7 +480,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
                     <GitBranch size={16} className="text-muse-400" />
                     <h3 className="text-sm font-bold text-white">星图引擎 · 知识图谱</h3>
                     <span className="text-xs text-slate-500">
-                        {nodes.length} 节点 · {edges.length} 关系
+                        {displayNodes.length}/{fullStats.nodes} 节点 · {displayEdges.length}/{fullStats.edges} 关系
                     </span>
                 </div>
                 <div className="flex items-center gap-4">
@@ -665,8 +676,24 @@ const NodeEditSidebar: React.FC<NodeEditSidebarProps> = ({ node, projectId, onCl
                 updatedData.worldSettings = projectData.worldSettings.map((w: any) =>
                     w.id === node.id ? { ...w, title: title, content: description } : w
                 );
+            } else if (node.type === 'Chapter') {
+                updatedData.chapters = projectData.chapters.map((c: any) =>
+                    c.id === node.id ? { ...c, title: title, summary: description } : c
+                );
+            } else if (node.type === 'PlotNode') {
+                updatedData.plotNodes = projectData.plotNodes.map((pn: any) =>
+                    pn.id === node.id ? { ...pn, title: title, description: description } : pn
+                );
+            } else if (node.type === 'Event') {
+                updatedData.timeline = projectData.timeline.map((e: any) =>
+                    e.id === node.id ? { ...e, title: title, description: description } : e
+                );
+            } else if (node.type === 'Echo') {
+                // Echo是AI生成的建议，不应直接编辑
+                alert('Echo节点为AI生成的建议，不可直接编辑');
+                setIsSaving(false);
+                return;
             }
-            // For Echo and Event, add logic if needed.
 
             // 1. Update React Local State
             updateProject(updatedData);
@@ -676,7 +703,6 @@ const NodeEditSidebar: React.FC<NodeEditSidebarProps> = ({ node, projectId, onCl
             await syncProject(updatedData);
 
             setIsEditing(false);
-            // Optionally, we could trigger loadGraph() here to refresh the visual graph
 
         } catch (e) {
             console.error("Failed to save node:", e);

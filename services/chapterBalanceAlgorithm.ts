@@ -159,21 +159,34 @@ function calculateMetrics(
  * 分析字数统计
  */
 function analyzeWordCount(chapters: Chapter[], metrics: ChapterMetrics[]) {
+  // 空数组保护
+  if (metrics.length === 0) {
+    return {
+      total: 0,
+      average: 0,
+      median: 0,
+      min: 0,
+      max: 0,
+      stdDev: 0,
+      outliers: { tooLong: [], tooShort: [] },
+    };
+  }
+
   const wordCounts = metrics.map(m => m.wordCount);
   const total = wordCounts.reduce((sum, count) => sum + count, 0);
   const average = total / wordCounts.length;
   const sorted = [...wordCounts].sort((a, b) => a - b);
-  const median = sorted[Math.floor(sorted.length / 2)];
-  const min = Math.min(...wordCounts);
-  const max = Math.max(...wordCounts);
+  const median = sorted[Math.floor(sorted.length / 2)] || 0;
+  const min = wordCounts.length > 0 ? Math.min(...wordCounts) : 0;
+  const max = wordCounts.length > 0 ? Math.max(...wordCounts) : 0;
   const stdDev = Math.sqrt(
     wordCounts.reduce((sum, count) => sum + Math.pow(count - average, 2), 0) / wordCounts.length
   );
-  
+
   // 识别异常值（超过1.5倍标准差）
   const tooLong = chapters.filter((chapter, i) => metrics[i].wordCount > average + 1.5 * stdDev);
   const tooShort = chapters.filter((chapter, i) => metrics[i].wordCount < average - 1.5 * stdDev);
-  
+
   return {
     total,
     average: Math.round(average),
@@ -352,7 +365,22 @@ function analyzePacingCurve(chapters: Chapter[], metrics: ChapterMetrics[]) {
 /**
  * 计算整体平衡评分
  */
-function calculateOverallBalance(chapters: Chapter[], metrics: ChapterMetrics[]) {
+function calculateOverallBalance(chapters: Chapter[], metrics: ChapterMetrics[]): {
+    score: number;
+    level: 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR';
+    strengths: string[];
+    weaknesses: string[];
+  } {
+  // 空数组保护
+  if (metrics.length === 0 || chapters.length === 0) {
+    return {
+      score: 0,
+      level: 'POOR' as const,
+      strengths: ['暂无章节数据，无法分析'],
+      weaknesses: ['请先创建章节内容'],
+    };
+  }
+
   // 各项权重
   const weights = {
     wordCount: 0.3,
@@ -360,31 +388,33 @@ function calculateOverallBalance(chapters: Chapter[], metrics: ChapterMetrics[])
     character: 0.25,
     pov: 0.2,
   };
-  
-  // 字数平衡评分（基于标准差）
+
+  // 字数平衡评分（基于标准差)
   const wordCounts = metrics.map(m => m.wordCount);
   const avgWordCount = wordCounts.reduce((a, b) => a + b, 0) / wordCounts.length;
   const wordCountStdDev = Math.sqrt(
     wordCounts.reduce((sum, count) => sum + Math.pow(count - avgWordCount, 2), 0) / wordCounts.length
   );
   const wordCountScore = Math.max(0, 100 - (wordCountStdDev / Math.max(avgWordCount, 1)) * 100);
-  
+
   // 冲突平衡评分
   const conflictCounts = metrics.map(m => m.conflictScenes);
   const avgConflict = conflictCounts.reduce((a, b) => a + b, 0) / conflictCounts.length;
   const conflictBalanceScore = conflictCounts.every(c => Math.abs(c - avgConflict) <= 2) ? 85 : 60;
-  
-  // 角色平衡评分（平均值）
-  const charBalanceScores = metrics.flatMap(m => 
-    Object.values(m.characterAppearances).map(count => 
+
+  // 角色平衡评分(平均值)
+  const charBalanceScores = metrics.flatMap(m =>
+    Object.values(m.characterAppearances).map(count =>
       count > 0 ? Math.min(100, count * 20) : 0
     )
   );
-  const characterScore = charBalanceScores.reduce((a, b) => a + b, 0) / Math.max(charBalanceScores.length, 1);
-  
+  const characterScore = charBalanceScores.length > 0
+    ? charBalanceScores.reduce((a, b) => a + b, 0) / charBalanceScores.length
+    : 0;
+
   // POV平衡评分（简化）
   const povScore = 75; // 基础分，需要更复杂分析
-  
+
   // 综合评分
   const overallScore = Math.round(
     wordCountScore * weights.wordCount +
@@ -392,13 +422,13 @@ function calculateOverallBalance(chapters: Chapter[], metrics: ChapterMetrics[])
     characterScore * weights.character +
     povScore * weights.pov
   );
-  
-  let level: 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR';
-  if (overallScore >= 90) level = 'EXCELLENT';
-  else if (overallScore >= 75) level = 'GOOD';
-  else if (overallScore >= 60) level = 'FAIR';
-  else level = 'POOR';
-  
+
+  const level: 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR' =
+    overallScore >= 90 ? 'EXCELLENT' :
+    overallScore >= 75 ? 'GOOD' :
+    overallScore >= 60 ? 'FAIR' :
+    'POOR';
+
   return {
     score: overallScore,
     level,
@@ -454,17 +484,22 @@ function calculatePacingScore(wordCount: number, conflictCount: number): number 
  * 生成优势点
  */
 function generateStrengths(score: number, metrics: ChapterMetrics[]): string[] {
+  // 空数组保护
+  if (metrics.length === 0) {
+    return ['暂无章节数据，无法分析'];
+  }
+
   const strengths: string[] = [];
-  
+
   if (score >= 75) {
     strengths.push('整体章节平衡性良好');
   }
-  
+
   const avgPacing = metrics.reduce((sum, m) => sum + m.pacingScore, 0) / metrics.length;
   if (avgPacing >= 70) {
     strengths.push('章节节奏控制得当');
   }
-  
+
   return strengths;
 }
 
@@ -472,21 +507,26 @@ function generateStrengths(score: number, metrics: ChapterMetrics[]): string[] {
  * 生成改进点
  */
 function generateWeaknesses(score: number, metrics: ChapterMetrics[]): string[] {
+  // 空数组保护
+  if (metrics.length === 0) {
+    return ['暂无章节数据，请先添加章节'];
+  }
+
   const weaknesses: string[] = [];
-  
+
   if (score < 75) {
     weaknesses.push('章节平衡需要优化');
   }
-  
+
   const wordCounts = metrics.map(m => m.wordCount);
   const avgWordCount = wordCounts.reduce((a, b) => a + b, 0) / wordCounts.length;
-  const variance = wordCounts.reduce((sum, count) => 
+  const variance = wordCounts.reduce((sum, count) =>
     sum + Math.pow(count - avgWordCount, 2), 0) / wordCounts.length;
-  
+
   if (variance > Math.pow(avgWordCount * 0.5, 2)) {
     weaknesses.push('章节字数差异较大，建议调整');
   }
-  
+
   return weaknesses;
 }
 
