@@ -388,3 +388,75 @@ ${content.slice(0, 10000)}
         return "摘要生成失败。";
     }
 };
+
+/**
+ * AI Enhanced Chapter Balance Suggestions
+ * Uses Gemini to provide intelligent analysis of chapter balance
+ */
+export const generateAIBalanceSuggestions = async (
+    chapters: Chapter[],
+    characters: Character[],
+    plotNodes: PlotNode[],
+    settings?: CreativeSettings
+): Promise<string> => {
+    const chapterInfo = chapters.map(ch => ({
+        title: ch.title,
+        wordCount: ch.content?.length || 0,
+        pov: ch.expectedPOV || '未知',
+        summary: ch.summary || '暂无摘要'
+    }));
+    
+    const characterNames = characters.map(c => c.name).join(', ');
+    const plotBeatCount = plotNodes.length;
+    
+    const prompt = `
+你是一位资深的小说编辑和结构顾问，擅长分析小说章节结构的平衡性。
+
+请分析以下小说的章节结构，并提供专业的优化建议：
+
+## 章节数据
+${JSON.stringify(chapterInfo, null, 2)}
+
+## 角色列表
+${characterNames}
+
+## 情节节点数
+${plotBeatCount}
+
+## 分析要求
+请从以下维度提供专业建议：
+
+1. **字数平衡**：哪些章节过长或过短？应该如何调整？
+
+2. **节奏控制**：章节的叙事节奏是否合理？是否有需要增加冲突或缓冲的地方？
+
+3. **角色出场**：主要角色的出场频率是否均衡？哪些角色出场过多或过少？
+
+4. **POV视角**：视角人物的分配是否合理？是否需要调整POV轮换模式？
+
+5. **结构优化**：基于情节节点，章节的拆分或合并建议。
+
+## 输出格式
+请用清晰的结构输出分析，包括：
+- 总体评价（0-100分）
+- 主要问题（如有）
+- 具体优化建议（按优先级排序）
+- 预期改进效果
+
+请直接输出分析结果，不要包含任何额外的解释或说明。
+    `;
+
+    try {
+        const responseText = await executeModelTask(
+            'generateAIBalanceSuggestions',
+            '',
+            prompt,
+            await getModelName('pro'),
+            settings?.creativity || 0.7
+        );
+        return responseText.trim();
+    } catch (error) {
+        console.error("Failed to generate AI balance suggestions:", error);
+        return "AI平衡分析生成失败。";
+    }
+};

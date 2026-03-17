@@ -16,12 +16,14 @@ import {
     ChevronDown,
     PlusCircle,
     LayoutList,
-    ChevronDownCircle
+    ChevronDownCircle,
+    BarChart3
 } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { splitPlotNodeIntoChapters, regenerateChapterOutline, auditChapterPlan } from '../../services/geminiService';
 import { Loader2, RefreshCw, AlertCircle, CheckCircle2, Info } from 'lucide-react'; // For loading state
 import { recalculateChapterOrders } from '../../utils/chapterUtils';
+import { ChapterBalanceAnalyzer } from '../ChapterBalanceAnalyzer';
 
 
 interface ChapterOutlinerProps {
@@ -40,6 +42,7 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
     const [auditResult, setAuditResult] = useState<{ isAligned: boolean; issues: { type: string; description: string; suggestion: string }[] } | null>(null);
     const [isAuditCollapsed, setIsAuditCollapsed] = useState(false);
     const [isAuditing, setIsAuditing] = useState(false);
+    const [showBalanceAnalyzer, setShowBalanceAnalyzer] = useState(false);
 
     const selectedPlotNode = useMemo(() =>
         project.plotNodes.find(n => n.id === selectedPlotNodeId),
@@ -193,6 +196,53 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
         setActiveSection(AppSection.DRAFTING);
     };
 
+    const handleApplyBalanceSuggestion = (suggestion: any) => {
+        switch (suggestion.type) {
+            case 'SPLIT':
+                // 将章节拆分为两个
+                const chapterToSplit = project.chapters.find(c => c.id === suggestion.chapterId);
+                if (chapterToSplit) {
+                    const halfLength = Math.floor((chapterToSplit.content?.length || 0) / 2);
+                    const firstHalf = chapterToSplit.content?.substring(0, halfLength) || '';
+                    const secondHalf = chapterToSplit.content?.substring(halfLength) || '';
+                    
+                    const newChapter: Chapter = {
+                        ...chapterToSplit,
+                        id: `chapter-${Date.now()}`,
+                        title: `${chapterToSplit.title} (第二部分)`,
+                        content: secondHalf,
+                        order: chapterToSplit.order + 1,
+                    };
+                    
+                    // 更新原章节
+                    const updatedChapters = project.chapters.map(c => 
+                        c.id === chapterToSplit.id 
+                            ? { ...c, content: firstHalf, title: `${c.title} (第一部分)` }
+                            : c.order > chapterToSplit.order ? { ...c, order: c.order + 1 } : c
+                    );
+                    
+                    updateProject({ chapters: [...updatedChapters, newChapter] });
+                    alert(`已拆分"${chapterToSplit.title}"为两个章节`);
+                }
+                break;
+                
+            case 'MERGE':
+                alert('章节合并功能需要手动操作，请选择要合并的章节');
+                break;
+                
+            case 'ADD_CONFLICT':
+                alert('建议在下一章节中增加冲突场景');
+                break;
+                
+            case 'BALANCE_CHARACTERS':
+                alert('请检查角色出场频率，在下一章节中调整出场角色');
+                break;
+                
+            default:
+                alert(`建议"${suggestion.description}"已记录，请手动调整`);
+        }
+    };
+
     const handleFission = async () => {
         if (!selectedPlotNode || isGenerating) return;
 
@@ -340,14 +390,23 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                                         {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
                                         {isGenerating ? '正在排布章节...' : '✨ AI 裂变章节细纲'}
                                     </button>
-                                    <button
-                                        onClick={handleAudit}
-                                        disabled={isAuditing || relatedChapters.length === 0}
-                                        className={`bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all border border-slate-700 ${isAuditing || relatedChapters.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    >
-                                        {isAuditing ? <Loader2 size={16} className="animate-spin" /> : <AlertCircle size={16} className="text-amber-400" />}
-                                        结构审计
-                                    </button>
+                                <button
+                                    onClick={handleAudit}
+                                    disabled={isAuditing || relatedChapters.length === 0}
+                                    className={`bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all border border-slate-700 ${isAuditing || relatedChapters.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    {isAuditing ? <Loader2 size={16} className="animate-spin" /> : <AlertCircle size={16} className="text-amber-400" />}
+                                    结构审计
+                                </button>
+                                
+                                <button
+                                    onClick={() => setShowBalanceAnalyzer(!showBalanceAnalyzer)}
+                                    disabled={project.chapters.length === 0}
+                                    className={`bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all border border-slate-700 ${project.chapters.length === 0 ? 'opacity-50 cursor-not-allowed' : ''} ${showBalanceAnalyzer ? 'bg-muse-600 text-white border-muse-500' : ''}`}
+                                >
+                                    <BarChart3 size={16} className="text-purple-400" />
+                                    平衡分析
+                                </button>
                                 </div>
                             </div>
 
@@ -560,6 +619,18 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                                 </button>
                             </div>
                         </div>
+                        
+                        {/* Chapter Balance Analyzer */}
+                        {showBalanceAnalyzer && (
+                            <div className="mt-6">
+                                <ChapterBalanceAnalyzer
+                                    chapters={project.chapters}
+                                    characters={project.characters}
+                                    plotNodes={project.plotNodes}
+                                    onApplySuggestion={handleApplyBalanceSuggestion}
+                                />
+                            </div>
+                        )}
                     </>
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center bg-slate-900/20 border border-slate-800/40 rounded-3xl p-12 text-center">

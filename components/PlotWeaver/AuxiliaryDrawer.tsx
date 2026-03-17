@@ -1,11 +1,12 @@
-import React from 'react';
-import { Activity, TrendingUp, Lightbulb, Sidebar, X, User, Globe, Zap, Info, Swords, Flame } from 'lucide-react';
+import React, { useState } from 'react';
+import { Activity, TrendingUp, Lightbulb, Sidebar, X, User, Globe, Zap, Info, Swords, Flame, BarChart3 } from 'lucide-react';
 import { TabMode } from '../PlotWeaver';
 import { ProjectState, PlotNode } from '../../types';
 import { PlotAnalysisPanel } from '../PlotWeaver/PlotAnalysisPanel';
 import { PlotRhythmChart } from '../PlotWeaver/PlotRhythmChart';
 import { PlotStructureAssistant } from '../PlotWeaver/PlotStructureAssistant';
 import { Loader } from '../Loader';
+import { ConflictVisualization } from '../ConflictVisualization';
 
 interface AuxiliaryDrawerProps {
     showRightSidebar: boolean;
@@ -40,6 +41,7 @@ export const AuxiliaryDrawer: React.FC<AuxiliaryDrawerProps> = ({
     isIterating,
     handleAnalyze
 }) => {
+    const [showConflictVisualization, setShowConflictVisualization] = useState(false);
     return (
         <div className={`fixed top-0 right-0 h-full w-[450px] bg-slate-900 border-l border-slate-800 shadow-2xl z-40 transform transition-transform duration-500 ease-in-out flex flex-col ${showRightSidebar ? 'translate-x-0' : 'translate-x-full'}`}>
             {/* Header */}
@@ -149,13 +151,46 @@ export const AuxiliaryDrawer: React.FC<AuxiliaryDrawerProps> = ({
                     </>
                 )}
 
-                {/* Global Loading Overlay for Right Panels */}
-                {isAnalyzing && (
-                    <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-sm flex items-center justify-center z-50">
-                        <Loader text="正在进行深度诊断与逻辑审计..." />
+                                   )}
+
+                    {/* 冲突场景可视化面板 */}
+                    <div className="mt-8">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2 text-muse-400 font-bold text-sm uppercase tracking-wider">
+                                <BarChart3 size={16} /> 冲突场景可视化分析
+                            </div>
+                            <button
+                                onClick={() => setShowConflictVisualization(!showConflictVisualization)}
+                                className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
+                                    showConflictVisualization 
+                                        ? 'bg-muse-600 text-white' 
+                                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                                }`}
+                            >
+                                {showConflictVisualization ? '隐藏分析' : '显示分析'}
+                            </button>
+                        </div>
+                        
+                        {showConflictVisualization && (
+                            <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-4">
+                                <ConflictVisualization
+                                    plotNodes={project.plotNodes}
+                                    chapters={project.chapters}
+                                    characters={project.characters}
+                                />
+                            </div>
+                        )}
                     </div>
-                )}
-            </div>
+                </>
+            )}
+
+            {/* Global Loading Overlay for Right Panels */}
+            {isAnalyzing && (
+                <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-sm flex items-center justify-center z-50">
+                    <Loader text="正在进行深度诊断与逻辑审计..." />
+                </div>
+            )}
+        </div>
 
             {/* Bottom Footer Action */}
             {activeTab === 'ANALYSIS' && (
