@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useRef } from 'react';
 
 // 虚拟列表包装组件
-// 如果react-window可用则使用它，否则回退到普通列表
+// 注意： 由于 react-window 2.x API 变化较大，这里使用普通滚动作为回退方案
+// 待 react-window 2.x 稳定后可切换回虚拟滚动
 
 interface VirtualListProps<T> {
   items: T[];
@@ -11,45 +12,35 @@ interface VirtualListProps<T> {
   className?: string;
 }
 
-export const VirtualList = <T,>({
+function VirtualListInner<T>({
   items,
   itemHeight,
   height,
   renderItem,
   className = ''
-}: VirtualListProps<T>) => {
-  // 尝试使用react-window，如果不可用则回退到普通渲染
-  try {
-    // 动态导入react-window（如果已安装）
-    // 注意：需要在项目中运行: npm install react-window @types/react-window
-    const { FixedSizeList } = require('react-window');
-    
-    return (
-      <FixedSizeList
-        height={height}
-        itemCount={items.length}
-        itemSize={itemHeight}
-        width="100%"
-        className={className}
-      >
-        {({ index, style }: { index: number; style: React.CSSProperties }) => (
-          <div style={style}>
-            {renderItem(items[index], index)}
-          </div>
-        )}
-      </FixedSizeList>
-    );
-  } catch (error) {
-    // react-window未安装，回退到普通渲染（带性能提示）
-    console.warn('react-window未安装，使用普通列表渲染。建议运行: npm install react-window @types/react-window');
-    
-    return (
-      <div className={className} style={{ height, overflowY: 'auto' }}>
-        {items.map((item, index) => renderItem(item, index))}
-      </div>
-    );
-  }
-};
+}: VirtualListProps<T>) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // 简单的滚动列表实现（不使用虚拟滚动）
+  // 如果需要真正的虚拟滚动，可以考虑降级到 react-window 1.x 或使用 react-virtualized
+  return (
+    <div
+      ref={containerRef}
+      className={className}
+      style={{ height, overflow: 'auto' }}
+    >
+      {items.map((item, index) => (
+        <div key={index} style={{ minHeight: itemHeight }}>
+          {renderItem(item, index)}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export const VirtualList = VirtualListInner as <T>(
+  props: VirtualListProps<T>
+) => React.ReactElement;
 
 // 判断是否需要虚拟滚动（列表长度阈值）
 export const shouldUseVirtualScroll = (itemCount: number): boolean => {
