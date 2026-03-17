@@ -22,7 +22,7 @@ export const generateCharacterImage = async (description: string): Promise<strin
     const prompt = `Digital concept art, detailed character design, cinematic lighting, 4k, trending on artstation. Character description: ${description}`;
 
     try {
-        const response: any = await retryOperation(() => (ai as any).models.generateContent({
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: {
                 parts: [{ text: prompt }]

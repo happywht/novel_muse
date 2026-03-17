@@ -28,7 +28,7 @@ export const generateText = async (prompt: string, promptKey: string = 'writing_
                 temperature: settings?.creativity || 0.8,
             }
         }));
-        return (response as any).text || "未生成任何内容。";
+        return (response as GenerateContentResponse).text || "未生成任何内容。";
     } catch (error) {
         console.error("Gemini Text Generation Error:", error);
         throw error;

@@ -17,32 +17,33 @@ import { CreativeCompassView } from './components/CreativeCompassView';
 import { ProjectLobby } from './components/ProjectLobby';
 import { useProjectStore, INITIAL_PROJECT } from './store/useProjectStore';
 import { storageService, STORAGE_KEYS } from './services/storageService';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const MUSE_FILE_VERSION = '1.0';
 
 const App: React.FC = () => {
-  const {
-    project,
-    activeSection,
-    savedProjects,
-    useBackend,
-    isSaving,
-    isLoading,
-    showGuide,
-    showSettings,
-    showPromptTuner,
-    showProjectList,
-    setActiveSection,
-    setShowGuide,
-    setShowSettings,
-    setShowPromptTuner,
-    updateProject,
-    initialize,
-    createProject,
-    switchProject,
-    deleteProject,
-    forceSync
-  } = useProjectStore();
+  // 切片化订阅 - 只订阅需要的部分，避免重渲染
+  const project = useProjectStore(state => state.project);
+  const activeSection = useProjectStore(state => state.activeSection);
+  const savedProjects = useProjectStore(state => state.savedProjects);
+  const useBackend = useProjectStore(state => state.useBackend);
+  const isSaving = useProjectStore(state => state.isSaving);
+  const isLoading = useProjectStore(state => state.isLoading);
+  const showGuide = useProjectStore(state => state.showGuide);
+  const showSettings = useProjectStore(state => state.showSettings);
+  const showPromptTuner = useProjectStore(state => state.showPromptTuner);
+  
+  const setActiveSection = useProjectStore(state => state.setActiveSection);
+  const setShowGuide = useProjectStore(state => state.setShowGuide);
+  const setShowSettings = useProjectStore(state => state.setShowSettings);
+  const setShowPromptTuner = useProjectStore(state => state.setShowPromptTuner);
+  const updateProject = useProjectStore(state => state.updateProject);
+  const initialize = useProjectStore(state => state.initialize);
+  const createProject = useProjectStore(state => state.createProject);
+  const switchProject = useProjectStore(state => state.switchProject);
+  const deleteProject = useProjectStore(state => state.deleteProject);
+  const forceSync = useProjectStore(state => state.forceSync);
+  const lastError = useProjectStore(state => state.lastError);
 
   const importFileRef = React.useRef<HTMLInputElement>(null);
 
@@ -135,19 +136,22 @@ const App: React.FC = () => {
 
   if (activeSection === AppSection.LOBBY) {
     return (
-      <ProjectLobby
-        projects={savedProjects}
-        currentProjectId={project.id}
-        onSwitchProject={handleSwitchProject}
-        onCreateProject={handleCreateProject}
-        onImportProject={() => importFileRef.current?.click()}
-        onExportProject={handleExportProject}
-        onDeleteProject={(id) => deleteProject(id)}
-      />
+      <ErrorBoundary>
+        <ProjectLobby
+          projects={savedProjects}
+          currentProjectId={project.id}
+          onSwitchProject={handleSwitchProject}
+          onCreateProject={handleCreateProject}
+          onImportProject={() => importFileRef.current?.click()}
+          onExportProject={handleExportProject}
+          onDeleteProject={(id) => deleteProject(id)}
+        />
+      </ErrorBoundary>
     );
   }
 
   return (
+    <ErrorBoundary>
     <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans selection:bg-muse-500/30 selection:text-muse-100 flex">
       {/* Hidden file input for import */}
       <input
@@ -260,6 +264,7 @@ const App: React.FC = () => {
       {/* Prompt Tuner Modal */}
       {showPromptTuner && <PromptTuner onClose={() => setShowPromptTuner(false)} />}
     </div>
+    </ErrorBoundary>
   );
 };
 

@@ -82,6 +82,8 @@ interface ProjectStore {
     setIsSaving: (saving: boolean) => void;
     isLoading: boolean;
     setIsLoading: (loading: boolean) => void;
+    lastError: string | null;
+    setLastError: (error: string | null) => void;
 
     // --- Actions ---
     initialize: () => Promise<void>;
@@ -111,6 +113,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     // --- Project State ---
     project: INITIAL_PROJECT,
     savedProjects: [],
+
+    // --- Error State ---
+    lastError: null,
+    setLastError: (error) => set({ lastError: error }),
 
     updateProject: (data) => {
         set((state) => ({
@@ -245,7 +251,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         };
 
         if (store.useBackend) {
-            try { await syncProject(newProject); } catch (e) { console.warn('Failed to sync new project', e); }
+            try { 
+                await syncProject(newProject); 
+            } catch (e) { 
+                console.warn('Failed to sync new project', e);
+                store.setLastError('数据同步失败：新创建的项目已保存到本地，但未能同步到服务器');
+            }
         }
 
         set((state) => ({
@@ -267,6 +278,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
                 return;
             } catch (e) {
                 console.warn('Failed to fetch from backend, falling back to local', e);
+                store.setLastError('从服务器加载项目失败，已回退到本地版本');
             }
         }
 
@@ -285,7 +297,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         }
 
         if (store.useBackend) {
-            try { await deleteProjectApi(id); } catch (e) { console.warn('Failed to delete from backend', e); }
+            try { 
+                await deleteProjectApi(id); 
+            } catch (e) { 
+                console.warn('Failed to delete from backend', e);
+                store.setLastError('删除项目失败：已从本地删除，但未能同步到服务器');
+            }
         }
 
         const state = get();
@@ -338,7 +355,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
                 set({ isSaving: false });
             } catch (err) {
                 console.warn('Backend sync failed:', err);
-                set({ isSaving: false });
+                set({ 
+                    isSaving: false,
+                    lastError: '数据同步失败：已保存到本地，将在下次连接时重试'
+                });
             }
         }, 2000);
     },

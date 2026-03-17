@@ -32,9 +32,9 @@ export const getModelName = async (tier: 'flash' | 'pro' = 'flash'): Promise<str
 export async function retryOperation<T>(operation: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
     try {
         return await operation();
-    } catch (error: any) {
-        const errorCode = error?.status || error?.code || error?.response?.status;
-        const errorMessage = error?.message || '';
+    } catch (error: unknown) {
+        const errorCode = (error as any)?.status || (error as any)?.code || (error as any)?.response?.status;
+        const errorMessage = (error as any)?.message || '';
         const isRetryable =
             errorCode === 503 ||
             errorCode === 429 ||

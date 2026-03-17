@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import { Book, Trash2, PenTool, RefreshCw, Clipboard, Check, Save, FileText, Cloud } from 'lucide-react';
 import { ProjectState } from '../../types';
 import { MarkdownRenderer } from '../MarkdownRenderer';
+import { VirtualList, shouldUseVirtualScroll } from '../VirtualList';
 
 interface ManuscriptViewProps {
     project: ProjectState;
@@ -113,42 +114,50 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({
                     {(project.chapters || []).length === 0 && (
                         <p className="text-slate-500 text-xs p-4 text-center">暂无正文章节。请去工坊采纳草稿。</p>
                     )}
-                    {[...(project.chapters || [])]
-                        .sort((a, b) => a.order - b.order)
-                        .map((chapter, idx) => (
-                            <div
-                                key={chapter.id}
-                                onClick={() => handleChapterSelect(chapter.id)}
-                                className={`p-3 rounded-lg cursor-pointer transition-colors group relative ${activeChapterId === chapter.id
-                                    ? 'bg-muse-900/50 text-muse-200 border border-muse-500/30'
-                                    : 'text-slate-300 hover:bg-slate-700/50 border border-transparent'
-                                    }`}
-                            >
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="text-xs font-bold opacity-50">#{idx + 1}</span>
-                                    <span className="text-[10px] text-slate-500">{new Date(chapter.lastModified).toLocaleDateString()}</span>
-                                </div>
-                                <h4 className="font-medium text-sm truncate pr-6">{chapter.title}</h4>
+                    
+                    {/* 使用虚拟滚动优化长列表性能 */}
+                    {(project.chapters || []).length > 0 && (
+                        <VirtualList
+                            items={[...(project.chapters || [])].sort((a, b) => a.order - b.order)}
+                            itemHeight={80}
+                            height={window.innerHeight - 200}
+                            className="space-y-1"
+                            renderItem={(chapter, idx) => (
+                                <div
+                                    key={chapter.id}
+                                    onClick={() => handleChapterSelect(chapter.id)}
+                                    className={`p-3 rounded-lg cursor-pointer transition-colors group relative ${activeChapterId === chapter.id
+                                        ? 'bg-muse-900/50 text-muse-200 border border-muse-500/30'
+                                        : 'text-slate-300 hover:bg-slate-700/50 border border-transparent'
+                                        }`}
+                                >
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-xs font-bold opacity-50">#{idx + 1}</span>
+                                        <span className="text-[10px] text-slate-500">{new Date(chapter.lastModified).toLocaleDateString()}</span>
+                                    </div>
+                                    <h4 className="font-medium text-sm truncate pr-6">{chapter.title}</h4>
 
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        fetchChapterContent(chapter.id);
-                                    }}
-                                    className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-500 hover:text-sky-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
-                                    title="从云端同步此章"
-                                >
-                                    <Cloud size={14} />
-                                </button>
-                                <button
-                                    onClick={(e) => handleDeleteChapter(e, chapter.id)}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
-                                    title="删除章节"
-                                >
-                                    <Trash2 size={14} />
-                                </button>
-                            </div>
-                        ))}
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            fetchChapterContent(chapter.id);
+                                        }}
+                                        className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-500 hover:text-sky-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                                        title="从云端同步此章"
+                                    >
+                                        <Cloud size={14} />
+                                    </button>
+                                    <button
+                                        onClick={(e) => handleDeleteChapter(e, chapter.id)}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                                        title="删除章节"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
+                            )}
+                        />
+                    )}
                 </div>
             </div>
 

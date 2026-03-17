@@ -1,5 +1,19 @@
 import { Character, WorldSetting, Echo, Chapter } from "../../types";
 
+// TypeScript类型声明（避免使用any）
+interface Segment {
+    isWordLike: boolean;
+    segment: string;
+}
+
+interface Segmenter {
+    segment(input: string): IterableIterator<Segment>;
+}
+
+interface IntlWithSegmenter {
+    Segmenter?: new (locale: string, options?: any) => Segmenter;
+}
+
 /**
  * NEW: Client-side RAG-lite Relevance Filter
  * Filters a large list of settings down to the most relevant ones based on current context
@@ -16,11 +30,12 @@ export const filterRelevantSettings = (
 
     // Tokenize query for better matching (if browser supports Intl.Segmenter)
     let queryTokens: string[] = [];
-    if (typeof Intl !== 'undefined' && (Intl as any).Segmenter) {
-        const segmenter = new (Intl as any).Segmenter('zh', { granularity: 'word' });
+    const intlWithSegmenter = Intl as IntlWithSegmenter;
+    if (typeof Intl !== 'undefined' && intlWithSegmenter.Segmenter) {
+        const segmenter = new intlWithSegmenter.Segmenter('zh', { granularity: 'word' });
         queryTokens = [...segmenter.segment(safeQuery)]
-            .filter((w: any) => w.isWordLike && w.segment.length > 1) // Filter out single chars/punctuation
-            .map((w: any) => w.segment);
+            .filter((w) => w.isWordLike && w.segment.length > 1) // Filter out single chars/punctuation
+            .map((w) => w.segment);
     } else {
         // Fallback: simple split by space/punctuation or just use the full string check
         queryTokens = safeQuery.split(/[\s,，.。！!?？]+/);

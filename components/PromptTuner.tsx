@@ -14,16 +14,19 @@ interface PromptTunerProps {
 }
 
 export const PromptTuner: React.FC<PromptTunerProps> = ({ onClose }) => {
-    const { project, updateProject } = useProjectStore();
+    // 切片化订阅
+    const customPrompts = useProjectStore(state => state.project.customPrompts);
+    const updateProject = useProjectStore(state => state.updateProject);
+    
     const [localPrompts, setLocalPrompts] = useState<Record<string, string>>({});
     const [expandedKey, setExpandedKey] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
 
     useEffect(() => {
-        if (project.customPrompts) {
-            setLocalPrompts(project.customPrompts);
+        if (customPrompts) {
+            setLocalPrompts(customPrompts);
         }
-    }, [project.customPrompts]);
+    }, [customPrompts]);
 
     const handleSave = () => {
         updateProject({ customPrompts: localPrompts });
