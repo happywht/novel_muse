@@ -4,6 +4,7 @@ import { generateText, expandWorldLore } from '../services/geminiService';
 import { Loader } from './Loader';
 import { Globe, Plus, Trash2, Map, Shield, Users, Scroll, BookPlus, AlertCircle, CheckCircle, Settings2, Eye, Cpu, BookOpen, GitCommit, Check, Edit2, Save, X, Search, Info, RefreshCw } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { VirtualList } from '../VirtualList';
 
 interface WorldBuilderProps {
     project: ProjectState;
@@ -318,6 +319,7 @@ export const WorldBuilder: React.FC<WorldBuilderProps> = ({ project, updateProje
 
                 {/* List of Items */}
                 <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                    {/* 新建条目表单 - 保持不动 */}
                     <div className="p-2">
                         <div className="flex gap-2">
                             <input
@@ -347,29 +349,50 @@ export const WorldBuilder: React.FC<WorldBuilderProps> = ({ project, updateProje
                             </div>
                         </div>
                     </div>
-
-                    {filteredSettings.map(lore => {
-                        const hasEcho = (project.echoes || []).some(e => e.targetId === lore.id && e.status === 'PENDING');
-                        return (
-                            <div
-                                key={lore.id}
-                                onClick={() => { setActiveItemId(lore.id); setDraftLore(null); }}
-                                className={`p-3 rounded-lg cursor-pointer flex justify-between items-center group relative overflow-hidden ${activeItemId === lore.id ? 'bg-muse-900/50 border border-muse-500/50' : 'bg-slate-800 hover:bg-slate-750 border border-transparent'} ${hasEcho && activeItemId !== lore.id ? 'shadow-[0_0_15px_rgba(34,211,238,0.15)] border-cyan-900/50' : ''}`}
-                            >
-                                {hasEcho && (
-                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)] animate-pulse"></div>
-                                )}
-                                <span className={`font-medium truncate ${hasEcho ? 'text-cyan-100' : 'text-slate-200'}`}>{lore.title}</span>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); deleteLore(lore.id); }}
-                                    className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-opacity"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
-                        )
-                    })}
-
+                    
+                    {/* 虚拟滚动列表 */}
+                    {filteredSettings.length > 0 && (
+                        <VirtualList
+                            items={filteredSettings}
+                            itemHeight={60}
+                            height={window.innerHeight - 450}
+                            className="space-y-2"
+                            renderItem={(lore, idx) => {
+                                const hasEcho = (project.echoes || []).some(e => e.targetId === lore.id && e.status === 'PENDING');
+                                return (
+                                    <div
+                                        key={lore.id}
+                                        onClick={() => { setActiveItemId(lore.id); setDraftLore(null); }}
+                                        className={`p-3 rounded-lg cursor-pointer flex justify-between items-center group relative overflow-hidden ${
+                                            activeItemId === lore.id 
+                                                ? 'bg-muse-900/50 border border-muse-500/50' 
+                                                : 'bg-slate-800 hover:bg-slate-750 border border-transparent'
+                                        } ${hasEcho && activeItemId !== lore.id ? 'shadow-[0_0_15px_rgba(34,211,238,0.15)] border-cyan-900/50' : ''}`}
+                                    >
+                                        {/* Echo指示器 */}
+                                        {hasEcho && (
+                                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)] animate-pulse"></div>
+                                        )}
+                                        
+                                        {/* 标题 */}
+                                        <span className={`font-medium truncate ${hasEcho ? 'text-cyan-100' : 'text-slate-200'}`}>
+                                            {lore.title}
+                                        </span>
+                                        
+                                        {/* 删除按钮 */}
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); deleteLore(lore.id); }}
+                                            className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-opacity"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                );
+                            }}
+                        />
+                    )}
+                    
+                    {/* 空状态 */}
                     {filteredSettings.length === 0 && (
                         <div className="text-center text-slate-500 text-sm mt-8 italic">
                             {searchQuery ? "未找到匹配条目" : "暂无条目"}

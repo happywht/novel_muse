@@ -4,6 +4,7 @@ import { generateText, generateCharacterImage, chatWithPersona } from '../servic
 import { Loader } from './Loader';
 import { User, Plus, Trash2, Camera, Sparkles, HeartHandshake, MessageCircle, X, Send, GitCommit, Check, Edit2, Save, Search, Palette, RotateCcw, AlertCircle, CheckCircle } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { VirtualList } from '../VirtualList';
 
 interface CharacterCreatorProps {
     project: ProjectState;
@@ -280,39 +281,69 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                    {project.characters.filter(c => c.name.includes(searchQuery) || c.role.includes(searchQuery)).map(char => {
-                        const hasEcho = (project.echoes || []).some(e => e.targetId === char.id && e.status === 'PENDING');
-                        return (
-                            <div
-                                key={char.id}
-                                onClick={() => { setActiveCharId(char.id); setDraftCharacter(null); }}
-                                className={`p-3 rounded-lg cursor-pointer flex items-center gap-3 group transition-all relative overflow-hidden ${activeCharId === char.id ? 'bg-muse-900/50 border border-muse-500/50' : 'bg-slate-800 border border-transparent hover:bg-slate-750'} ${hasEcho && activeCharId !== char.id ? 'shadow-[0_0_15px_rgba(34,211,238,0.15)] border-cyan-900/50' : ''}`}
-                            >
-                                {hasEcho && (
-                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)] animate-pulse"></div>
-                                )}
-                                <div className={`w-10 h-10 rounded-full bg-slate-700 overflow-hidden flex-shrink-0 border ${hasEcho ? 'border-cyan-500/50' : 'border-slate-600'}`}>
-                                    {char.imageUrl ? (
-                                        <img src={char.imageUrl} alt={char.name} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-slate-500">
-                                            <User size={20} />
+                    {/* 空状态 */}
+                    {project.characters.filter(c => c.name.includes(searchQuery) || c.role.includes(searchQuery)).length === 0 && (
+                        <p className="text-slate-500 text-xs p-4 text-center">暂无匹配角色</p>
+                    )}
+                    
+                    {/* 虚拟滚动优化 */}
+                    {project.characters.filter(c => c.name.includes(searchQuery) || c.role.includes(searchQuery)).length > 0 && (
+                        <VirtualList
+                            items={project.characters.filter(c => c.name.includes(searchQuery) || c.role.includes(searchQuery))}
+                            itemHeight={80}
+                            height={window.innerHeight - 400}
+                            className="space-y-2"
+                            renderItem={(char, idx) => {
+                                const hasEcho = (project.echoes || []).some(e => e.targetId === char.id && e.status === 'PENDING');
+                                return (
+                                    <div
+                                        key={char.id}
+                                        onClick={() => { setActiveCharId(char.id); setDraftCharacter(null); }}
+                                        className={`p-3 rounded-lg cursor-pointer flex items-center gap-3 group transition-all relative overflow-hidden ${
+                                            activeCharId === char.id 
+                                                ? 'bg-muse-900/50 border border-muse-500/50' 
+                                                : 'bg-slate-800 border border-transparent hover:bg-slate-750'
+                                        } ${hasEcho && activeCharId !== char.id ? 'shadow-[0_0_15px_rgba(34,211,238,0.15)] border-cyan-900/50' : ''}`}
+                                    >
+                                        {/* Echo指示器 */}
+                                        {hasEcho && (
+                                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)] animate-pulse"></div>
+                                        )}
+                                        
+                                        {/* 头像 */}
+                                        <div className={`w-10 h-10 rounded-full bg-slate-700 overflow-hidden flex-shrink-0 border ${
+                                            hasEcho ? 'border-cyan-500/50' : 'border-slate-600'
+                                        }`}>
+                                            {char.imageUrl ? (
+                                                <img src={char.imageUrl} alt={char.name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-slate-500">
+                                                    <User size={20} />
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className={`font-medium truncate ${hasEcho ? 'text-cyan-100' : 'text-slate-200'}`}>{char.name}</p>
-                                    <p className="text-xs text-slate-500 truncate">{char.role}</p>
-                                </div>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); deleteChar(char.id); }}
-                                    className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 p-1"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
-                        )
-                    })}
+                                        
+                                        {/* 角色信息 */}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="font-medium text-sm text-slate-200 truncate">
+                                                {char.name}
+                                                {hasEcho && <span className="ml-2 text-[10px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded-full">待处理</span>}
+                                            </div>
+                                            <div className="text-xs text-slate-500 truncate">{char.role}</div>
+                                        </div>
+                                        
+                                        {/* 删除按钮 */}
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); deleteChar(char.id); }}
+                                            className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-opacity p-1"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                );
+                            }}
+                        />
+                    )}
                 </div>
             </div>
 
