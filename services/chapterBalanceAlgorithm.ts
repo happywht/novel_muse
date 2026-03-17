@@ -122,11 +122,11 @@ function calculateMetrics(
 ): ChapterMetrics[] {
   return chapters.map(chapter => {
     const wordCount = chapter.content?.length || 0;
-    
-    // 分析冲突场景（从plotNodes关联）
-    const conflictNodes = plotNodes.filter(node => 
-      node.relatedChapters?.includes(chapter.id) && 
-      node.beatTag.includes('conflict')
+
+    // 分析冲突场景（从plotNodes关联，使用conflictScenario判断）
+    const conflictNodes = plotNodes.filter(node =>
+      node.relatedChapters?.includes(chapter.id) &&
+      node.conflictScenario != null
     );
     
     // 统计角色出场
@@ -190,11 +190,11 @@ function analyzeWordCount(chapters: Chapter[], metrics: ChapterMetrics[]) {
  */
 function analyzeConflictDistribution(chapters: Chapter[], plotNodes: PlotNode[]) {
   const distribution = chapters.map(chapter => {
-    const conflictNodes = plotNodes.filter(node => 
-      node.relatedChapters?.includes(chapter.id) && 
-      node.beatTag.includes('conflict')
+    const conflictNodes = plotNodes.filter(node =>
+      node.relatedChapters?.includes(chapter.id) &&
+      node.conflictScenario != null
     );
-    
+
     return {
       chapterId: chapter.id,
       chapterTitle: chapter.title,
@@ -202,13 +202,13 @@ function analyzeConflictDistribution(chapters: Chapter[], plotNodes: PlotNode[])
       density: conflictNodes.length / Math.max(chapter.content?.length || 1, 1000), // 每千字冲突数
     };
   });
-  
+
   const avgDensity = distribution.reduce((sum, d) => sum + d.density, 0) / distribution.length;
   const hotspots = distribution.filter(d => d.density > avgDensity * 1.5).map(d => d.chapterId);
   const coldspots = distribution.filter(d => d.density < avgDensity * 0.5).map(d => d.chapterId);
-  
+
   return {
-    totalScenes: plotNodes.filter(n => n.beatTag.includes('conflict')).length,
+    totalScenes: plotNodes.filter(n => n.conflictScenario != null).length,
     distribution,
     hotspots,
     coldspots,
