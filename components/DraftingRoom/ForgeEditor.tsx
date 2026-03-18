@@ -7,6 +7,7 @@ import {
 import { Echo, PolishMode, ProjectState } from '../../types';
 import { DraftEditor } from './DraftEditor';
 import { Loader } from '../Loader';
+import { EchoSummaryCard } from '../Echo/EchoSummaryCard';
 
 interface ForgeEditorProps {
     project: ProjectState;
@@ -137,61 +138,16 @@ export const ForgeEditor: React.FC<ForgeEditorProps> = ({
                     />
                 </div>
 
-                {/* Auto-Echo Capture Section */}
+                {/* Echo Summary Card - 新的渐进式确认UI */}
                 {generatedContent && (
-                    <div className="bg-slate-950/50 p-4 border-t border-slate-800">
-                        <div className="flex items-center justify-between mb-2">
-                            <h3 className="text-xs font-bold text-slate-400 flex items-center gap-1">
-                                <ScanSearch className="text-muse-400" size={14} />
-                                命运回响 (状态提取)
-                            </h3>
-                            <button
-                                onClick={handleExtractEchoes}
-                                disabled={isExtracting}
-                                className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded flex items-center gap-1 transition-colors disabled:opacity-50 border border-slate-700"
-                            >
-                                {isExtracting ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                                提取状态变更
-                            </button>
-                        </div>
-
-                        {extractedEchoes.length > 0 && (
-                            <div className="space-y-2 mt-2 max-h-32 overflow-y-auto custom-scrollbar">
-                                {extractedEchoes.map(echo => (
-                                    <div key={echo.id} className="bg-slate-800/80 p-2 rounded border border-slate-700 flex gap-2 items-start">
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-1.5">
-                                                <span className={`text-[8px] uppercase font-bold px-1.5 py-0.5 rounded-sm ${echo.type === 'CHARACTER' ? 'bg-indigo-900/50 text-indigo-300' : 'bg-emerald-900/50 text-emerald-300'
-                                                    }`}>
-                                                    {echo.type === 'CHARACTER' ? '人物' : '世界'}
-                                                </span>
-                                                <span className="font-bold text-slate-300 text-xs truncate">{echo.targetName}</span>
-                                            </div>
-                                            <p className="text-muse-300 text-xs mt-1">{echo.description}</p>
-                                        </div>
-                                        <div className="flex gap-1 shrink-0">
-                                            <button
-                                                onClick={() => handleSimulatePropagation(echo.targetName, echo.description)}
-                                                title="蝴蝶效应预演"
-                                                className="text-muse-400 hover:text-muse-300 p-1"
-                                            >
-                                                <Zap size={14} />
-                                            </button>
-                                            <button onClick={() => handleAddEcho(echo)} className="text-emerald-500 hover:text-emerald-400 p-1">
-                                                <Check size={14} />
-                                            </button>
-                                            <button
-                                                onClick={() => setExtractedEchoes(prev => prev.filter(e => e.id !== echo.id))}
-                                                className="text-slate-500 hover:text-red-400 p-1"
-                                            >
-                                                <X size={14} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                    <EchoSummaryCard
+                        echoes={extractedEchoes}
+                        isExtracting={isExtracting}
+                        onExtract={handleExtractEchoes}
+                        onAccept={handleAddEcho}
+                        onReject={(echo) => setExtractedEchoes(prev => prev.filter(e => e.id !== echo.id))}
+                        onSimulate={handleSimulatePropagation}
+                    />
                 )}
 
                 {(isGenerating || isPolishing) && (

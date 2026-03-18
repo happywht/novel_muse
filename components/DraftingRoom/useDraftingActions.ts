@@ -315,7 +315,10 @@ export const useDraftingActions = ({
                     description: c.suggestedUpdate,
                     reason: c.reason,
                     status: 'PENDING' as const,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    // MVP: 准确性提升字段
+                    confidence: c.confidence,
+                    extractionEvidence: c.extractionEvidence
                 }));
                 updateProject({ echoes: [...(project.echoes || []), ...(newEchoes as Echo[])] });
             }
@@ -338,7 +341,10 @@ export const useDraftingActions = ({
                 description: c.suggestedUpdate,
                 reason: c.reason,
                 status: 'PENDING' as const,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                // MVP: 准确性提升字段
+                confidence: c.confidence,
+                extractionEvidence: c.extractionEvidence
             })) as Echo[]);
         } finally {
             setIsExtracting(false);

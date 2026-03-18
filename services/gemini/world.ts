@@ -163,7 +163,7 @@ export const expandWorldLore = async (title: string, currentContent: string, gen
   ${currentContent}
   
   任务要求：
-  请基于以上核心概览，进行深度的“设定考古”与“逻辑扩充”。要求脑洞大开但逻辑自洽，增加关于起源、内在矛盾、或其对世界产生的微妙影响等细节。
+  请基于以上核心概览，进行深度的"设定考古"与"逻辑扩充"。要求脑洞大开但逻辑自洽，增加关于起源、内在矛盾、或其对世界产生的微妙影响等细节。
   
   请直接输出扩充后的设定内容（Markdown 格式）。`;
 
@@ -183,11 +183,17 @@ export const expandWorldLore = async (title: string, currentContent: string, gen
 
 /**
  * Extract state change recommendations from scene content
+ * MVP重构: 添加置信度评分、上下文增强、ID匹配优化
  */
 export const analyzeStateChanges = async (
     sceneContent: string,
     activeCharacters: Character[],
-    allWorldSettings: WorldSetting[]
+    allWorldSettings: WorldSetting[],
+    // MVP: 可选上下文参数
+    context?: {
+        recentChapterSummary?: string;      // 最近章节摘要
+        unresolvedForeshadowing?: string[]; // 未解决伏笔
+    }
 ): Promise<StateChangeRecommendation[]> => {
     if (!sceneContent || (activeCharacters.length === 0 && allWorldSettings.length === 0)) return [];
 
@@ -200,28 +206,61 @@ export const analyzeStateChanges = async (
                 targetName: { type: Type.STRING, description: "Name/Title of the entity" },
                 targetType: { type: Type.STRING, description: "CHARACTER or WORLD" },
                 suggestedUpdate: { type: Type.STRING, description: "Specifically what changed (e.g., 'Lost an arm', 'Village destroyed'). Keep it concise." },
-                reason: { type: Type.STRING, description: "Quote from the text justifying this change." }
+                reason: { type: Type.STRING, description: "Quote from the text justifying this change." },
+                // MVP: 新增置信度字段
+                confidence: { type: Type.NUMBER, description: "0-1之间的置信度评分。0.9+表示非常确定，0.7-0.9表示较确定，0.5-0.7表示一般确定，低于0.5建议不提取" },
+                extractionEvidence: { type: Type.STRING, description: "原文中支持此提取的具体句子（原文引用）" }
             },
-            required: ["targetName", "targetType", "suggestedUpdate", "reason"]
+            required: ["targetName", "targetType", "suggestedUpdate", "reason", "confidence"]
         }
     };
 
     const lookupTable = formatEntityLookupTable(activeCharacters, allWorldSettings);
     const instruction = getInstructionWithSettings('echo_analysis');
+
+    // MVP: 构建上下文增强部分
+    const contextSection = context?.recentChapterSummary
+        ? `\n【前文背景（最近章节摘要）】:\n${context.recentChapterSummary}\n`
+        : '';
+
+    const foreshadowingSection = context?.unresolvedForeshadowing?.length
+        ? `\n【待回收的伏笔线索】:\n${context.unresolvedForeshadowing.map(f => `- ${f}`).join('\n')}\n`
+        : '';
+
     const prompt = `
-    阅读以下小说片段，分析是否发生了对【人物状态】或【世界环境】有**永久性或重大影响**的事件。
-    只有当发生重大变更（如：受伤、死亡、获得重要道具、关系决裂、地点损毁、物品丢失）时才生成记录。
-    如果只是普通的对话或移动，请不要生成记录。
+    你是一位专业的小说设定分析师。请阅读以下小说片段，分析是否发生了对【人物状态】或【世界环境】有**永久性或重大影响**的事件。
+    ${contextSection}
+    ${foreshadowingSection}
+    【可在以下实体中匹配】:
+    ${lookupTable}
 
     【待分析文本】:
     ${sceneContent}
 
-    【可在以下实体中匹配】:
-    ${lookupTable}
+    【重大事件定义】（必须满足以下之一才提取）:
+    1. 角色状态永久改变：死亡、残疾、获得/失去重要能力
+    2. 获得具有剧情意义的物品：非普通道具，影响后续剧情的物品
+    3. 人际关系发生质的变化：从盟友变敌人、建立新关系、关系决裂
+    4. 世界规则被打破或改变：重要地点损毁、势力格局变化
+    5. 秘密被揭露：影响后续剧情的重要信息
 
-    【要求】:
-    1. 必须根据提供的 ID 映射表返回正确的 targetId（如果能匹配到）。
-    2. 如果实体不在表中但确有变动，请尝试猜测其 targetName 但 targetId 留空。
+    【非重大事件】（请不要提取）:
+    - 普通对话（即使包含情感交流）
+    - 地点移动（除非触发了上述重大事件）
+    - 临时性状态（轻微受伤但很快恢复）
+    - 获得普通物品（食物、金钱、日常用品）
+
+    【输出要求】:
+    1. targetId: 必须从上述实体映射表中精确匹配ID，如果无法匹配请留空
+    2. targetName: 实体名称，必须与映射表中的名称完全一致
+    3. confidence: 置信度评分
+       - 0.9-1.0: 非常确定，原文有明确描述
+       - 0.7-0.9: 较确定，可以合理推断
+       - 0.5-0.7: 一般确定，存在多种可能解释
+       - <0.5: 不确定，建议不提取
+    4. extractionEvidence: 原文中支持此提取的具体句子，必须引用原文
+
+    请输出 JSON 格式。如果没有重大事件，返回空数组 []。
     `;
 
     try {
@@ -239,17 +278,36 @@ export const analyzeStateChanges = async (
         const result: StateChangeRecommendation[] = [];
 
         for (const item of raw) {
-            let id = item.targetId || ''; // Favor AI returned ID
+            // MVP: 置信度过滤 - 低于0.5的跳过
+            if (item.confidence !== undefined && item.confidence < 0.5) {
+                console.log(`[Echo] 跳过低置信度提取: ${item.targetName} (${item.confidence})`);
+                continue;
+            }
 
-            // Fallback: If AI didn't provide ID or it's invalid, try fuzzy match
+            let id = item.targetId || '';
+
+            // MVP: 改进的ID匹配逻辑 - 精确匹配优先
             if (!id) {
                 if (item.targetType === 'CHARACTER') {
-                    const char = activeCharacters.find(c => c.name.includes(item.targetName) || item.targetName.includes(c.name));
+                    // 优先精确匹配
+                    let char = activeCharacters.find(c => c.name === item.targetName);
+                    // 其次尝试包含匹配（但需要更严格）
+                    if (!char) {
+                        char = activeCharacters.find(c =>
+                            (c.name.includes(item.targetName) && item.targetName.length >= 2) ||
+                            (item.targetName.includes(c.name) && c.name.length >= 2)
+                        );
+                    }
                     if (char) id = char.id;
                 } else if (item.targetType === 'WORLD') {
+                    // 优先精确匹配
                     let setting = allWorldSettings.find(w => w.title === item.targetName);
+                    // 其次尝试包含匹配
                     if (!setting) {
-                        setting = allWorldSettings.find(w => w.title.includes(item.targetName) || item.targetName.includes(w.title));
+                        setting = allWorldSettings.find(w =>
+                            (w.title.includes(item.targetName) && item.targetName.length >= 2) ||
+                            (item.targetName.includes(w.title) && w.title.length >= 2)
+                        );
                     }
                     if (setting) id = setting.id;
                 }
@@ -261,7 +319,9 @@ export const analyzeStateChanges = async (
                     targetType: item.targetType,
                     targetName: item.targetName,
                     suggestedUpdate: item.suggestedUpdate,
-                    reason: item.reason
+                    reason: item.reason,
+                    confidence: item.confidence,
+                    extractionEvidence: item.extractionEvidence
                 });
             }
         }
@@ -274,16 +334,26 @@ export const analyzeStateChanges = async (
 
 /**
  * Automatic Echo capture from generated text
+ * MVP: 增加置信度评分和改进的ID匹配
  */
 export const extractEchoesFromText = async (
     text: string,
     characters: Character[],
-    worldSettings: WorldSetting[]
+    worldSettings: WorldSetting[],
+    // MVP: 新增参数 - 历史上下文
+    recentEchoes: Echo[] = []
 ): Promise<Echo[]> => {
     if (!text || text.length < 100) return [];
 
-    const contextStr = formatContext(characters, worldSettings, []);
+    const contextStr = formatContext(characters, worldSettings, recentEchoes);
     const lookupTable = formatEntityLookupTable(characters, worldSettings);
+
+    // MVP: 构建历史状态摘要，帮助AI判断"变化"
+    const recentChangesSummary = recentEchoes
+        .filter(e => e.status === 'ACCEPTED')
+        .slice(-5)
+        .map(e => `- ${e.targetName}: ${e.description}`)
+        .join('\n');
 
     const responseSchema = {
         type: Type.ARRAY,
@@ -293,8 +363,11 @@ export const extractEchoesFromText = async (
                 targetId: { type: Type.STRING, description: "The ID of the character or world setting from the lookup table" },
                 targetName: { type: Type.STRING, description: "Name of the character or world setting affected" },
                 targetType: { type: Type.STRING, description: "CHARACTER or WORLD" },
-                description: { type: Type.STRING, description: "What happened? (Concise, e.g., 'Lost left arm', 'Obtained the Magic Sword')" },
+                description: { type: Type.STRING, description: "What happened? (Concise, e.g., Lost left arm, Obtained the Magic Sword)" },
                 reason: { type: Type.STRING, description: "Why is this significant?" },
+                // MVP: new confidence field
+                confidence: { type: Type.NUMBER, description: "0-1: How confident are you about this extraction? 0.9+ = very certain, 0.7-0.9 = likely, <0.7 = uncertain" },
+                extractionEvidence: { type: Type.STRING, description: "The exact sentence from the text that supports this extraction" },
                 triples: {
                     type: Type.ARRAY,
                     description: "Structural changes (triples) for Knowledge Graph integration",
@@ -302,17 +375,18 @@ export const extractEchoesFromText = async (
                         type: Type.OBJECT,
                         properties: {
                             subject: { type: Type.STRING, description: "Short entity name" },
-                            relation: { type: Type.STRING, description: "Short relation keyword (e.g., '位于', '持有', '仇恨', '爱')" },
+                            relation: { type: Type.STRING, description: "Short relation keyword" },
                             object: { type: Type.STRING, description: "Short target entity name" }
                         },
                         required: ["subject", "relation", "object"]
                     }
                 }
             },
-            required: ["targetName", "targetType", "description", "reason"]
+            required: ["targetName", "targetType", "description", "reason", "confidence"]
         }
     };
 
+    // MVP: 改进的Prompt，增加量化标准和上下文
     const prompt = `
     你是一个文学评论家和设定分析师。
     请阅读以下小说正文片段，分析其中是否发生了**具有持久影响**的关键事件（Fate Echoes）。
@@ -323,11 +397,31 @@ export const extractEchoesFromText = async (
     【小说正文片段】:
     ${text.substring(0, 15000)} ... (截取部分)
 
+    ${recentChangesSummary ? `【最近已确认的状态变化】:\n${recentChangesSummary}\n` : ''}
+
+    【重大事件定义】(必须满足以下之一):
+    1. 角色状态永久改变(死亡、残疾、获得/失去能力)
+    2. 获得具有剧情意义的物品(非普通道具)
+    3. 人际关系发生质的改变(从盟友变敌人，或建立新关系)
+    4. 世界规则被打破或改变
+    5. 秘密被揭露(影响后续剧情)
+
+    【非重大事件】(不要提取):
+    1. 普通对话(即使包含情感)
+    2. 地点移动(除非触发上述重大事件)
+    3. 临时性状态(受伤但很快恢复)
+    4. 获得普通物品(食物、金钱)
+
     【提取规则】:
-    1. **只提取重大变更**: 忽略琐碎的对话或动作。只关注状态改变（受伤、获得物品、关系破裂、死亡）、重大秘密揭露、或世界规则的变动。
-    2. **精准关联**: 尽量将事件关联到上述映射表中的实体，并返回正确的 targetId。
-    3. **客观描述**: 描述必须是客观的事实陈述。
-    4. **结构化三元组 (Triples)**: 对于每一个重大变更，尝试将其进一步拆解为“主体-关系-客体”的结构化三元组。例如：“林青在京城遭遇伏击” -> \`[{"subject": "林青", "relation": "位于", "object": "京城"}]\`。
+    1. **精准关联**: 尽量将事件关联到上述映射表中的实体，并返回正确的 targetId。
+    2. **客观描述**: 描述必须是客观的事实陈述。
+    3. **置信度评分**:
+       - 0.9-1.0: 原文有明确描述，非常确定
+       - 0.7-0.9: 可以合理推断，较确定
+       - 0.5-0.7: 存在多种可能，一般确定
+       - <0.5: 不确定，建议不提取
+    4. **提供证据**: 返回原文中支持此提取的具体句子。
+    5. **结构化三元组**: 对于每一个重大变更，尝试将其拆解为"主体-关系-客体"。
 
     请输出 JSON 格式的事件及三元组列表。如果没有重大事件，返回空数组。
     `;
@@ -347,16 +441,36 @@ export const extractEchoesFromText = async (
         const result: Echo[] = [];
 
         for (const item of raw) {
-            let id = item.targetId || ''; // Favor AI returned ID
+            // MVP: 置信度过滤 - 低于0.5的跳过
+            if (item.confidence !== undefined && item.confidence < 0.5) {
+                console.log(`[Echo] 跳过低置信度提取: ${item.targetName} (${item.confidence})`);
+                continue;
+            }
 
+            let id = item.targetId || '';
+
+            // MVP: 改进的ID匹配逻辑 - 精确匹配优先
             if (!id) {
                 if (item.targetType === 'CHARACTER') {
-                    const char = characters.find(c => c.name.includes(item.targetName) || item.targetName.includes(c.name));
+                    // 优先精确匹配
+                    let char = characters.find(c => c.name === item.targetName);
+                    // 其次尝试包含匹配（但需要更严格）
+                    if (!char) {
+                        char = characters.find(c =>
+                            (c.name.includes(item.targetName) && item.targetName.length >= 2) ||
+                            (item.targetName.includes(c.name) && c.name.length >= 2)
+                        );
+                    }
                     if (char) id = char.id;
                 } else if (item.targetType === 'WORLD') {
+                    // 优先精确匹配
                     let setting = worldSettings.find(w => w.title === item.targetName);
+                    // 其次尝试包含匹配
                     if (!setting) {
-                        setting = worldSettings.find(w => w.title.includes(item.targetName) || item.targetName.includes(w.title));
+                        setting = worldSettings.find(w =>
+                            (w.title.includes(item.targetName) && item.targetName.length >= 2) ||
+                            (item.targetName.includes(w.title) && w.title.length >= 2)
+                        );
                     }
                     if (setting) id = setting.id;
                 }
@@ -370,9 +484,12 @@ export const extractEchoesFromText = async (
                     type: item.targetType,
                     description: item.description,
                     reason: item.reason,
-                    status: 'PENDING',
+                    status: item.confidence && item.confidence >= 0.85 ? 'AUTO_ACCEPTED' : 'PENDING',
                     timestamp: Date.now(),
-                    triples: item.triples
+                    triples: item.triples,
+                    // MVP: 新增字段
+                    confidence: item.confidence,
+                    extractionEvidence: item.extractionEvidence
                 });
             }
         }
@@ -397,7 +514,7 @@ export const consolidateMemory = async (
     const echoText = echoesToConsolidate.map(e => `- ${e.description} (${new Date(e.timestamp).toLocaleDateString()})`).join('\n');
 
     const prompt = `
-    你是一个负责维护小说世界观的“档案管理员”。
+    你是一个负责维护小说世界观的"档案管理员"。
     你的任务是将【最近发生的事件】（短期记忆）永久性地整合进【实体档案描述】（长期记忆）中。
 
     【实体名称】: ${targetName} (${targetType === 'CHARACTER' ? '角色' : '世界设定'})
@@ -410,7 +527,7 @@ export const consolidateMemory = async (
 
     【整合规则】:
     1. **更新状态**: 如果新记忆改变了实体的状态（如受伤、失去物品、获得能力），请在描述中体现。
-    2. **丰富背景**: 将发生的事件作为“过去的历史”写入描述。
+    2. **丰富背景**: 将发生的事件作为"过去的历史"写入描述。
     3. **保持连贯**: 不要简单地追加文本，而是重写描述，使其通顺、自然。
     4. **精简**: 去除不再重要的细节，保留核心特质和关键变化。
 

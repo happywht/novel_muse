@@ -134,10 +134,13 @@ export interface Echo {
   targetName: string;
   description: string;
   reason: string;
-  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'PREDICTION' | 'ARCHIVED';
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'PREDICTION' | 'ARCHIVED' | 'AUTO_ACCEPTED';
   timestamp: number;
   triples?: KnowledgeTriple[]; // NEW: Structural changes associated with this echo
   branchId?: string; // NEW Task 2.2
+  // MVP: 准确性提升字段
+  confidence?: number;           // 0-1: AI置信度，用于自动处理判断
+  extractionEvidence?: string;   // 原文中支持此提取的具体句子
 }
 
 export interface StateChangeRecommendation {
@@ -146,6 +149,9 @@ export interface StateChangeRecommendation {
   targetName: string;
   suggestedUpdate: string;
   reason: string;
+  // MVP: 准确性提升字段
+  confidence?: number;           // 0-1: AI置信度
+  extractionEvidence?: string;   // 原文依据
 }
 
 export interface TimelineEvent {

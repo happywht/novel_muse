@@ -152,16 +152,19 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
         if (nodes.length === 0) return;
 
         const simulate = () => {
-            const alpha = 0.3;
-            const repulsion = 5000;
-            const attraction = 0.005;
-            const damping = 0.85;
-            const centerGravity = 0.01;
+            const alpha = 0.1; // 降低力的强度，减少晃动
+            const repulsion = 3000; // 降低排斥力
+            const attraction = 0.002; // 降低吸引力
+            const damping = 0.95; // 增加阻尼，更快稳定
+            const centerGravity = 0.005; // 降低向心力
+            const minVelocity = 0.01; // 最小速度阈值
 
             const width = containerRef.current?.clientWidth || 800;
             const height = containerRef.current?.clientHeight || 600;
             const cx = width / 2;
             const cy = height / 2;
+
+            let hasSignificantMovement = false;
 
             // Apply forces
             for (let i = 0; i < displayNodes.length; i++) {
@@ -212,16 +215,26 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
                 }
             }
 
-            // Update positions
+            // Update positions and check for movement
             for (const node of displayNodes) {
                 if (dragNode.current && dragNode.current.id === node.id) continue;
                 node.vx *= damping;
                 node.vy *= damping;
+                
+                // 如果速度大于阈值，则认为有显著移动
+                if (Math.abs(node.vx) > minVelocity || Math.abs(node.vy) > minVelocity) {
+                    hasSignificantMovement = true;
+                }
+                
                 node.x += node.vx;
                 node.y += node.vy;
             }
 
-            setNodes([...nodes]); // Keep raw nodes state for persistence but simulate only visible
+            // 只有存在显著移动时才更新状态，减少不必要的重渲染
+            if (hasSignificantMovement) {
+                setNodes([...nodes]);
+            }
+            
             animRef.current = requestAnimationFrame(simulate);
         };
 
@@ -732,7 +745,7 @@ const NodeEditSidebar: React.FC<NodeEditSidebarProps> = ({ node, projectId, onCl
                 {isEditing ? (
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1">标识 (Name)</label>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">标识 (Name/Title)</label>
                             <input
                                 type="text"
                                 value={title}
@@ -741,7 +754,7 @@ const NodeEditSidebar: React.FC<NodeEditSidebarProps> = ({ node, projectId, onCl
                             />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1">详情 (Description/Content)</label>
+                            <label className="block text-xs font-bold text-slate-500 mb-1">详情 (Description/Content/Summary)</label>
                             <textarea
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
@@ -756,21 +769,22 @@ const NodeEditSidebar: React.FC<NodeEditSidebarProps> = ({ node, projectId, onCl
                             <h2 className="text-2xl font-serif font-bold text-white mb-2 leading-tight">{title}</h2>
                             {node.properties?.role && <div className="text-xs font-medium text-muse-400 mb-4 bg-muse-400/10 inline-block px-2 py-1 rounded border border-muse-400/20">{node.properties.role}</div>}
                             {node.properties?.category && <div className="text-xs font-medium text-muse-400 mb-4 bg-muse-400/10 inline-block px-2 py-1 rounded border border-muse-400/20">{node.properties.category}</div>}
+                            {node.properties?.type && <div className="text-xs font-medium text-muse-400 mb-4 bg-muse-400/10 inline-block px-2 py-1 rounded border border-muse-400/20">{node.properties.type}</div>}
+                            {node.properties?.status && <div className="text-xs font-medium text-muse-400 mb-4 bg-muse-400/10 inline-block px-2 py-1 rounded border border-muse-400/20">{node.properties.status}</div>}
+                            {node.properties?.order !== undefined && <div className="text-xs font-medium text-muse-400 mb-4 bg-muse-400/10 inline-block px-2 py-1 rounded border border-muse-400/20">排序: {node.properties.order}</div>}
                         </div>
 
                         <div>
                             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 border-b border-slate-800 pb-1">详细描述</h4>
                             <p className="text-sm font-serif leading-relaxed text-slate-400 whitespace-pre-wrap">{description || "暂无描述"}</p>
                         </div>
-
-                        {/* Additional read-only properties could go here */}
                     </div>
                 )}
             </div>
 
             {/* Footer / Actions */}
             <div className="p-4 border-t border-slate-800 bg-slate-800/30 flex justify-end gap-2">
-                {(node.type === 'Character' || node.type === 'WorldSetting') && (
+                {node.type !== 'Echo' && ( // Echo节点不可编辑
                     isEditing ? (
                         <>
                             <button onClick={() => setIsEditing(false)} disabled={isSaving} className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white transition-colors">取消</button>
@@ -781,7 +795,7 @@ const NodeEditSidebar: React.FC<NodeEditSidebarProps> = ({ node, projectId, onCl
                         </>
                     ) : (
                         <button onClick={() => setIsEditing(true)} className="px-4 py-2 text-xs font-bold bg-slate-700 hover:bg-slate-600 text-white rounded transition-colors w-full">
-                            ✏️ 编辑档案
+                            ✏️ 编辑节点
                         </button>
                     )
                 )}

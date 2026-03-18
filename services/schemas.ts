@@ -116,6 +116,9 @@ export const AiStateChangeSchema = z.object({
     targetType: z.enum(['CHARACTER', 'WORLD']).default('CHARACTER'),
     suggestedUpdate: z.string().default(''),
     reason: z.string().default(''),
+    // MVP: 准确性提升字段
+    confidence: z.number().min(0).max(1).default(0.5),
+    extractionEvidence: z.string().optional(),
 });
 
 export const AiStateChangeArraySchema = z.array(AiStateChangeSchema);
@@ -132,6 +135,9 @@ export const AiEchoSchema = z.object({
         relation: z.string(),
         object: z.string()
     })).optional(),
+    // MVP: 准确性提升字段
+    confidence: z.number().min(0).max(1).default(0.5),
+    extractionEvidence: z.string().optional(),
 });
 
 export const AiEchoArraySchema = z.array(AiEchoSchema);
