@@ -12,7 +12,8 @@ export const STORAGE_KEYS = {
     GEMINI_API_KEY: 'muse_gemini_api_key',
     GLM_API_KEY: 'muse_glm_api_key', // Future proofing
     MODEL_OVERRIDE: 'muse_model_override',
-    SETTINGS: 'muse_settings'
+    SETTINGS: 'muse_settings',
+    GLOBAL_CONFIG: 'muse_global_config', // 新增：全局配置
 };
 
 /**

@@ -5,6 +5,7 @@ import { Loader } from './Loader';
 import { Globe, Plus, Trash2, Map, Shield, Users, Scroll, BookPlus, AlertCircle, CheckCircle, Settings2, Eye, Cpu, BookOpen, GitCommit, Check, Edit2, Save, X, Search, Info, RefreshCw } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { VirtualList } from './VirtualList';
+import { useDebouncedValue } from '../hooks/useDebouncedConfig';
 
 interface WorldBuilderProps {
     project: ProjectState;
@@ -38,6 +39,7 @@ export const WorldBuilder: React.FC<WorldBuilderProps> = ({ project, updateProje
 
     // Search State
     const [searchQuery, setSearchQuery] = useState('');
+    const debouncedSearchQuery = useDebouncedValue(searchQuery, 'search');
 
     // Edit Mode State
     const [isEditing, setIsEditing] = useState(false);
@@ -219,7 +221,7 @@ export const WorldBuilder: React.FC<WorldBuilderProps> = ({ project, updateProje
     // Filter settings based on category AND search query
     const filteredSettings = project.worldSettings.filter(w =>
         w.category === selectedCategory &&
-        w.title.toLowerCase().includes(searchQuery.toLowerCase())
+        w.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
     );
 
     const handleManualAdd = () => {

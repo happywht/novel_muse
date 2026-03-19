@@ -5,6 +5,7 @@ import { Loader } from './Loader';
 import { User, Plus, Trash2, Camera, Sparkles, HeartHandshake, MessageCircle, X, Send, GitCommit, Check, Edit2, Save, Search, Palette, RotateCcw, AlertCircle, CheckCircle } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { VirtualList } from './VirtualList';
+import { useDebouncedValue } from '../hooks/useDebouncedConfig';
 
 interface CharacterCreatorProps {
     project: ProjectState;
@@ -20,6 +21,7 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
     const [isEditing, setIsEditing] = useState(false);
     const [editDescription, setEditDescription] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const debouncedSearchQuery = useDebouncedValue(searchQuery, 'search');
     const [imageStyle, setImageStyle] = useState('Anime'); // Default style
 
     // Chat State
@@ -282,14 +284,14 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
 
                 <div className="flex-1 overflow-y-auto p-2 space-y-2">
                     {/* 空状态 */}
-                    {project.characters.filter(c => c.name.includes(searchQuery) || c.role.includes(searchQuery)).length === 0 && (
+                    {project.characters.filter(c => c.name.includes(debouncedSearchQuery) || c.role.includes(debouncedSearchQuery)).length === 0 && (
                         <p className="text-slate-500 text-xs p-4 text-center">暂无匹配角色</p>
                     )}
-                    
+
                     {/* 虚拟滚动优化 */}
-                    {project.characters.filter(c => c.name.includes(searchQuery) || c.role.includes(searchQuery)).length > 0 && (
+                    {project.characters.filter(c => c.name.includes(debouncedSearchQuery) || c.role.includes(debouncedSearchQuery)).length > 0 && (
                         <VirtualList
-                            items={project.characters.filter(c => c.name.includes(searchQuery) || c.role.includes(searchQuery))}
+                            items={project.characters.filter(c => c.name.includes(debouncedSearchQuery) || c.role.includes(debouncedSearchQuery))}
                             itemHeight={80}
                             height={window.innerHeight - 400}
                             className="space-y-2"

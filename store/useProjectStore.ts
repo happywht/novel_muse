@@ -9,9 +9,33 @@
  */
 
 import { create } from 'zustand';
-import { AppSection, ProjectState, WorldGenConfig } from '../types';
+import { AppSection, ProjectState, WorldGenConfig, DeepPartial } from '../types';
 import { isBackendAvailable, fetchProjectList, fetchProject, syncProject, patchProject, deleteProjectApi, fetchChapter, fetchChaptersContent } from '../services/apiService';
 import { storageService, STORAGE_KEYS } from '../services/storageService';
+import { DEFAULT_CONFIG, getGlobalConfig } from '../config/global';
+
+// ============================================================
+// Utility Functions
+// ============================================================
+
+/**
+ * 深度合并两个对象
+ */
+function deepMerge<T>(target: T, source: DeepPartial<T>): T {
+    const result = { ...target };
+    
+    for (const key in source) {
+        if (source[key] !== undefined) {
+            if (typeof source[key] === 'object' && source[key] !== null && !Array.isArray(source[key])) {
+                result[key] = deepMerge(result[key], source[key] as any);
+            } else {
+                result[key] = source[key] as any;
+            }
+        }
+    }
+    
+    return result;
+}
 
 // ============================================================
 // Default State
@@ -85,6 +109,11 @@ interface ProjectStore {
     lastError: string | null;
     setLastError: (error: string | null) => void;
 
+    // --- Global Config State ---
+    globalConfig: typeof DEFAULT_CONFIG;
+    loadGlobalConfig: () => Promise<void>;
+    updateGlobalConfig: (updates: DeepPartial<typeof DEFAULT_CONFIG>) => Promise<void>;
+
     // --- Actions ---
     initialize: () => Promise<void>;
     createProject: () => Promise<void>;
@@ -113,6 +142,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     // --- Project State ---
     project: INITIAL_PROJECT,
     savedProjects: [],
+
+    // --- Global Config State ---
+    globalConfig: DEFAULT_CONFIG,
 
     // --- Error State ---
     lastError: null,
@@ -166,7 +198,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     // --- Actions ---
     initialize: async () => {
         set({ isLoading: true });
-        const backendOk = await isBackendAvailable();
+        
+        // 检查全局配置是否启用了后端同步
+        const config = await getGlobalConfig();
+        const backendSyncEnabled = config.storage.backendSync.enabled;
+        
+        // 只有在全局配置启用且后端可用时才使用后端
+        const backendOk = backendSyncEnabled && await isBackendAvailable();
         set({ useBackend: backendOk });
 
         // Try to migrate from localStorage if needed
@@ -330,12 +368,16 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         set({ savedProjects: newList });
     },
 
-    syncToBackend: () => {
+    syncToBackend: async () => {
         const { useBackend, project } = get();
         if (!useBackend) return;
 
         if (_saveTimer) clearTimeout(_saveTimer);
         set({ isSaving: true });
+
+        // 使用全局配置的同步间隔
+        const config = await getGlobalConfig();
+        const syncInterval = config.storage.autoSaveInterval;
 
         _saveTimer = setTimeout(async () => {
             try {
@@ -360,7 +402,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
                     lastError: '数据同步失败：已保存到本地，将在下次连接时重试'
                 });
             }
-        }, 2000);
+        }, syncInterval);
     },
 
     loadFromPersistentStorage: async () => {
@@ -456,5 +498,21 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         const { syncToBackend, saveToPersistentStorage } = get();
         await saveToPersistentStorage();
         syncToBackend();
+    },
+
+    // 更新全局配置
+    updateGlobalConfig: async (updates: DeepPartial<typeof DEFAULT_CONFIG>) => {
+        const currentConfig = get().globalConfig;
+        const newConfig = deepMerge(currentConfig, updates);
+        
+        // 更新store状态
+        set({ globalConfig: newConfig });
+        
+        // 清除core.ts中的配置缓存
+        const { clearConfigCache } = await import('../services/gemini/core');
+        clearConfigCache();
+        
+        // 保存到storage
+        await storageService.setItem(STORAGE_KEYS.GLOBAL_CONFIG, newConfig);
     }
 }));

@@ -1,10 +1,12 @@
 import React from 'react';
+import DOMPurify from 'dompurify';
 
-// 简单的HTML净化函数（避免引入额外依赖）
+// 使用DOMPurify进行安全的HTML净化
 const sanitizeHtml = (html: string): string => {
-  const temp = document.createElement('div');
-  temp.textContent = html;
-  return temp.innerHTML;
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'strong', 'em', 'span', 'div', 'br'],
+    ALLOWED_ATTR: ['class', 'style'],
+  });
 };
 
 // A simple component to render text with basic formatting without heavy dependencies

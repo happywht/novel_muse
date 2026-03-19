@@ -5,13 +5,55 @@ import { useProjectStore } from "../../store/useProjectStore";
 import { fetchOpenAICompatible } from "../openAiAdapter";
 import { getProviderForTask, LLMTaskType, Provider } from "../llmRouter";
 import { storageService, STORAGE_KEYS } from "../storageService";
+import { DEFAULT_CONFIG } from "../../config/global";
 
-const STORAGE_KEY_API = STORAGE_KEYS.GEMINI_API_KEY;
-const STORAGE_KEY_MODEL = STORAGE_KEYS.MODEL_OVERRIDE;
+const STORAGE_KEY_GLOBAL_CONFIG = STORAGE_KEYS.GLOBAL_CONFIG;
+
+// 获取全局配置（带缓存）
+let cachedConfig: typeof DEFAULT_CONFIG | null = null;
+let configLoadPromise: Promise<typeof DEFAULT_CONFIG> | null = null;
+
+export const getGlobalConfig = async (): Promise<typeof DEFAULT_CONFIG> => {
+    // 如果已经有缓存，直接返回
+    if (cachedConfig) {
+        return cachedConfig;
+    }
+    
+    // 如果正在加载，返回同一个promise
+    if (configLoadPromise) {
+        return configLoadPromise;
+    }
+    
+    // 开始加载配置
+    configLoadPromise = (async () => {
+        try {
+            const savedConfig = await storageService.getItem<typeof DEFAULT_CONFIG>(STORAGE_KEY_GLOBAL_CONFIG);
+            if (savedConfig) {
+                // 合并保存的配置和默认配置
+                cachedConfig = { ...DEFAULT_CONFIG, ...savedConfig };
+            } else {
+                cachedConfig = DEFAULT_CONFIG;
+            }
+        } catch (error) {
+            console.error('加载全局配置失败:', error);
+            cachedConfig = DEFAULT_CONFIG;
+        }
+        configLoadPromise = null;
+        return cachedConfig!;
+    })();
+    
+    return configLoadPromise;
+};
+
+// 清除配置缓存（在配置更新后调用）
+export const clearConfigCache = (): void => {
+    cachedConfig = null;
+};
 
 export const getAIClient = async () => {
-    const savedKey = await storageService.getItem<string>(STORAGE_KEY_API);
-    const apiKey = savedKey || process.env.API_KEY || process.env.GEMINI_API_KEY;
+    const config = await getGlobalConfig();
+    const apiKey = config.ai.providers.gemini.apiKey || process.env.API_KEY || process.env.GEMINI_API_KEY;
+    
     if (!apiKey) {
         throw new Error("请先在全局设置面板中配置您的 Gemini API Key。");
     }
@@ -19,11 +61,28 @@ export const getAIClient = async () => {
 };
 
 export const getModelName = async (tier: 'flash' | 'pro' = 'flash'): Promise<string> => {
-    const customModel = await storageService.getItem<string>(STORAGE_KEY_MODEL);
-    if (customModel) return customModel;
-    return tier === 'pro'
-        ? (process.env.GEMINI_PRO_MODEL || 'gemini-3-pro-preview')
-        : (process.env.GEMINI_FLASH_MODEL || 'gemini-3-flash-preview');
+    const config = await getGlobalConfig();
+    
+    // 使用配置中的模型名称
+    if (tier === 'pro') {
+        return config.ai.providers.gemini.proModel || process.env.GEMINI_PRO_MODEL || 'gemini-3-pro-preview';
+    } else {
+        return config.ai.providers.gemini.flashModel || process.env.GEMINI_FLASH_MODEL || 'gemini-3-flash-preview';
+    }
+};
+
+// 根据任务类型获取模型名称（支持任务级别覆盖）
+export const getModelNameForTask = async (task: LLMTaskType): Promise<string> => {
+    const config = await getGlobalConfig();
+    
+    // 检查是否有任务级别的模型覆盖
+    const taskOverride = config.ai.taskModelOverrides[task];
+    if (taskOverride) {
+        return taskOverride;
+    }
+    
+    // 回退到默认逻辑
+    return getModelName('flash');
 };
 
 /**

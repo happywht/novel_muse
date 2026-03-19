@@ -9,8 +9,8 @@ import { DraftingRoom } from './components/DraftingRoom';
 import { EchoChamber } from './components/EchoChamber';
 import { UserGuide } from './components/UserGuide';
 import { Sidebar } from './components/Sidebar';
-import { FolderOpen, Plus, Trash2, Save, X, Check, Download, Upload, Database, HardDrive, RefreshCw, BookOpen } from 'lucide-react';
-import { SettingsPanel } from './components/SettingsPanel';
+import { FolderOpen, Plus, Trash2, Save, X, Check, Download, Upload, Database, HardDrive, RefreshCw, BookOpen, AlertCircle } from 'lucide-react';
+import { SettingsPanel } from './components/SettingsPanel/index';
 import { KnowledgeGraph } from './components/KnowledgeGraph';
 import { PromptTuner } from './components/PromptTuner';
 import { CreativeCompassView } from './components/CreativeCompassView';
@@ -18,6 +18,7 @@ import { ProjectLobby } from './components/ProjectLobby';
 import { useProjectStore, INITIAL_PROJECT } from './store/useProjectStore';
 import { storageService, STORAGE_KEYS } from './services/storageService';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { useFeature } from './hooks/useFeature';
 
 const MUSE_FILE_VERSION = '1.0';
 
@@ -44,6 +45,10 @@ const App: React.FC = () => {
   const deleteProject = useProjectStore(state => state.deleteProject);
   const forceSync = useProjectStore(state => state.forceSync);
   const lastError = useProjectStore(state => state.lastError);
+
+  // Feature flags from global config
+  const enableEchoSystem = useFeature('enableEchoSystem');
+  const enableKnowledgeGraph = useFeature('enableKnowledgeGraph');
 
   const importFileRef = React.useRef<HTMLInputElement>(null);
 
@@ -242,12 +247,28 @@ const App: React.FC = () => {
             <DraftingRoom project={project} updateProject={updateProject} />
           )}
           {activeSection === AppSection.ECHOES && (
-            <EchoChamber project={project} updateProject={updateProject} />
+            enableEchoSystem ? (
+              <EchoChamber project={project} updateProject={updateProject} />
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center min-h-0 bg-[#0b1222] animate-fade-in p-6">
+                <AlertCircle size={48} className="text-slate-600 mb-4" />
+                <h3 className="text-lg font-bold text-slate-400 mb-2">Echo系统已禁用</h3>
+                <p className="text-sm text-slate-500">请在「设置 → 高级 → 功能开关」中启用Echo系统</p>
+              </div>
+            )
           )}
           {activeSection === AppSection.GRAPH && (
-            <div className="flex-1 flex flex-col min-h-0 bg-[#0b1222] animate-fade-in relative z-10 p-6">
-              <KnowledgeGraph projectId={project.id} useBackend={useBackend} projectData={project} updateProject={updateProject} />
-            </div>
+            enableKnowledgeGraph ? (
+              <div className="flex-1 flex flex-col min-h-0 bg-[#0b1222] animate-fade-in relative z-10 p-6">
+                <KnowledgeGraph projectId={project.id} useBackend={useBackend} projectData={project} updateProject={updateProject} />
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center min-h-0 bg-[#0b1222] animate-fade-in p-6">
+                <AlertCircle size={48} className="text-slate-600 mb-4" />
+                <h3 className="text-lg font-bold text-slate-400 mb-2">知识图谱已禁用</h3>
+                <p className="text-sm text-slate-500">请在「设置 → 高级 → 功能开关」中启用知识图谱</p>
+              </div>
+            )
           )}
           {activeSection === AppSection.CREATIVE_COMPASS && (
             <CreativeCompassView project={project} updateProject={updateProject} />
