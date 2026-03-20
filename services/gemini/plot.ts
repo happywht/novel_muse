@@ -11,11 +11,28 @@ import {
     getAIClient, executeModelTask, getInstructionWithSettings, getModelName
 } from "./core";
 import { formatContext, filterRelevantSettings, formatEntityLookupTable } from "./helpers";
+import { buildPromptContent } from "../../config/prompts";
 
 export interface PlotRhythmPoint {
     beat: string;
     tension: number;
     description: string;
+}
+
+/**
+ * Graph context structure for plot generation
+ */
+export interface GraphContext {
+    characterRelationships: Array<{
+        subject: string;
+        relation: string;
+        object: string;
+        weight?: number;
+    }>;
+    plotLineage?: {
+        predecessors: any[];
+        successors: any[];
+    };
 }
 
 /**
@@ -28,7 +45,8 @@ export const generatePlotFromContext = async (
     worldSettings: WorldSetting[],
     settings?: CreativeSettings,
     template?: string,
-    echoes: Echo[] = []
+    echoes: Echo[] = [],
+    graphContext?: GraphContext
 ): Promise<PlotNode[]> => {
     const queryContext = `${premise} ${template || ''} ${characters.map(c => c.name).join(' ')}`;
     const relevantSettings = filterRelevantSettings(worldSettings, queryContext, 15);
@@ -60,6 +78,18 @@ export const generatePlotFromContext = async (
         contextStr += "无特别约束设定。\n";
     }
 
+    // Build graph context section
+    let graphContextSection = '';
+    if (graphContext?.characterRelationships?.length) {
+        graphContextSection = `
+【角色关系图谱 (来自知识库)】:
+${graphContext.characterRelationships.map(r =>
+    `- ${r.subject} --[${r.relation}]--> ${r.object}${r.weight ? ` (强度: ${r.weight})` : ''}`
+).join('\n')}
+`;
+        console.log('[Plot Generation] Using graph context with', graphContext.characterRelationships.length, 'relationships');
+    }
+
     const lookupTable = formatEntityLookupTable(characters, relevantSettings);
     const instruction = getInstructionWithSettings('plot_weaving', settings);
 
@@ -83,16 +113,18 @@ export const generatePlotFromContext = async (
     const prompt = `
   小说类型: ${genre}
   核心梗概: ${premise}
-  
+
   ${contextStr}
+
+  ${graphContextSection}
 
   【实体表 (Entity Mapping Table)】:
   ${lookupTable}
-  
+
   ${taskRequirement}
-  
+
   请直接输出大纲内容。
-  
+
   **重要输出格式要求**：
   你必须返回一个符合以下 JSON 结构的数组：
   [

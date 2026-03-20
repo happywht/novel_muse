@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { ProjectState, PlotNode } from '../types';
 import { generatePlotFromContext, rewritePlot, analyzePlot, analyzePlotRhythm } from '../services/geminiService';
+import { fetchPlotNodeContext } from '../services/apiService';
+import type { GraphContext } from '../services/gemini/plot';
 
 interface UsePlotWeaverAIProps {
     project: ProjectState;
@@ -19,13 +21,28 @@ export const usePlotWeaverAI = ({ project, updateProject, updateProjectWithHisto
     const performGeneratePlot = async (templateContext?: string) => {
         setIsGeneratingPlot(true);
         try {
+            // Fetch graph context from knowledge graph
+            let graphContext: GraphContext | undefined;
+            try {
+                const contextData = await fetchPlotNodeContext(project.id);
+                graphContext = {
+                    characterRelationships: contextData.relationships || [],
+                    plotLineage: null
+                };
+                console.log('[Plot Generation] Fetched graph context:', graphContext.characterRelationships.length, 'relationships');
+            } catch (e) {
+                console.warn('[Plot Generation] Failed to fetch graph context, proceeding without it:', e);
+            }
+
             const result = await generatePlotFromContext(
                 project.premise,
                 project.genre,
                 project.characters,
                 project.worldSettings,
                 project.creativeSettings,
-                templateContext || ''
+                templateContext || '',
+                [],  // echoes
+                graphContext  // new parameter
             );
 
             const newNodes: PlotNode[] = result.map((node, idx) => ({

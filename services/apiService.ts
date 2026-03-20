@@ -276,3 +276,24 @@ export const simulatePropagation = async (projectId: string, triggerName: string
     if (!response.ok) return [];
     return await response.json();
 };
+
+/**
+ * Fetch plot node context from knowledge graph
+ * Returns related plot nodes, characters, world settings, and relationships
+ */
+export const fetchPlotNodeContext = async (
+    projectId: string,
+    plotNodeId?: string
+): Promise<{
+    plotNodes: any[];
+    characters: any[];
+    worldSettings: any[];
+    relationships: any[];
+}> => {
+    const url = plotNodeId
+        ? `${API_BASE}/graph/plot-context/${projectId}/${plotNodeId}`
+        : `${API_BASE}/graph/plot-context/${projectId}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to fetch plot context');
+    return response.json();
+};

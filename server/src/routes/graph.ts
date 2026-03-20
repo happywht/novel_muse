@@ -3,7 +3,8 @@ import {
     getProjectGraph, findPath, getNeighbors, syncProjectToGraph,
     createEdge, verifyLogicConflicts, getRelatedSubgraph,
     inferNarrativeInsights, getPhysicalStatus, getUnresolvedForeshadowing,
-    mergeBranch, getFactionGroups, simulateStatePropagation
+    mergeBranch, getFactionGroups, simulateStatePropagation,
+    getCharacterConflicts, getHighIntensityConflicts
 } from '../services/neo4jService';
 
 const router = Router();
@@ -189,6 +190,31 @@ router.post('/:projectId/propagate', async (req: Request, res: Response) => {
         res.json(risks);
     } catch (err: any) {
         console.error('Propagation simulation error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/graph/:projectId/conflicts/character/:characterId - Get conflicts for a character
+router.get('/:projectId/conflicts/character/:characterId', async (req: Request, res: Response) => {
+    try {
+        const conflicts = await getCharacterConflicts(
+            req.params.projectId as string,
+            req.params.characterId as string
+        );
+        res.json(conflicts);
+    } catch (err: any) {
+        console.error('Character conflicts fetch error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/graph/:projectId/conflicts/high-intensity - Get high intensity conflicts
+router.get('/:projectId/conflicts/high-intensity', async (req: Request, res: Response) => {
+    try {
+        const conflicts = await getHighIntensityConflicts(req.params.projectId as string);
+        res.json(conflicts);
+    } catch (err: any) {
+        console.error('High intensity conflicts fetch error:', err);
         res.status(500).json({ error: err.message });
     }
 });

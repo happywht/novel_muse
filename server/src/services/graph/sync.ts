@@ -302,6 +302,105 @@ const doSyncProject = async (projectData: any): Promise<void> => {
             }
         }
 
+        // 2.5. Create PlotNode nodes and relationships
+        if (projectData.plotNodes?.length > 0) {
+            try {
+                // 2.5.1. Create PlotNode nodes
+                for (const node of projectData.plotNodes) {
+                    await session.run(
+                        `MERGE (pn:PlotNode {id: $id, projectId: $projectId})
+                         SET pn.title = $title, pn.content = $content,
+                             pn.order = $order, pn.beatTag = $beatTag`,
+                        { id: node.id, projectId, title: node.title, content: node.content?.substring(0, 500), order: node.order, beatTag: node.beatTag }
+                    );
+
+                    // 2.5.2. Create PlotNode-Character relationships
+                    if (node.relatedCharacters?.length > 0) {
+                        for (const charId of node.relatedCharacters) {
+                            try {
+                                await session.run(
+                                    `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})
+                                     MATCH (c:Character {id: $charId, projectId: $projectId})
+                                     MERGE (pn)-[:INVOLVES]->(c)`,
+                                    { plotNodeId: node.id, projectId, charId }
+                                );
+                            } catch (charRelErr) {
+                                console.warn(`Failed to link PlotNode ${node.id} to Character ${charId}:`, charRelErr);
+                            }
+                        }
+                    }
+
+                    // 2.5.3. Create PlotNode-WorldSetting relationships
+                    if (node.relatedLocations?.length > 0) {
+                        for (const locId of node.relatedLocations) {
+                            try {
+                                await session.run(
+                                    `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})
+                                     MATCH (w:WorldSetting {id: $locId, projectId: $projectId})
+                                     MERGE (pn)-[:LOCATED_IN]->(w)`,
+                                    { plotNodeId: node.id, projectId, locId }
+                                );
+                            } catch (locRelErr) {
+                                console.warn(`Failed to link PlotNode ${node.id} to WorldSetting ${locId}:`, locRelErr);
+                            }
+                        }
+                    }
+                }
+
+                // 2.5.4. Create PRECEDES relationships between consecutive PlotNodes
+                const sortedNodes = [...projectData.plotNodes].sort((a, b) => a.order - b.order);
+                for (let i = 0; i < sortedNodes.length - 1; i++) {
+                    try {
+                        await session.run(
+                            `MATCH (a:PlotNode {id: $idA, projectId: $projectId})
+                             MATCH (b:PlotNode {id: $idB, projectId: $projectId})
+                             MERGE (a)-[:PRECEDES]->(b)`,
+                            { idA: sortedNodes[i].id, idB: sortedNodes[i + 1].id, projectId }
+                        );
+                    } catch (precErr) {
+                        console.warn(`Failed to create PRECEDES relationship for PlotNodes ${sortedNodes[i].id} -> ${sortedNodes[i + 1].id}:`, precErr);
+                    }
+                }
+
+                // 2.5.5. Create ConflictScenario relationships
+                for (const node of projectData.plotNodes) {
+                    if (node.conflictScenario && node.conflictScenario.participants?.length > 0) {
+                        const conflict = node.conflictScenario;
+
+                        // 为每个参与者创建冲突关系
+                        for (const participantId of conflict.participants) {
+                            try {
+                                await session.run(
+                                    `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})
+                                     MATCH (c:Character {id: $participantId, projectId: $projectId})
+                                     MERGE (pn)-[r:HAS_CONFLICT_PARTICIPANT]->(c)
+                                     SET r.conflictType = $conflictType,
+                                         r.stakes = $stakes,
+                                         r.intensity = $intensity`,
+                                    {
+                                        plotNodeId: node.id,
+                                        projectId,
+                                        participantId,
+                                        conflictType: conflict.type || 'CONFRONTATION',
+                                        stakes: conflict.stakes || '',
+                                        intensity: conflict.intensity || 5
+                                    }
+                                );
+                            } catch (conflictErr) {
+                                console.warn(`Failed to create conflict relationship for PlotNode ${node.id} -> Character ${participantId}:`, conflictErr);
+                            }
+                        }
+
+                        console.log(`  └─ Conflict scenario: ${conflict.participants.length} participants, intensity ${conflict.intensity}`);
+                    }
+                }
+
+                console.log(`✅ Synced ${sortedNodes.length} PlotNodes with relationships`);
+            } catch (plotNodeErr) {
+                console.warn("⚠️ PlotNode sync failed:", plotNodeErr);
+            }
+        }
+
         // 3. Create WorldSetting nodes
         if (projectData.worldSettings?.length > 0) {
             for (const ws of projectData.worldSettings) {

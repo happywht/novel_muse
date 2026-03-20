@@ -224,3 +224,193 @@ export const getPhysicalStatus = async (
         await session.close();
     }
 };
+
+/**
+ * 获取情节节点的完整上下文（用于 AI 生成）
+ * @param projectId 项目ID
+ * @param plotNodeId 情节节点ID（可选，不传则获取整个项目的情节图）
+ */
+export const getPlotNodeContext = async (
+    projectId: string,
+    plotNodeId?: string
+): Promise<{
+    plotNodes: any[];
+    characters: any[];
+    worldSettings: any[];
+    relationships: any[];
+}> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        // 如果指定了 plotNodeId，获取该节点及其关联信息
+        // 否则获取整个项目的情节图
+
+        // 1. 获取 PlotNodes
+        const plotNodesResult = plotNodeId
+            ? await session.run(
+                `MATCH (pn:PlotNode {projectId: $projectId, id: $plotNodeId}) RETURN pn`,
+                { projectId, plotNodeId }
+            )
+            : await session.run(
+                `MATCH (pn:PlotNode {projectId: $projectId}) RETURN pn ORDER BY pn.order`,
+                { projectId }
+            );
+
+        // 2. 获取关联的 Characters
+        const charsResult = await session.run(
+            `MATCH (pn:PlotNode {projectId: $projectId})-[:INVOLVES]->(c:Character)
+             RETURN DISTINCT c`,
+            { projectId }
+        );
+
+        // 3. 获取关联的 WorldSettings
+        const settingsResult = await session.run(
+            `MATCH (pn:PlotNode {projectId: $projectId})-[:LOCATED_AT]->(w:WorldSetting)
+             RETURN DISTINCT w`,
+            { projectId }
+        );
+
+        // 4. 获取角色之间的关系
+        const relsResult = await session.run(
+            `MATCH (c1:Character {projectId: $projectId})-[r]->(c2:Character {projectId: $projectId})
+             WHERE type(r) IN ['ENEMY_OF', 'ALLY_OF', 'LOVES', 'KIN_OF', 'MENTORS', 'RIVAL_OF', 'SERVES', 'FRIEND_OF']
+             RETURN c1.name as subject, type(r) as relation, c2.name as object, r.weight as weight`,
+            { projectId }
+        );
+
+        return {
+            plotNodes: plotNodesResult.records.map(r => r.get('pn').properties),
+            characters: charsResult.records.map(r => r.get('c').properties),
+            worldSettings: settingsResult.records.map(r => r.get('w').properties),
+            relationships: relsResult.records.map(r => ({
+                subject: r.get('subject'),
+                relation: r.get('relation'),
+                object: r.get('object'),
+                weight: r.get('weight')
+            }))
+        };
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * 获取情节的上下游链路
+ */
+export const getPlotLineage = async (
+    projectId: string,
+    plotNodeId: string
+): Promise<{
+    node: any;
+    predecessors: any[];
+    successors: any[];
+}> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        // 获取当前节点
+        const nodeResult = await session.run(
+            `MATCH (pn:PlotNode {projectId: $projectId, id: $plotNodeId}) RETURN pn`,
+            { projectId, plotNodeId }
+        );
+
+        // 获取前驱节点
+        const predResult = await session.run(
+            `MATCH (prev:PlotNode {projectId: $projectId})-[:PRECEDES]->(pn:PlotNode {id: $plotNodeId})
+             RETURN prev ORDER BY prev.order`,
+            { projectId, plotNodeId }
+        );
+
+        // 获取后继节点
+        const succResult = await session.run(
+            `MATCH (pn:PlotNode {id: $plotNodeId})-[:PRECEDES]->(next:PlotNode {projectId: $projectId})
+             RETURN next ORDER BY next.order`,
+            { projectId, plotNodeId }
+        );
+
+        return {
+            node: nodeResult.records[0]?.get('pn').properties || null,
+            predecessors: predResult.records.map(r => r.get('prev').properties),
+            successors: succResult.records.map(r => r.get('next').properties)
+        };
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * 获取角色参与的所有冲突场景
+ */
+export const getCharacterConflicts = async (
+    projectId: string,
+    characterId: string
+): Promise<Array<{
+    plotNode: any;
+    conflictType: string;
+    stakes: string;
+    intensity: number;
+    otherParticipants: any[];
+}>> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        const result = await session.run(
+            `MATCH (c:Character {id: $characterId, projectId: $projectId})<-[r:HAS_CONFLICT_PARTICIPANT]-(pn:PlotNode)
+             MATCH (other:Character)<-[:HAS_CONFLICT_PARTICIPANT]-(pn)
+             WHERE other.id <> $characterId
+             RETURN pn, r.conflictType as conflictType, r.stakes as stakes, r.intensity as intensity, collect(other) as otherParticipants
+             ORDER BY r.intensity DESC`,
+            { projectId, characterId }
+        );
+
+        return result.records.map(record => ({
+            plotNode: record.get('pn').properties,
+            conflictType: record.get('conflictType'),
+            stakes: record.get('stakes'),
+            intensity: record.get('intensity'),
+            otherParticipants: record.get('otherParticipants').map((n: any) => n.properties)
+        }));
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * 获取项目中所有高强度的冲突场景（intensity >= 7）
+ */
+export const getHighIntensityConflicts = async (
+    projectId: string
+): Promise<Array<{
+    plotNode: any;
+    conflictType: string;
+    stakes: string;
+    intensity: number;
+    participants: any[];
+}>> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        const result = await session.run(
+            `MATCH (pn:PlotNode {projectId: $projectId})-[r:HAS_CONFLICT_PARTICIPANT]->(c:Character)
+             WHERE r.intensity >= 7
+             WITH pn, r, collect(c) as participants
+             RETURN pn, r.conflictType as conflictType, r.stakes as stakes, r.intensity as intensity, participants
+             ORDER BY r.intensity DESC`,
+            { projectId }
+        );
+
+        return result.records.map(record => ({
+            plotNode: record.get('pn').properties,
+            conflictType: record.get('conflictType'),
+            stakes: record.get('stakes'),
+            intensity: record.get('intensity'),
+            participants: record.get('participants').map((n: any) => n.properties)
+        }));
+    } finally {
+        await session.close();
+    }
+};
