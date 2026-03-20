@@ -530,25 +530,25 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
                                     </div>
                                 )}
 
-                                {/* 特征与弱点 */}
+                                {/* 特征与弱点 - 完整显示，不截断 */}
                                 {(activeChar.signature || activeChar.contrast || activeChar.weakness) && (
-                                    <div className="grid grid-cols-3 gap-3">
+                                    <div className="space-y-3">
                                         {activeChar.signature && (
-                                            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3">
-                                                <h4 className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest mb-1">✨ 标志特征</h4>
-                                                <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">{activeChar.signature}</p>
+                                            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
+                                                <h4 className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest mb-2">✨ 标志特征</h4>
+                                                <p className="text-xs text-slate-400 leading-relaxed whitespace-pre-line">{activeChar.signature}</p>
                                             </div>
                                         )}
                                         {activeChar.contrast && (
-                                            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3">
-                                                <h4 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-1">🎭 反差萌点</h4>
-                                                <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">{activeChar.contrast}</p>
+                                            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
+                                                <h4 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-2">🎭 反差萌点</h4>
+                                                <p className="text-xs text-slate-400 leading-relaxed">{activeChar.contrast}</p>
                                             </div>
                                         )}
                                         {activeChar.weakness && (
-                                            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3">
-                                                <h4 className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-1">💔 致命弱点</h4>
-                                                <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">{activeChar.weakness}</p>
+                                            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
+                                                <h4 className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-2">💔 致命弱点</h4>
+                                                <p className="text-xs text-slate-400 leading-relaxed">{activeChar.weakness}</p>
                                             </div>
                                         )}
                                     </div>
