@@ -512,6 +512,13 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         const { clearConfigCache } = await import('../services/gemini/core');
         clearConfigCache();
         
+        // 如果缓存配置改变，清除缓存管理器中的缓存
+        if (updates.performance?.cache?.enabled === false || 
+            (updates.performance?.cache?.ttl && updates.performance.cache.ttl !== currentConfig.performance.cache.ttl)) {
+            const { cacheManager } = await import('../services/cacheManager');
+            cacheManager.clear();
+        }
+        
         // 保存到storage
         await storageService.setItem(STORAGE_KEYS.GLOBAL_CONFIG, newConfig);
     }

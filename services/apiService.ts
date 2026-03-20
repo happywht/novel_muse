@@ -2,6 +2,7 @@ import {
     ProjectState, Character, WorldSetting, Draft, Chapter, Echo,
     KnowledgeTriple, Faction, PropagationRisk, PhysicalStatus
 } from '../types';
+import { cacheManager, generateCacheKey } from './cacheManager';
 
 export const API_BASE = 'http://localhost:3001/api';
 
@@ -27,9 +28,22 @@ export const isBackendAvailable = async (): Promise<boolean> => {
 
 /** Fetch project list from the backend */
 export const fetchProjectList = async (): Promise<ProjectSummary[]> => {
+    const cacheKey = generateCacheKey('projectList');
+    
+    const cached = await cacheManager.get<ProjectSummary[]>(cacheKey);
+    if (cached) {
+        return cached;
+    }
+    
     const res = await fetch(`${API_BASE}/projects`);
     if (!res.ok) throw new Error(`Failed to fetch projects: ${res.statusText}`);
-    return res.json();
+    const data = res.json();
+    
+    // Cache the result
+    const result = await data;
+    await cacheManager.set(cacheKey, result);
+    
+    return result;
 };
 
 /** Fetch a full project by ID */
@@ -110,13 +124,26 @@ export interface GraphData {
 
 /** Fetch the knowledge graph for a project with optional filtering */
 export const fetchGraph = async (projectId: string, types?: string[]): Promise<GraphData> => {
+    const cacheKey = generateCacheKey('graph', projectId, types);
+    
+    const cached = await cacheManager.get<GraphData>(cacheKey);
+    if (cached) {
+        return cached;
+    }
+    
     const url = types && types.length > 0
         ? `${API_BASE}/graph/${projectId}?types=${encodeURIComponent(types.join(','))}`
         : `${API_BASE}/graph/${projectId}`;
 
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Failed to fetch graph: ${res.statusText}`);
-    return res.json();
+    const data = res.json();
+    
+    // Cache the result
+    const result = await data;
+    await cacheManager.set(cacheKey, result);
+    
+    return result;
 };
 
 /** Fetch neighbors of a specific node */
@@ -138,31 +165,75 @@ export const createEdgeApi = async (projectId: string, sourceId: string, targetI
 
 /** Fetch relevant subgraph for scene generation context */
 export const fetchRelatedSubgraph = async (projectId: string, anchors: string[], branchId: string = 'main'): Promise<string> => {
+    const cacheKey = generateCacheKey('subgraph', projectId, anchors.join(','), branchId);
+    
+    const cached = await cacheManager.get<string>(cacheKey);
+    if (cached) {
+        return cached;
+    }
+    
     const response = await fetch(`${API_BASE}/graph/${projectId}/subgraph?anchors=${encodeURIComponent(anchors.join(','))}&branchId=${branchId}`);
     if (!response.ok) throw new Error('Failed to fetch subgraph');
     const data = await response.json();
+    
+    await cacheManager.set(cacheKey, data.subgraph);
+    
     return data.subgraph;
 };
 
+/** Fetch narrative insights */
 export const fetchNarrativeInsights = async (projectId: string, branchId: string = 'main'): Promise<any[]> => {
+    const cacheKey = generateCacheKey('narrativeInsights', projectId, branchId);
+    
+    const cached = await cacheManager.get<any[]>(cacheKey);
+    if (cached) {
+        return cached;
+    }
+    
     const response = await fetch(`${API_BASE}/graph/${projectId}/insights?branchId=${branchId}`);
     if (!response.ok) throw new Error('Failed to fetch narrative insights');
-    return await response.json();
+    
+    const data = await response.json();
+    await cacheManager.set(cacheKey, data);
+    
+    return data;
 };
 
 export const fetchPhysicalStatus = async (projectId: string, characterNames: string[], branchId: string = 'main'): Promise<PhysicalStatus[]> => {
+    const cacheKey = generateCacheKey('physicalStatus', projectId, characterNames.join(','), branchId);
+    
+    const cached = await cacheManager.get<PhysicalStatus[]>(cacheKey);
+    if (cached) {
+        return cached;
+    }
+    
     const response = await fetch(`${API_BASE}/graph/${projectId}/physical-status?names=${encodeURIComponent(characterNames.join(','))}&branchId=${branchId}`);
     if (!response.ok) throw new Error('Failed to fetch physical status');
-    return response.json();
+    
+    const data = await response.json();
+    await cacheManager.set(cacheKey, data);
+    
+    return data;
 };
 
 /**
  * Task 2.1 & 2.2: Fetch pending foreshadowing hooks
  */
 export const fetchUnresolvedForeshadowing = async (projectId: string, branchId: string = 'main'): Promise<KnowledgeTriple[]> => {
+    const cacheKey = generateCacheKey('foreshadowing', projectId, branchId);
+    
+    const cached = await cacheManager.get<KnowledgeTriple[]>(cacheKey);
+    if (cached) {
+        return cached;
+    }
+    
     const response = await fetch(`${API_BASE}/graph/${projectId}/foreshadowing?branchId=${branchId}`);
     if (!response.ok) throw new Error('Failed to fetch foreshadowing');
-    return response.json();
+    
+    const data = await response.json();
+    await cacheManager.set(cacheKey, data);
+    
+    return data;
 };
 
 /**
@@ -179,9 +250,20 @@ export const mergeBranchApi = async (projectId: string, branchId: string): Promi
 
 // Task 5.1: Fetch faction groups
 export const fetchFactions = async (projectId: string): Promise<Faction[]> => {
+    const cacheKey = generateCacheKey('factions', projectId);
+    
+    const cached = await cacheManager.get<Faction[]>(cacheKey);
+    if (cached) {
+        return cached;
+    }
+    
     const response = await fetch(`${API_BASE}/graph/${projectId}/factions`);
     if (!response.ok) return [];
-    return await response.json();
+    
+    const data = await response.json();
+    await cacheManager.set(cacheKey, data);
+    
+    return data;
 };
 
 // Task 5.2: Simulate state propagation (Butterfly Effect)

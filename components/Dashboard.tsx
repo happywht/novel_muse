@@ -3,7 +3,8 @@ import {
     Rocket, Sparkles, Wand2, BookOpen, AlertCircle, CheckCircle,
     X, Zap, Target, Download, Copy, Check, ArrowRight
 } from 'lucide-react';
-import { ProjectState } from '../types';
+import { ProjectState, WorldSetting } from '../types';
+import { generateText, batchGenerateCharacters, batchGenerateWorldSettingsByCategory, generatePlotFromContext } from '../services/geminiService';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { Loader } from './Loader';
 
@@ -12,6 +13,8 @@ interface DashboardProps {
     updateProject: (updates: Partial<ProjectState>) => void;
     onImportProject: () => void;
 }
+
+const WORLD_CATEGORIES: WorldSetting['category'][] = ['Geography', 'Magic/Tech', 'Society', 'History', 'Other'];
 
 export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject, onImportProject }) => {
     const [brainstormInput, setBrainstormInput] = useState('');
@@ -35,24 +38,71 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject, on
         if (!brainstormInput.trim()) return;
         setIsGenerating(true);
         try {
-            // Mock brainstorm logic
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            setSuggestion(`### 灵感建议\n\n根据你的输入"${brainstormInput}"，我建议增加一个具有逆向思维的角色，他能够看到事物的负面空间...`);
+        const prompt = `基于"${brainstormInput}"，为小说创作提供1个最精彩的创意灵感。
+
+        请按照以下格式输出：
+        【书名】（起一个吸引人的书名）
+        【核心梗概】（100字左右的故事核心）
+        【类型】（如：历史悬疑、科幻冒险、都市情感等）
+        【详细创意】（包含核心创意概念、对角色/剧情/世界观的影响、具体实现建议）
+
+        要求：
+        1. 必须严格包含【书名】、【核心梗概】、【类型】、【详细创意】四个部分
+        2. 每个标记后面直接跟内容，不要换行
+        3. 内容要具体、有创意、可执行`;
+            
+            const result = await generateText(prompt, 'generateText');
+            setSuggestion(result);
+        } catch (error) {
+            console.error('Brainstorm error:', error);
+            setSuggestion('### 错误\n\n生成灵感时出错，请重试。');
         } finally {
             setIsGenerating(false);
         }
     };
 
-    const handleSaveIdea = () => {
+        const handleSaveIdea = () => {
         if (!suggestion) return;
-        updateProject({
-            worldSettings: [...project.worldSettings, {
-                id: Date.now().toString(),
-                category: 'Other',
-                title: 'AI 灵感记录',
-                content: suggestion
-            }]
-        });
+        
+        // 解析AI生成的建议，提取关键信息
+        const updates: Partial<ProjectState> = {};
+        
+        // 提取书名 - 支持多种格式
+        const titleMatch = suggestion.match(/【书名】\s*[:：]?\s*([^\n]+)/i) || 
+                          suggestion.match(/书名[:：]\s*([^\n]+)/i);
+        if (titleMatch) {
+            updates.title = titleMatch[1].trim().replace(/^[:：]\s*/, '');
+        }
+        
+        // 提取核心梗概 - 支持多种格式
+        const premiseMatch = suggestion.match(/【核心梗概】\s*[:：]?\s*([\s\S]+?)(?=\n【|$)/i) || 
+                            suggestion.match(/核心梗概[:：]\s*([\s\S]+?)(?=\n【|$)/i);
+        if (premiseMatch) {
+            updates.premise = premiseMatch[1].trim().replace(/^[:：]\s*/, '');
+        }
+        
+        // 提取类型 - 支持多种格式
+        const genreMatch = suggestion.match(/【类型】\s*[:：]?\s*([^\n]+)/i) || 
+                          suggestion.match(/类型[:：]\s*([^\n]+)/i);
+        if (genreMatch) {
+            updates.genre = genreMatch[1].trim().replace(/^[:：]\s*/, '');
+        }
+        
+        // 同时将完整建议保存到worldSettings供参考
+        updates.worldSettings = [...project.worldSettings, {
+            id: Date.now().toString(),
+            category: 'Other',
+            title: `AI灵感记录: ${brainstormInput.substring(0, 30)}...`,
+            content: suggestion
+        }];
+        
+        // 应用所有更新
+        updateProject(updates);
+        
+        // 显示结果
+        const resultMsg = `更新完成！\n\n书名: ${updates.title || '未提取到'}\n核心梗概: ${updates.premise ? updates.premise.substring(0, 50) + '...' : '未提取到'}\n类型: ${updates.genre || '未提取到'}`;
+        alert(resultMsg);
+        
         setSuggestion('');
         setBrainstormInput('');
     };
@@ -69,17 +119,48 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject, on
         setKickstartStatus('正在推演核心角色...');
 
         try {
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // 1. 生成核心角色
+            const characters = await batchGenerateCharacters(project.premise, project.genre, project.creativeSettings);
+            updateProject({ characters: [...project.characters, ...characters] });
+            
             setKickstartStep(2);
             setKickstartStatus('正在构建世界观设定...');
 
-            await new Promise(resolve => setTimeout(resolve, 2500));
+            // 2. 生成世界观设定
+            const worldPromises = WORLD_CATEGORIES.map(async (category) => {
+                const settings = await batchGenerateWorldSettingsByCategory(
+                    project.premise,
+                    project.genre,
+                    category,
+                    3,
+                    project.creativeSettings
+                );
+                return settings;
+            });
+            
+            const worldResults = await Promise.all(worldPromises);
+            const allWorldSettings = worldResults.flat();
+            updateProject({ worldSettings: [...project.worldSettings, ...allWorldSettings] });
+            
             setKickstartStep(3);
             setKickstartStatus('正在生成剧情大纲...');
 
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // 3. 生成剧情大纲
+            const plotNodes = await generatePlotFromContext(
+                project.premise,
+                project.genre,
+                project.characters,
+                project.worldSettings,
+                project.creativeSettings
+            );
+            updateProject({ plotNodes: [...project.plotNodes, ...plotNodes] });
+            
             setKickstartStatus('创世纪完成！');
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            await new Promise(resolve => setTimeout(resolve, 1500));
+        } catch (error) {
+            console.error('Kickstart error:', error);
+            setKickstartStatus('创世纪失败，请重试。');
+            await new Promise(resolve => setTimeout(resolve, 2000));
         } finally {
             setIsKickstarting(false);
             setKickstartStep(0);

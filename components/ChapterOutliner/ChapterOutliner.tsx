@@ -24,6 +24,7 @@ import { splitPlotNodeIntoChapters, regenerateChapterOutline, auditChapterPlan }
 import { Loader2, RefreshCw, AlertCircle, CheckCircle2, Info } from 'lucide-react'; // For loading state
 import { recalculateChapterOrders } from '../../utils/chapterUtils';
 import { ChapterBalanceAnalyzer } from '../ChapterBalanceAnalyzer';
+import { useFeature } from '../../hooks/useFeature';
 
 
 interface ChapterOutlinerProps {
@@ -33,6 +34,10 @@ interface ChapterOutlinerProps {
 
 export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updateProject }) => {
     const { setActiveSection, setActiveChapterId } = useProjectStore();
+    
+    // 功能开关检查
+    const enableChapterBalance = useFeature('enableChapterBalance');
+    
     const [selectedPlotNodeId, setSelectedPlotNodeId] = useState<string | null>(
         project.plotNodes.length > 0 ? project.plotNodes[0].id : null
     );
@@ -401,11 +406,15 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                                 
                                 <button
                                     onClick={() => setShowBalanceAnalyzer(!showBalanceAnalyzer)}
-                                    disabled={project.chapters.length === 0}
-                                    className={`bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all border border-slate-700 ${project.chapters.length === 0 ? 'opacity-50 cursor-not-allowed' : ''} ${showBalanceAnalyzer ? 'bg-muse-600 text-white border-muse-500' : ''}`}
+                                    disabled={project.chapters.length === 0 || !enableChapterBalance}
+                                    title={!enableChapterBalance ? '章节平衡分析已禁用，请在设置中启用' : ''}
+                                    className={`bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all border border-slate-700 ${project.chapters.length === 0 || !enableChapterBalance ? 'opacity-50 cursor-not-allowed' : ''} ${showBalanceAnalyzer ? 'bg-muse-600 text-white border-muse-500' : ''}`}
                                 >
                                     <BarChart3 size={16} className="text-purple-400" />
                                     平衡分析
+                                    {!enableChapterBalance && (
+                                        <span className="text-[10px] text-slate-500">(已禁用)</span>
+                                    )}
                                 </button>
                                 </div>
                             </div>
@@ -621,7 +630,7 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                         </div>
                         
                         {/* Chapter Balance Analyzer */}
-                        {showBalanceAnalyzer && (
+                        {showBalanceAnalyzer && enableChapterBalance && (
                             <div className="mt-6">
                                 <ChapterBalanceAnalyzer
                                     chapters={project.chapters}

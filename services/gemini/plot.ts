@@ -154,43 +154,36 @@ export const rewritePlot = async (
     const lookupTable = formatEntityLookupTable(characters, worldSettings);
     const instruction = getInstructionWithSettings('plot_weaving', settings);
 
-    const prompt = `
-    你是一个天才的剧情架构师。
-    你的任务是根据【修改指令】对现有的【剧情大纲】进行局部或全局的优化。
-    
-    小说类型: ${genre}
-    
-    ${contextStr}
+    // 使用buildPromptContent构建prompt，支持项目级自定义
+    const basePrompt = buildPromptContent('plot_rewrite', undefined, settings);
+    const prompt = `${basePrompt}
 
-    【实体表 (Entity Mapping Table)】:
-    ${lookupTable}
-    
-    【当前剧情大纲】:
-    ${currentPlot}
-    
-    【修改指令/诊断反馈】:
-    ${directive}
-    
-    任务要求：
-    1. **精准落实指令**：针对指令（或诊断反馈）指出需要修复的地方进行精准修改。
-    2. **最小变动原则**：禁止进行无关的重写。凡是指令未涉及的部分，应尽可能保持原有的文字、结构 and 逻辑不变。
-    3. **元数据对齐**：务必保留或根据新情节更新 beatTag, relatedCharacters, relatedLocations 等元数据字段。
-    4. **保持连贯性**：修改后的剧情必须与角色设定和世界观保持高度的一致性。
-    
-    **重要输出格式要求**：
-    你必须返回一个符合以下 JSON 结构的数组：
-    [
-      {
-        "title": "情节标题",
-        "content": "该情节点的详细描述...",
-        "beatTag": "...",
-        "relatedCharacters": ["ID1"],
-        "relatedLocations": ["ID2"]
-      },
-      ...
-    ]
-    禁止包含任何开场白或解释文字。
-    `;
+小说类型: ${genre}
+${contextStr}
+【实体表 (Entity Mapping Table)】: ${lookupTable}
+【当前剧情大纲】: ${currentPlot}
+【修改指令/诊断反馈】: ${directive}
+
+任务要求：
+1. **精准落实指令**：针对指令（或诊断反馈）指出需要修复的地方进行精准修改。
+2. **最小变动原则**：禁止进行无关的重写，保持原有文字、结构和逻辑不变。
+3. **元数据对齐**：保留或根据新情节更新 beatTag, relatedCharacters, relatedLocations 等元数据字段。
+4. **保持连贯性**：修改后的剧情必须与角色设定和世界观保持高度的一致性。
+
+**重要输出格式要求**：
+你必须返回一个符合以下 JSON 结构的数组：
+[
+  {
+    "title": "情节标题",
+    "content": "该情节点的详细描述...",
+    "beatTag": "...",
+    "relatedCharacters": ["ID1"],
+    "relatedLocations": ["ID2"]
+  },
+  ...
+]
+禁止包含任何开场白或解释文字。
+`;
 
     try {
         const responseText = await executeModelTask(

@@ -7,6 +7,7 @@ import {
 } from "./core";
 import { formatContext } from "./helpers";
 import { API_BASE } from "../apiService";
+import { buildPromptContent } from "../../config/prompts";
 
 /**
  * Deep plot auditing for logic and pacing
@@ -15,23 +16,18 @@ export const analyzePlot = async (premise: string, currentPlot: string, characte
     const instruction = getInstructionWithSettings('plot_analysis', settings);
     const contextStr = formatContext(characters, worldSettings, echoes);
 
-    const prompt = `
-    你是一个极其严苛的小说编辑和逻辑审计师。
-    请基于以下【核心梗概】和【设定背景】，对当前的【剧情大纲】进行深度审计。
-    
-    【核心梗概】: ${premise}
-    
-    ${contextStr}
-    
-    【当前剧情大纲】:
-    ${currentPlot}
-    
-    任务要求：
-    1. **逻辑漏洞检测**：找出剧情中的逻辑硬伤、角色动机不合理、或违反既定世界观法则的地方。
-    2. **节奏与情感审计**：分析剧情的张力起伏（Pacing），指出哪里节奏太拖沓或转折太突兀。
-    3. **给出【可操作的优化方案】**：针对每一个发现的问题，请提供具体的修改建议（例如：“在节点 2 中加入关于主角弱点的细节，为节点 5 的失败做铺垫”）。
-    
-    请使用 Markdown 格式输出。请确保报告包含一个明确的“可操作建议列表”，以便后续自动修复程序调用。`;
+    // 使用buildPromptContent构建prompt，支持项目级自定义
+    const basePrompt = buildPromptContent('audit_plot', undefined, settings);
+    const prompt = `${basePrompt}
+
+【核心梗概】: ${premise}
+
+${contextStr}
+
+【当前剧情大纲】:
+${currentPlot}
+
+请使用 Markdown 格式输出。请确保报告包含一个明确的“可操作建议列表”，以便后续自动修复程序调用。`;
 
     try {
         return await executeModelTask(

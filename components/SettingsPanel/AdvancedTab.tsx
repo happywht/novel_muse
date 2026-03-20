@@ -57,6 +57,10 @@ export const AdvancedTab: React.FC<AdvancedTabProps> = ({ showToast }) => {
                 },
             });
 
+            // 清除日志缓存，让新配置立即生效
+            const { clearLoggerCache } = await import('../../utils/logger');
+            clearLoggerCache();
+
             showToast('高级配置已保存！', 'success');
             setEditing(false);
         } catch (error) {

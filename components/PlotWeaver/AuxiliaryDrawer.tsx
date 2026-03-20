@@ -7,6 +7,7 @@ import { PlotRhythmChart } from '../PlotWeaver/PlotRhythmChart';
 import { PlotStructureAssistant } from '../PlotWeaver/PlotStructureAssistant';
 import { Loader } from '../Loader';
 import { ConflictVisualization } from '../ConflictVisualization';
+import { useFeature } from '../../hooks/useFeature';
 
 interface AuxiliaryDrawerProps {
     showRightSidebar: boolean;
@@ -41,6 +42,9 @@ export const AuxiliaryDrawer: React.FC<AuxiliaryDrawerProps> = ({
     isIterating,
     handleAnalyze
 }) => {
+    // 功能开关检查
+    const enableConflictVisualization = useFeature('enableConflictVisualization');
+    
     const [showConflictVisualization, setShowConflictVisualization] = useState(false);
     return (
         <div className={`fixed top-0 right-0 h-full w-[450px] bg-slate-900 border-l border-slate-800 shadow-2xl z-40 transform transition-transform duration-500 ease-in-out flex flex-col ${showRightSidebar ? 'translate-x-0' : 'translate-x-full'}`}>
@@ -157,17 +161,22 @@ export const AuxiliaryDrawer: React.FC<AuxiliaryDrawerProps> = ({
                                 </div>
                                 <button
                                     onClick={() => setShowConflictVisualization(!showConflictVisualization)}
+                                    disabled={!enableConflictVisualization}
+                                    title={!enableConflictVisualization ? '冲突可视化已禁用，请在设置中启用' : ''}
                                     className={`px-3 py-1.5 text-xs rounded-lg transition-colors ${
-                                        showConflictVisualization
-                                            ? 'bg-muse-600 text-white'
-                                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                                        !enableConflictVisualization
+                                            ? 'opacity-50 cursor-not-allowed bg-slate-800 text-slate-500'
+                                            : showConflictVisualization
+                                                ? 'bg-muse-600 text-white'
+                                                : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                                     }`}
                                 >
                                     {showConflictVisualization ? '隐藏分析' : '显示分析'}
+                                    {!enableConflictVisualization && ' (已禁用)'}
                                 </button>
                             </div>
 
-                            {showConflictVisualization && (
+                            {showConflictVisualization && enableConflictVisualization && (
                                 <div className="bg-slate-900/50 rounded-xl border border-slate-800 p-4">
                                     <ConflictVisualization
                                         plotNodes={project.plotNodes}

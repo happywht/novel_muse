@@ -386,45 +386,19 @@ export const extractEchoesFromText = async (
         }
     };
 
-    // MVP: 改进的Prompt，增加量化标准和上下文
-    const prompt = `
-    你是一个文学评论家和设定分析师。
-    请阅读以下小说正文片段，分析其中是否发生了**具有持久影响**的关键事件（Fate Echoes）。
+    // 使用buildPromptContent构建prompt，支持项目级自定义
+    const basePrompt = buildPromptContent('world_echo_extraction', undefined, settings);
+    const prompt = `${basePrompt}
 
-    【可在以下实体中寻找关联】:
-    ${lookupTable}
+【可在以下实体中寻找关联】:
+${lookupTable}
 
-    【小说正文片段】:
-    ${text.substring(0, 15000)} ... (截取部分)
+【小说正文片段】:
+${text.substring(0, 15000)} ... (截取部分)
 
-    ${recentChangesSummary ? `【最近已确认的状态变化】:\n${recentChangesSummary}\n` : ''}
+${recentChangesSummary ? `【最近已确认的状态变化】:\n${recentChangesSummary}\n` : ''}
 
-    【重大事件定义】(必须满足以下之一):
-    1. 角色状态永久改变(死亡、残疾、获得/失去能力)
-    2. 获得具有剧情意义的物品(非普通道具)
-    3. 人际关系发生质的改变(从盟友变敌人，或建立新关系)
-    4. 世界规则被打破或改变
-    5. 秘密被揭露(影响后续剧情)
-
-    【非重大事件】(不要提取):
-    1. 普通对话(即使包含情感)
-    2. 地点移动(除非触发上述重大事件)
-    3. 临时性状态(受伤但很快恢复)
-    4. 获得普通物品(食物、金钱)
-
-    【提取规则】:
-    1. **精准关联**: 尽量将事件关联到上述映射表中的实体，并返回正确的 targetId。
-    2. **客观描述**: 描述必须是客观的事实陈述。
-    3. **置信度评分**:
-       - 0.9-1.0: 原文有明确描述，非常确定
-       - 0.7-0.9: 可以合理推断，较确定
-       - 0.5-0.7: 存在多种可能，一般确定
-       - <0.5: 不确定，建议不提取
-    4. **提供证据**: 返回原文中支持此提取的具体句子。
-    5. **结构化三元组**: 对于每一个重大变更，尝试将其拆解为"主体-关系-客体"。
-
-    请输出 JSON 格式的事件及三元组列表。如果没有重大事件，返回空数组。
-    `;
+请输出 JSON 格式的事件及三元组列表。如果没有重大事件，返回空数组。`;
 
     try {
         const responseText = await executeModelTask(

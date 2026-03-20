@@ -6,6 +6,7 @@ import { fetchOpenAICompatible } from "../openAiAdapter";
 import { getProviderForTask, LLMTaskType, Provider } from "../llmRouter";
 import { storageService, STORAGE_KEYS } from "../storageService";
 import { DEFAULT_CONFIG } from "../../config/global";
+import { cacheManager, generateCacheKey } from "../cacheManager";
 
 const STORAGE_KEY_GLOBAL_CONFIG = STORAGE_KEYS.GLOBAL_CONFIG;
 
@@ -121,6 +122,10 @@ export const getInstructionWithSettings = (promptKey: string, settings?: Creativ
 
 /**
  * Unified execution wrapper for Multi-Agent routing
+ * 
+ * Now supports caching based on global config:
+ * - cache.enabled: Controls whether caching is active
+ * - cache.ttl: Controls cache expiration time in milliseconds
  */
 export const executeModelTask = async (
     task: LLMTaskType,
@@ -131,7 +136,29 @@ export const executeModelTask = async (
     responseSchema?: any,
     thinkingBudget?: number
 ): Promise<string> => {
+    // Generate cache key from task parameters
+    const cacheKey = generateCacheKey(
+        task,
+        systemInstruction,
+        prompt,
+        geminiModel,
+        temperature,
+        responseSchema ? JSON.stringify(responseSchema) : undefined,
+        thinkingBudget
+    );
+
+    // Try to get from cache first
+    const cachedResult = await cacheManager.get<string>(cacheKey);
+    if (cachedResult !== null) {
+        console.log(`[Cache HIT] Task: ${task}`);
+        return cachedResult;
+    }
+
+    console.log(`[Cache MISS] Task: ${task}`);
+
     const provider = getProviderForTask(task);
+
+    let result: string;
 
     if (provider === Provider.GLM) {
         const modelName = process.env.GLM_MODEL_NAME || 'glm-4-plus';
@@ -143,7 +170,7 @@ export const executeModelTask = async (
             finalPrompt += '\n\n请严格按要求输出 JSON 格式。';
         }
 
-        const responseText = await fetchOpenAICompatible(
+        result = await fetchOpenAICompatible(
             provider,
             endpoint,
             modelName,
@@ -154,28 +181,32 @@ export const executeModelTask = async (
             temperature,
             isJson ? 'json_object' : undefined
         );
-        return responseText;
+    } else {
+        // Default Gemini Execution
+        const ai = await getAIClient();
+        const config: any = {
+            systemInstruction,
+            temperature,
+        };
+
+        if (responseSchema) {
+            config.responseMimeType = "application/json";
+            config.responseSchema = responseSchema;
+        }
+        if (thinkingBudget) {
+            config.thinkingConfig = { thinkingBudget };
+        }
+
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+            model: geminiModel,
+            contents: prompt,
+            config
+        }));
+        result = (response as any).text || "";
     }
 
-    // Default Gemini Execution
-    const ai = await getAIClient();
-    const config: any = {
-        systemInstruction,
-        temperature,
-    };
-
-    if (responseSchema) {
-        config.responseMimeType = "application/json";
-        config.responseSchema = responseSchema;
-    }
-    if (thinkingBudget) {
-        config.thinkingConfig = { thinkingBudget };
-    }
-
-    const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-        model: geminiModel,
-        contents: prompt,
-        config
-    }));
-    return (response as any).text || ""; // Type casting for response
+    // Cache the result
+    await cacheManager.set(cacheKey, result);
+    
+    return result;
 };
