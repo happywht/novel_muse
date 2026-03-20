@@ -132,35 +132,91 @@ export function safeParseAiJson<T>(
                     mappedChar.role = mappedChar.archetype || '未知角色';
                 }
 
-                // 处理signature对象转字符串
+                // 处理signature对象转字符串 - 保留所有字段
                 if (mappedChar.signature && typeof mappedChar.signature === 'object') {
                     const sig = mappedChar.signature as Record<string, string>;
                     const parts: string[] = [];
-                    if (sig.appearance) parts.push(`【外貌】${sig.appearance}`);
-                    if (sig.behavior) parts.push(`【行为】${sig.behavior}`);
+
+                    // signature 字段中文映射
+                    const SIGNATURE_LABELS: Record<string, string> = {
+                        'appearance': '外貌',
+                        'behavior': '行为',
+                        'habit': '习惯',
+                        'speech': '说话方式',
+                        'style': '风格',
+                        'trait': '特质',
+                        'feature': '特征',
+                    };
+
+                    for (const [key, value] of Object.entries(sig)) {
+                        const label = SIGNATURE_LABELS[key] || key;
+                        parts.push(`【${label}】${value}`);
+                    }
                     mappedChar.signature = parts.join('\n');
                 }
 
-                // 处理relationships对象转字符串
+                // 处理relationships对象转字符串 - 保留所有字段
                 if (mappedChar.relationships && typeof mappedChar.relationships === 'object') {
                     const rel = mappedChar.relationships as Record<string, string>;
                     const parts: string[] = [];
+
+                    // 完整的关系类型中文映射
                     const RELATION_LABELS: Record<string, string> = {
+                        // 基本关系
                         'friend': '朋友',
                         'enemy': '敌人',
                         'rival': '对手',
-                        'love_interest': '情感对象',
-                        'obsession': '执念对象',
-                        'pawn': '棋子',
-                        'ward': '被监护人',
+                        'ally': '盟友',
                         'colleague': '同僚',
+                        'partner': '伙伴',
+                        'companion': '同伴',
+
+                        // 情感关系
+                        'love_interest': '情感对象',
+                        'lover': '恋人',
+                        'spouse': '配偶',
+                        'ex': '前任',
+                        'crush': '暗恋对象',
+                        'obsession': '执念对象',
+
+                        // 家庭关系
+                        'family': '家人',
+                        'parent': '父母',
+                        'child': '子女',
+                        'sibling': '兄弟姐妹',
                         'brother': '兄弟',
+                        'sister': '姐妹',
+                        'cousin': '表亲',
+                        'relative': '亲戚',
+
+                        // 权力关系
+                        'master': '主人',
+                        'servant': '仆人',
+                        'mentor': '导师',
+                        'student': '学生',
+                        'ward': '被监护人',
+                        'guardian': '监护人',
+                        'boss': '上司',
+                        'subordinate': '下属',
+
+                        // 对抗关系
+                        'nemesis': '宿敌',
+                        'archenemy': '死敌',
+                        'foil': '衬托者',
+
+                        // 特殊关系
+                        'pawn': '棋子',
                         'frenemy': '亦敌亦友',
                         'bodyguard': '保护对象',
                         'study_target': '研究对象',
+                        'victim': '受害者',
+                        'savior': '救星',
+                        'debtor': '债务人',
+                        'creditor': '债权人',
                     };
+
                     for (const [key, value] of Object.entries(rel)) {
-                        const label = RELATION_LABELS[key] || key;
+                        const label = RELATION_LABELS[key] || key; // 保留原始键名以防遗漏
                         parts.push(`${label}: ${value}`);
                     }
                     mappedChar.relationships = parts.join('；');
