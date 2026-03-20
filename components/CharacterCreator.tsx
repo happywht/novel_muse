@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { ProjectState, Character, Echo } from '../types';
+import { ProjectState, Character, Echo, RELATION_TYPE_LABELS } from '../types';
 import { generateText, generateCharacterImage, chatWithPersona } from '../services/geminiService';
 import { Loader } from './Loader';
-import { User, Plus, Trash2, Camera, Sparkles, HeartHandshake, MessageCircle, X, Send, GitCommit, Check, Edit2, Save, Search, Palette, RotateCcw, AlertCircle, CheckCircle } from 'lucide-react';
+import { User, Plus, Trash2, Camera, Sparkles, HeartHandshake, MessageCircle, X, Send, GitCommit, Check, Edit2, Save, Search, Palette, RotateCcw, AlertCircle, CheckCircle, Users } from 'lucide-react';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { VirtualList } from './VirtualList';
 import { useDebouncedValue } from '../hooks/useDebouncedConfig';
+// === 新增：关系工具函数 ===
+import { getRelationType, getTargetName, isStructuredFormat, parseLegacyRelationships } from '../utils/characterRelations';
 
 interface CharacterCreatorProps {
     project: ProjectState;
@@ -572,16 +574,100 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
                                         )}
                                     </div>
 
+                                    {/* === 人际关系展示区域 - 支持新旧格式 === */}
                                     <div className="bg-slate-800/40 rounded-2xl border border-slate-700/50 p-6 shadow-inner">
                                         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
                                             <HeartHandshake size={14} className="text-rose-500" /> 人际羁绊 (Relationships)
                                         </h3>
-                                        <textarea
-                                            value={activeChar.relationships || ''}
-                                            onChange={(e) => updateRelationship(e.target.value)}
-                                            placeholder="描述该角色与其他人的复杂关系、秘密契约或深仇大恨..."
-                                            className="w-full bg-slate-900/50 border border-slate-700 rounded-xl p-4 text-sm text-slate-300 focus:border-rose-500 outline-none resize-none h-24 transition-colors"
-                                        />
+
+                                        {/* === 新格式：结构化关系展示 === */}
+                                        {isStructuredFormat(activeChar.structuredRelations) && activeChar.structuredRelations ? (
+                                            <div className="space-y-3 mb-4">
+                                                <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+                                                    <Users size={12} />
+                                                    <span>关系网络 ({activeChar.structuredRelations.length} 条)</span>
+                                                </div>
+                                                <div className="grid gap-2">
+                                                    {activeChar.structuredRelations.map((rel, idx) => {
+                                                        const relationType = getRelationType(rel);
+                                                        const typeLabel = RELATION_TYPE_LABELS[relationType] || rel.description || '关联';
+                                                        const targetName = getTargetName(rel) || rel.targetCharacterId || '未知对象';
+
+                                                        // 根据关系类型选择颜色
+                                                        const colorMap: Record<string, { bg: string; border: string; text: string }> = {
+                                                            'ENEMY_OF': { bg: 'bg-red-950/30', border: 'border-red-500/30', text: 'text-red-400' },
+                                                            'ALLY_OF': { bg: 'bg-blue-950/30', border: 'border-blue-500/30', text: 'text-blue-400' },
+                                                            'LOVES': { bg: 'bg-pink-950/30', border: 'border-pink-500/30', text: 'text-pink-400' },
+                                                            'KIN_OF': { bg: 'bg-amber-950/30', border: 'border-amber-500/30', text: 'text-amber-400' },
+                                                            'MENTORS': { bg: 'bg-purple-950/30', border: 'border-purple-500/30', text: 'text-purple-400' },
+                                                            'RIVAL_OF': { bg: 'bg-orange-950/30', border: 'border-orange-500/30', text: 'text-orange-400' },
+                                                            'SERVES': { bg: 'bg-slate-700/30', border: 'border-slate-500/30', text: 'text-slate-400' },
+                                                            'FRIEND_OF': { bg: 'bg-emerald-950/30', border: 'border-emerald-500/30', text: 'text-emerald-400' },
+                                                            'RELATED_TO': { bg: 'bg-slate-700/30', border: 'border-slate-500/30', text: 'text-slate-400' },
+                                                        };
+                                                        const colors = colorMap[relationType] || colorMap['RELATED_TO'];
+
+                                                        return (
+                                                            <div
+                                                                key={rel.id || idx}
+                                                                className={`flex items-center gap-3 p-3 rounded-lg ${colors.bg} border ${colors.border} transition-all hover:scale-[1.01]`}
+                                                            >
+                                                                <div className="flex-1 flex items-center gap-2">
+                                                                    <span className={`text-xs font-bold ${colors.text} uppercase tracking-wider`}>
+                                                                        {typeLabel}
+                                                                    </span>
+                                                                    <span className="text-slate-400">→</span>
+                                                                    <span className="text-sm text-white font-medium">{targetName}</span>
+                                                                </div>
+                                                                {/* 关系强度指示器 */}
+                                                                {rel.weight !== undefined && (
+                                                                    <div className="flex items-center gap-1" title={`关系强度: ${rel.weight}`}>
+                                                                        <div className="w-12 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                                                                            <div
+                                                                                className={`h-full rounded-full ${rel.weight > 70 ? 'bg-rose-500' : rel.weight > 40 ? 'bg-amber-500' : 'bg-slate-500'}`}
+                                                                                style={{ width: `${rel.weight}%` }}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {/* 关系走向标签 */}
+                                                                {rel.trajectory && rel.trajectory !== 'stable' && (
+                                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${rel.trajectory === 'rising' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                                                        {rel.trajectory === 'rising' ? '升温中' : '降温中'}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ) : null}
+
+                                        {/* === 旧格式：字符串关系编辑（兼容旧数据） === */}
+                                        <div className="space-y-2">
+                                            {!isStructuredFormat(activeChar.structuredRelations) && (
+                                                <>
+                                                    <label className="text-[10px] text-slate-500 uppercase tracking-wider">自由文本描述</label>
+                                                    <textarea
+                                                        value={activeChar.relationships || ''}
+                                                        onChange={(e) => updateRelationship(e.target.value)}
+                                                        placeholder="描述该角色与其他人的复杂关系、秘密契约或深仇大恨..."
+                                                        className="w-full bg-slate-900/50 border border-slate-700 rounded-xl p-4 text-sm text-slate-300 focus:border-rose-500 outline-none resize-none h-24 transition-colors"
+                                                    />
+                                                </>
+                                            )}
+                                            {/* 如果有结构化关系，也显示只读的文本描述作为补充 */}
+                                            {isStructuredFormat(activeChar.structuredRelations) && activeChar.relationships && (
+                                                <details className="group">
+                                                    <summary className="cursor-pointer text-[10px] text-slate-500 hover:text-slate-400 uppercase tracking-wider">
+                                                        查看原始文本描述
+                                                    </summary>
+                                                    <div className="mt-2 p-3 bg-slate-900/30 rounded-lg text-xs text-slate-500 italic">
+                                                        {activeChar.relationships}
+                                                    </div>
+                                                </details>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>

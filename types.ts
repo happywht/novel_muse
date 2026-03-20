@@ -2,6 +2,64 @@
 
 export type BeatTag = 'INCITING_INCIDENT' | 'PLOT_POINT_1' | 'MIDPOINT' | 'PLOT_POINT_2' | 'CLIMAX' | 'RESOLUTION' | 'OTHER' | null;
 
+/**
+ * 角色关系类型枚举 - 与图谱关系类型对应
+ */
+export type CharacterRelationType =
+  | 'ENEMY_OF'      // 敌对
+  | 'ALLY_OF'       // 盟友
+  | 'LOVES'         // 爱慕
+  | 'KIN_OF'        // 亲属
+  | 'MENTORS'       // 师徒
+  | 'RIVAL_OF'      // 竞争对手
+  | 'SERVES'        // 效忠
+  | 'FRIEND_OF'     // 朋友
+  | 'RELATED_TO';   // 通用关系（兜底）
+
+/**
+ * 结构化角色关系 - 用于图谱存储和查询
+ * 支持两种格式：
+ * 1. AI返回的简化格式: { targetName, type?, description? }
+ * 2. 完整格式: { id, targetCharacterId, targetCharacterName, ... }
+ */
+export interface CharacterRelation {
+  id?: string;                   // 关系唯一ID（可选，AI生成时可能没有）
+  targetCharacterId?: string;    // 目标角色ID（可选，AI生成时可能只有名称）
+  targetCharacterName?: string;  // 目标角色名称（旧字段名，保持向后兼容）
+  targetName?: string;           // 目标角色名称（推荐使用，与AI返回字段一致）
+  type?: CharacterRelationType;  // 关系类型（可选，AI生成时可能不返回，默认值为 'RELATED_TO'）
+  description?: string;          // 关系描述（如 "青梅竹马"）
+  weight?: number;               // 关系强度 0-100
+  trajectory?: 'rising' | 'falling' | 'stable'; // 关系走向
+  isBidirectional?: boolean;     // 是否双向关系
+  createdAt?: number;            // 创建时间
+  updatedAt?: number;            // 更新时间
+}
+
+/**
+ * 关系类型中文显示名称映射
+ */
+export const RELATION_TYPE_LABELS: Record<CharacterRelationType, string> = {
+  ENEMY_OF: '敌对',
+  ALLY_OF: '盟友',
+  LOVES: '爱慕',
+  KIN_OF: '亲属',
+  MENTORS: '师徒',
+  RIVAL_OF: '竞争',
+  SERVES: '效忠',
+  FRIEND_OF: '朋友',
+  RELATED_TO: '关联',
+};
+
+/**
+ * 旧格式关系解析结果
+ * 解析 "朋友: 张三；敌人: 李四" 格式
+ */
+export interface ParsedLegacyRelation {
+  type: string;      // 原始类型名（如 "朋友"）
+  targetName: string; // 目标角色名
+}
+
 export type ConflictType = 'CONFRONTATION' | 'CLIMAX' | 'TWIST' | null;
 
 export interface PlotNode {
@@ -46,7 +104,8 @@ export interface Character {
   contrast?: string; // 反差萌点
   weakness?: string; // 弱点/缺陷
 
-  relationships?: string; // 人际关系
+  relationships?: string; // 人际关系（兼容旧数据，string 格式）
+  structuredRelations?: CharacterRelation[]; // 结构化关系数组（新格式，用于图谱）
   imageUrl?: string;
 
   // 系统字段
@@ -239,3 +298,10 @@ export interface LogicConflict {
   truthInGraph: string;
   extractedFact: string;
 }
+
+/**
+ * 深度部分类型 - 用于部分更新
+ */
+export type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};

@@ -3,6 +3,163 @@ import { graphLlm } from './llm';
 
 const syncLocks = new Map<string, Promise<void>>();
 
+// ============================================================
+// Security: Relation Type Whitelist and Mapping
+// ============================================================
+
+/**
+ * 中文关系名到英文枚举的映射
+ * 与前端 schemas.ts 保持一致
+ */
+const CHINESE_TO_TYPE_MAP: Record<string, string> = {
+    // 敌对关系
+    '敌人': 'ENEMY_OF',
+    '敌对': 'ENEMY_OF',
+    '仇人': 'ENEMY_OF',
+    '仇敌': 'ENEMY_OF',
+    '死敌': 'ENEMY_OF',
+    '宿敌': 'ENEMY_OF',
+    'nemesis': 'ENEMY_OF',
+    'archenemy': 'ENEMY_OF',
+
+    // 盟友关系
+    '盟友': 'ALLY_OF',
+    '同盟': 'ALLY_OF',
+    '伙伴': 'ALLY_OF',
+    '同伴': 'ALLY_OF',
+    '同僚': 'ALLY_OF',
+    'ally': 'ALLY_OF',
+    'companion': 'ALLY_OF',
+
+    // 爱情关系
+    '爱': 'LOVES',
+    '爱慕': 'LOVES',
+    '恋人': 'LOVES',
+    '情人': 'LOVES',
+    '暗恋': 'LOVES',
+    '喜欢': 'LOVES',
+    'loves': 'LOVES',
+    'lover': 'LOVES',
+    'crush': 'LOVES',
+
+    // 亲情关系
+    '亲人': 'KIN_OF',
+    '亲属': 'KIN_OF',
+    '家人': 'KIN_OF',
+    '亲戚': 'KIN_OF',
+    'kin': 'KIN_OF',
+    'family': 'KIN_OF',
+
+    // 师徒关系
+    '师父': 'MENTORS',
+    '师傅': 'MENTORS',
+    '徒弟': 'MENTORS',
+    '师徒': 'MENTORS',
+    '导师': 'MENTORS',
+    '学生': 'MENTORS',
+    'mentor': 'MENTORS',
+    'student': 'MENTORS',
+
+    // 竞争关系
+    '竞争': 'RIVAL_OF',
+    '对手': 'RIVAL_OF',
+    '敌手': 'RIVAL_OF',
+    'rival': 'RIVAL_OF',
+
+    // 效忠关系
+    '效忠': 'SERVES',
+    '下属': 'SERVES',
+    '仆人': 'SERVES',
+    '臣服': 'SERVES',
+    'serves': 'SERVES',
+    'servant': 'SERVES',
+    'subordinate': 'SERVES',
+
+    // 友谊关系
+    '朋友': 'FRIEND_OF',
+    '好友': 'FRIEND_OF',
+    '友情': 'FRIEND_OF',
+    'friend': 'FRIEND_OF',
+};
+
+/**
+ * 有效的关系类型白名单
+ * 这些是 Neo4j 图数据库中允许的关系类型
+ */
+const VALID_RELATION_TYPES = new Set([
+    'ENEMY_OF',
+    'ALLY_OF',
+    'LOVES',
+    'KIN_OF',
+    'MENTORS',
+    'RIVAL_OF',
+    'SERVES',
+    'FRIEND_OF',
+    'RELATED_TO',  // 默认/后备类型
+    // 系统内置关系类型
+    'INVOLVED_IN',
+    'HAS_ECHO',
+    'POV_IS',
+    'PRECEDES',
+    'IMPLEMENTS',
+    'INVOLVES',
+    'LOCATED_IN',
+]);
+
+/**
+ * 安全地将关系类型字符串转换为有效的 Cypher 关系类型
+ *
+ * @param relation - 原始关系类型字符串（可能是中文、英文或混合）
+ * @returns 经过白名单验证的安全关系类型
+ *
+ * Security:
+ * - 使用白名单验证，防止 Cypher 注入
+ * - 支持中文关系名到英文枚举的转换
+ * - 任何不在白名单中的类型都回退到 RELATED_TO
+ */
+function sanitizeRelationType(relation: string): string {
+    if (!relation || typeof relation !== 'string') {
+        return 'RELATED_TO';
+    }
+
+    // 1. 尝试从中文映射表查找
+    const normalizedInput = relation.trim();
+    if (CHINESE_TO_TYPE_MAP[normalizedInput]) {
+        return CHINESE_TO_TYPE_MAP[normalizedInput];
+    }
+
+    // 2. 标准化英文输入（转大写，替换空格为下划线）
+    const normalized = normalizedInput
+        .toUpperCase()
+        .replace(/\s+/g, '_')
+        .replace(/[^A-Z0-9_]/g, '');
+
+    // 3. 检查是否在白名单中
+    if (VALID_RELATION_TYPES.has(normalized)) {
+        return normalized;
+    }
+
+    // 4. 处理 AI 可能返回的简化格式（如 ENEMY -> ENEMY_OF）
+    const simplifiedMapping: Record<string, string> = {
+        'ENEMY': 'ENEMY_OF',
+        'ALLY': 'ALLY_OF',
+        'LOVE': 'LOVES',
+        'KIN': 'KIN_OF',
+        'MENTOR': 'MENTORS',
+        'RIVAL': 'RIVAL_OF',
+        'SERVE': 'SERVES',
+        'FRIEND': 'FRIEND_OF',
+    };
+
+    if (simplifiedMapping[normalized]) {
+        return simplifiedMapping[normalized];
+    }
+
+    // 5. 不在白名单中，使用默认类型
+    console.warn(`[Graph Security] Unknown relation type "${relation}" -> normalized to "${normalized}" -> fallback to RELATED_TO`);
+    return 'RELATED_TO';
+}
+
 /**
  * Sync: Push project data from MySQL into Neo4j
  */
@@ -62,30 +219,86 @@ const doSyncProject = async (projectData: any): Promise<void> => {
                 );
             }
 
-            // [P0] NEW: Extract and sync structured character relationships via AI
+            // [P0] Sync character relationships - prioritize structuredRelations over AI extraction
             try {
-                const extractedRelations = await graphLlm.extractCharacterRelationships(projectData.characters);
-                if (extractedRelations.length > 0) {
-                    for (const rel of extractedRelations) {
-                        const relType = rel.relation.replace(/[^A-Z0-9_]/gi, '').toUpperCase() || 'RELATED_TO';
-                        await session.run(
-                            `MATCH (s:Character {projectId: $projectId, name: $subject})
-                             MATCH (o:Character {projectId: $projectId, name: $object})
-                             MERGE (s)-[r:${relType}]->(o)
-                             ON CREATE SET r.weight = $weight, r.reason = $reason, r.source = 'AI_EXTRACTED'`,
-                            {
-                                projectId,
-                                subject: rel.subject,
-                                object: rel.object,
+                let triplesToSync: Array<{
+                    subject: string;
+                    relation: string;
+                    object: string;
+                    weight: number;
+                    reason: string;
+                    source: 'STRUCTURED_DATA' | 'AI_EXTRACTED';
+                }> = [];
+
+                // Step 1: Try to use structuredRelations from frontend
+                let hasStructuredData = false;
+                for (const char of projectData.characters) {
+                    if (char.structuredRelations && Array.isArray(char.structuredRelations) && char.structuredRelations.length > 0) {
+                        hasStructuredData = true;
+                        for (const rel of char.structuredRelations) {
+                            // Get target character name - support both targetName and targetCharacterName
+                            const targetName = rel.targetName || rel.targetCharacterName;
+                            if (!targetName) continue;
+
+                            // Security: Use whitelist validation instead of regex filtering
+                            const relType = sanitizeRelationType(rel.type || 'RELATED_TO');
+
+                            triplesToSync.push({
+                                subject: char.name,
+                                relation: relType,
+                                object: targetName,
                                 weight: rel.weight || 50,
-                                reason: rel.reason || ''
-                            }
-                        );
+                                reason: rel.description || '',
+                                source: 'STRUCTURED_DATA'
+                            });
+                        }
                     }
-                    console.log(`🧠 AI extracted ${extractedRelations.length} character relationships for project ${projectId}`);
                 }
-            } catch (aiErr) {
-                console.warn("⚠️ AI Relationship Extraction failed during sync, skipping structural edges.", aiErr);
+
+                // Step 2: Fallback to AI extraction only if no structured data exists
+                if (!hasStructuredData) {
+                    console.log(`🔄 No structuredRelations found, falling back to AI extraction for project ${projectId}`);
+                    const extractedRelations = await graphLlm.extractCharacterRelationships(projectData.characters);
+                    if (extractedRelations.length > 0) {
+                        triplesToSync = extractedRelations.map(rel => ({
+                            subject: rel.subject,
+                            // Security: Use whitelist validation instead of regex filtering
+                            relation: sanitizeRelationType(rel.relation),
+                            object: rel.object,
+                            weight: rel.weight || 50,
+                            reason: rel.reason || '',
+                            source: 'AI_EXTRACTED' as const
+                        }));
+                    }
+                }
+
+                // Step 3: Sync all triples to Neo4j
+                if (triplesToSync.length > 0) {
+                    for (const triple of triplesToSync) {
+                        try {
+                            await session.run(
+                                `MATCH (s:Character {projectId: $projectId, name: $subject})
+                                 MATCH (o:Character {projectId: $projectId, name: $object})
+                                 MERGE (s)-[r:${triple.relation}]->(o)
+                                 ON CREATE SET r.weight = $weight, r.reason = $reason, r.source = $source, r.createdAt = timestamp()
+                                 ON MATCH SET r.weight = $weight, r.reason = $reason, r.source = $source, r.updatedAt = timestamp()`,
+                                {
+                                    projectId,
+                                    subject: triple.subject,
+                                    object: triple.object,
+                                    weight: triple.weight,
+                                    reason: triple.reason,
+                                    source: triple.source
+                                }
+                            );
+                        } catch (err) {
+                            console.warn(`Failed to sync relation ${triple.subject}-[:${triple.relation}]->${triple.object}:`, err);
+                        }
+                    }
+                    console.log(`✅ Synced ${triplesToSync.length} character relationships for project ${projectId} (source: ${hasStructuredData ? 'STRUCTURED_DATA' : 'AI_EXTRACTED'})`);
+                }
+            } catch (syncErr) {
+                console.warn("⚠️ Character relationship sync failed, skipping structural edges.", syncErr);
             }
         }
 
@@ -169,8 +382,8 @@ const doSyncProject = async (projectData: any): Promise<void> => {
                 // NEW: Process associated structural triples
                 if (echo.triples && Array.isArray(echo.triples)) {
                     for (const triple of echo.triples) {
-                        // Sanitize relation type for Cypher (parameterized types aren't supported)
-                        const relType = triple.relation.replace(/[^A-Z0-9_]/gi, '').toUpperCase() || 'RELATED_TO';
+                        // Security: Use whitelist validation instead of regex filtering
+                        const relType = sanitizeRelationType(triple.relation);
                         try {
                             await session.run(
                                 `MATCH (s {projectId: $projectId}) WHERE (s.name = $subject OR s.title = $subject)

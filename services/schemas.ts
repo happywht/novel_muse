@@ -222,6 +222,61 @@ export function safeParseAiJson<T>(
                     mappedChar.relationships = parts.join('；');
                 }
 
+                // ===== 新增: 处理结构化关系数据 =====
+                if (mappedChar.structuredRelations && Array.isArray(mappedChar.structuredRelations)) {
+                    // 关系类型到标准枚举的映射
+                    const TYPE_TO_ENUM: Record<string, string> = {
+                        'ENEMY_OF': 'ENEMY_OF',
+                        'ALLY_OF': 'ALLY_OF',
+                        'LOVES': 'LOVES',
+                        'KIN_OF': 'KIN_OF',
+                        'MENTORS': 'MENTORS',
+                        'RIVAL_OF': 'RIVAL_OF',
+                        'SERVES': 'SERVES',
+                        'FRIEND_OF': 'FRIEND_OF',
+                        'RELATED_TO': 'RELATED_TO',
+                        // AI 可能返回的其他格式
+                        'ENEMY': 'ENEMY_OF',
+                        'ALLY': 'ALLY_OF',
+                        'LOVE': 'LOVES',
+                        'KIN': 'KIN_OF',
+                        'MENTOR': 'MENTORS',
+                        'RIVAL': 'RIVAL_OF',
+                        'SERVE': 'SERVES',
+                        'FRIEND': 'FRIEND_OF',
+                    };
+
+                    // 枚举到中文的映射（用于生成 relationships 字符串）
+                    const ENUM_TO_LABEL: Record<string, string> = {
+                        'ENEMY_OF': '敌人',
+                        'ALLY_OF': '盟友',
+                        'LOVES': '爱慕',
+                        'KIN_OF': '亲属',
+                        'MENTORS': '师徒',
+                        'RIVAL_OF': '竞争',
+                        'SERVES': '效忠',
+                        'FRIEND_OF': '朋友',
+                        'RELATED_TO': '关联',
+                    };
+
+                    // 标准化关系类型（保留 AI 返回的简化格式，后续在 Dashboard 中转换为完整格式）
+                    mappedChar.structuredRelations = mappedChar.structuredRelations.map((rel: any) => ({
+                        targetName: rel.targetName,
+                        // 如果 AI 没有返回 type，使用默认值 'RELATED_TO'
+                        type: rel.type ? (TYPE_TO_ENUM[rel.type.toUpperCase()] || 'RELATED_TO') : 'RELATED_TO',
+                        description: rel.description,
+                    }));
+
+                    // 如果没有 relationships 字符串，从结构化数据生成（双写）
+                    if (!mappedChar.relationships && mappedChar.structuredRelations.length > 0) {
+                        const parts = mappedChar.structuredRelations.map((rel: any) => {
+                            const label = ENUM_TO_LABEL[rel.type] || '关联';
+                            return `${label}: ${rel.targetName}`;
+                        });
+                        mappedChar.relationships = parts.join('；');
+                    }
+                }
+
                 return mappedChar;
             }
             return char;
@@ -270,7 +325,16 @@ export function safeParseAiJson<T>(
 // ============================================================
 
 // --- Characters (batchGenerateCharacters) ---
-// 升级: 支持更丰富的角色字段
+// 升级: 支持更丰富的角色字段 + 结构化关系
+export const AiCharacterRelationSchema = z.object({
+    targetName: z.string().describe('目标角色名称'),
+    type: z.enum([
+        'ENEMY_OF', 'ALLY_OF', 'LOVES', 'KIN_OF',
+        'MENTORS', 'RIVAL_OF', 'SERVES', 'FRIEND_OF', 'RELATED_TO'
+    ]).optional().describe('关系类型（可选，默认为 RELATED_TO）'),
+    description: z.string().optional().describe('关系描述'),
+});
+
 export const AiCharacterSchema = z.object({
     name: z.string().min(1, '角色名不能为空'),
     role: z.string().default('未知角色'),
@@ -286,7 +350,9 @@ export const AiCharacterSchema = z.object({
     contrast: z.string().optional(), // 反差萌点
     weakness: z.string().optional(), // 弱点/缺陷
 
-    relationships: z.string().optional(),
+    // 关系字段 - 双格式支持
+    relationships: z.string().optional().describe('人际关系（字符串格式，兼容旧数据）'),
+    structuredRelations: z.array(AiCharacterRelationSchema).optional().describe('结构化关系数组（新格式）'),
 });
 
 export const AiCharacterArraySchema = z.array(AiCharacterSchema);

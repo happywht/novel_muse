@@ -12,6 +12,7 @@ import {
     getInstructionWithSettings, getModelName
 } from "./core";
 import { formatContext, formatEntityLookupTable } from "./helpers";
+import { buildPromptContent } from "../../config/prompts";
 import { fetchRelatedSubgraph } from "../apiService";
 
 /**
@@ -48,10 +49,10 @@ export const generateCharacterImage = async (description: string): Promise<strin
 
 /**
  * Batch generate core characters from premise
- * 修复: 添加archetype字段、使用正确的system instruction、降低temperature
+ * 升级: 支持结构化关系数据，实现双写兼容
  */
 export const batchGenerateCharacters = async (premise: string, genre: string, settings?: CreativeSettings): Promise<Omit<Character, 'id'>[]> => {
-    // 修复: Schema中添加archetype字段
+    // 升级: Schema中添加结构化关系字段
     const characterSchema = {
         type: Type.ARRAY,
         items: {
@@ -61,13 +62,34 @@ export const batchGenerateCharacters = async (premise: string, genre: string, se
                 role: { type: Type.STRING, description: "One of: 主角, 反派, 导师, 伙伴, 守护者, 变形者, 捣蛋鬼, 信使" },
                 archetype: { type: Type.STRING, description: "角色原型，如：英雄、智者、捣蛋鬼、变形者、守护者、信使" },
                 description: { type: Type.STRING, description: "详细的人物小传。必须包含：外貌、性格、明确的欲望和恐惧、秘密、标志性特征(Signature)、道德阵营(Alignment)。" },
-                relationships: { type: Type.STRING, description: "与其他角色的潜在关系（如：血缘、仇恨、暗恋、挚友等）" }
+                // 新增: 角色深度字段
+                alignment: { type: Type.STRING, description: "道德阵营（如：守序善良、混乱邪恶、中立善良等）" },
+                desire: { type: Type.STRING, description: "核心欲望：角色最想得到什么？" },
+                fear: { type: Type.STRING, description: "核心恐惧：角色最害怕什么？" },
+                signature: { type: Type.STRING, description: "标志性特征：让读者记住这个角色的特点" },
+                contrast: { type: Type.STRING, description: "反差萌点：角色表里不一的地方" },
+                weakness: { type: Type.STRING, description: "弱点/缺陷：角色的致命缺陷" },
+                // 关系字段 - 双格式
+                relationships: { type: Type.STRING, description: "与其他角色的关系概述（简短描述）" },
+                structuredRelations: {
+                    type: Type.ARRAY,
+                    description: "结构化关系列表",
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            targetName: { type: Type.STRING, description: "目标角色名称（必须是本次生成的其他角色之一）" },
+                            type: { type: Type.STRING, description: "关系类型: ENEMY_OF(敌对), ALLY_OF(盟友), LOVES(爱慕), KIN_OF(亲属), MENTORS(师徒), RIVAL_OF(竞争), SERVES(效忠), FRIEND_OF(朋友)" },
+                            description: { type: Type.STRING, description: "关系详细描述" }
+                        },
+                        required: ["targetName", "type"]
+                    }
+                }
             },
             required: ["name", "role", "archetype", "description"]
         }
     };
 
-    // 修复: 使用正确的system instruction
+    // 使用正确的system instruction
     const instruction = getInstructionWithSettings('character_gen', settings);
     const settingText = settings ? `风格要求：基调 ${settings.tone}，风格 ${settings.style}。` : "";
 
@@ -80,12 +102,14 @@ export const batchGenerateCharacters = async (premise: string, genre: string, se
 4. **4位 功能性角色**：从 [守护者(Guardian), 变形者(Shapeshifter), 捣蛋鬼(Trickster), 信使(Herald)] 中选择，确保角色类型的多样性。
 
 【核心要求】：
-- **角色关联**: 确保这七个人物之间存在复杂的人际纠葛（血缘、仇恨、债务、暗恋、挚友等）。
+- **角色关联**: 确保这七个人物之间存在复杂的人际纠葛。每个角色至少与2个其他角色有关系。
 - **深度刻画**: 每个人物都必须有：
-  - 明确的欲望 (Desire)
-  - 核心恐惧 (Fear)
-  - 标志性特征 (Signature)
-  - 道德阵营 (Alignment: 守序善良/混乱邪恶等)
+  - 明确的欲望 (desire)
+  - 核心恐惧 (fear)
+  - 标志性特征 (signature)
+  - 道德阵营 (alignment: 守序善良/混乱邪恶等)
+  - 弱点/缺陷 (weakness)
+- **关系结构化**: structuredRelations 必须准确填写，targetName 必须是本次生成的其他角色名之一
 - **archetype字段**: 必须填写，使用上述角色原型之一。
 - 请使用中文输出。`;
 
@@ -438,7 +462,9 @@ export const extractEchoesFromText = async (
     characters: Character[],
     worldSettings: WorldSetting[],
     // MVP: 新增参数 - 历史上下文
-    recentEchoes: Echo[] = []
+    recentEchoes: Echo[] = [],
+    // 新增: 创意设置（用于prompt构建）
+    settings?: CreativeSettings
 ): Promise<Echo[]> => {
     if (!text || text.length < 100) return [];
 
