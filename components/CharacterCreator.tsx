@@ -443,10 +443,20 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
                             <div className="flex-1 space-y-6">
                                 <div className="flex justify-between items-start">
                                     <div>
-                                        <div className="flex items-center gap-2 mb-1">
+                                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                                             <span className="px-2 py-0.5 bg-muse-950 text-muse-400 border border-muse-500/30 rounded text-[10px] font-bold uppercase tracking-wider">
                                                 {activeChar.role}
                                             </span>
+                                            {activeChar.archetype && (
+                                                <span className="px-2 py-0.5 bg-slate-700 text-slate-300 rounded text-[10px]">
+                                                    {activeChar.archetype}
+                                                </span>
+                                            )}
+                                            {activeChar.alignment && (
+                                                <span className="px-2 py-0.5 bg-indigo-950 text-indigo-300 border border-indigo-500/30 rounded text-[10px]">
+                                                    {activeChar.alignment}
+                                                </span>
+                                            )}
                                         </div>
                                         <h1 className="text-4xl font-serif font-bold text-white tracking-tight">{activeChar.name}</h1>
                                     </div>
@@ -486,6 +496,63 @@ export const CharacterCreator: React.FC<CharacterCreatorProps> = ({ project, upd
                                         )}
                                     </div>
                                 </div>
+
+                                {/* 角色标签 */}
+                                {activeChar.tags && activeChar.tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                        {activeChar.tags.map((tag, idx) => (
+                                            <span key={idx} className="px-2 py-1 bg-slate-700/50 text-slate-300 rounded-full text-xs border border-slate-600">
+                                                {tag}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* 核心驱动 - 欲望与恐惧 */}
+                                {(activeChar.desire || activeChar.fear) && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {activeChar.desire && (
+                                            <div className="bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-4">
+                                                <h4 className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                                    🔥 核心欲望
+                                                </h4>
+                                                <p className="text-sm text-slate-300 leading-relaxed">{activeChar.desire}</p>
+                                            </div>
+                                        )}
+                                        {activeChar.fear && (
+                                            <div className="bg-red-950/30 border border-red-500/20 rounded-xl p-4">
+                                                <h4 className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                                    ⚡ 核心恐惧
+                                                </h4>
+                                                <p className="text-sm text-slate-300 leading-relaxed">{activeChar.fear}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* 特征与弱点 */}
+                                {(activeChar.signature || activeChar.contrast || activeChar.weakness) && (
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {activeChar.signature && (
+                                            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3">
+                                                <h4 className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest mb-1">✨ 标志特征</h4>
+                                                <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">{activeChar.signature}</p>
+                                            </div>
+                                        )}
+                                        {activeChar.contrast && (
+                                            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3">
+                                                <h4 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-1">🎭 反差萌点</h4>
+                                                <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">{activeChar.contrast}</p>
+                                            </div>
+                                        )}
+                                        {activeChar.weakness && (
+                                            <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-3">
+                                                <h4 className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-1">💔 致命弱点</h4>
+                                                <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">{activeChar.weakness}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                                 <div className="space-y-4">
                                     <div className="bg-slate-800/40 rounded-2xl border border-slate-700/50 p-6 shadow-inner">

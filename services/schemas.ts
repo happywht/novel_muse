@@ -88,6 +88,62 @@ export function safeParseAiJson<T>(
     }
 
     // Step 2.6: Data sanitization for known AI quirks
+    // 角色数据字段映射: AI返回的archetype包含角色类型，需要映射到role字段
+    if (Array.isArray(rawObj) && label === 'batchGenerateCharacters') {
+        const ROLE_MAPPING: Record<string, string> = {
+            '主角': '主角',
+            'Protagonist': '主角',
+            '反派': '反派',
+            'Antagonist': '反派',
+            '导师': '导师',
+            'Mentor': '导师',
+            '伙伴': '伙伴',
+            'Ally': '伙伴',
+            '守护者': '守护者',
+            'Guardian': '守护者',
+            '变形者': '变形者',
+            'Shapeshifter': '变形者',
+            '捣蛋鬼': '捣蛋鬼',
+            'Trickster': '捣蛋鬼',
+            '信使': '信使',
+            'Herald': '信使',
+        };
+
+        rawObj = rawObj.map((char: any) => {
+            if (char && typeof char === 'object') {
+                const mappedChar = { ...char };
+
+                // 如果archetype包含角色类型，映射到role
+                if (mappedChar.archetype && typeof mappedChar.archetype === 'string') {
+                    const archetypeLower = mappedChar.archetype;
+                    for (const [key, value] of Object.entries(ROLE_MAPPING)) {
+                        if (archetypeLower.includes(key)) {
+                            // 如果role为空或是职位描述，用archetype的角色类型
+                            if (!mappedChar.role || mappedChar.role.length > 10) {
+                                mappedChar.role = value;
+                            }
+                            break;
+                        }
+                    }
+                }
+
+                // 确保role字段有值
+                if (!mappedChar.role) {
+                    mappedChar.role = mappedChar.archetype || '未知角色';
+                }
+
+                // 处理signature -> signature字段映射
+                if (mappedChar.signature && !mappedChar.signature) {
+                    mappedChar.signature = mappedChar.signature;
+                }
+
+                return mappedChar;
+            }
+            return char;
+        });
+        console.log(`[Zod] ${label}: Applied character role mapping`);
+    }
+
     // Clean beatTag values that don't match our enum
     if (label === 'Plot Rewrite' || label === 'Plot Generation') {
         const sanitizeBeatTag = (obj: any): any => {
