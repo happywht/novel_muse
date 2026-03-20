@@ -15,7 +15,7 @@ import { z } from 'zod';
 /**
  * Parses a raw JSON string from AI and validates it against a Zod schema.
  * Returns the validated data or null on failure.
- * 
+ *
  * @param rawText - The raw text response from the AI model
  * @param schema - A Zod schema to validate against
  * @param label - A human-readable label for logging purposes
@@ -47,10 +47,47 @@ export function safeParseAiJson<T>(
         rawObj = JSON.parse(cleanedText);
     } catch (jsonError) {
         console.error(`[Zod] ${label}: JSON.parse failed. Raw text (first 500 chars):`, cleanedText.substring(0, 500));
+        console.error(`[Zod] ${label}: JSON.parse error details:`, jsonError);
         return null;
     }
 
-    // Step 2.5: Data sanitization for known AI quirks
+    // Step 2.5: Handle nested AI response structures
+    // AI sometimes returns { story_info: {...}, characters: [...] } instead of direct array
+    if (rawObj && typeof rawObj === 'object' && !Array.isArray(rawObj)) {
+        const obj = rawObj as Record<string, unknown>;
+
+        // 通用处理: 检查常见的嵌套数组字段
+        // 角色生成: 提取 characters 数组
+        if (obj.characters && Array.isArray(obj.characters)) {
+            console.log(`[Zod] ${label}: Detected nested structure with 'characters' array, extracting...`);
+            rawObj = obj.characters;
+        }
+        // 世界观生成: 提取 settings 或 worldSettings 数组
+        else if (obj.settings && Array.isArray(obj.settings)) {
+            console.log(`[Zod] ${label}: Detected nested structure with 'settings' array, extracting...`);
+            rawObj = obj.settings;
+        }
+        else if (obj.worldSettings && Array.isArray(obj.worldSettings)) {
+            console.log(`[Zod] ${label}: Detected nested structure with 'worldSettings' array, extracting...`);
+            rawObj = obj.worldSettings;
+        }
+        // 剧情生成: 提取 plotNodes 或 nodes 数组
+        else if (obj.plotNodes && Array.isArray(obj.plotNodes)) {
+            console.log(`[Zod] ${label}: Detected nested structure with 'plotNodes' array, extracting...`);
+            rawObj = obj.plotNodes;
+        }
+        else if (obj.nodes && Array.isArray(obj.nodes)) {
+            console.log(`[Zod] ${label}: Detected nested structure with 'nodes' array, extracting...`);
+            rawObj = obj.nodes;
+        }
+        // 章节生成: 提取 chapters 数组
+        else if (obj.chapters && Array.isArray(obj.chapters)) {
+            console.log(`[Zod] ${label}: Detected nested structure with 'chapters' array, extracting...`);
+            rawObj = obj.chapters;
+        }
+    }
+
+    // Step 2.6: Data sanitization for known AI quirks
     // Clean beatTag values that don't match our enum
     if (label === 'Plot Rewrite' || label === 'Plot Generation') {
         const sanitizeBeatTag = (obj: any): any => {
@@ -70,17 +107,19 @@ export function safeParseAiJson<T>(
             }
             return obj;
         };
-        
+
         rawObj = sanitizeBeatTag(rawObj);
     }
 
     // Step 3: Validate with Zod (safeParse never throws)
     const result = schema.safeParse(rawObj);
     if (result.success) {
+        console.log(`[Zod] ${label}: Validation successful.`);
         return result.data;
     } else {
         console.warn(`[Zod] ${label}: Validation failed. Issues:`, result.error.issues.map(i => `${i.path.join('.')}: ${i.message}`));
-        console.warn(`[Zod] ${label}: Raw object (keys):`, typeof rawObj === 'object' && rawObj !== null ? Object.keys(rawObj) : typeof rawObj);
+        console.warn(`[Zod] ${label}: Raw object (keys):`, typeof rawObj === 'object' && rawObj !== null ? (Array.isArray(rawObj) ? `Array(${rawObj.length})` : Object.keys(rawObj)) : typeof rawObj);
+        console.warn(`[Zod] ${label}: Full error:`, result.error);
         return null;
     }
 }
@@ -90,11 +129,22 @@ export function safeParseAiJson<T>(
 // ============================================================
 
 // --- Characters (batchGenerateCharacters) ---
+// 升级: 支持更丰富的角色字段
 export const AiCharacterSchema = z.object({
     name: z.string().min(1, '角色名不能为空'),
     role: z.string().default('未知角色'),
     archetype: z.string().default(''),
     description: z.string().default(''),
+
+    // 新增: 角色深度字段
+    alignment: z.string().optional(), // 道德阵营
+    tags: z.array(z.string()).optional(), // 角色标签
+    desire: z.string().optional(), // 核心欲望
+    fear: z.string().optional(), // 核心恐惧
+    signature: z.string().optional(), // 标志性特征
+    contrast: z.string().optional(), // 反差萌点
+    weakness: z.string().optional(), // 弱点/缺陷
+
     relationships: z.string().optional(),
 });
 

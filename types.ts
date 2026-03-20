@@ -33,11 +33,26 @@ export interface Message {
 export interface Character {
   id: string;
   name: string;
-  role: string; // Protagonist, Antagonist, Support
-  archetype: string;
-  description: string;
-  relationships?: string; // New field for interpersonal dynamics
+  role: string; // Protagonist, Antagonist, Mentor, Guardian, Shapeshifter, Trickster, Herald
+  archetype: string; // 角色原型
+  description: string; // 详细描述
+
+  // 升级: 新增角色深度字段
+  alignment?: string; // 道德阵营 (守序善良/混乱邪恶等)
+  tags?: string[]; // 角色标签 (高智商低情商、洁癖晚期等)
+  desire?: string; // 核心欲望
+  fear?: string; // 核心恐惧
+  signature?: string; // 标志性特征
+  contrast?: string; // 反差萌点
+  weakness?: string; // 弱点/缺陷
+
+  relationships?: string; // 人际关系
   imageUrl?: string;
+
+  // 系统字段
+  physicalStatus?: string; // 身体状态
+  foreshadowingHooks?: string[]; // 伏笔钩子
+  lastModified?: number;
 }
 
 export interface WorldSetting {

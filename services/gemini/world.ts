@@ -48,8 +48,10 @@ export const generateCharacterImage = async (description: string): Promise<strin
 
 /**
  * Batch generate core characters from premise
+ * 修复: 添加archetype字段、使用正确的system instruction、降低temperature
  */
 export const batchGenerateCharacters = async (premise: string, genre: string, settings?: CreativeSettings): Promise<Omit<Character, 'id'>[]> => {
+    // 修复: Schema中添加archetype字段
     const characterSchema = {
         type: Type.ARRAY,
         items: {
@@ -57,95 +59,190 @@ export const batchGenerateCharacters = async (premise: string, genre: string, se
             properties: {
                 name: { type: Type.STRING },
                 role: { type: Type.STRING, description: "One of: 主角, 反派, 导师, 伙伴, 守护者, 变形者, 捣蛋鬼, 信使" },
+                archetype: { type: Type.STRING, description: "角色原型，如：英雄、智者、捣蛋鬼、变形者、守护者、信使" },
                 description: { type: Type.STRING, description: "详细的人物小传。必须包含：外貌、性格、明确的欲望和恐惧、秘密、标志性特征(Signature)、道德阵营(Alignment)。" },
-                relationships: { type: Type.STRING, description: "与其他角色的潜在关系" }
+                relationships: { type: Type.STRING, description: "与其他角色的潜在关系（如：血缘、仇恨、暗恋、挚友等）" }
             },
-            required: ["name", "role", "description"]
+            required: ["name", "role", "archetype", "description"]
         }
     };
 
+    // 修复: 使用正确的system instruction
+    const instruction = getInstructionWithSettings('character_gen', settings);
     const settingText = settings ? `风格要求：基调 ${settings.tone}，风格 ${settings.style}。` : "";
 
     const prompt = `基于小说梗概："${premise}" (类型: ${genre})，请设计 **7位** 核心角色。${settingText}
-    
-    请混合使用以下角色原型，构建一个功能完整的角色阵容：
-    1. **1位 主角 (Protagonist)**：故事的核心驱动者。
-    2. **1位 反派 (Antagonist)**：与主角对立的主要力量。
-    3. **1位 导师 (Mentor)** 或 **伙伴 (Ally)**。
-    4. **4位 功能性角色**：从 [守护者, 变形者, 捣蛋鬼, 信使] 中选择，以增加故事的张力和变数。
-    
-    要求：
-    - 确保这七个人物之间存在复杂的纠葛（如血缘、仇恨、债务、暗恋、挚友等）。
-    - **深度刻画**：每个人物都必须有明确的欲望、恐惧和独特的标志性特征。
-    - 请使用中文输出。`;
+
+请严格按照以下角色配置，构建一个功能完整的角色阵容：
+1. **1位 主角 (Protagonist)**：故事的核心驱动者，必须有明确的欲望和恐惧。
+2. **1位 反派 (Antagonist)**：与主角对立的主要力量，动机必须合理且令人信服。
+3. **1位 导师 (Mentor)** 或 **伙伴 (Ally)**：提供指导或支持的关键人物。
+4. **4位 功能性角色**：从 [守护者(Guardian), 变形者(Shapeshifter), 捣蛋鬼(Trickster), 信使(Herald)] 中选择，确保角色类型的多样性。
+
+【核心要求】：
+- **角色关联**: 确保这七个人物之间存在复杂的人际纠葛（血缘、仇恨、债务、暗恋、挚友等）。
+- **深度刻画**: 每个人物都必须有：
+  - 明确的欲望 (Desire)
+  - 核心恐惧 (Fear)
+  - 标志性特征 (Signature)
+  - 道德阵营 (Alignment: 守序善良/混乱邪恶等)
+- **archetype字段**: 必须填写，使用上述角色原型之一。
+- 请使用中文输出。`;
 
     try {
+        console.log('【batchGenerateCharacters】开始调用AI，prompt:', prompt);
         const responseText = await executeModelTask(
             'batchGenerateCharacters',
-            '',
+            instruction,  // 修复: 使用正确的system instruction
             prompt,
             'gemini-3-flash-preview',
-            0.7,
+            0.6,  // 修复: 降低temperature提高一致性
             characterSchema
         );
+        console.log('【batchGenerateCharacters】AI原始响应:', responseText);
+
+        if (!responseText) {
+            console.error('【batchGenerateCharacters】错误：AI返回空响应');
+            throw new Error('AI返回空响应');
+        }
 
         const parsed = safeParseAiJson(responseText, AiCharacterArraySchema, 'batchGenerateCharacters');
-        return parsed ?? [];
+        console.log('【batchGenerateCharacters】解析结果:', parsed);
+
+        if (!parsed) {
+            console.error('【batchGenerateCharacters】警告：解析失败，返回null');
+            throw new Error('角色数据解析失败，请重试');
+        } else if (parsed.length === 0) {
+            console.warn('【batchGenerateCharacters】警告：解析成功但返回空数组');
+            throw new Error('AI未返回任何角色，请重试');
+        } else if (parsed.length < 5) {
+            console.warn(`【batchGenerateCharacters】警告：期望7个角色，实际只生成${parsed.length}个`);
+        }
+
+        console.log('【batchGenerateCharacters】成功：解析到', parsed.length, '个角色');
+        return parsed;
     } catch (e) {
-        console.error("Batch Character Generation Error", e);
+        console.error("【batchGenerateCharacters】捕获到异常:", e);
         throw e;
     }
 };
 
 /**
- * Batch generate world settings by category
+ * 分类差异化的世界观生成指导
  */
-export const batchGenerateWorldSettingsByCategory = async (premise: string, genre: string, category: string, settings?: CreativeSettings): Promise<Omit<WorldSetting, 'id'>[]> => {
+const WORLD_CATEGORY_GUIDANCE: Record<string, string> = {
+    'Geography': `
+【地理地貌类设定指导】:
+- 重点关注：地理位置、地貌特征、气候环境、自然资源
+- 必须包含：该地理特征对文明/势力分布的影响
+- 叙事钩子：可探索的秘境、危险的禁区、战略要地
+- 示例方向：悬浮大陆、地下迷宫城市、永冻荒原、活火山群`,
+
+    'Magic/Tech': `
+【魔法/科技类设定指导】:
+- 重点关注：能力体系的规则、使用代价、等级划分
+- 必须包含：该能力对社会的改变、获取/学习方式
+- 叙事钩子：禁忌技术、失落的魔法、代价与副作用
+- 示例方向：元素魔法系统、蒸汽朋克机械、基因改造技术`,
+
+    'Society': `
+【社会人文类设定指导】:
+- 重点关注：社会阶层、权力结构、文化习俗、宗教信仰
+- 必须包含：社会矛盾、压迫/反抗的根源
+- 叙事钩子：地下反抗组织、贵族阴谋、禁忌的节日
+- 示例方向：种姓制度、商业帝国、秘密结社`,
+
+    'History': `
+【历史传说类设定指导】:
+- 重点关注：关键历史事件、神话传说、英雄/反派人物
+- 必须包含：历史对当下的深远影响
+- 叙事钩子：被掩盖的真相、失落的文明、预言与诅咒
+- 示例方向：诸神黄昏、王朝覆灭、创世神话`,
+
+    'Other': `
+【其他设定指导】:
+- 重点关注：未分类但重要的世界元素
+- 可包含：特殊物品、独特生物、神秘现象
+- 叙事钩子：必须与主线剧情产生关联
+- 示例方向：神器的传说、变异生物、时空裂缝`
+};
+
+/**
+ * Batch generate world settings by category
+ * 修复: 使用正确的system instruction、分类差异化prompt、降低temperature
+ */
+export const batchGenerateWorldSettingsByCategory = async (
+    premise: string,
+    genre: string,
+    category: WorldSetting['category'],
+    count: number = 3,
+    settings?: CreativeSettings
+): Promise<Omit<WorldSetting, 'id'>[]> => {
     const worldSchema = {
         type: Type.ARRAY,
         items: {
             type: Type.OBJECT,
             properties: {
-                title: { type: Type.STRING },
-                category: { type: Type.STRING },
-                content: { type: Type.STRING, description: "详细的设定描述" }
+                title: { type: Type.STRING, description: "设定标题，简洁有力" },
+                content: { type: Type.STRING, description: "详细的设定描述，包含内在矛盾或叙事钩子" }
             },
             required: ["title", "content"]
         }
     };
 
+    // 修复: 使用正确的system instruction
+    const instruction = getInstructionWithSettings('world_gen', settings);
     const settingText = settings ? `风格要求：基调 ${settings.tone}，风格 ${settings.style}。` : "";
 
+    // 修复: 使用分类差异化的指导
+    const categoryGuidance = WORLD_CATEGORY_GUIDANCE[category] || WORLD_CATEGORY_GUIDANCE['Other'];
+
     const prompt = `基于小说梗概："${premise}" (类型: ${genre})。
-    请为世界观分类 **"${category}"** 构思 **2-3个** 关键设定条目。${settingText}
-    
-    要求：
-    - 设定必须独特且符合小说类型。
-    - 能够为剧情提供冲突或背景支持。
-    - 请使用中文输出。`;
+请为世界观分类 **"${category}"** 构思 **${count}个** 关键设定条目。
+
+${categoryGuidance}
+
+${settingText}
+
+【通用要求】:
+- 设定必须独特且符合小说类型。
+- 每个设定必须包含内在矛盾或叙事钩子。
+- 能够为剧情提供冲突或背景支持。
+- 请使用中文输出。`;
 
     try {
+        console.log(`【batchGenerateWorldSettingsByCategory】开始生成 ${category} 类设定`);
         const responseText = await executeModelTask(
             'batchGenerateSettings',
-            '',
+            instruction,  // 修复: 使用正确的system instruction
             prompt,
             'gemini-3-flash-preview',
-            0.7,
+            0.5,  // 修复: 降低temperature提高一致性
             worldSchema
         );
 
-        const parsed = safeParseAiJson(responseText, AiWorldSettingArraySchema, 'batchGenerateWorldSettings');
-        if (parsed) {
-            return parsed.map(item => ({
-                title: item.title,
-                content: item.content,
-                category: category as WorldSetting['category']
-            }));
+        if (!responseText) {
+            console.error(`【batchGenerateWorldSettingsByCategory】${category}: AI返回空响应`);
+            throw new Error(`${category}类设定生成失败：AI返回空响应`);
         }
-        return [];
+
+        const parsed = safeParseAiJson(responseText, AiWorldSettingArraySchema, 'batchGenerateWorldSettings');
+
+        if (!parsed || parsed.length === 0) {
+            console.error(`【batchGenerateWorldSettingsByCategory】${category}: 解析失败或返回空`);
+            throw new Error(`${category}类设定生成失败：数据解析错误`);
+        }
+
+        console.log(`【batchGenerateWorldSettingsByCategory】${category}: 成功生成${parsed.length}个设定`);
+
+        return parsed.map(item => ({
+            title: item.title,
+            content: item.content,
+            category: category
+        }));
     } catch (e) {
-        console.error(`Batch World Generation Error (${category})`, e);
-        return [];
+        console.error(`【batchGenerateWorldSettingsByCategory】${category} 捕获异常:`, e);
+        throw e;  // 修复: 向上抛出异常而非静默返回空数组
     }
 };
 

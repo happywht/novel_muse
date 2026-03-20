@@ -120,14 +120,95 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject, on
 
         try {
             // 1. 生成核心角色
+            console.log('【创世纪】========== 开始生成角色 ==========');
+            console.log('【创世纪】前提:', project.premise);
+            console.log('【创世纪】类型:', project.genre);
+            console.log('【创世纪】创意设置:', project.creativeSettings);
+            
             const characters = await batchGenerateCharacters(project.premise, project.genre, project.creativeSettings);
-            updateProject({ characters: [...project.characters, ...characters] });
+            
+            console.log('【创世纪】原始生成结果:', characters);
+            console.log('【创世纪】结果类型:', typeof characters);
+            console.log('【创世纪】结果是否为数组:', Array.isArray(characters));
+            console.log('【创世纪】数组长度:', characters ? characters.length : 'N/A');
+            
+            if (!characters) {
+                console.error('【创世纪】致命错误：batchGenerateCharacters返回null或undefined');
+                throw new Error('角色生成失败：返回值为null或undefined');
+            }
+            
+            if (!Array.isArray(characters)) {
+                console.error('【创世纪】致命错误：batchGenerateCharacters返回的不是数组，类型:', typeof characters);
+                throw new Error(`角色生成失败：返回类型为${typeof characters}，期望数组`);
+            }
+            
+            if (characters.length === 0) {
+                console.error('【创世纪】警告：batchGenerateCharacters返回空数组');
+                alert('警告：未生成任何角色');
+            }
+            
+            // 为生成的角色添加ID和所有必需字段
+            console.log('【创世纪】为角色添加ID...');
+            const charactersWithId = characters.map((char, index) => {
+                console.log(`【创世纪】处理角色${index}:`, char);
+
+                // 确保所有必需字段都存在
+                if (!char.name) {
+                    console.error(`【创世纪】警告：角色${index}缺少name字段`);
+                    char.name = '未命名角色';
+                }
+                if (!char.role) {
+                    console.warn(`【创世纪】警告：角色${index}缺少role字段`);
+                    char.role = '未知';
+                }
+                if (!char.archetype) {
+                    console.log(`【创世纪】角色${index} archetype为空，设置默认值`);
+                    char.archetype = char.role || '';
+                }
+
+                // 修复: 如果没有description，从其他字段组合生成
+                if (!char.description) {
+                    const descParts: string[] = [];
+                    if (char.desire) descParts.push(`【欲望】${char.desire}`);
+                    if (char.fear) descParts.push(`【恐惧】${char.fear}`);
+                    if (char.signature) descParts.push(`【特征】${char.signature}`);
+                    if (char.contrast) descParts.push(`【反差】${char.contrast}`);
+                    if (char.weakness) descParts.push(`【弱点】${char.weakness}`);
+
+                    char.description = descParts.length > 0
+                        ? descParts.join('\n')
+                        : (char.contrast || char.signature || '暂无描述');
+                    console.log(`【创世纪】角色${index} 自动生成description:`, char.description);
+                }
+
+                const charWithId = {
+                    ...char,
+                    id: `char_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 6)}`,
+                    physicalStatus: '健康',
+                    foreshadowingHooks: [],
+                    lastModified: Date.now()
+                };
+                console.log(`【创世纪】角色${index}处理后:`, charWithId);
+                return charWithId;
+            });
+            
+            console.log('【创世纪】准备更新的角色数组:', charactersWithId);
+            console.log('【创世纪】当前项目角色数:', project.characters.length);
+            
+            const newCharacters = [...project.characters, ...charactersWithId];
+            console.log('【创世纪】更新后的总角色数:', newCharacters.length);
+            
+            updateProject({ characters: newCharacters });
+            console.log('【创世纪】updateProject调用完成');
             
             setKickstartStep(2);
             setKickstartStatus('正在构建世界观设定...');
 
             // 2. 生成世界观设定
+            console.log('【创世纪】========== 开始生成世界观设定 ==========');
+            
             const worldPromises = WORLD_CATEGORIES.map(async (category) => {
+                console.log(`【创世纪】开始生成分类: ${category}`);
                 const settings = await batchGenerateWorldSettingsByCategory(
                     project.premise,
                     project.genre,
@@ -135,32 +216,119 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject, on
                     3,
                     project.creativeSettings
                 );
-                return settings;
+                console.log(`【创世纪】分类${category}原始结果:`, settings);
+                return { settings, category };
             });
             
             const worldResults = await Promise.all(worldPromises);
-            const allWorldSettings = worldResults.flat();
-            updateProject({ worldSettings: [...project.worldSettings, ...allWorldSettings] });
+            console.log('【创世纪】所有分类生成完成:', worldResults);
             
+            const allWorldSettings = worldResults.flatMap(result => {
+                console.log(`【创世纪】处理分类: ${result.category}`);
+                if (!result.settings) {
+                    console.error(`【创世纪】错误: ${result.category} 返回null或undefined`);
+                    return [];
+                }
+                if (!Array.isArray(result.settings)) {
+                    console.error(`【创世纪】错误: ${result.category} 返回的不是数组, 类型:`, typeof result.settings);
+                    return [];
+                }
+                if (result.settings.length === 0) {
+                    console.warn(`【创世纪】警告: ${result.category} 返回空数组`);
+                }
+                return result.settings.map(setting => {
+                    console.log(`【创世纪】处理设定:`, setting);
+                    return {
+                        ...setting,
+                        category: result.category as WorldSetting['category']
+                    };
+                });
+            });
+            
+            console.log('【创世纪】所有设定合并后:', allWorldSettings);
+            
+            // 为生成的世界观设定添加唯一ID
+            console.log('【创世纪】为世界观设定添加ID...');
+            const worldSettingsWithId = allWorldSettings.map((setting, index) => {
+                // 确保所有必需字段都存在
+                if (!setting.title) {
+                    console.error(`【创世纪】警告：设定${index}缺少title字段`);
+                    setting.title = '未命名设定';
+                }
+                if (!setting.content) {
+                    console.error(`【创世纪】警告：设定${index}缺少content字段`);
+                    setting.content = '暂无内容';
+                }
+                
+                const id = `world_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 6)}`;
+                console.log(`【创世纪】设定${index} ID: ${id}`);
+                return {
+                    ...setting,
+                    id,
+                    lastModified: Date.now()
+                };
+            });
+            
+            console.log('【创世纪】最终世界观设定数组:', worldSettingsWithId);
+            console.log('【创世纪】当前项目世界观数:', project.worldSettings.length);
+
+            const newWorldSettings = [...project.worldSettings, ...worldSettingsWithId];
+            console.log('【创世纪】更新后的总世界观数:', newWorldSettings.length);
+
+            updateProject({ worldSettings: newWorldSettings });
+            console.log('【创世纪】世界观设定updateProject调用完成');
+
+            // 修复: 删除了重复的 updateProject 调用
+
             setKickstartStep(3);
             setKickstartStatus('正在生成剧情大纲...');
 
-            // 3. 生成剧情大纲
+            // 修复: 使用最新状态生成剧情
+            // 从 useProjectStore 获取最新状态，而非闭包中的旧 project
+            const { useProjectStore } = await import('../store/useProjectStore');
+            const latestProject = useProjectStore.getState().project;
+
+            console.log('【创世纪】使用最新状态生成剧情');
+            console.log('【创世纪】最新角色数:', latestProject.characters.length);
+            console.log('【创世纪】最新世界观数:', latestProject.worldSettings.length);
+
             const plotNodes = await generatePlotFromContext(
-                project.premise,
-                project.genre,
-                project.characters,
-                project.worldSettings,
-                project.creativeSettings
+                latestProject.premise,
+                latestProject.genre,
+                latestProject.characters,  // 使用最新的角色列表
+                latestProject.worldSettings,  // 使用最新的世界观设定
+                latestProject.creativeSettings
             );
-            updateProject({ plotNodes: [...project.plotNodes, ...plotNodes] });
-            
+
+            console.log('【创世纪】生成的剧情节点数:', plotNodes.length);
+            updateProject({ plotNodes: [...latestProject.plotNodes, ...plotNodes] });
+
             setKickstartStatus('创世纪完成！');
+
+            // 显示成功摘要
+            const summary = `创世纪完成！\n\n✅ 生成角色: ${charactersWithId.length} 个\n✅ 生成世界观: ${worldSettingsWithId.length} 个\n✅ 生成剧情节点: ${plotNodes.length} 个`;
+            console.log(summary);
+
             await new Promise(resolve => setTimeout(resolve, 1500));
-        } catch (error) {
-            console.error('Kickstart error:', error);
-            setKickstartStatus('创世纪失败，请重试。');
-            await new Promise(resolve => setTimeout(resolve, 2000));
+        } catch (error: any) {
+            console.error('【创世纪】捕获到错误:', error);
+
+            // 修复: 提供更详细的错误信息
+            let errorMessage = '创世纪失败，请重试。';
+
+            if (error?.message?.includes('角色')) {
+                errorMessage = `角色生成失败: ${error.message}`;
+            } else if (error?.message?.includes('世界观') || error?.message?.includes('设定')) {
+                errorMessage = `世界观生成失败: ${error.message}`;
+            } else if (error?.message?.includes('剧情')) {
+                errorMessage = `剧情生成失败: ${error.message}`;
+            } else if (error?.message) {
+                errorMessage = `创世纪失败: ${error.message}`;
+            }
+
+            setKickstartStatus(errorMessage);
+            alert(errorMessage);  // 向用户显示具体错误
+            await new Promise(resolve => setTimeout(resolve, 3000));
         } finally {
             setIsKickstarting(false);
             setKickstartStep(0);
