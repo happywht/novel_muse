@@ -132,16 +132,45 @@ export function safeParseAiJson<T>(
                     mappedChar.role = mappedChar.archetype || '未知角色';
                 }
 
-                // 处理signature -> signature字段映射
-                if (mappedChar.signature && !mappedChar.signature) {
-                    mappedChar.signature = mappedChar.signature;
+                // 处理signature对象转字符串
+                if (mappedChar.signature && typeof mappedChar.signature === 'object') {
+                    const sig = mappedChar.signature as Record<string, string>;
+                    const parts: string[] = [];
+                    if (sig.appearance) parts.push(`【外貌】${sig.appearance}`);
+                    if (sig.behavior) parts.push(`【行为】${sig.behavior}`);
+                    mappedChar.signature = parts.join('\n');
+                }
+
+                // 处理relationships对象转字符串
+                if (mappedChar.relationships && typeof mappedChar.relationships === 'object') {
+                    const rel = mappedChar.relationships as Record<string, string>;
+                    const parts: string[] = [];
+                    const RELATION_LABELS: Record<string, string> = {
+                        'friend': '朋友',
+                        'enemy': '敌人',
+                        'rival': '对手',
+                        'love_interest': '情感对象',
+                        'obsession': '执念对象',
+                        'pawn': '棋子',
+                        'ward': '被监护人',
+                        'colleague': '同僚',
+                        'brother': '兄弟',
+                        'frenemy': '亦敌亦友',
+                        'bodyguard': '保护对象',
+                        'study_target': '研究对象',
+                    };
+                    for (const [key, value] of Object.entries(rel)) {
+                        const label = RELATION_LABELS[key] || key;
+                        parts.push(`${label}: ${value}`);
+                    }
+                    mappedChar.relationships = parts.join('；');
                 }
 
                 return mappedChar;
             }
             return char;
         });
-        console.log(`[Zod] ${label}: Applied character role mapping`);
+        console.log(`[Zod] ${label}: Applied character role mapping and field conversion`);
     }
 
     // Clean beatTag values that don't match our enum
