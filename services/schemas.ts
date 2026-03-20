@@ -421,7 +421,7 @@ export const AiPlotNodeSchema = z.object({
         participants: z.array(z.string()).optional(), // 参与角色ID数组
         stakes: z.string().optional(), // 赌注/冲突核心
         intensity: z.number().min(1).max(10).optional(), // 1-10强度等级
-    }).optional(),
+    }).nullable().optional(), // 允许 null 和 undefined
 });
 
 export const AiPlotNodeArraySchema = z.array(AiPlotNodeSchema);
