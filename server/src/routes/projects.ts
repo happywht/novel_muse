@@ -156,6 +156,8 @@ router.get('/:id', async (req: Request, res: Response) => {
                 creativity: project.creativity,
                 targetAudience: project.targetAudience,
                 promptProfile: (project as any).promptProfile || undefined,
+                styleTags: safeJsonParseOptional((project as any).styleTags),
+                referenceText: (project as any).referenceText || undefined,
             },
             worldGenConfig: {
                 detailLevel: project.detailLevel,
@@ -365,6 +367,8 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                     creativity: Number(data.creativeSettings?.creativity ?? 0.7),
                     targetAudience: data.creativeSettings?.targetAudience || '',
                     promptProfile: data.creativeSettings?.promptProfile || 'WEB_NOVEL',
+                    styleTags: data.creativeSettings?.styleTags ? JSON.stringify(data.creativeSettings.styleTags) : null,
+                    referenceText: data.creativeSettings?.referenceText || null,
                     detailLevel: data.worldGenConfig?.detailLevel || 'Standard',
                     focus: data.worldGenConfig?.focus || 'Balanced',
                     activeBranchId: data.activeBranchId || null,
@@ -382,6 +386,8 @@ router.put('/:id/full', async (req: Request, res: Response) => {
                     creativity: Number(data.creativeSettings?.creativity ?? 0.7),
                     targetAudience: data.creativeSettings?.targetAudience || '',
                     promptProfile: data.creativeSettings?.promptProfile || 'WEB_NOVEL',
+                    styleTags: data.creativeSettings?.styleTags ? JSON.stringify(data.creativeSettings.styleTags) : null,
+                    referenceText: data.creativeSettings?.referenceText || null,
                     detailLevel: data.worldGenConfig?.detailLevel || 'Standard',
                     focus: data.worldGenConfig?.focus || 'Balanced',
                     activeBranchId: data.activeBranchId || null,
@@ -814,6 +820,8 @@ router.patch('/:id', async (req: Request, res: Response) => {
             if (data.creativeSettings.creativity !== undefined) updateData.creativity = Number(data.creativeSettings.creativity);
             if (data.creativeSettings.targetAudience !== undefined) updateData.targetAudience = data.creativeSettings.targetAudience;
             if (data.creativeSettings.promptProfile !== undefined) updateData.promptProfile = data.creativeSettings.promptProfile;
+            if (data.creativeSettings.styleTags !== undefined) updateData.styleTags = data.creativeSettings.styleTags ? JSON.stringify(data.creativeSettings.styleTags) : null;
+            if (data.creativeSettings.referenceText !== undefined) updateData.referenceText = data.creativeSettings.referenceText || null;
         }
 
         // World Gen Config (flattened in DB)

@@ -295,7 +295,7 @@ export const polishDraft = async (
             instruction,
             prompt,
             'gemini-3-flash-preview',
-            0.8
+            settings?.creativity || 0.8
         ) || content;
     } catch (e) {
         console.error("Polish Error", e);

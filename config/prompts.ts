@@ -242,7 +242,12 @@ export const buildPromptContent = (
     let instruction = projectOverrides?.[key] || template.instruction;
 
     if (creativeSettings) {
-        instruction += `\n\n【当前总体设定】\n- 核心风格: ${profile === 'WEB_NOVEL' ? '精品网文/爽文' : '传统文学/严肃文学'}\n- 叙事基调: ${creativeSettings.tone}\n- 文字风格: ${creativeSettings.style}\n- 目标受众: ${creativeSettings.targetAudience}`;
+        // 根据 promptProfile 自动推导 style 描述
+        const derivedStyle = profile === 'WEB_NOVEL'
+            ? '干练、诙谐、快节奏，对话驱动'
+            : '注重细节描写、情感渲染、留白与意境';
+
+        instruction += `\n\n【当前总体设定】\n- 核心风格: ${profile === 'WEB_NOVEL' ? '精品网文/爽文' : '传统文学/严肃文学'}\n- 叙事基调: ${creativeSettings.tone}\n- 文字风格: ${creativeSettings.style || derivedStyle}\n- 目标受众: ${creativeSettings.targetAudience || '通用读者'}`;
 
         if (creativeSettings.styleTags && creativeSettings.styleTags.length > 0) {
             instruction += `\n- 微观技法倾向: [${creativeSettings.styleTags.join('], [')}]`;

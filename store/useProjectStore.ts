@@ -62,11 +62,13 @@ export const INITIAL_PROJECT: ProjectState = {
     genre: '',
     premise: '',
     creativeSettings: {
-        tone: '平衡 (Balanced)',
-        style: '通俗易懂 (Standard)',
+        tone: '史诗',
+        style: '',
         creativity: 0.8,
-        targetAudience: '成人 (Adult)',
+        targetAudience: '',
         promptProfile: 'WEB_NOVEL',
+        styleTags: [],
+        referenceText: '',
     },
     worldGenConfig: {
         detailLevel: 'Standard',
@@ -270,8 +272,16 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         const config = await getGlobalConfig();
         const backendSyncEnabled = config.storage.backendSync.enabled;
         
-        // 只有在全局配置启用且后端可用时才使用后端
-        const backendOk = backendSyncEnabled && await isBackendAvailable();
+        // 检测后端可用性（带重试，最多尝试 3 次，每次间隔 2 秒）
+        let backendOk = false;
+        if (backendSyncEnabled) {
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                backendOk = await isBackendAvailable();
+                if (backendOk) break;
+                console.log(`⚠️ Backend health check failed (attempt ${attempt}/3), retrying in 2s...`);
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+        }
         set({ useBackend: backendOk });
 
         // Try to migrate from localStorage if needed

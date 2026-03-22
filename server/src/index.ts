@@ -17,19 +17,25 @@ const PORT = process.env.PORT || 3001;
 // Initialize Neo4j
 let neo4jAvailable = false;
 
-// 异步初始化 Neo4j 并创建索引
-const initializeNeo4j = async () => {
-    try {
-        await initNeo4j();
-        neo4jAvailable = true;
-        console.log('📊 Neo4j: ✅ Connected');
-    } catch (err) {
-        console.warn('⚠️ Neo4j initialization failed. Graph features disabled.', err);
+// 异步初始化 Neo4j 并创建索引（带重试机制）
+const initializeNeo4j = async (retries = 3, delay = 3000): Promise<void> => {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            await initNeo4j();
+            neo4jAvailable = true;
+            console.log('📊 Neo4j: ✅ Connected');
+            return;
+        } catch (err) {
+            console.warn(`⚠️ Neo4j initialization failed (attempt ${attempt}/${retries}).`, err instanceof Error ? err.message : err);
+            if (attempt < retries) {
+                console.log(`⏳ Retrying in ${delay / 1000}s...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+                console.warn('⚠️ Neo4j initialization failed after all retries. Graph features disabled.');
+            }
+        }
     }
 };
-
-// 启动 Neo4j 初始化（不阻塞服务器启动）
-initializeNeo4j();
 
 // Middleware
 app.use(cors());
@@ -41,9 +47,6 @@ app.use('/api', apiKeyAuth);
 
 // Routes
 app.use('/api/projects', projectsRouter);
-if (neo4jAvailable) {
-    app.use('/api/graph', graphRouter);
-}
 
 // Health check (public route, no auth required)
 app.get('/api/health', (_req, res) => {
@@ -61,10 +64,20 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`🚀 Muse Backend Server running at http://localhost:${PORT}`);
     console.log(`📦 API Base: http://localhost:${PORT}/api`);
-    console.log(`📊 Neo4j: ${neo4jAvailable ? '✅ Connected' : '❌ Unavailable'}`);
+
+    // 先启动 HTTP 服务，再初始化 Neo4j（带重试）
+    await initializeNeo4j();
+
+    // Neo4j 连接成功后动态注册 graph 路由
+    if (neo4jAvailable) {
+        app.use('/api/graph', graphRouter);
+        console.log('📊 Neo4j: ✅ Graph routes registered');
+    } else {
+        console.log('📊 Neo4j: ❌ Graph features disabled');
+    }
 });
 
 // Graceful shutdown

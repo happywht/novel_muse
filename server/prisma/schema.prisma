@@ -22,6 +22,8 @@ model Project {
   creativity       Float     @default(0.7)
   targetAudience   String    @default("")
   promptProfile    String?   @default("WEB_NOVEL") // NEW: Choice of prompt pack
+  styleTags        String?   @db.LongText        // JSON array of style tags
+  referenceText    String?   @db.LongText        // Few-Shot reference text
 
   // World Gen Config
   detailLevel      String    @default("Standard")
