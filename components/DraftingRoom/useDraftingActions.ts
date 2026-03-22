@@ -13,8 +13,11 @@ import {
     fetchUnresolvedForeshadowing, fetchRelatedSubgraph,
     fetchPhysicalStatus, mergeBranchApi,
     fetchFactions, simulatePropagation,
-    fetchNarrativeInsights, patchProject
+    fetchNarrativeInsights, patchProject,
+    fetchForgeContext, syncForgeResult, ForgeGraphContext
 } from '../../services/apiService';
+import { useToast } from '../../hooks/useToast';
+import { CREATIVE_CONFIG } from '../../config/constants';
 
 interface UseDraftingActionsProps {
     project: ProjectState;
@@ -39,6 +42,8 @@ export const useDraftingActions = ({
     setActiveChapterId,
     fetchChapterContent
 }: UseDraftingActionsProps) => {
+    const { toast } = useToast();
+
     // UI State
     const [viewMode, setViewMode] = React.useState<ViewMode>('FORGE');
     const [plotBeat, setPlotBeat] = React.useState('');
@@ -51,7 +56,7 @@ export const useDraftingActions = ({
     const [activeDraftId, setActiveDraftId] = React.useState<string | null>(null);
     const [showAdvancedParams, setShowAdvancedParams] = React.useState(false);
     const [pacing, setPacing] = React.useState<'SLOW_BURN' | 'BALANCED' | 'CLIMAX'>('BALANCED');
-    const [targetWordCount, setTargetWordCount] = React.useState(3000);
+    const [targetWordCount, setTargetWordCount] = React.useState<number>(CREATIVE_CONFIG.DEFAULT_TARGET_WORD_COUNT);
     const [povCharId, setPovCharId] = React.useState('');
     const [isPolishing, setIsPolishing] = React.useState(false);
     const [showPolishMenu, setShowPolishMenu] = React.useState(false);
@@ -93,6 +98,12 @@ export const useDraftingActions = ({
     // Logic Audit State
     const [isAuditingLogic, setIsAuditingLogic] = React.useState(false);
     const [logicConflicts, setLogicConflicts] = React.useState<any[]>([]);
+
+    // Forge Graph Context State
+    const [useGraphContext, setUseGraphContext] = React.useState(true);
+    const [isFetchingGraphContext, setIsFetchingGraphContext] = React.useState(false);
+    const [forgeGraphContext, setForgeGraphContext] = React.useState<ForgeGraphContext | null>(null);
+    const [isSyncingToGraph, setIsSyncingToGraph] = React.useState(false);
 
     // Computed Settings
     const effectiveCreativeSettings = {
@@ -142,8 +153,8 @@ export const useDraftingActions = ({
     }, [activeChapterId, project.chapters]);
 
     React.useEffect(() => {
-        if (project.creativeSettings.promptProfile === 'WEB_NOVEL' && targetWordCount === 3000) setTargetWordCount(5000);
-        else if (project.creativeSettings.promptProfile === 'LITERARY' && targetWordCount === 5000) setTargetWordCount(3000);
+        if (project.creativeSettings.promptProfile === 'WEB_NOVEL' && targetWordCount === CREATIVE_CONFIG.DEFAULT_TARGET_WORDS.LITERARY) setTargetWordCount(CREATIVE_CONFIG.DEFAULT_TARGET_WORDS.WEB_NOVEL);
+        else if (project.creativeSettings.promptProfile === 'LITERARY' && targetWordCount === CREATIVE_CONFIG.DEFAULT_TARGET_WORDS.WEB_NOVEL) setTargetWordCount(CREATIVE_CONFIG.DEFAULT_TARGET_WORDS.LITERARY);
     }, [project.creativeSettings.promptProfile]);
 
     // Handlers
@@ -201,9 +212,9 @@ export const useDraftingActions = ({
         setIsMergingBranch(true);
         try {
             await mergeBranchApi(project.id, activeBranchId);
-            alert("合并成功！");
+            toast.success("合并成功！");
         } catch (err) {
-            alert("合并失败: " + (err as Error).message);
+            toast.error("合并失败: " + (err as Error).message);
         } finally {
             setIsMergingBranch(false);
         }
@@ -211,7 +222,7 @@ export const useDraftingActions = ({
 
     const handleGenerate = async () => {
         if (!plotBeat.trim()) {
-            alert("请输入或选择一个情节目标");
+            toast.warning("请输入或选择一个情节目标");
             return;
         }
         setIsGenerating(true);
@@ -223,7 +234,7 @@ export const useDraftingActions = ({
             const sortedChapters = [...project.chapters].sort((a, b) => a.order - b.order);
             const currentIndex = sortedChapters.findIndex(c => c.id === activeChapterId);
             const prevChapter = currentIndex > 0 ? sortedChapters[currentIndex - 1] : (currentIndex < 0 ? sortedChapters[sortedChapters.length - 1] : null);
-            const previousContext = prevChapter?.content?.slice(-2000);
+            const previousContext = prevChapter?.content?.slice(-CREATIVE_CONFIG.PREVIOUS_CONTEXT_LENGTH);
 
             const rollingSummary = sortedChapters.slice(0, currentIndex >= 0 ? currentIndex : sortedChapters.length)
                 .filter(c => c.summary && c.summary.trim() !== "")
@@ -236,7 +247,89 @@ export const useDraftingActions = ({
             let physicalStatus = [];
             let unresolvedForeshadowing = [];
 
-            if (useBackend) {
+            // 使用新的Forge图谱上下文API（如果启用）
+            if (useBackend && useGraphContext) {
+                setIsFetchingGraphContext(true);
+                try {
+                    // 获取选中的第一个地点ID（如果有）
+                    const firstLocationId = selectedSettingIds.length > 0 ? selectedSettingIds[0] : undefined;
+
+                    // 调用统一的Forge上下文API
+                    const forgeContext = await fetchForgeContext(project.id, {
+                        characterIds: selectedChars,
+                        locationId: firstLocationId,
+                        plotNodeId: localPlotNodeId || undefined
+                    });
+
+                    setForgeGraphContext(forgeContext);
+
+                    // 构建图谱上下文字符串（用于AI生成）
+                    const contextParts: string[] = [];
+
+                    // 角色状态
+                    if (forgeContext.characters.length > 0) {
+                        contextParts.push('\n【角色当前状态】');
+                        forgeContext.characters.forEach(char => {
+                            contextParts.push(`- ${char.name} (${char.role}): ${char.physicalStatus}`);
+                            if (char.location) contextParts.push(`  位置: ${char.location}`);
+                            if (char.desire) contextParts.push(`  核心欲望: ${char.desire}`);
+                            if (char.fear) contextParts.push(`  核心恐惧: ${char.fear}`);
+                            if (char.weakness) contextParts.push(`  弱点: ${char.weakness}`);
+                            if (char.signature) contextParts.push(`  标志特征: ${char.signature}`);
+                            if (char.relationships && char.relationships.length > 0) {
+                                char.relationships.forEach(rel => {
+                                    contextParts.push(`  与 ${rel.targetName}: ${rel.type} (权重: ${rel.weight})${rel.trajectory ? ` [${rel.trajectory}]` : ''}`);
+                                });
+                            }
+                        });
+                    }
+
+                    // 未回收伏笔
+                    if (forgeContext.unresolvedForeshadowing.length > 0) {
+                        contextParts.push('\n【待回收伏笔】');
+                        forgeContext.unresolvedForeshadowing.forEach(f => {
+                            contextParts.push(`- ${f.subject} ${f.relation} ${f.object} [状态: ${f.status}]`);
+                        });
+                    }
+
+                    // 地点上下文
+                    if (forgeContext.locationContext) {
+                        contextParts.push('\n【场景设定】');
+                        contextParts.push(`[${forgeContext.locationContext.category}] ${forgeContext.locationContext.title}: ${forgeContext.locationContext.content}`);
+                    }
+
+                    // 情节上下文
+                    if (forgeContext.plotContext) {
+                        contextParts.push('\n【情节背景】');
+                        const relatedChars = forgeContext.plotContext.relatedCharacters.length > 0
+                            ? ` (涉及: ${forgeContext.plotContext.relatedCharacters.join(', ')})`
+                            : '';
+                        contextParts.push(`${forgeContext.plotContext.title}${relatedChars}: ${forgeContext.plotContext.content}`);
+                    }
+
+                    graphContext = contextParts.join('\n');
+                    physicalStatus = forgeContext.characters;
+                    unresolvedForeshadowing = forgeContext.unresolvedForeshadowing;
+                } catch (err) {
+                    console.error('Failed to fetch forge context, falling back to legacy APIs:', err);
+                    // 降级到旧的API
+                    const anchors = [...activeCharacters.map(c => c.name), ...activeSettings.map(s => s.title)];
+                    const promises: Promise<any>[] = [fetchUnresolvedForeshadowing(project.id, activeBranchId)];
+                    if (anchors.length > 0) {
+                        promises.push(fetchRelatedSubgraph(project.id, anchors, activeBranchId));
+                        promises.push(fetchPhysicalStatus(project.id, anchors, activeBranchId));
+                    }
+                    const results = await Promise.all(promises);
+                    unresolvedForeshadowing = results[0];
+                    if (anchors.length > 0) {
+                        graphContext = results[1];
+                        physicalStatus = results[2];
+                    }
+                } finally {
+                    setIsFetchingGraphContext(false);
+                }
+            } else if (useBackend) {
+                // 旧逻辑：分别调用各个API
                 const anchors = [...activeCharacters.map(c => c.name), ...activeSettings.map(s => s.title)];
                 const promises: Promise<any>[] = [fetchUnresolvedForeshadowing(project.id, activeBranchId)];
                 if (anchors.length > 0) {
@@ -266,7 +359,7 @@ export const useDraftingActions = ({
             // 自动触发逻辑审计
             triggerLogicAudit(result);
         } catch (e) {
-            alert("生成失败");
+            toast.error("生成失败");
         } finally {
             setIsGenerating(false);
         }
@@ -282,7 +375,7 @@ export const useDraftingActions = ({
             const activeCharacters = (project.characters || []).filter(c => selectedChars.includes(c.id));
             triggerStateAnalysis(result, activeCharacters);
         } catch (e) {
-            alert("润色失败");
+            toast.error("润色失败");
         } finally {
             setIsPolishing(false);
         }
@@ -296,7 +389,7 @@ export const useDraftingActions = ({
             );
             applyRewrite(rewrittenText);
         } catch (e) {
-            alert("局部重写失败");
+            toast.error("局部重写失败");
         } finally {
             setIsLocalRewriting(false);
         }
@@ -360,7 +453,7 @@ export const useDraftingActions = ({
         if (!generatedContent) return;
         setIsSaving(true);
         try {
-            const title = plotBeat.slice(0, 20) || `草稿 ${new Date().toLocaleTimeString()}`;
+            const title = plotBeat.slice(0, CREATIVE_CONFIG.PLOT_BEAT_TITLE_LENGTH) || `草稿 ${new Date().toLocaleTimeString()}`;
             const newDraft: Draft = {
                 id: activeDraftId || Date.now().toString(),
                 title,
@@ -429,10 +522,10 @@ export const useDraftingActions = ({
         setIsSaving(true);
         const newChapterId = Date.now().toString();
         try {
-            // 决定标题：如果已有章节且标题不是默认的“第x章”，则保留原标题；否则使用情节摘要的前30个字
+            // 决定标题：如果已有章节且标题不是默认的”第x章”，则保留原标题；否则使用情节摘要的前30个字
             let title = (targetChapter && !targetChapter.title.startsWith('第'))
                 ? targetChapter.title
-                : (plotBeat.slice(0, 30) || `第 ${order} 章`);
+                : (plotBeat.slice(0, CREATIVE_CONFIG.CHAPTER_TITLE_LENGTH) || `第 ${order} 章`);
 
             const content = generatedContent;
 
@@ -486,7 +579,13 @@ export const useDraftingActions = ({
             updateProject({ chapters: updatedChapters });
             if (useBackend) await patchProject(project.id, { chapters: updatedChapters });
 
-            alert("已成功采纳至正文！");
+            // 自动同步到图谱（如果启用了图谱上下文）
+            const finalChapterId = chapterIdToUpdate || newChapterId;
+            if (useGraphContext && extractedEchoes.length > 0) {
+                handleSyncToGraph(finalChapterId);
+            }
+
+            toast.success("已成功采纳至正文！");
             setViewMode('MANUSCRIPT');
             if (chapterIdToUpdate) setActiveChapterId(chapterIdToUpdate);
             else {
@@ -504,6 +603,51 @@ export const useDraftingActions = ({
         if (confirm("确定要删除此章节吗？此操作不可撤销。")) {
             updateProject({ chapters: project.chapters.filter(c => c.id !== id) });
             if (activeChapterId === id) setActiveChapterId(null);
+        }
+    };
+
+    /**
+     * 同步Forge生成结果到知识图谱
+     */
+    const handleSyncToGraph = async (chapterId: string) => {
+        if (!useBackend || !useGraphContext) return;
+
+        setIsSyncingToGraph(true);
+        try {
+            // 准备同步数据
+            const echoesToSync = extractedEchoes.filter(e => e.status === 'ACCEPTED');
+            const physicalStatusUpdates = echoesToSync
+                .filter(e => e.type === 'CHARACTER')
+                .map(e => ({
+                    characterId: e.targetId || '',
+                    characterName: e.targetName,
+                    status: e.description,
+                    reason: e.reason,
+                }));
+
+            await syncForgeResult(project.id, {
+                chapterId,
+                echoes: echoesToSync.map(e => ({
+                    id: e.id,
+                    targetId: e.targetId,
+                    targetName: e.targetName,
+                    targetType: e.type,
+                    description: e.description,
+                    reason: e.reason,
+                    triples: [], // 可以从Echo中提取知识三元组
+                })),
+                physicalStatusUpdates,
+            });
+
+            // 清空已同步的Echo
+            setExtractedEchoes(prev => prev.filter(e => e.status !== 'ACCEPTED'));
+
+            console.log('Forge结果已成功同步到知识图谱');
+        } catch (error) {
+            console.error('同步到图谱失败:', error);
+            toast.error('同步到图谱失败，请查看控制台了解详情');
+        } finally {
+            setIsSyncingToGraph(false);
         }
     };
 
@@ -529,7 +673,7 @@ export const useDraftingActions = ({
             setPropagationRisks(risks);
         } catch (err) {
             console.error(err);
-            alert("模拟失败");
+            toast.error("模拟失败");
         } finally {
             setIsSimulatingPropagation(false);
         }
@@ -646,6 +790,13 @@ export const useDraftingActions = ({
         logicConflicts,
         setLogicConflicts,
         handleVerifyLogic,
+
+        // Forge Graph Context
+        useGraphContext, setUseGraphContext,
+        isFetchingGraphContext,
+        forgeGraphContext,
+        isSyncingToGraph,
+        handleSyncToGraph,
 
         // Reference Sidebar
         showReference, setShowReference,

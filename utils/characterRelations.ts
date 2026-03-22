@@ -269,3 +269,57 @@ export function createCharacterRelation(
     ...options,
   };
 }
+
+/**
+ * 从结构化关系生成展示字符串（替代双写）
+ * 用于AI prompts和UI显示
+ * @param relations 结构化关系数组
+ * @returns 格式化的关系字符串，如 "朋友: 张三；敌人: 李四"
+ */
+export function getDisplayRelationships(relations: CharacterRelation[] | undefined): string {
+  if (!relations || relations.length === 0) return '';
+
+  const parts: string[] = relations.map((relation) => {
+    const type = getRelationType(relation);
+    const label = RELATION_TYPE_LABELS[type] || '关联';
+    const targetName = getTargetName(relation);
+    return `${label}: ${targetName}`;
+  });
+
+  return parts.join('；');
+}
+
+/**
+ * 规范化角色数据（填充 structuredRelations）
+ * 用于处理旧数据，确保角色有结构化关系
+ * @param character 角色对象
+ * @param allCharacters 所有角色列表（用于匹配目标角色ID）
+ * @returns 规范化后的角色对象
+ */
+export function normalizeCharacterRelations(
+  character: Character,
+  allCharacters: Character[]
+): Character {
+  // 如果已有结构化关系，直接返回
+  if (character.structuredRelations && character.structuredRelations.length > 0) {
+    return character;
+  }
+
+  // 如果只有旧格式关系字符串，转换为新格式
+  if (character.relationships) {
+    const parsed = parseLegacyRelationships(character.relationships);
+    const structured = convertLegacyToStructured(parsed, allCharacters);
+
+    return {
+      ...character,
+      structuredRelations: structured,
+      // relationships 保留不变（向后兼容）
+    };
+  }
+
+  // 无任何关系数据
+  return {
+    ...character,
+    structuredRelations: [],
+  };
+}

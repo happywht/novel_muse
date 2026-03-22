@@ -19,6 +19,7 @@ import { useProjectStore, INITIAL_PROJECT } from './store/useProjectStore';
 import { storageService, STORAGE_KEYS } from './services/storageService';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useFeature } from './hooks/useFeature';
+import { ConfirmDialogProvider } from './hooks/useConfirm';
 
 const MUSE_FILE_VERSION = '1.0';
 
@@ -157,6 +158,7 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
+    <ConfirmDialogProvider>
     <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans selection:bg-muse-500/30 selection:text-muse-100 flex">
       {/* Hidden file input for import */}
       <input
@@ -285,6 +287,7 @@ const App: React.FC = () => {
       {/* Prompt Tuner Modal */}
       {showPromptTuner && <PromptTuner onClose={() => setShowPromptTuner(false)} />}
     </div>
+    </ConfirmDialogProvider>
     </ErrorBoundary>
   );
 };

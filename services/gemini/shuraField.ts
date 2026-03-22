@@ -6,6 +6,7 @@ import {
     executeModelTask, getInstructionWithSettings
 } from "./core";
 import { formatContext, filterRelevantSettings, formatEntityLookupTable } from "./helpers";
+import { getDisplayRelationships } from "../../utils/characterRelations";
 
 export interface ConflictScenario {
     type: 'CONFRONTATION' | 'CLIMAX' | 'TWIST';
@@ -41,7 +42,12 @@ export const generateConflictScenario = async (
     selectedCharacters.forEach((c, idx) => {
         charContext += `${idx + 1}. ${c.name} (${c.role})\n`;
         charContext += `   性格: ${c.description.slice(0, 200)}${c.description.length > 200 ? '...' : ''}\n`;
-        if (c.relationships) {
+        // 使用结构化关系生成展示字符串（替代直接访问 c.relationships）
+        const displayRels = getDisplayRelationships(c.structuredRelations);
+        if (displayRels) {
+            charContext += `   关系网络: ${displayRels}\n`;
+        } else if (c.relationships) {
+            // 向后兼容：如果没有结构化关系，回退到旧格式
             charContext += `   关系网络: ${c.relationships}\n`;
         }
         // 分析与其他参与者的关系

@@ -3,8 +3,33 @@
  * Centralized configuration for all AI models, storage, performance, and features
  */
 
-import { LLMTaskType } from '../types';
 import { STORAGE_KEYS } from '../services/storageService';
+
+// LLM任务类型枚举 - 用于任务模型覆盖配置
+export type LLMTaskType =
+    | 'analyzePlot'
+    | 'batchGenerateSettings'
+    | 'analyzeStateChanges'
+    | 'deduceWorldConsequences'
+    | 'auditChapterPlan'
+    | 'extractEchoes'
+    | 'batchGenerateCharacters'
+    | 'generatePlot'
+    | 'rewritePlot'
+    | 'splitPlotNodeIntoChapters'
+    | 'regenerateChapterOutline'
+    | 'expandScene'
+    | 'expandWorldLore'
+    | 'polishDraft'
+    | 'generateText'
+    | 'rewriteLocalText'
+    | 'analyzePlotRhythm'
+    | 'summarizeChapter'
+    | 'extractKnowledgeTriples'
+    | 'inspectLogicConflicts'
+    | 'generateTwistHooks'
+    | 'generateConflictScenario'
+    | 'generateAIBalanceSuggestions';
 
 export enum Provider {
     GLM = 'GLM',

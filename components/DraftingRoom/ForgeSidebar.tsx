@@ -2,7 +2,7 @@ import React from 'react';
 import {
     GitCommit, Brain, X, Zap, Sparkles, RefreshCw,
     Loader2, Users, Plus, Eye, MapPin, Gauge, FileText,
-    PenTool, Trash2, AlertTriangle, Sidebar
+    PenTool, Trash2, AlertTriangle, Sidebar, Network, CheckCircle2
 } from 'lucide-react';
 import { ProjectState, Character, WorldSetting, Draft, KnowledgeTriple, NarrativeInsight } from '../../types';
 import { ContinuityBanner } from '../panels/ContinuityBanner';
@@ -63,6 +63,10 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
         handleDeleteBranch,
         logicConflicts,
         setLogicConflicts,
+        useGraphContext,
+        setUseGraphContext,
+        isFetchingGraphContext,
+        isSyncingToGraph,
     } = actions;
     return (
         <div className="w-1/3 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar pt-10 pb-10">
@@ -474,6 +478,51 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
                     {isFetchingFactions ? <RefreshCw size={14} className="animate-spin" /> : <Users size={14} />}
                     势力版图
                 </button>
+            )}
+
+            {/* Graph Context Toggle */}
+            {useBackend && (
+                <div className="bg-slate-800/50 p-3 rounded-xl border border-slate-700">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Zap size={16} className={useGraphContext ? "text-purple-400" : "text-slate-500"} />
+                            <span className="text-xs text-slate-300 font-medium">图谱上下文增强</span>
+                        </div>
+                        <button
+                            onClick={() => setUseGraphContext(!useGraphContext)}
+                            className={`relative w-10 h-5 rounded-full transition-colors ${
+                                useGraphContext ? 'bg-purple-600' : 'bg-slate-700'
+                            }`}
+                        >
+                            <div
+                                className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                                    useGraphContext ? 'translate-x-5' : 'translate-x-0.5'
+                                }`}
+                            />
+                        </button>
+                    </div>
+                    {useGraphContext && (
+                        <div className="mt-2 pt-2 border-t border-slate-700">
+                            <p className="text-[10px] text-slate-400 leading-relaxed">
+                                启用后，AI将在生成时自动获取：
+                            </p>
+                            <ul className="text-[10px] text-slate-500 mt-1 space-y-0.5">
+                                <li>• 角色的物理状态和当前位置</li>
+                                <li>• 角色之间的关系走向</li>
+                                <li>• 未回收的伏笔线索</li>
+                                <li>• 情节节点的上下文</li>
+                            </ul>
+                        </div>
+                    )}
+                    {(isFetchingGraphContext || isSyncingToGraph) && (
+                        <div className="mt-2 flex items-center gap-2 text-[10px] text-purple-400">
+                            <Loader2 size={10} className="animate-spin" />
+                            <span>
+                                {isFetchingGraphContext ? '正在获取图谱上下文...' : '正在同步到知识图谱...'}
+                            </span>
+                        </div>
+                    )}
+                </div>
             )}
 
             {/* Action Button */}

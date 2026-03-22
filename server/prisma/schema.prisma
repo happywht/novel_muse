@@ -42,18 +42,44 @@ model Project {
   plotNodes        PlotNode[]
   echoes           Echo[]
   timeline         TimelineEvent[]
+  batchOperations  BatchOperation[]
 }
 
 model Character {
-  id            String   @id @default(cuid())
-  name          String
-  role          String
-  archetype     String   @default("")
-  description   String   @db.LongText
-  relationships String?  @db.Text
-  imageUrl      String?  @db.Text
-  projectId     String
-  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id                   String   @id @default(cuid())
+  name                 String
+  role                 String
+  archetype            String   @default("")
+  description          String   @db.LongText
+  relationships        String?  @db.Text          // 保留用于向后兼容和迁移
+  structuredRelations  String?  @db.LongText      // 新增: 结构化关系 JSON 存储
+  imageUrl             String?  @db.Text
+
+  // 角色深度字段
+  alignment            String?
+  tags                 String?  // JSON array
+  desire               String?  @db.Text
+  fear                 String?  @db.Text
+  signature            String?  @db.Text
+  contrast             String?  @db.Text
+  weakness             String?  @db.Text
+
+  // 角色弧线
+  arc                  String?  @db.Text // JSON object
+
+  // 世界设定关联
+  originLocation       String?
+  residence            String?
+  controlledTerritories String? @db.Text // JSON array
+  exiledFrom           String?  @db.Text // JSON array
+
+  // 系统字段
+  physicalStatus       String?  @db.Text
+  foreshadowingHooks   String?  @db.Text // JSON array
+  lastModified         BigInt?
+
+  projectId            String
+  project              Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }
@@ -63,6 +89,9 @@ model WorldSetting {
   category  String
   title     String
   content   String  @db.LongText
+  parentId  String?
+  importance Int?
+  tags      String? // JSON array
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
@@ -100,7 +129,9 @@ model Chapter {
   summary      String?  @db.LongText
   expectedPOV  String?  @db.Text
   beats        String?  @db.LongText // JSON blob for scene beats
-  plotNodeId   String?  
+  metadata     String?  @db.Text // JSON array
+  targetWordCount Int?
+  plotNodeId   String?
   order        Int
   lastModified BigInt
   projectId    String
@@ -111,13 +142,15 @@ model Chapter {
 
 model Echo {
   id          String   @id @default(cuid())
-  type        String   
+  type        String
   targetId    String
   targetName  String
   description String   @db.LongText
   reason      String   @db.LongText
   status      String   @default("PENDING")
   triples     String?  @db.LongText // NEW: JSON blob for associated triples
+  confidence  Float?
+  extractionEvidence String? @db.Text
   timestamp   BigInt
   branchId    String?  // NEW Task 2.2
   projectId   String
@@ -148,8 +181,24 @@ model PlotNode {
   beatTag          String?
   relatedCharacters String? @db.Text // JSON string of IDs
   relatedLocations  String? @db.Text // JSON string of IDs
+  conflictScenario String?  @db.Text // JSON object
+  relatedChapters  String?  @db.Text // JSON array
   projectId        String
   project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+}
+
+model BatchOperation {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  operation   String   // BATCH_ACCEPT, BATCH_REJECT
+  echoIds     String   @db.Text // JSON array
+  previousStates String @db.Text // JSON object: { echoId: previousStatus }
+  timestamp   BigInt
+  expiresAt   BigInt?  // 过期时间，用于清理
+
+  @@index([projectId])
+  @@index([expiresAt])
 }

@@ -267,14 +267,8 @@ export function safeParseAiJson<T>(
                         description: rel.description,
                     }));
 
-                    // 如果没有 relationships 字符串，从结构化数据生成（双写）
-                    if (!mappedChar.relationships && mappedChar.structuredRelations.length > 0) {
-                        const parts = mappedChar.structuredRelations.map((rel: any) => {
-                            const label = ENUM_TO_LABEL[rel.type] || '关联';
-                            return `${label}: ${rel.targetName}`;
-                        });
-                        mappedChar.relationships = parts.join('；');
-                    }
+                    // 移除双写逻辑: relationships 现在是计算属性，由前端/后端根据 structuredRelations 动态生成
+                    // 不再在此处从 structuredRelations 生成 relationships 字符串
                 }
 
                 return mappedChar;
@@ -353,6 +347,10 @@ export const AiCharacterSchema = z.object({
     // 关系字段 - 双格式支持
     relationships: z.string().optional().describe('人际关系（字符串格式，兼容旧数据）'),
     structuredRelations: z.array(AiCharacterRelationSchema).optional().describe('结构化关系数组（新格式）'),
+
+    // 世界设定关联（可选）
+    originLocation: z.string().optional().describe('角色的起源/出生地名称'),
+    residence: z.string().optional().describe('角色的居住地名称'),
 });
 
 export const AiCharacterArraySchema = z.array(AiCharacterSchema);
@@ -415,6 +413,7 @@ export const AiPlotNodeSchema = z.object({
     beatTag: z.enum(['INCITING_INCIDENT', 'PLOT_POINT_1', 'MIDPOINT', 'PLOT_POINT_2', 'CLIMAX', 'RESOLUTION', 'OTHER']).optional(),
     relatedCharacters: z.array(z.string()).optional(), // List of Character IDs
     relatedLocations: z.array(z.string()).optional(),  // List of WorldSetting IDs
+    relatedChapters: z.array(z.string()).optional(),  // List of Chapter IDs
     // NEW: 修罗场冲突场景元数据
     conflictScenario: z.object({
         type: z.enum(['CONFRONTATION', 'CLIMAX', 'TWIST']).nullable().optional(),

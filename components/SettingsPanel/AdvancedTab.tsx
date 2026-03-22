@@ -256,7 +256,7 @@ export const AdvancedTab: React.FC<AdvancedTabProps> = ({ showToast }) => {
                         <label className="block text-xs font-medium text-slate-400 mb-2">日志级别</label>
                         <select
                             value={localConfig.logLevel}
-                            onChange={(e) => setLocalConfig({ ...localConfig, logLevel: e.target.value })}
+                            onChange={(e) => setLocalConfig({ ...localConfig, logLevel: e.target.value as 'none' | 'error' | 'warn' | 'info' | 'debug' })}
                             disabled={!editing}
                             className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white
                                 focus:border-muse-500 outline-none disabled:bg-slate-800/50 disabled:text-slate-500"

@@ -1,11 +1,25 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ProjectState, Character, WorldSetting, Echo } from '../types';
 import {
     X, Activity, Clock, User, Globe, Sparkles,
     Filter, Zap, PlayCircle, Brain, CheckCircle,
-    Trash2, ChevronRight, Inbox, History, Search, Loader2, ArrowRight
+    Trash2, ChevronRight, Inbox, History, Search, Loader2, ArrowRight,
+    Network, AlertTriangle, GitBranch, Users, ClipboardCheck, FileText,
+    RotateCcw, List
 } from 'lucide-react';
 import { deduceWorldConsequences, consolidateMemory } from '../services/geminiService';
+import {
+    fetchRelationshipTimeline,
+    fetchEchoForeshadowing,
+    detectContradictions,
+    API_BASE,
+    BatchOperationHistoryItem
+} from '../services/apiService';
+import { EchoDeepReview } from './Echo/EchoDeepReview';
+import { EchoIntegrityReport } from './Echo/EchoIntegrityReport';
+import { useProjectStore } from '../store/useProjectStore';
+import { useToast } from '../hooks/useToast';
+import { RELATIONSHIP_CONFIG } from '../config/constants';
 
 interface EchoChamberProps {
     project: ProjectState;
@@ -14,13 +28,68 @@ interface EchoChamberProps {
 
 type ViewFilter = 'PENDING' | 'HISTORY';
 
+// Graph Query State Types
+interface RelationshipTimelineItem {
+    timestamp: number;
+    echoId: string;
+    relation: string;
+    trajectory: string;
+    weight: number;
+    description: string;
+}
+
+interface ForeshadowingItem {
+    subject: string;
+    relation: string;
+    object: string;
+    echoId: string;
+    createdAt: number;
+    relatedChapter?: string;
+}
+
+interface ContradictionItem {
+    type: 'RELATIONSHIP_CONFLICT' | 'STATE_MISMATCH' | 'TEMPORAL_ERROR';
+    description: string;
+    entities: string[];
+    conflictingEchoes: string[];
+    severity: 'HIGH' | 'MEDIUM' | 'LOW';
+}
+
 export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject }) => {
+    const { toast } = useToast();
     const [selectedEchoId, setSelectedEchoId] = useState<string | null>(null);
     const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
     const [viewFilter, setViewFilter] = useState<ViewFilter>('PENDING');
     const [isDeducing, setIsDeducing] = useState(false);
     const [isConsolidating, setIsConsolidating] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+
+    // Graph Query States
+    const [selectedChar1Id, setSelectedChar1Id] = useState<string | null>(null);
+    const [selectedChar2Id, setSelectedChar2Id] = useState<string | null>(null);
+    const [relationshipTimeline, setRelationshipTimeline] = useState<RelationshipTimelineItem[]>([]);
+    const [foreshadowingList, setForeshadowingList] = useState<ForeshadowingItem[]>([]);
+    const [contradictions, setContradictions] = useState<ContradictionItem[]>([]);
+    const [isLoadingTimeline, setIsLoadingTimeline] = useState(false);
+    const [isLoadingForeshadowing, setIsLoadingForeshadowing] = useState(false);
+    const [isLoadingContradictions, setIsLoadingContradictions] = useState(false);
+    const [showGraphPanel, setShowGraphPanel] = useState(false);
+
+    // Deep Review & Integrity Report States
+    const [showDeepReview, setShowDeepReview] = useState(false);
+    const [showIntegrityReport, setShowIntegrityReport] = useState(false);
+
+    // Batch Operation History States
+    const [showBatchHistory, setShowBatchHistory] = useState(false);
+    const [undoingOperationId, setUndoingOperationId] = useState<string | null>(null);
+
+    // Get batch operation history and actions from store
+    const {
+        batchOperationHistory,
+        loadBatchOperationHistory,
+        undoLastBatchOperation,
+        useBackend
+    } = useProjectStore();
 
     // --- Data Processing ---
 
@@ -66,6 +135,105 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
         entityHistory.filter(e => e.status === 'ACCEPTED')
         , [entityHistory]);
 
+    // --- Graph Query Handlers ---
+
+    // Load foreshadowing on mount
+    useEffect(() => {
+        if (showGraphPanel && foreshadowingList.length === 0) {
+            loadForeshadowing();
+        }
+    }, [showGraphPanel]);
+
+    const loadForeshadowing = async () => {
+        setIsLoadingForeshadowing(true);
+        try {
+            const result = await fetchEchoForeshadowing(project.id);
+            setForeshadowingList(result);
+        } catch (err) {
+            console.error('Failed to load foreshadowing:', err);
+        } finally {
+            setIsLoadingForeshadowing(false);
+        }
+    };
+
+    const loadRelationshipTimeline = async () => {
+        if (!selectedChar1Id || !selectedChar2Id) {
+            toast.warning('请选择两个角色');
+            return;
+        }
+        if (selectedChar1Id === selectedChar2Id) {
+            toast.warning('请选择两个不同的角色');
+            return;
+        }
+
+        setIsLoadingTimeline(true);
+        try {
+            const result = await fetchRelationshipTimeline(project.id, selectedChar1Id, selectedChar2Id);
+            setRelationshipTimeline(result);
+        } catch (err) {
+            console.error('Failed to load relationship timeline:', err);
+            toast.error('加载关系时间线失败');
+        } finally {
+            setIsLoadingTimeline(false);
+        }
+    };
+
+    const loadContradictions = async () => {
+        setIsLoadingContradictions(true);
+        try {
+            const result = await detectContradictions(project.id);
+            setContradictions(result);
+        } catch (err) {
+            console.error('Failed to detect contradictions:', err);
+            toast.error('矛盾检测失败');
+        } finally {
+            setIsLoadingContradictions(false);
+        }
+    };
+
+    const handleAcceptEchoToGraph = async (echoId: string) => {
+        try {
+            const response = await fetch(`${API_BASE}/graph/${project.id}/echoes/${echoId}/accept`, {
+                method: 'POST'
+            });
+            if (!response.ok) throw new Error('Failed to accept echo to graph');
+
+            // Update local state
+            handleAction(echoId, 'ACCEPTED');
+            toast.success('Echo已采纳并同步到图谱');
+        } catch (err) {
+            console.error('Failed to accept echo:', err);
+            toast.error('同步到图谱失败');
+        }
+    };
+
+    // Deep Review Handlers
+    const handleAcceptEcho = (echo: Echo) => {
+        handleAction(echo.id, 'ACCEPTED');
+    };
+
+    const handleRejectEcho = (echo: Echo) => {
+        handleAction(echo.id, 'REJECTED');
+    };
+
+    const handleBatchAccept = (echoes: Echo[]) => {
+        const updatedEchoes = project.echoes.map(e =>
+            echoes.find(selected => selected.id === e.id)
+                ? { ...e, status: 'ACCEPTED' as const }
+                : e
+        );
+        updateProject({ echoes: updatedEchoes });
+    };
+
+    const handleBatchReject = (echoes: Echo[]) => {
+        const updatedEchoes = project.echoes.map(e =>
+            echoes.find(selected => selected.id === e.id)
+                ? { ...e, status: 'REJECTED' as const }
+                : e
+        );
+        updateProject({ echoes: updatedEchoes });
+    };
+
     // --- Handlers ---
 
     const handleAction = (echoId: string, status: 'ACCEPTED' | 'REJECTED') => {
@@ -108,7 +276,7 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
             setViewFilter('PENDING'); // Ensure we see the results
         } catch (e) {
             console.error(e);
-            alert("推演失败");
+            toast.error("推演失败");
         } finally {
             setIsDeducing(false);
         }
@@ -164,10 +332,10 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                 });
             });
 
-            alert("记忆固化完成！短期记忆已转化为长期档案。");
+            toast.success("记忆固化完成！短期记忆已转化为长期档案。");
         } catch (e) {
             console.error(e);
-            alert("记忆固化失败");
+            toast.error("记忆固化失败");
         } finally {
             setIsConsolidating(false);
         }
@@ -221,7 +389,217 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                     >
                         {isDeducing ? <Loader2 size={14} className="animate-spin" /> : <><Sparkles size={16} /> <span className="text-xs font-bold">推演蝴蝶效应</span></>}
                     </button>
+
+                    <button
+                        onClick={() => setShowGraphPanel(!showGraphPanel)}
+                        className={`px-3 py-1.5 rounded-lg flex items-center gap-2 transition-all shadow-lg active:scale-95 ${
+                            showGraphPanel
+                                ? 'bg-muse-600 text-white'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                        }`}
+                    >
+                        <Network size={16} />
+                        <span className="text-xs font-bold">图谱查询</span>
+                    </button>
+
+                    <button
+                        onClick={() => setShowDeepReview(true)}
+                        className="bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/30 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-all shadow-lg active:scale-95"
+                    >
+                        <Search size={16} />
+                        <span className="text-xs font-bold">深度审核</span>
+                    </button>
+
+                    <button
+                        onClick={() => setShowIntegrityReport(true)}
+                        className="bg-amber-900/50 hover:bg-amber-800 text-amber-200 border border-amber-500/30 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-all shadow-lg active:scale-95"
+                    >
+                        <FileText size={16} />
+                        <span className="text-xs font-bold">完整性报告</span>
+                    </button>
+
+                    <button
+                        onClick={async () => {
+                            setShowBatchHistory(true);
+                            if (useBackend) {
+                                await loadBatchOperationHistory();
+                            }
+                        }}
+                        className={`bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-all shadow-lg active:scale-95 relative ${batchOperationHistory.length > 0 ? 'ring-1 ring-muse-500/50' : ''}`}
+                        title="查看批量操作历史并撤销"
+                    >
+                        <List size={16} />
+                        <span className="text-xs font-bold">操作历史</span>
+                        {batchOperationHistory.length > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-muse-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                                {batchOperationHistory.length}
+                            </span>
+                        )}
+                    </button>
                 </div>
+
+                {/* Graph Query Panel */}
+                {showGraphPanel && (
+                    <div className="border-b border-slate-800 bg-slate-950/20 p-4 space-y-4">
+                        {/* Relationship Timeline Section */}
+                        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                            <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                                <Users size={16} className="text-muse-400" />
+                                关系时间线
+                            </h3>
+                            <div className="flex gap-2 mb-3">
+                                <select
+                                    value={selectedChar1Id || ''}
+                                    onChange={(e) => setSelectedChar1Id(e.target.value || null)}
+                                    className="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-300"
+                                >
+                                    <option value="">选择角色1</option>
+                                    {project.characters.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                                <select
+                                    value={selectedChar2Id || ''}
+                                    onChange={(e) => setSelectedChar2Id(e.target.value || null)}
+                                    className="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-300"
+                                >
+                                    <option value="">选择角色2</option>
+                                    {project.characters.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                                <button
+                                    onClick={loadRelationshipTimeline}
+                                    disabled={isLoadingTimeline || !selectedChar1Id || !selectedChar2Id}
+                                    className="bg-muse-600 hover:bg-muse-500 disabled:bg-slate-700 text-white px-3 py-1.5 rounded text-xs font-bold transition-all"
+                                >
+                                    {isLoadingTimeline ? <Loader2 size={12} className="animate-spin" /> : '查询'}
+                                </button>
+                            </div>
+
+                            {relationshipTimeline.length > 0 && (
+                                <div className="space-y-2 max-h-40 overflow-y-auto">
+                                    {relationshipTimeline.map((item, idx) => (
+                                        <div key={idx} className="bg-slate-900/50 p-2 rounded border border-slate-800 text-xs">
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="text-muse-400 font-bold">{item.relation}</span>
+                                                <span className="text-slate-500">{new Date(item.timestamp).toLocaleDateString()}</span>
+                                            </div>
+                                            <p className="text-slate-400">{item.description}</p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
+                                                    <div
+                                                        className={`h-full rounded-full ${
+                                                            item.weight > RELATIONSHIP_CONFIG.HIGH_WEIGHT_THRESHOLD ? 'bg-rose-500' :
+                                                            item.weight > RELATIONSHIP_CONFIG.MEDIUM_WEIGHT_THRESHOLD ? 'bg-amber-500' : 'bg-blue-500'
+                                                        }`}
+                                                        style={{ width: `${item.weight}%` }}
+                                                    />
+                                                </div>
+                                                <span className={`text-[8px] px-1 rounded font-bold ${
+                                                    item.trajectory === 'rising' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                    item.trajectory === 'falling' ? 'bg-rose-500/20 text-rose-400' :
+                                                    'bg-slate-700 text-slate-400'
+                                                }`}>
+                                                    {item.trajectory === 'rising' ? '↑ 上升' : item.trajectory === 'falling' ? '↓ 下降' : '→ 稳定'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Foreshadowing Section */}
+                        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                    <GitBranch size={16} className="text-amber-400" />
+                                    未回收伏笔 ({foreshadowingList.length})
+                                </h3>
+                                <button
+                                    onClick={loadForeshadowing}
+                                    disabled={isLoadingForeshadowing}
+                                    className="text-[10px] text-slate-400 hover:text-white"
+                                >
+                                    {isLoadingForeshadowing ? <Loader2 size={12} className="animate-spin" /> : '刷新'}
+                                </button>
+                            </div>
+
+                            {foreshadowingList.length > 0 ? (
+                                <div className="space-y-2 max-h-40 overflow-y-auto">
+                                    {foreshadowingList.map((item, idx) => (
+                                        <div key={idx} className="bg-amber-900/10 border border-amber-500/20 p-2 rounded text-xs">
+                                            <div className="flex items-center gap-1 text-amber-300 mb-1">
+                                                <span className="font-bold">{item.subject}</span>
+                                                <ArrowRight size={10} className="text-amber-500" />
+                                                <span className="text-amber-400">[{item.relation}]</span>
+                                                <ArrowRight size={10} className="text-amber-500" />
+                                                <span className="font-bold">{item.object}</span>
+                                            </div>
+                                            <div className="flex justify-between text-slate-500 text-[10px]">
+                                                <span>来源: {item.relatedChapter || '未知章节'}</span>
+                                                <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-xs text-slate-500 text-center py-4">暂未发现未回收的伏笔</p>
+                            )}
+                        </div>
+
+                        {/* Contradiction Detection Section */}
+                        <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                    <AlertTriangle size={16} className="text-rose-400" />
+                                    矛盾检测
+                                </h3>
+                                <button
+                                    onClick={loadContradictions}
+                                    disabled={isLoadingContradictions}
+                                    className="bg-rose-600 hover:bg-rose-500 disabled:bg-slate-700 text-white px-3 py-1 rounded text-xs font-bold transition-all"
+                                >
+                                    {isLoadingContradictions ? <Loader2 size={12} className="animate-spin" /> : '检测矛盾'}
+                                </button>
+                            </div>
+
+                            {contradictions.length > 0 && (
+                                <div className="space-y-2 max-h-40 overflow-y-auto">
+                                    {contradictions.map((item, idx) => (
+                                        <div
+                                            key={idx}
+                                            className={`p-2 rounded border text-xs ${
+                                                item.severity === 'HIGH' ? 'bg-rose-900/20 border-rose-500/50' :
+                                                item.severity === 'MEDIUM' ? 'bg-amber-900/20 border-amber-500/50' :
+                                                'bg-slate-900/20 border-slate-700/50'
+                                            }`}
+                                        >
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className={`font-bold ${
+                                                    item.severity === 'HIGH' ? 'text-rose-400' :
+                                                    item.severity === 'MEDIUM' ? 'text-amber-400' :
+                                                    'text-slate-400'
+                                                }`}>
+                                                    {item.severity === 'HIGH' ? '🔴 严重' :
+                                                     item.severity === 'MEDIUM' ? '🟡 中等' : '🟢 轻微'}
+                                                </span>
+                                                <span className="text-slate-500 text-[10px]">
+                                                    {item.type.replace(/_/g, ' ')}
+                                                </span>
+                                            </div>
+                                            <p className="text-slate-300 mb-1">{item.description}</p>
+                                            <div className="text-slate-500 text-[10px]">
+                                                涉及实体: {item.entities.join(', ')}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                     {filteredEchoes.length === 0 ? (
@@ -257,9 +635,12 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                                     {viewFilter === 'PENDING' && (
                                         <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <button
-                                                onClick={(e) => { e.stopPropagation(); handleAction(echo.id, 'ACCEPTED'); }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleAcceptEchoToGraph(echo.id);
+                                                }}
                                                 className="bg-emerald-600 hover:bg-emerald-500 text-white p-1.5 rounded-lg shadow-lg shadow-emerald-900/20 transition-all active:scale-90"
-                                                title="采纳"
+                                                title="采纳并同步到图谱"
                                             >
                                                 <CheckCircle size={16} />
                                             </button>
@@ -279,7 +660,7 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                                         {echo.description}
                                     </p>
                                     <div className="mt-2 text-xs text-slate-500 border-l-2 border-slate-800 pl-3 py-1 italic">
-                                        “{echo.reason}”
+                                        "{echo.reason}"
                                     </div>
 
                                     {/* NEW: Display Triples with Weight & Trajectory */}
@@ -302,7 +683,7 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                                                                 <div className="flex items-center gap-1.5 flex-1" title={`强度: ${t.weight}`}>
                                                                     <div className="h-1 flex-1 bg-slate-800 rounded-full overflow-hidden">
                                                                         <div
-                                                                            className={`h-full rounded-full ${t.weight > 70 ? 'bg-rose-500' : t.weight > 40 ? 'bg-amber-500' : 'bg-blue-500'}`}
+                                                                            className={`h-full rounded-full ${t.weight > RELATIONSHIP_CONFIG.HIGH_WEIGHT_THRESHOLD ? 'bg-rose-500' : t.weight > RELATIONSHIP_CONFIG.MEDIUM_WEIGHT_THRESHOLD ? 'bg-amber-500' : 'bg-blue-500'}`}
                                                                             style={{ width: `${t.weight}%` }}
                                                                         />
                                                                     </div>
@@ -424,7 +805,7 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                                                     </span>
                                                 </div>
                                                 <h4 className="text-xs font-bold text-slate-200 mb-1">{item.description}</h4>
-                                                <p className="text-[10px] text-slate-500 leading-relaxed italic">“{item.reason}”</p>
+                                                <p className="text-[10px] text-slate-500 leading-relaxed italic">"{item.reason}"</p>
                                             </div>
                                         </div>
                                     ))
@@ -434,6 +815,164 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                     </>
                 )}
             </div>
+
+            {/* Deep Review Panel */}
+            <EchoDeepReview
+                isOpen={showDeepReview}
+                onClose={() => setShowDeepReview(false)}
+                echoes={project.echoes}
+                chapters={project.chapters}
+                characters={project.characters}
+                worldSettings={project.worldSettings}
+                onAccept={handleAcceptEcho}
+                onReject={handleRejectEcho}
+                onBatchAccept={handleBatchAccept}
+                onBatchReject={handleBatchReject}
+            />
+
+            {/* Integrity Report Panel */}
+            <EchoIntegrityReport
+                isOpen={showIntegrityReport}
+                onClose={() => setShowIntegrityReport(false)}
+                onConfirm={() => setShowIntegrityReport(false)}
+                echoes={project.echoes}
+                characters={project.characters}
+                worldSettings={project.worldSettings}
+                chapters={project.chapters}
+            />
+
+            {/* Batch Operation History Modal */}
+            {showBatchHistory && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm animate-fade-in"
+                    onClick={() => setShowBatchHistory(false)}
+                >
+                    <div
+                        className="w-[500px] max-h-[70vh] bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 overflow-hidden flex flex-col animate-scale-in"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Header */}
+                        <div className="p-4 border-b border-slate-800 bg-slate-950/50 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <List className="text-muse-400" size={20} />
+                                <h2 className="text-lg font-bold text-white">批量操作历史</h2>
+                            </div>
+                            <button
+                                onClick={() => setShowBatchHistory(false)}
+                                className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-800"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                            {!useBackend ? (
+                                <div className="text-center py-8 text-slate-500">
+                                    <AlertTriangle size={32} className="mx-auto mb-3 opacity-50" />
+                                    <p className="text-sm">批量操作历史需要后端支持</p>
+                                    <p className="text-xs mt-1">请启用后端服务以使用此功能</p>
+                                </div>
+                            ) : batchOperationHistory.length === 0 ? (
+                                <div className="text-center py-8 text-slate-500">
+                                    <History size={32} className="mx-auto mb-3 opacity-50" />
+                                    <p className="text-sm">暂无批量操作历史</p>
+                                    <p className="text-xs mt-1">最近的批量操作记录将显示在这里</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {batchOperationHistory.map((item: BatchOperationHistoryItem) => (
+                                        <div
+                                            key={item.id}
+                                            className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 hover:border-slate-600 transition-all"
+                                        >
+                                            <div className="flex items-start justify-between mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    {item.operation === 'BATCH_ACCEPT' ? (
+                                                        <CheckCircle size={16} className="text-emerald-400" />
+                                                    ) : (
+                                                        <Trash2 size={16} className="text-rose-400" />
+                                                    )}
+                                                    <span className={`text-sm font-bold ${
+                                                        item.operation === 'BATCH_ACCEPT' ? 'text-emerald-400' : 'text-rose-400'
+                                                    }`}>
+                                                        {item.operation === 'BATCH_ACCEPT' ? '批量采纳' : '批量拒绝'}
+                                                    </span>
+                                                </div>
+                                                <span className="text-xs text-slate-500">
+                                                    {new Date(item.timestamp).toLocaleString('zh-CN', {
+                                                        month: 'short',
+                                                        day: 'numeric',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center justify-between">
+                                                <div className="text-xs text-slate-400">
+                                                    影响 <span className="font-bold text-slate-300">{item.echoCount}</span> 条 Echo
+                                                </div>
+
+                                                {item.canUndo && (
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (undoingOperationId === item.id) return;
+
+                                                            setUndoingOperationId(item.id);
+                                                            try {
+                                                                await undoLastBatchOperation(item.id);
+                                                                // 成功后关闭弹窗
+                                                                setShowBatchHistory(false);
+                                                            } catch (err) {
+                                                                console.error('Failed to undo:', err);
+                                                                toast.error('撤销失败，请重试');
+                                                            } finally {
+                                                                setUndoingOperationId(null);
+                                                            }
+                                                        }}
+                                                        disabled={undoingOperationId === item.id}
+                                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                                            undoingOperationId === item.id
+                                                                ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                                                                : 'bg-amber-900/50 hover:bg-amber-800 text-amber-200 border border-amber-500/30 active:scale-95'
+                                                        }`}
+                                                    >
+                                                        {undoingOperationId === item.id ? (
+                                                            <>
+                                                                <Loader2 size={12} className="animate-spin" />
+                                                                撤销中...
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <RotateCcw size={12} />
+                                                                撤销
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                )}
+
+                                                {!item.canUndo && (
+                                                    <span className="text-xs text-slate-600 px-3 py-1.5">
+                                                        已过期
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t border-slate-800 bg-slate-950/30">
+                            <p className="text-xs text-slate-500 text-center">
+                                批量操作在 5 分钟内可撤销
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

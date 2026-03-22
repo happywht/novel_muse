@@ -1,12 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
     Rocket, Sparkles, Wand2, BookOpen, AlertCircle, CheckCircle,
-    X, Zap, Target, Download, Copy, Check, ArrowRight
+    X, Zap, Target, Download, Copy, Check, ArrowRight, GitBranch,
+    Clock, Users, Globe, FileText, Lightbulb, TrendingUp
 } from 'lucide-react';
-import { ProjectState, WorldSetting } from '../types';
+import { ProjectState, WorldSetting, NarrativeInsight } from '../types';
 import { generateText, batchGenerateCharacters, batchGenerateWorldSettingsByCategory, generatePlotFromContext } from '../services/geminiService';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { Loader } from './Loader';
+import {
+    fetchGraph, fetchNarrativeInsights, fetchProjectStatistics,
+    ProjectStatistics, GraphData
+} from '../services/apiService';
+import { useToast } from '../hooks/useToast';
 
 interface DashboardProps {
     project: ProjectState;
@@ -17,6 +23,7 @@ interface DashboardProps {
 const WORLD_CATEGORIES: WorldSetting['category'][] = ['Geography', 'Magic/Tech', 'Society', 'History', 'Other'];
 
 export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject, onImportProject }) => {
+    const { toast } = useToast();
     const [brainstormInput, setBrainstormInput] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [suggestion, setSuggestion] = useState('');
@@ -27,12 +34,77 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject, on
     const [isExporting, setIsExporting] = useState(false);
     const [copySuccess, setCopySuccess] = useState(false);
 
-    // Calculate total words across all chapters and drafts
-    const totalWords = useMemo(() => {
+    // 图谱和统计数据状态
+    const [graphData, setGraphData] = useState<GraphData | null>(null);
+    const [narrativeInsights, setNarrativeInsights] = useState<NarrativeInsight[]>([]);
+    const [statistics, setStatistics] = useState<ProjectStatistics | null>(null);
+    const [isLoadingStats, setIsLoadingStats] = useState(false);
+
+    // 获取图谱数据和叙事洞察
+    useEffect(() => {
+        if (project.id) {
+            setIsLoadingStats(true);
+
+            // 并行获取统计数据、图谱数据和叙事洞察
+            Promise.all([
+                fetchProjectStatistics(project.id).catch(err => {
+                    console.warn('Failed to fetch statistics:', err);
+                    return null;
+                }),
+                fetchGraph(project.id).catch(err => {
+                    console.warn('Failed to fetch graph:', err);
+                    return null;
+                }),
+                fetchNarrativeInsights(project.id).catch(err => {
+                    console.warn('Failed to fetch narrative insights:', err);
+                    return [];
+                })
+            ]).then(([stats, graph, insights]) => {
+                if (stats) setStatistics(stats);
+                if (graph) setGraphData(graph);
+                if (insights) setNarrativeInsights(insights);
+            }).finally(() => {
+                setIsLoadingStats(false);
+            });
+        }
+    }, [project.id, project.lastModified]);
+
+    // 使用真实的 lastModified 时间
+    const lastSyncTime = useMemo(() => {
+        const timestamp = statistics?.lastModified || project.lastModified;
+        return timestamp ? new Date(timestamp).toLocaleTimeString() : '--:--:--';
+    }, [statistics?.lastModified, project.lastModified]);
+
+    // 使用统计数据或本地计算作为回退
+    const displayStats = useMemo(() => {
+        if (statistics) {
+            return {
+                totalWords: statistics.totalWords,
+                chapterCount: statistics.chapterCount,
+                characterCount: statistics.characterCount,
+                worldSettingCount: statistics.worldSettingCount,
+                plotNodeCount: statistics.plotNodeCount,
+                echoCount: statistics.echoCount,
+                pendingEchoCount: statistics.pendingEchoCount,
+                relationshipCount: statistics.relationshipCount,
+                timelineCount: statistics.timelineCount
+            };
+        }
+        // 回退到本地计算
         const chapterWords = project.chapters.reduce((sum, ch) => sum + ch.content.length, 0);
         const draftWords = (project.drafts || []).reduce((sum, dr) => sum + dr.content.length, 0);
-        return chapterWords + draftWords;
-    }, [project.chapters, project.drafts]);
+        return {
+            totalWords: chapterWords + draftWords,
+            chapterCount: project.chapters.length,
+            characterCount: project.characters.length,
+            worldSettingCount: project.worldSettings.length,
+            plotNodeCount: project.plotNodes.length,
+            echoCount: project.echoes.length,
+            pendingEchoCount: project.echoes.filter(e => e.status === 'PENDING').length,
+            relationshipCount: graphData?.edges?.length || 0,
+            timelineCount: project.timeline?.length || 0
+        };
+    }, [statistics, project, graphData]);
 
     const handleBrainstorm = async () => {
         if (!brainstormInput.trim()) return;
@@ -101,8 +173,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject, on
         
         // 显示结果
         const resultMsg = `更新完成！\n\n书名: ${updates.title || '未提取到'}\n核心梗概: ${updates.premise ? updates.premise.substring(0, 50) + '...' : '未提取到'}\n类型: ${updates.genre || '未提取到'}`;
-        alert(resultMsg);
-        
+        toast.success(resultMsg, 6000);
+
         setSuggestion('');
         setBrainstormInput('');
     };
@@ -144,7 +216,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject, on
             
             if (characters.length === 0) {
                 console.error('【创世纪】警告：batchGenerateCharacters返回空数组');
-                alert('警告：未生成任何角色');
+                toast.warning('未生成任何角色');
             }
             
             // 为生成的角色添加ID和所有必需字段
@@ -327,7 +399,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject, on
             }
 
             setKickstartStatus(errorMessage);
-            alert(errorMessage);  // 向用户显示具体错误
+            toast.error(errorMessage, 6000);  // 向用户显示具体错误
             await new Promise(resolve => setTimeout(resolve, 3000));
         } finally {
             setIsKickstarting(false);
@@ -385,7 +457,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject, on
                                         Novel Architect v2.0
                                     </span>
                                     <span className="text-[10px] text-slate-500 font-medium">
-                                        Last Sync: {new Date().toLocaleTimeString()}
+                                        Last Sync: {lastSyncTime}
                                     </span>
                                 </div>
                             </div>
@@ -490,26 +562,91 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject, on
                 <div className="lg:col-span-3 space-y-5">
                     {/* Quick Brief */}
                     <div className="bg-slate-800/20 rounded-xl border border-slate-700/40 p-5 space-y-4">
-                        <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">创作简略 (Brief)</div>
+                        <div className="flex items-center justify-between">
+                            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">创作简略 (Brief)</div>
+                            {isLoadingStats && (
+                                <div className="w-3 h-3 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                            )}
+                        </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <div className="text-[10px] text-slate-500 uppercase">总字数</div>
-                                <div className="text-xl font-mono text-white tracking-tight">{totalWords.toLocaleString()}</div>
+                                <div className="text-[10px] text-slate-500 uppercase flex items-center gap-1">
+                                    <FileText size={10} /> 总字数
+                                </div>
+                                <div className="text-xl font-mono text-white tracking-tight">{displayStats.totalWords.toLocaleString()}</div>
                             </div>
                             <div className="space-y-1">
-                                <div className="text-[10px] text-slate-500 uppercase">正式章节</div>
-                                <div className="text-xl font-mono text-white tracking-tight">{project.chapters.length}</div>
+                                <div className="text-[10px] text-slate-500 uppercase flex items-center gap-1">
+                                    <BookOpen size={10} /> 正式章节
+                                </div>
+                                <div className="text-xl font-mono text-white tracking-tight">{displayStats.chapterCount}</div>
                             </div>
                             <div className="space-y-1">
-                                <div className="text-[10px] text-slate-500 uppercase">核心角色</div>
-                                <div className="text-xl font-mono text-amber-400 tracking-tight">{project.characters.length}</div>
+                                <div className="text-[10px] text-slate-500 uppercase flex items-center gap-1">
+                                    <Users size={10} /> 核心角色
+                                </div>
+                                <div className="text-xl font-mono text-amber-400 tracking-tight">{displayStats.characterCount}</div>
                             </div>
                             <div className="space-y-1">
-                                <div className="text-[10px] text-slate-500 uppercase">世界设定</div>
-                                <div className="text-xl font-mono text-sky-400 tracking-tight">{project.worldSettings.length}</div>
+                                <div className="text-[10px] text-slate-500 uppercase flex items-center gap-1">
+                                    <Globe size={10} /> 世界设定
+                                </div>
+                                <div className="text-xl font-mono text-sky-400 tracking-tight">{displayStats.worldSettingCount}</div>
+                            </div>
+                            <div className="space-y-1">
+                                <div className="text-[10px] text-slate-500 uppercase flex items-center gap-1">
+                                    <TrendingUp size={10} /> 剧情节点
+                                </div>
+                                <div className="text-xl font-mono text-purple-400 tracking-tight">{displayStats.plotNodeCount}</div>
+                            </div>
+                            <div className="space-y-1">
+                                <div className="text-[10px] text-slate-500 uppercase flex items-center gap-1">
+                                    <GitBranch size={10} /> 关系数
+                                </div>
+                                <div className="text-xl font-mono text-emerald-400 tracking-tight">{displayStats.relationshipCount}</div>
+                            </div>
+                            <div className="space-y-1">
+                                <div className="text-[10px] text-slate-500 uppercase flex items-center gap-1">
+                                    <Lightbulb size={10} /> Echo待处理
+                                </div>
+                                <div className="text-xl font-mono text-orange-400 tracking-tight">{displayStats.pendingEchoCount}/{displayStats.echoCount}</div>
+                            </div>
+                            <div className="space-y-1">
+                                <div className="text-[10px] text-slate-500 uppercase flex items-center gap-1">
+                                    <Clock size={10} /> Timeline事件
+                                </div>
+                                <div className="text-xl font-mono text-cyan-400 tracking-tight">{displayStats.timelineCount}</div>
                             </div>
                         </div>
                     </div>
+
+                    {/* Narrative Insights */}
+                    {narrativeInsights.length > 0 && (
+                        <div className="bg-slate-800/20 rounded-xl border border-slate-700/40 p-4 space-y-3">
+                            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                <Sparkles size={12} className="text-amber-400" /> 叙事洞察
+                            </div>
+                            <div className="space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar">
+                                {narrativeInsights.slice(0, 3).map((insight, index) => (
+                                    <div key={index} className="bg-slate-900/50 rounded-lg p-3 text-xs">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                                insight.type === 'ALLIANCE_POTENTIAL' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                insight.type === 'CONFLICT_WARNING' ? 'bg-red-500/20 text-red-400' :
+                                                insight.type === 'SECRET_CONNECTION' ? 'bg-purple-500/20 text-purple-400' :
+                                                'bg-blue-500/20 text-blue-400'
+                                            }`}>
+                                                {insight.type === 'ALLIANCE_POTENTIAL' ? '联盟潜力' :
+                                                 insight.type === 'CONFLICT_WARNING' ? '冲突预警' :
+                                                 insight.type === 'SECRET_CONNECTION' ? '隐秘关联' : '派系变动'}
+                                            </span>
+                                        </div>
+                                        <p className="text-slate-300 leading-relaxed">{insight.description}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {/* Kickstart */}
                     <div className="bg-slate-800/40 rounded-xl border border-slate-700/60 p-5 relative overflow-hidden flex-1 flex flex-col">

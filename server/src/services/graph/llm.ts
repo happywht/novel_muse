@@ -2,6 +2,37 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { z } from "zod";
 
 /**
+ * 关系类型中文显示名称映射
+ */
+const RELATION_TYPE_LABELS: Record<string, string> = {
+    'ENEMY_OF': '敌人',
+    'ALLY_OF': '盟友',
+    'LOVES': '爱慕',
+    'KIN_OF': '亲属',
+    'MENTORS': '师徒',
+    'RIVAL_OF': '竞争',
+    'SERVES': '效忠',
+    'FRIEND_OF': '朋友',
+    'RELATED_TO': '关联',
+};
+
+/**
+ * 从结构化关系生成展示字符串
+ */
+function getDisplayRelationships(structuredRelations: any[] | undefined): string {
+    if (!structuredRelations || !Array.isArray(structuredRelations) || structuredRelations.length === 0) {
+        return '';
+    }
+    return structuredRelations
+        .map((rel: any) => {
+            const typeLabel = RELATION_TYPE_LABELS[rel.type] || rel.description || '关联';
+            const targetName = rel.targetName || rel.targetCharacterName || rel.targetCharacterId;
+            return `${typeLabel}: ${targetName}`;
+        })
+        .join('；');
+}
+
+/**
  * Knowledge Triple Schema (simplified for extraction)
  */
 export const AiKnowledgeTripleSchema = z.object({
@@ -36,9 +67,11 @@ export class GraphLLMService {
     async extractCharacterRelationships(characters: any[]): Promise<KnowledgeTriple[]> {
         if (!process.env.GEMINI_API_KEY || characters.length < 2) return [];
 
-        const charData = characters.map(c =>
-            `[${c.name} (${c.role})]: ${c.description || ''} ${c.relationships || ''}`
-        ).join('\n\n');
+        const charData = characters.map(c => {
+            // 优先使用结构化关系，向后兼容旧格式
+            const displayRels = getDisplayRelationships(c.structuredRelations) || c.relationships || '';
+            return `[${c.name} (${c.role})]: ${c.description || ''} ${displayRels}`;
+        }).join('\n\n');
 
         const prompt = `
 你是一位极其专业的小说平衡分析师。你的任务是分析以下角色的描述及其人际关系，并提取为结构化的【三元组】（Subject-Relation-Object）。

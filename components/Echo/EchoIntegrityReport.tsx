@@ -14,6 +14,7 @@ import {
   IntegrityReport,
   IntegrityIssue
 } from './echoUtils';
+import { useToast } from '../../hooks/useToast';
 
 interface EchoIntegrityReportProps {
   isOpen: boolean;
@@ -146,6 +147,7 @@ export const EchoIntegrityReport: React.FC<EchoIntegrityReportProps> = ({
   worldSettings,
   chapters = []
 }) => {
+  const { toast } = useToast();
   // 执行完整性检查
   const report = useMemo<IntegrityReport>(() => {
     return checkIntegrity(echoes, characters, worldSettings, chapters);

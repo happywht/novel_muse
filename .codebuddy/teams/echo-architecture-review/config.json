@@ -1,0 +1,18 @@
+{
+  "name": "echo-architecture-review",
+  "leadAgentId": "a3480660431240fa9ef99c9cee912139",
+  "workspacePath": "d:/家庭/副业探索/小说项目/小说开题/remix_-muse_-小说架构师_022302",
+  "createdAt": "2026-03-17T17:18:01.929Z",
+  "options": {
+    "workspacePath": "d:/家庭/副业探索/小说项目/小说开题/remix_-muse_-小说架构师_022302",
+    "isAutoTeam": false
+  },
+  "members": [
+    {
+      "memberId": "team-lead@echo-architecture-review",
+      "name": "team-lead",
+      "role": "Team Lead - coordinates the team and interacts with the user"
+    }
+  ],
+  "isAutoTeam": false
+}

@@ -10,7 +10,21 @@
 
 import { create } from 'zustand';
 import { AppSection, ProjectState, WorldGenConfig, DeepPartial } from '../types';
-import { isBackendAvailable, fetchProjectList, fetchProject, syncProject, patchProject, deleteProjectApi, fetchChapter, fetchChaptersContent } from '../services/apiService';
+import {
+    isBackendAvailable, fetchProjectList, fetchProject, syncProject, patchProject,
+    deleteProjectApi, fetchChapter, fetchChaptersContent,
+    // Character Graph APIs
+    fetchCharacterTraits, fetchCharacterEvolution, fetchCharacterForeshadowing,
+    // Echo Graph APIs
+    fetchRelationshipTimeline, fetchEchoForeshadowing, detectContradictions,
+    // Outliner Graph APIs
+    fetchChapterDependencies, fetchChapterCharacterNetwork, fetchConflictHeatmap,
+    // Forge Graph APIs
+    fetchForgeContext, syncForgeResult, ForgeGraphContext,
+    // Echo Batch Operations APIs
+    batchAcceptEchoes, batchRejectEchoes, undoBatchOperation, getBatchOperationHistory,
+    BatchOperationHistoryItem
+} from '../services/apiService';
 import { storageService, STORAGE_KEYS } from '../services/storageService';
 import { DEFAULT_CONFIG, getGlobalConfig } from '../config/global';
 
@@ -75,6 +89,19 @@ export const INITIAL_PROJECT: ProjectState = {
 // Store Interface
 // ============================================================
 
+// 图谱查询结果类型定义
+interface GraphQueryState {
+    // 角色图谱
+    characterTraits: Map<string, any>; // characterId -> traits
+    characterEvolution: Map<string, any[]>; // characterId -> evolution history
+    characterForeshadowing: Map<string, any[]>; // characterId -> foreshadowing
+
+    // 加载状态
+    loadingTraits: Set<string>; // 正在加载的角色ID
+    loadingEvolution: Set<string>;
+    loadingForeshadowing: Set<string>;
+}
+
 interface ProjectStore {
     // --- Project State ---
     project: ProjectState;
@@ -109,6 +136,30 @@ interface ProjectStore {
     lastError: string | null;
     setLastError: (error: string | null) => void;
 
+    // --- Internal Sync State (for devtools tracking) ---
+    _internal: {
+        saveTimer: number | null;  // setTimeout 返回值在浏览器中是 number
+        pendingPatch: Partial<ProjectState>;
+    };
+
+    // --- Echo Batch Operations State ---
+    batchOperationHistory: BatchOperationHistoryItem[];
+    lastBatchOperationId: string | null;
+    isBatchProcessing: boolean;
+
+    // --- Graph Query State ---
+    graphQuery: GraphQueryState;
+    fetchCharacterTraits: (characterId: string) => Promise<void>;
+    fetchCharacterEvolution: (characterId: string) => Promise<void>;
+    fetchCharacterForeshadowing: (characterId: string) => Promise<void>;
+    clearCharacterGraphData: (characterId: string) => void;
+
+    // --- Batch Operations Actions ---
+    batchAcceptEchoes: (echoIds: string[], syncToGraph?: boolean) => Promise<void>;
+    batchRejectEchoes: (echoIds: string[]) => Promise<void>;
+    undoLastBatchOperation: (operationId?: string) => Promise<void>;
+    loadBatchOperationHistory: () => Promise<void>;
+
     // --- Global Config State ---
     globalConfig: typeof DEFAULT_CONFIG;
     loadGlobalConfig: () => Promise<void>;
@@ -129,12 +180,6 @@ interface ProjectStore {
 }
 
 // ============================================================
-// Debounce Timer (module-level to avoid closure issues)
-// ============================================================
-let _saveTimer: ReturnType<typeof setTimeout> | null = null;
-let _pendingPatch: Partial<ProjectState> = {};
-
-// ============================================================
 // Store Implementation
 // ============================================================
 
@@ -150,13 +195,35 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     lastError: null,
     setLastError: (error) => set({ lastError: error }),
 
+    // --- Internal Sync State ---
+    _internal: {
+        saveTimer: null,
+        pendingPatch: {},
+    },
+
+    // --- Echo Batch Operations State ---
+    batchOperationHistory: [],
+    lastBatchOperationId: null,
+    isBatchProcessing: false,
+
+    // --- Graph Query State ---
+    graphQuery: {
+        characterTraits: new Map(),
+        characterEvolution: new Map(),
+        characterForeshadowing: new Map(),
+        loadingTraits: new Set(),
+        loadingEvolution: new Set(),
+        loadingForeshadowing: new Set(),
+    },
+
     updateProject: (data) => {
         set((state) => ({
             project: { ...state.project, ...data },
+            _internal: {
+                ...state._internal,
+                pendingPatch: { ...state._internal.pendingPatch, ...data },
+            },
         }));
-
-        // Track the changes for incremental sync
-        _pendingPatch = { ..._pendingPatch, ...data };
 
         // Trigger auto-save
         const store = get();
@@ -369,40 +436,54 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     },
 
     syncToBackend: async () => {
-        const { useBackend, project } = get();
+        const { useBackend, project, _internal } = get();
         if (!useBackend) return;
 
-        if (_saveTimer) clearTimeout(_saveTimer);
+        if (_internal.saveTimer) clearTimeout(_internal.saveTimer);
         set({ isSaving: true });
 
         // 使用全局配置的同步间隔
         const config = await getGlobalConfig();
         const syncInterval = config.storage.autoSaveInterval;
 
-        _saveTimer = setTimeout(async () => {
+        const timerId = setTimeout(async () => {
             try {
+                const currentState = get();
+                const { project, _internal } = currentState;
                 const id = project.id;
                 const complexFields = ['characters', 'worldSettings', 'plotHistory', 'drafts', 'chapters', 'plotNodes', 'echoes', 'timeline'];
-                const hasComplexChanges = Object.keys(_pendingPatch).some(key => complexFields.includes(key));
+                const hasComplexChanges = Object.keys(_internal.pendingPatch).some(key => complexFields.includes(key));
 
                 if (hasComplexChanges) {
                     console.log('☁️ Full Sync (PUT) to backend:', id);
                     await syncProject({ ...project, lastModified: Date.now() });
-                } else if (Object.keys(_pendingPatch).length > 0) {
-                    console.log('☁️ Incremental Sync (PATCH) to backend:', id, Object.keys(_pendingPatch));
-                    await patchProject(id, { ..._pendingPatch, lastModified: Date.now() });
+                } else if (Object.keys(_internal.pendingPatch).length > 0) {
+                    console.log('☁️ Incremental Sync (PATCH) to backend:', id, Object.keys(_internal.pendingPatch));
+                    await patchProject(id, { ..._internal.pendingPatch, lastModified: Date.now() });
                 }
 
-                _pendingPatch = {};
-                set({ isSaving: false });
+                set((state) => ({
+                    _internal: {
+                        ...state._internal,
+                        pendingPatch: {},
+                    },
+                    isSaving: false,
+                }));
             } catch (err) {
                 console.warn('Backend sync failed:', err);
-                set({ 
+                set({
                     isSaving: false,
                     lastError: '数据同步失败：已保存到本地，将在下次连接时重试'
                 });
             }
-        }, syncInterval);
+        }, syncInterval) as unknown as number;
+
+        set((state) => ({
+            _internal: {
+                ...state._internal,
+                saveTimer: timerId,
+            },
+        }));
     },
 
     loadFromPersistentStorage: async () => {
@@ -481,11 +562,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         );
 
         set((state) => ({
-            project: { ...state.project, chapters: updatedChapters }
+            project: { ...state.project, chapters: updatedChapters },
+            _internal: {
+                ...state._internal,
+                pendingPatch: { ...state._internal.pendingPatch, chapters: updatedChapters },
+            },
         }));
-
-        // Track changes for sync
-        _pendingPatch = { ..._pendingPatch, chapters: updatedChapters };
 
         const store = get();
         if (!store.isLoading) {
@@ -501,25 +583,305 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     },
 
     // 更新全局配置
+    loadGlobalConfig: async () => {
+        try {
+            const savedConfig = await storageService.getItem<typeof DEFAULT_CONFIG>(STORAGE_KEYS.GLOBAL_CONFIG);
+            if (savedConfig) {
+                set({ globalConfig: deepMerge(DEFAULT_CONFIG, savedConfig) });
+            }
+        } catch (err) {
+            console.error('Failed to load global config:', err);
+        }
+    },
+
     updateGlobalConfig: async (updates: DeepPartial<typeof DEFAULT_CONFIG>) => {
         const currentConfig = get().globalConfig;
         const newConfig = deepMerge(currentConfig, updates);
-        
+
         // 更新store状态
         set({ globalConfig: newConfig });
-        
+
         // 清除core.ts中的配置缓存
         const { clearConfigCache } = await import('../services/gemini/core');
         clearConfigCache();
-        
+
         // 如果缓存配置改变，清除缓存管理器中的缓存
-        if (updates.performance?.cache?.enabled === false || 
+        if (updates.performance?.cache?.enabled === false ||
             (updates.performance?.cache?.ttl && updates.performance.cache.ttl !== currentConfig.performance.cache.ttl)) {
             const { cacheManager } = await import('../services/cacheManager');
             cacheManager.clear();
         }
-        
+
         // 保存到storage
         await storageService.setItem(STORAGE_KEYS.GLOBAL_CONFIG, newConfig);
+    },
+
+    // --- Graph Query Methods ---
+
+    fetchCharacterTraits: async (characterId: string) => {
+        const { project, useBackend, graphQuery } = get();
+        if (!useBackend) return;
+
+        // 如果正在加载，直接返回
+        if (graphQuery.loadingTraits.has(characterId)) return;
+
+        // 标记为加载中
+        set({
+            graphQuery: {
+                ...graphQuery,
+                loadingTraits: new Set([...graphQuery.loadingTraits, characterId])
+            }
+        });
+
+        try {
+            const traits = await fetchCharacterTraits(project.id, characterId);
+            const newTraitsMap = new Map(graphQuery.characterTraits);
+            if (traits) {
+                newTraitsMap.set(characterId, traits);
+            }
+
+            set({
+                graphQuery: {
+                    ...get().graphQuery,
+                    characterTraits: newTraitsMap,
+                    loadingTraits: new Set([...get().graphQuery.loadingTraits].filter(id => id !== characterId))
+                }
+            });
+        } catch (err) {
+            console.error('Failed to fetch character traits:', err);
+            set({
+                graphQuery: {
+                    ...get().graphQuery,
+                    loadingTraits: new Set([...get().graphQuery.loadingTraits].filter(id => id !== characterId))
+                }
+            });
+        }
+    },
+
+    fetchCharacterEvolution: async (characterId: string) => {
+        const { project, useBackend, graphQuery } = get();
+        if (!useBackend) return;
+
+        // 如果正在加载，直接返回
+        if (graphQuery.loadingEvolution.has(characterId)) return;
+
+        // 标记为加载中
+        set({
+            graphQuery: {
+                ...graphQuery,
+                loadingEvolution: new Set([...graphQuery.loadingEvolution, characterId])
+            }
+        });
+
+        try {
+            const evolution = await fetchCharacterEvolution(project.id, characterId);
+            const newEvolutionMap = new Map(graphQuery.characterEvolution);
+            newEvolutionMap.set(characterId, evolution);
+
+            set({
+                graphQuery: {
+                    ...get().graphQuery,
+                    characterEvolution: newEvolutionMap,
+                    loadingEvolution: new Set([...get().graphQuery.loadingEvolution].filter(id => id !== characterId))
+                }
+            });
+        } catch (err) {
+            console.error('Failed to fetch character evolution:', err);
+            set({
+                graphQuery: {
+                    ...get().graphQuery,
+                    loadingEvolution: new Set([...get().graphQuery.loadingEvolution].filter(id => id !== characterId))
+                }
+            });
+        }
+    },
+
+    fetchCharacterForeshadowing: async (characterId: string) => {
+        const { project, useBackend, graphQuery } = get();
+        if (!useBackend) return;
+
+        // 如果正在加载，直接返回
+        if (graphQuery.loadingForeshadowing.has(characterId)) return;
+
+        // 标记为加载中
+        set({
+            graphQuery: {
+                ...graphQuery,
+                loadingForeshadowing: new Set([...graphQuery.loadingForeshadowing, characterId])
+            }
+        });
+
+        try {
+            const foreshadowing = await fetchCharacterForeshadowing(project.id, characterId);
+            const newForeshadowingMap = new Map(graphQuery.characterForeshadowing);
+            newForeshadowingMap.set(characterId, foreshadowing);
+
+            set({
+                graphQuery: {
+                    ...get().graphQuery,
+                    characterForeshadowing: newForeshadowingMap,
+                    loadingForeshadowing: new Set([...get().graphQuery.loadingForeshadowing].filter(id => id !== characterId))
+                }
+            });
+        } catch (err) {
+            console.error('Failed to fetch character foreshadowing:', err);
+            set({
+                graphQuery: {
+                    ...get().graphQuery,
+                    loadingForeshadowing: new Set([...get().graphQuery.loadingForeshadowing].filter(id => id !== characterId))
+                }
+            });
+        }
+    },
+
+    clearCharacterGraphData: (characterId: string) => {
+        const { graphQuery } = get();
+        const newTraitsMap = new Map(graphQuery.characterTraits);
+        const newEvolutionMap = new Map(graphQuery.characterEvolution);
+        const newForeshadowingMap = new Map(graphQuery.characterForeshadowing);
+
+        newTraitsMap.delete(characterId);
+        newEvolutionMap.delete(characterId);
+        newForeshadowingMap.delete(characterId);
+
+        set({
+            graphQuery: {
+                ...graphQuery,
+                characterTraits: newTraitsMap,
+                characterEvolution: newEvolutionMap,
+                characterForeshadowing: newForeshadowingMap,
+            }
+        });
+    },
+
+    // --- Echo Batch Operations ---
+
+    batchAcceptEchoes: async (echoIds: string[], syncToGraph: boolean = true) => {
+        const { project, useBackend } = get();
+
+        if (!useBackend) {
+            // Fallback to local update
+            const updatedEchoes = project.echoes.map(e =>
+                echoIds.includes(e.id) ? { ...e, status: 'ACCEPTED' as const } : e
+            );
+            get().updateProject({ echoes: updatedEchoes });
+            return;
+        }
+
+        try {
+            const result = await batchAcceptEchoes(project.id, echoIds, syncToGraph);
+
+            // 更新本地状态
+            const updatedEchoes = project.echoes.map(e =>
+                echoIds.includes(e.id) ? { ...e, status: 'ACCEPTED' as const } : e
+            );
+            get().updateProject({ echoes: updatedEchoes });
+
+            // 更新批量操作历史
+            const historyItem: BatchOperationHistoryItem = {
+                id: result.operationId,
+                operation: 'BATCH_ACCEPT',
+                echoCount: result.affectedCount,
+                timestamp: Date.now(),
+                canUndo: true
+            };
+
+            set((state: any) => ({
+                batchOperationHistory: [historyItem, ...state.batchOperationHistory]
+            }));
+        } catch (err) {
+            console.error('Failed to batch accept echoes:', err);
+            // 回退到本地更新
+            const updatedEchoes = project.echoes.map(e =>
+                echoIds.includes(e.id) ? { ...e, status: 'ACCEPTED' as const } : e
+            );
+            get().updateProject({ echoes: updatedEchoes });
+        }
+    },
+
+    batchRejectEchoes: async (echoIds: string[]) => {
+        const { project, useBackend } = get();
+
+        if (!useBackend) {
+            // Fallback to local update
+            const updatedEchoes = project.echoes.map(e =>
+                echoIds.includes(e.id) ? { ...e, status: 'REJECTED' as const } : e
+            );
+            get().updateProject({ echoes: updatedEchoes });
+            return;
+        }
+
+        try {
+            const result = await batchRejectEchoes(project.id, echoIds);
+
+            // 更新本地状态
+            const updatedEchoes = project.echoes.map(e =>
+                echoIds.includes(e.id) ? { ...e, status: 'REJECTED' as const } : e
+            );
+            get().updateProject({ echoes: updatedEchoes });
+
+            // 更新批量操作历史
+            const historyItem: BatchOperationHistoryItem = {
+                id: result.operationId,
+                operation: 'BATCH_REJECT',
+                echoCount: result.affectedCount,
+                timestamp: Date.now(),
+                canUndo: true
+            };
+
+            set((state: any) => ({
+                batchOperationHistory: [historyItem, ...state.batchOperationHistory]
+            }));
+        } catch (err) {
+            console.error('Failed to batch reject echoes:', err);
+            // 回退到本地更新
+            const updatedEchoes = project.echoes.map(e =>
+                echoIds.includes(e.id) ? { ...e, status: 'REJECTED' as const } : e
+            );
+            get().updateProject({ echoes: updatedEchoes });
+        }
+    },
+
+    undoLastBatchOperation: async (operationId?: string) => {
+        const { project, useBackend } = get();
+
+        if (!useBackend) {
+            alert('批量撤销需要后端支持');
+            return;
+        }
+
+        try {
+            await undoBatchOperation(project.id, operationId);
+
+            // 重新加载项目数据
+            const fullProject = await fetchProject(project.id);
+            set({ project: { ...INITIAL_PROJECT, ...fullProject } });
+
+            // 清除已撤销的操作历史
+            set((state: any) => ({
+                batchOperationHistory: state.batchOperationHistory.filter(
+                    (item: BatchOperationHistoryItem) => item.id !== operationId
+                )
+            }));
+        } catch (err) {
+            console.error('Failed to undo batch operation:', err);
+            alert('撤销失败');
+        }
+    },
+
+    loadBatchOperationHistory: async () => {
+        const { project, useBackend } = get();
+
+        if (!useBackend) {
+            console.log('批量操作历史需要后端支持');
+            return;
+        }
+
+        try {
+            const result = await getBatchOperationHistory(project.id);
+            set({ batchOperationHistory: result.operations });
+        } catch (err) {
+            console.error('Failed to load batch operation history:', err);
+        }
     }
 }));

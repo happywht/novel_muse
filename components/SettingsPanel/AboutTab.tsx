@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Info, Github, ExternalLink, Heart, BookOpen } from 'lucide-react';
+import { Info, Github, ExternalLink, Heart, BookOpen, Feather, Globe, Users } from 'lucide-react';
 
 export const AboutTab: React.FC = () => {
     const version = 'v1.0.0-beta';

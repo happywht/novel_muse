@@ -9,6 +9,7 @@ import { PlotCard } from './PlotWeaver/PlotCard';
 import { AuxiliaryDrawer } from './PlotWeaver/AuxiliaryDrawer';
 import { usePlotWeaverAI } from '../hooks/usePlotWeaverAI';
 import { VirtualList } from './VirtualList';
+import { UI_CONFIG, PLOT_CONFIG } from '../config/constants';
 
 interface PlotWeaverProps {
     project: ProjectState;
@@ -47,7 +48,7 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
     // --- Effects ---
     useEffect(() => {
         if (toast) {
-            const timer = setTimeout(() => setToast(null), 3000);
+            const timer = setTimeout(() => setToast(null), UI_CONFIG.TOAST_DURATION);
             return () => clearTimeout(timer);
         }
     }, [toast]);
@@ -78,7 +79,7 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
         };
         updateProject({
             ...data,
-            plotHistory: [historyItem, ...(project.plotHistory || [])].slice(0, 10)
+            plotHistory: [historyItem, ...(project.plotHistory || [])].slice(0, PLOT_CONFIG.MAX_HISTORY_ITEMS)
         });
     };
 
@@ -222,8 +223,8 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                             <>
                                 <VirtualList
                                     items={sortedNodes}
-                                    itemHeight={120}
-                                    height={window.innerHeight - 250}
+                                    itemHeight={UI_CONFIG.PLOT_CARD_HEIGHT}
+                                    height={window.innerHeight - UI_CONFIG.VIRTUAL_LIST_BOTTOM_OFFSET}
                                     className="space-y-4"
                                     renderItem={(node, idx) => (
                                         <PlotCard

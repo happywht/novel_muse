@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { Echo, Chapter, Character } from '../../types';
 import { EchoSummaryCard, EchoReviewPanel, EchoDeepReview } from '../Echo';
+import { useToast } from '../../hooks/useToast';
 
 // 示例Echo数据（包含置信度和提取证据）
 const sampleEchoes: Echo[] = [
@@ -95,6 +96,7 @@ const sampleCharacters: Character[] = [
 ];
 
 export const EchoDemo: React.FC = () => {
+  const { toast } = useToast();
   const [echoes, setEchoes] = useState<Echo[]>(sampleEchoes);
   const [showReviewPanel, setShowReviewPanel] = useState(false);
   const [showDeepReview, setShowDeepReview] = useState(false);
@@ -119,7 +121,7 @@ export const EchoDemo: React.FC = () => {
 
   const handleSimulate = (targetName: string, description: string) => {
     console.log('蝴蝶效应预演:', { targetName, description });
-    alert(`蝴蝶效应预演: ${targetName} - ${description}`);
+    toast.info(`蝴蝶效应预演: ${targetName} - ${description}`);
   };
 
   const handleBatchAccept = (selectedEchoes: Echo[]) => {

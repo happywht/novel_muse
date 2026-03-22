@@ -14,6 +14,7 @@ import {
 import { formatContext, formatEntityLookupTable } from "./helpers";
 import { buildPromptContent } from "../../config/prompts";
 import { fetchRelatedSubgraph } from "../apiService";
+import { getDisplayRelationships } from "../../utils/characterRelations";
 
 /**
  * Image generation for characters
@@ -769,15 +770,16 @@ export const deduceWorldConsequences = async (
  */
 export const chatWithPersona = async (character: Character, message: string, history: { role: string, content: string }[]): Promise<string> => {
     const ai = await getAIClient();
+    const displayRels = getDisplayRelationships(character.structuredRelations) || character.relationships || '';
     const systemInstruction = `
     你现在必须完全扮演以下角色进行对话。不要暴露你是AI。
-    
+
     【角色档案】
     姓名: ${character.name}
     身份: ${character.role}
     性格与描述: ${character.description}
-    人际关系: ${character.relationships}
-    
+    人际关系: ${displayRels}
+
     你的说话风格、语气、用词必须完全符合该角色的设定。
     如果是反派，要表现出阴暗或狂妄；如果是智者，要深沉。
     请用中文回复。

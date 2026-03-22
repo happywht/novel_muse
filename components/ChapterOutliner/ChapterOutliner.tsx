@@ -17,14 +17,30 @@ import {
     PlusCircle,
     LayoutList,
     ChevronDownCircle,
-    BarChart3
+    BarChart3,
+    Network,
+    Flame,
+    Link2,
+    Target
 } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { splitPlotNodeIntoChapters, regenerateChapterOutline, auditChapterPlan } from '../../services/geminiService';
+import { isBackendAvailable } from '../../services/apiService';
 import { Loader2, RefreshCw, AlertCircle, CheckCircle2, Info } from 'lucide-react'; // For loading state
 import { recalculateChapterOrders } from '../../utils/chapterUtils';
 import { ChapterBalanceAnalyzer } from '../ChapterBalanceAnalyzer';
 import { useFeature } from '../../hooks/useFeature';
+import { ChapterGraphVisualization } from './ChapterGraphVisualization';
+import { ForeshadowingChainPanel } from './ForeshadowingChainPanel';
+import {
+    countWords,
+    formatWordCount,
+    calculateProgress,
+    getProgressStatus,
+    WORD_COUNT_TARGETS,
+    DEFAULT_TARGET_WORD_COUNT
+} from '../../utils/wordCount';
+import { useToast } from '../../hooks/useToast';
 
 
 interface ChapterOutlinerProps {
@@ -34,7 +50,8 @@ interface ChapterOutlinerProps {
 
 export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updateProject }) => {
     const { setActiveSection, setActiveChapterId } = useProjectStore();
-    
+    const { toast } = useToast();
+
     // 功能开关检查
     const enableChapterBalance = useFeature('enableChapterBalance');
     
@@ -48,6 +65,11 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
     const [isAuditCollapsed, setIsAuditCollapsed] = useState(false);
     const [isAuditing, setIsAuditing] = useState(false);
     const [showBalanceAnalyzer, setShowBalanceAnalyzer] = useState(false);
+    const [graphChapterId, setGraphChapterId] = useState<string | null>(null);
+    const [showForeshadowingPanel, setShowForeshadowingPanel] = useState(false);
+
+    // 检查后端是否可用
+    const { useBackend } = useProjectStore();
 
     const selectedPlotNode = useMemo(() =>
         project.plotNodes.find(n => n.id === selectedPlotNodeId),
@@ -186,11 +208,11 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                     }))
                 });
             } else {
-                alert("局部重写未能生成有效内容，请重试。");
+                toast.warning("局部重写未能生成有效内容，请重试。");
             }
         } catch (error) {
             console.error("Regenerate Error:", error);
-            alert("局部重写失败，请检查网络或配置后重试。");
+            toast.error("局部重写失败，请检查网络或配置后重试。");
         } finally {
             setRegeneratingChapterId(null);
         }
@@ -227,24 +249,24 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                     );
                     
                     updateProject({ chapters: [...updatedChapters, newChapter] });
-                    alert(`已拆分"${chapterToSplit.title}"为两个章节`);
+                    toast.success(`已拆分"${chapterToSplit.title}"为两个章节`);
                 }
                 break;
-                
+
             case 'MERGE':
-                alert('章节合并功能需要手动操作，请选择要合并的章节');
+                toast.info('章节合并功能需要手动操作，请选择要合并的章节');
                 break;
-                
+
             case 'ADD_CONFLICT':
-                alert('建议在下一章节中增加冲突场景');
+                toast.info('建议在下一章节中增加冲突场景');
                 break;
-                
+
             case 'BALANCE_CHARACTERS':
-                alert('请检查角色出场频率，在下一章节中调整出场角色');
+                toast.info('请检查角色出场频率，在下一章节中调整出场角色');
                 break;
-                
+
             default:
-                alert(`建议"${suggestion.description}"已记录，请手动调整`);
+                toast.info(`建议"${suggestion.description}"已记录，请手动调整`);
         }
     };
 
@@ -290,7 +312,7 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
             }
         } catch (error) {
             console.error("Fission Error:", error);
-            alert("生成章节细纲失败，请检查网络或配置后重试。");
+            toast.error("生成章节细纲失败，请检查网络或配置后重试。");
         } finally {
             setIsGenerating(false);
         }
@@ -312,7 +334,7 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
             setIsAuditCollapsed(false);
         } catch (error) {
             console.error("Audit Error:", error);
-            alert("审计失败，请重试。");
+            toast.error("审计失败，请重试。");
         } finally {
             setIsAuditing(false);
         }
@@ -415,6 +437,24 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                                     {!enableChapterBalance && (
                                         <span className="text-[10px] text-slate-500">(已禁用)</span>
                                     )}
+                                </button>
+                                <button
+                                    onClick={() => setGraphChapterId('heatmap')}
+                                    disabled={project.chapters.length === 0}
+                                    title="查看全项目冲突热力图"
+                                    className={`bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all border border-slate-700 ${project.chapters.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <Flame size={16} className="text-orange-400" />
+                                    冲突热力图
+                                </button>
+                                <button
+                                    onClick={() => setShowForeshadowingPanel(true)}
+                                    disabled={project.echoes.length === 0}
+                                    title="查看伏笔链追踪"
+                                    className={`bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all border border-slate-700 ${project.echoes.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <Link2 size={16} className="text-cyan-400" />
+                                    伏笔追踪
                                 </button>
                                 </div>
                             </div>
@@ -546,6 +586,64 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                                         </div>
 
                                         <div className="space-y-4 flex-1">
+                                            {/* Word Count Progress */}
+                                            <div className="bg-slate-950/30 rounded-xl p-3 border border-slate-800/40">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <Target size={12} className="text-sky-400" />
+                                                        <span className="text-[10px] font-bold text-slate-500 uppercase">写作进度</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <select
+                                                            value={chapter.targetWordCount || DEFAULT_TARGET_WORD_COUNT}
+                                                            onChange={(e) => handleUpdateChapter(chapter.id, { targetWordCount: Number(e.target.value) })}
+                                                            className="bg-slate-800 border border-slate-700 text-slate-300 text-[10px] rounded-lg px-2 py-1 outline-none focus:border-sky-500"
+                                                        >
+                                                            {WORD_COUNT_TARGETS.map(opt => (
+                                                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                                {(() => {
+                                                    const wordCount = countWords(chapter.content || '');
+                                                    const target = chapter.targetWordCount || DEFAULT_TARGET_WORD_COUNT;
+                                                    const progress = calculateProgress(wordCount, target);
+                                                    const status = getProgressStatus(progress);
+
+                                                    return (
+                                                        <div className="space-y-1.5">
+                                                            <div className="flex justify-between text-[10px]">
+                                                                <span className="text-slate-400">
+                                                                    {formatWordCount(wordCount)} / {formatWordCount(target)}
+                                                                </span>
+                                                                <span className={`font-bold ${
+                                                                    progress >= 100 ? 'text-emerald-400' :
+                                                                    progress >= 75 ? 'text-sky-400' :
+                                                                    progress >= 50 ? 'text-amber-400' :
+                                                                    progress >= 25 ? 'text-orange-400' :
+                                                                    'text-slate-500'
+                                                                }`}>
+                                                                    {progress}% · {status}
+                                                                </span>
+                                                            </div>
+                                                            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                                                <div
+                                                                    className={`h-full rounded-full transition-all duration-500 ${
+                                                                        progress >= 100 ? 'bg-emerald-500' :
+                                                                        progress >= 75 ? 'bg-sky-500' :
+                                                                        progress >= 50 ? 'bg-amber-500' :
+                                                                        progress >= 25 ? 'bg-orange-500' :
+                                                                        'bg-slate-600'
+                                                                    }`}
+                                                                    style={{ width: `${Math.min(100, progress)}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+
                                             <div>
                                                 <label className="text-[10px] font-bold text-slate-500 uppercase mb-1.5 flex items-center gap-1.5">
                                                     <Calendar size={12} /> 章节细纲内容
@@ -570,12 +668,19 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                                                         onChange={(e) => handleUpdateChapter(chapter.id, { expectedPOV: e.target.value })}
                                                     />
                                                 </div>
-                                                <div className="pt-5">
+                                                <div className="pt-5 flex gap-2">
+                                                    <button
+                                                        onClick={() => setGraphChapterId(chapter.id)}
+                                                        className="h-10 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1 transition-all border border-slate-700/50 hover:border-muse-500/50 hover:text-muse-400"
+                                                        title="查看图谱可视化"
+                                                    >
+                                                        <Network size={14} />
+                                                    </button>
                                                     <button
                                                         onClick={() => handleGoToDraft(chapter.id)}
                                                         className="h-10 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold flex items-center gap-2 transition-all border border-slate-700/50 group-hover:bg-violet-600 group-hover:text-white group-hover:border-violet-500 group-hover:shadow-lg group-hover:shadow-violet-600/20"
                                                     >
-                                                        <PenTool size={14} /> ✍️ 去写正文
+                                                        <PenTool size={14} /> 去写正文
                                                     </button>
                                                 </div>
                                             </div>
@@ -653,6 +758,23 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                     </div>
                 )}
             </div>
+
+            {/* Graph Visualization Modal */}
+            {graphChapterId && (
+                <ChapterGraphVisualization
+                    projectId={project.id}
+                    chapterId={graphChapterId}
+                    onClose={() => setGraphChapterId(null)}
+                />
+            )}
+
+            {/* Foreshadowing Chain Panel */}
+            {showForeshadowingPanel && (
+                <ForeshadowingChainPanel
+                    projectId={project.id}
+                    onClose={() => setShowForeshadowingPanel(false)}
+                />
+            )}
         </div>
     );
 };

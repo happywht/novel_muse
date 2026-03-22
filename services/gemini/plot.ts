@@ -11,6 +11,7 @@ import {
     getAIClient, executeModelTask, getInstructionWithSettings, getModelName
 } from "./core";
 import { formatContext, filterRelevantSettings, formatEntityLookupTable } from "./helpers";
+import { getDisplayRelationships } from "../../utils/characterRelations";
 import { buildPromptContent } from "../../config/prompts";
 
 export interface PlotRhythmPoint {
@@ -55,7 +56,8 @@ export const generatePlotFromContext = async (
     if (characters.length > 0) {
         characters.forEach(c => {
             const charEchoes = echoes.filter(e => e.targetId === c.id && e.status === 'ACCEPTED').sort((a, b) => a.timestamp - b.timestamp);
-            contextStr += `- ${c.name} (${c.role}): ${c.description} (关系: ${c.relationships})\n`;
+            const displayRels = getDisplayRelationships(c.structuredRelations) || c.relationships || '';
+            contextStr += `- ${c.name} (${c.role}): ${c.description}${displayRels ? ` (关系: ${displayRels})` : ''}\n`;
             if (charEchoes.length > 0) {
                 contextStr += `  ⚡ [当前状态变更]: ${charEchoes.map(e => e.description).join('; ')}\n`;
             }

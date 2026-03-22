@@ -1,4 +1,5 @@
 import { Character, WorldSetting, Echo, Chapter } from "../../types";
+import { getDisplayRelationships } from "../../utils/characterRelations";
 
 // TypeScript类型声明（避免使用any）
 interface Segment {
@@ -91,7 +92,12 @@ export const formatContext = (characters: Character[], worldSettings: WorldSetti
             const charEchoes = activeEchoes.filter(e => e.targetId === c.id).sort((a, b) => a.timestamp - b.timestamp);
 
             context += `- ${c.name} (${c.role}): ${c.description.slice(0, 150)}...\n`;
-            if (c.relationships) {
+            // 使用结构化关系生成展示字符串（替代直接访问 c.relationships）
+            const displayRelations = getDisplayRelationships(c.structuredRelations);
+            if (displayRelations) {
+                context += `  关系/羁绊: ${displayRelations}\n`;
+            } else if (c.relationships) {
+                // 向后兼容：如果没有结构化关系，回退到旧格式
                 context += `  关系/羁绊: ${c.relationships}\n`;
             }
 

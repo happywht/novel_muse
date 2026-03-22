@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client';
 import { projectsRouter } from './routes/projects';
 import { graphRouter } from './routes/graph';
 import { initNeo4j, closeNeo4j } from './services/neo4jService';
+import { apiKeyAuth } from './middleware/auth';
 
 // Load .env
 import * as dotenv from 'dotenv';
@@ -15,16 +16,28 @@ const PORT = process.env.PORT || 3001;
 
 // Initialize Neo4j
 let neo4jAvailable = false;
-try {
-    initNeo4j();
-    neo4jAvailable = true;
-} catch (err) {
-    console.warn('⚠️ Neo4j initialization failed. Graph features disabled.', err);
-}
+
+// 异步初始化 Neo4j 并创建索引
+const initializeNeo4j = async () => {
+    try {
+        await initNeo4j();
+        neo4jAvailable = true;
+        console.log('📊 Neo4j: ✅ Connected');
+    } catch (err) {
+        console.warn('⚠️ Neo4j initialization failed. Graph features disabled.', err);
+    }
+};
+
+// 启动 Neo4j 初始化（不阻塞服务器启动）
+initializeNeo4j();
 
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
+// Authentication Middleware (applied before routes)
+// Public routes like /api/health are excluded in the middleware
+app.use('/api', apiKeyAuth);
 
 // Routes
 app.use('/api/projects', projectsRouter);
@@ -32,7 +45,7 @@ if (neo4jAvailable) {
     app.use('/api/graph', graphRouter);
 }
 
-// Health check
+// Health check (public route, no auth required)
 app.get('/api/health', (_req, res) => {
     res.json({
         status: 'ok',

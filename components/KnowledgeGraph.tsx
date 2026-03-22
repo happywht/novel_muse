@@ -1,6 +1,14 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GitBranch, RefreshCw, ZoomIn, ZoomOut, Maximize2, Loader, AlertCircle } from 'lucide-react';
 import { fetchGraph, GraphNode, GraphEdge } from '../services/apiService';
+import { useToast } from '../hooks/useToast';
+import {
+    GRAPH_CONFIG,
+    GRAPH_NODE_COLORS,
+    GRAPH_NEW_EDGE_COLOR,
+    GRAPH_LAYER_LABELS,
+    GRAPH_RELATIONSHIP_LABELS
+} from '../config/constants';
 
 interface KnowledgeGraphProps {
     projectId: string;
@@ -9,40 +17,6 @@ interface KnowledgeGraphProps {
     updateProject: (data: any) => void; // Add updateProject
 }
 
-// Color palette for node types
-const NODE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-    Character: { bg: '#8b5cf6', border: '#a78bfa', text: '#f5f3ff' },
-    WorldSetting: { bg: '#3b82f6', border: '#60a5fa', text: '#eff6ff' },
-    Event: { bg: '#f59e0b', border: '#fbbf24', text: '#fffbeb' },
-    Echo: { bg: '#06b6d4', border: '#22d3ee', text: '#ecfeff' },
-    Chapter: { bg: '#10b981', border: '#34d399', text: '#f0fdf4' }, // Emerald for Chapters
-    PlotNode: { bg: '#ec4899', border: '#f472b6', text: '#fdf2f8' }, // Pink for Plot
-};
-
-const LAYER_LABELS: Record<string, string> = {
-    Character: '角色',
-    WorldSetting: '设定',
-    Chapter: '大纲章节',
-    Event: '时间线',
-    Echo: '预测回响',
-    PlotNode: '情节卡片'
-};
-
-const REL_LABELS: Record<string, string> = {
-    RELATED_TO: '关联',
-    ENEMY_OF: '仇敌',
-    LOVES: '爱慕',
-    ALLY_OF: '盟友',
-    MENTORS: '师徒',
-    KIN_OF: '血缘',
-    LOCATED_IN: '位于',
-    INVOLVED_IN: '参与',
-    INVOLVES: '包含/出场',
-    HAS_ECHO: '回响',
-    CAUSED: '导致',
-    PRECEDES: '前置于',
-    POV_IS: '视角角色'
-};
 
 interface SimNode extends GraphNode {
     x: number;
@@ -53,6 +27,7 @@ interface SimNode extends GraphNode {
 }
 
 export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBackend, projectData, updateProject }) => {
+    const { toast } = useToast();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const animRef = useRef<number>(0);
@@ -284,7 +259,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
             if (isHighlighted) {
                 const mx = (a.x + b.x) / 2;
                 const my = (a.y + b.y) / 2;
-                const label = REL_LABELS[edge.type] || edge.type;
+                const label = GRAPH_RELATIONSHIP_LABELS[edge.type] || edge.type;
                 ctx.font = '10px sans-serif';
                 ctx.fillStyle = '#94a3b8';
                 ctx.textAlign = 'center';
@@ -306,7 +281,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
 
         // Draw nodes
         for (const node of displayNodes) {
-            const colors = NODE_COLORS[node.type] || NODE_COLORS.Character;
+            const colors = GRAPH_NODE_COLORS[node.type] || GRAPH_NODE_COLORS.Character;
             const isSelected = selectedNode?.id === node.id;
             const isHovered = hoveredNode?.id === node.id;
             const r = node.radius;
@@ -498,7 +473,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
                 </div>
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-1.5 bg-slate-950/50 px-2 py-1 rounded border border-slate-700/50">
-                        {Object.entries(LAYER_LABELS).map(([key, label]) => (
+                        {Object.entries(GRAPH_LAYER_LABELS).map(([key, label]) => (
                             <label key={key} className="flex items-center gap-1.5 cursor-pointer px-1.5 hover:bg-slate-800 rounded transition-colors group">
                                 <input
                                     type="checkbox"
@@ -569,11 +544,11 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
             {/* Legend (Moved to bottom left absolute) */}
             <div className="absolute bottom-4 left-4 flex flex-col gap-2 p-3 bg-slate-900/80 backdrop-blur-sm border border-slate-700/50 rounded-lg pointer-events-none z-10 transition-opacity">
                 <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1 border-b border-slate-800 pb-1">图例 · 图层</div>
-                {Object.entries(NODE_COLORS).map(([type, colors]) => (
+                {Object.entries(GRAPH_NODE_COLORS).map(([type, colors]) => (
                     <div key={type} className={`flex items-center gap-2 transition-opacity ${activeLayers.includes(type) ? 'opacity-100' : 'opacity-30'}`}>
                         <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors.bg, border: `1px solid ${colors.border}` }} />
                         <span className="text-[11px] text-slate-300 font-medium tracking-wide">
-                            {LAYER_LABELS[type] || type}
+                            {GRAPH_LAYER_LABELS[type] || type}
                         </span>
                     </div>
                 ))}
@@ -602,7 +577,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
                                 id="edgeTypeSelect"
                                 className="w-full bg-slate-950 border border-slate-700 rounded p-2.5 text-sm text-white focus:border-muse-500 outline-none"
                             >
-                                {Object.entries(REL_LABELS).map(([k, v]) => (
+                                {Object.entries(GRAPH_RELATIONSHIP_LABELS).map(([k, v]) => (
                                     <option key={k} value={k}>{v} ({k})</option>
                                 ))}
                                 <option value="CUSTOM">自定义...</option>
@@ -637,7 +612,7 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
                                         setEdgeCreationDialog(null);
                                     } catch (e) {
                                         console.error("Failed to create edge", e);
-                                        alert("创建关系失败，请检查后端运行状态。");
+                                        toast.error("创建关系失败，请检查后端运行状态。");
                                     }
                                 }}
                                 className="px-5 py-2 rounded text-sm font-bold bg-muse-600 hover:bg-muse-500 text-white shadow-lg transition-colors"
@@ -663,6 +638,7 @@ interface NodeEditSidebarProps {
 }
 
 const NodeEditSidebar: React.FC<NodeEditSidebarProps> = ({ node, projectId, onClose, projectData, updateProject }) => {
+    const { toast } = useToast();
     const [isEditing, setIsEditing] = useState(false);
     const [title, setTitle] = useState(node.label || '');
     const [description, setDescription] = useState(node.properties?.description || node.properties?.content || '');
@@ -703,7 +679,7 @@ const NodeEditSidebar: React.FC<NodeEditSidebarProps> = ({ node, projectId, onCl
                 );
             } else if (node.type === 'Echo') {
                 // Echo是AI生成的建议，不应直接编辑
-                alert('Echo节点为AI生成的建议，不可直接编辑');
+                toast.warning('Echo节点为AI生成的建议，不可直接编辑');
                 setIsSaving(false);
                 return;
             }
@@ -719,13 +695,13 @@ const NodeEditSidebar: React.FC<NodeEditSidebarProps> = ({ node, projectId, onCl
 
         } catch (e) {
             console.error("Failed to save node:", e);
-            alert("保存失败");
+            toast.error("保存失败");
         } finally {
             setIsSaving(false);
         }
     };
 
-    const colors = NODE_COLORS[node.type] || NODE_COLORS.Character;
+    const colors = GRAPH_NODE_COLORS[node.type] || GRAPH_NODE_COLORS.Character;
 
     return (
         <div className="flex flex-col h-full bg-slate-900 text-slate-300">
