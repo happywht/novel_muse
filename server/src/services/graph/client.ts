@@ -10,12 +10,8 @@ async function createIndexes(driver: Driver): Promise<void> {
     const session = driver.session();
 
     const indexes = [
-        // 项目+ID 复合索引（最重要，用于快速定位特定项目内的节点）
-        {
-            name: 'project_node_id',
-            query: `CREATE INDEX project_node_id IF NOT EXISTS FOR (n) ON (n.projectId, n.id)`,
-            description: 'projectId, n.id',
-        },
+        // 注意：Neo4j 4.x 不支持不带标签的通用索引
+        // 已通过各节点类型的专用索引覆盖查询需求
 
         // 角色名称索引（用于角色名称搜索和查重）
         {

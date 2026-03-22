@@ -137,6 +137,12 @@ export function CharacterCreatorProvider({
   // 编辑和搜索状态
   const [isEditing, setIsEditing] = useState(false);
   const [editDescription, setEditDescription] = useState('');
+  // 深度字段编辑状态
+  const [editDesire, setEditDesire] = useState('');
+  const [editFear, setEditFear] = useState('');
+  const [editSignature, setEditSignature] = useState('');
+  const [editContrast, setEditContrast] = useState('');
+  const [editWeakness, setEditWeakness] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [imageStyle, setImageStyle] = useState('Anime');
 

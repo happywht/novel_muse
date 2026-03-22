@@ -4,7 +4,7 @@ import {
     StateChangeRecommendation
 } from "../../types";
 import {
-    safeParseAiJson, AiCharacterArraySchema, AiWorldSettingArraySchema,
+    safeParseAiJson, AiCharacterArraySchema, AiCharacterSchema, AiWorldSettingArraySchema,
     AiEchoArraySchema, AiStateChangeArraySchema
 } from "../schemas";
 import {
@@ -815,7 +815,7 @@ export const generateSingleCharacter = async (
     premise: string,
     genre: string,
     settings?: CreativeSettings
-): Promise<Omit<Character, 'id'>> {
+): Promise<Partial<Character> | null> => {
     // 复用 batchGenerateCharacters 的 Schema，但生成单个角色
     const characterSchema = {
         type: Type.OBJECT,
@@ -856,7 +856,7 @@ ${settingText}
     try {
         console.log('[generateSingleCharacter] 开始生成角色:', name);
         const responseText = await executeModelTask(
-            'generateSingleCharacter',
+            'batchGenerateCharacters',  // 复用已有的任务类型
             instruction,
             prompt,
             'gemini-3-flash-preview',
