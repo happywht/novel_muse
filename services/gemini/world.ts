@@ -804,3 +804,84 @@ export const chatWithPersona = async (character: Character, message: string, his
         throw e;
     }
 };
+
+/**
+ * Generate a single character with full depth fields
+ * Reuses the same schema as batchGenerateCharacters but single character output
+ */
+export const generateSingleCharacter = async (
+    name: string,
+    role: string,
+    premise: string,
+    genre: string,
+    settings?: CreativeSettings
+): Promise<Omit<Character, 'id'>> {
+    // 复用 batchGenerateCharacters 的 Schema，但生成单个角色
+    const characterSchema = {
+        type: Type.OBJECT,
+        properties: {
+            name: { type: Type.STRING },
+            role: { type: Type.STRING, description: "One of: 主角, 反派, 导师, 伙伴, 守护者, 变形者, 捣蛋鬼, 信使" },
+            archetype: { type: Type.STRING, description: "角色原型，如：英雄、智者/捣蛋鬼/变形者/守护者/信使" },
+            description: { type: Type.STRING, description: "详细的人物小传。必须包含:外貌、性格、明确的欲望和恐惧、秘密、标志性特征(Signature)、道德阵营(Alignment)。" },
+            // 角色深度字段
+            alignment: { type: Type.STRING, description: "道德阵营(如:守序善良、混乱邪恶、中立善良等)" },
+            desire: { type: Type.STRING, description: "核心欲望:角色最想得到什么?" },
+            fear: { type: Type.STRING, description: "核心恐惧:角色最害怕什么?" },
+            signature: { type: Type.STRING, description: "标志性特征:让读者记住这个角色的特点" },
+            contrast: { type: Type.STRING, description: "反差萌点:角色表里不一的地方" },
+            weakness: { type: Type.STRING, description: "弱点/缺陷:角色的致命缺陷" },
+            // 关系字段 - 单个角色不需要结构化关系
+            relationships: { type: Type.STRING, description: "与其他角色的关系概述(简短描述)" },
+        },
+        required: ["name", "role", "archetype", "description"]
+    };
+
+    const instruction = getInstructionWithSettings('character_gen', settings);
+    const settingText = settings ? `风格要求:基调 ${settings.tone}，风格 ${settings.style}。` : "";
+
+    const prompt = `为小说"${premise}"(类型: ${genre})创建一个详细的角色档案。
+
+角色名称: "${name}"
+角色定位: ${role}
+
+请包含:外貌特征、 核心性格(道德阵营)、 动机与目标(欲望与恐惧). 秘密与缺陷、 能力。
+${settingText}
+
+【核心要求】:
+- 深度刻画: 必须有明确的欲望 (desire)、 核心恐惧 (fear). 标志性特征 (signature). 弱点/缺陷 (weakness)
+- 道德阵营 (alignment): 守序善良/混乱邪恶等
+- 请使用中文输出。`;
+
+    try {
+        console.log('[generateSingleCharacter] 开始生成角色:', name);
+        const responseText = await executeModelTask(
+            'generateSingleCharacter',
+            instruction,
+            prompt,
+            'gemini-3-flash-preview',
+            0.6,
+            characterSchema
+        );
+        console.log('[generateSingleCharacter] AI原始响应:', responseText);
+
+        if (!responseText) {
+            console.error('[generateSingleCharacter] 错误: AI返回空响应');
+            throw new Error('AI返回空响应');
+        }
+
+        const parsed = safeParseAiJson(responseText, AiCharacterSchema, 'generateSingleCharacter');
+        console.log('[generateSingleCharacter] 解析结果:', parsed);
+
+        if (!parsed) {
+            console.error('[generateSingleCharacter] 警告: 解析失败, 返回null');
+            return null;
+        }
+
+        console.log('[generateSingleCharacter] 成功生成角色:', parsed.name);
+        return parsed;
+    } catch (e) {
+        console.error('[generateSingleCharacter] 捕获到异常:', e);
+        throw e;
+    }
+};

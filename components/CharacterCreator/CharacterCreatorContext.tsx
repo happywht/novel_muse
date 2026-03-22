@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { ProjectState, Character, Echo } from '../../types';
 import { generateText, generateCharacterImage, chatWithPersona } from '../../services/geminiService';
+import { generateSingleCharacter } from '../../services/gemini/world';
 import { useProjectStore } from '../../store/useProjectStore';
 import { isStructuredFormat, parseLegacyRelationships } from '../../utils/characterRelations';
 import { RELATION_TYPE_LABELS } from '../../types';
@@ -164,6 +165,11 @@ export function CharacterCreatorProvider({
   useEffect(() => {
     if (activeChar) {
       setEditDescription(activeChar.description);
+      setEditDesire(activeChar.desire || '');
+      setEditFear(activeChar.fear || '');
+      setEditSignature(activeChar.signature || '');
+      setEditContrast(activeChar.contrast || '');
+      setEditWeakness(activeChar.weakness || '');
       setIsEditing(false);
     }
   }, [activeCharId, activeChar]);
@@ -177,31 +183,44 @@ export function CharacterCreatorProvider({
     }
   }, [activeCharId, useBackend, fetchCharacterTraits, fetchCharacterEvolution, fetchCharacterForeshadowing]);
 
-  // 生成角色
+  // 生成角色 - 使用深度生成函数获取完整字段
   const handleGenerateChar = useCallback(async () => {
     setIsGeneratingInfo(true);
     try {
-      const prompt = `为一部类型为 "${project.genre}" 的小说创建一个详细的角色档案。
-角色定位: ${roleInput}
-名字: "${nameInput || '未命名'}"
-小说核心梗概: ${project.premise}.
+      // 调用新的深度生成函数
+      const charData = await generateSingleCharacter(
+        nameInput || '新角色',
+        roleInput,
+        project.premise,
+        project.genre,
+        project.creativeSettings
+      );
 
-请包含：外貌特征、核心性格、动机与目标、秘密与缺陷、能力。
-请使用中文输出。`;
+      if (!charData) {
+        throw new Error('角色数据生成失败');
+      }
 
-      const description = await generateText(prompt, 'character_gen', project.creativeSettings);
-
+      // 构建完整的 Character 对象
       const newChar: Character = {
         id: crypto.randomUUID(),
-        name: nameInput || '新角色',
-        role: roleInput,
-        archetype: '待定',
-        description: description,
-        relationships: '',
-        structuredRelations: [],
+        name: charData.name || nameInput || '新角色',
+        role: charData.role || roleInput,
+        archetype: charData.archetype || '待定',
+        description: charData.description || '',
+        // 深度字段
+        alignment: charData.alignment,
+        desire: charData.desire,
+        fear: charData.fear,
+        signature: charData.signature,
+        contrast: charData.contrast,
+        weakness: charData.weakness,
+        // 关系字段
+        relationships: charData.relationships || '',
+        structuredRelations: charData.structuredRelations || [],
       };
 
       setDraftCharacter(newChar);
+      toast.success('角色档案已生成，包含深度字段');
     } catch (e) {
       console.error(e);
       toast.error('角色生成失败，请稍后重试');
@@ -285,16 +304,26 @@ ${iterationFeedback}
     }
   }, [activeChar, imageStyle, project, updateProject, toast]);
 
-  // 保存编辑
+  // 保存编辑 - 添加深度字段
   const handleSaveEdit = useCallback(() => {
     if (!activeChar) return;
     const updatedChars = project.characters.map((c) =>
-      c.id === activeChar.id ? { ...c, description: editDescription } : c
+      c.id === activeChar.id ? {
+        ...c,
+        description: editDescription,
+        // 深度字段
+        desire: editDesire,
+        fear: editFear,
+        signature: editSignature,
+        contrast: editContrast,
+        weakness: editWeakness,
+      } : c
     );
     updateProject({ characters: updatedChars });
     setIsEditing(false);
     toast.success('档案更新已保存');
-  }, [activeChar, editDescription, project.characters, updateProject, toast]);
+  }, [activeChar, editDescription, editDesire, editFear, editFear, editSignature, editSignature, editContrast, editContrast, editWeakness, project.characters, updateProject, toast]
+);
 
   // 删除角色
   const deleteChar = useCallback(
