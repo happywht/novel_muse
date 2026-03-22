@@ -93,6 +93,53 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
                 </div>
             )}
 
+            {/* Post-write Validation Results (from InkOS) */}
+            {actions.postWriteViolations && actions.postWriteViolations.length > 0 && (
+                <div className="bg-orange-900/20 border border-orange-500/40 p-4 rounded-xl space-y-2 mb-4 animate-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-orange-400 font-bold text-sm">
+                            <AlertTriangle size={16} />
+                            写后质检 ({actions.postWriteViolations.length} 项)
+                        </div>
+                        <button onClick={() => actions.clearValidationResults?.()} className="text-[10px] text-orange-400 hover:text-orange-300 underline">清除</button>
+                    </div>
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+                        {actions.postWriteViolations.map((v, i) => (
+                            <div key={i} className={`text-[10px] p-2 rounded border ${v.severity === 'error' ? 'bg-red-900/30 border-red-500/30 text-red-200' : 'bg-orange-900/20 border-orange-500/20 text-orange-200'}`}>
+                                <span className="font-bold">[{v.rule}]</span> {v.description}
+                                <div className="text-slate-400 mt-0.5">→ {v.suggestion}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* AI-Tell Detection Result */}
+            {actions.aiTellResult && actions.aiTellResult.issues.length > 0 && (
+                <div className="bg-cyan-900/15 border border-cyan-500/30 p-4 rounded-xl space-y-2 mb-4 animate-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
+                            <Network size={16} />
+                            AI痕迹检测 (风险 {actions.aiTellResult.aiScore}/100)
+                        </div>
+                        <button onClick={() => actions.clearValidationResults?.()} className="text-[10px] text-cyan-400 hover:text-cyan-300 underline">清除</button>
+                    </div>
+                    {actions.aiTellResult.aiScore >= 30 && (
+                        <div className="text-[10px] text-cyan-300/70 bg-cyan-900/30 p-1.5 rounded border border-cyan-500/20">
+                            💡 提示：可使用「反AI润色」模式降低AI痕迹
+                        </div>
+                    )}
+                    <div className="space-y-1.5 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                        {actions.aiTellResult.issues.map((issue, i) => (
+                            <div key={i} className="text-[10px] p-2 rounded border bg-cyan-900/15 border-cyan-500/15 text-cyan-200">
+                                <span className="font-bold">[{issue.category}]</span> {issue.description}
+                                <div className="text-slate-400 mt-0.5">→ {issue.suggestion}</div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Task 2.2: What-If Branching Sandbox */}
             <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 shadow-xl mb-4">
                 <div className="flex items-center justify-between mb-3 text-muse-300 font-bold">

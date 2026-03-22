@@ -9,6 +9,7 @@ import {
     getInstructionWithSettings, getModelName
 } from "./core";
 import { formatContext, buildTieredMemory, filterRelevantSettings } from "./helpers";
+import { buildGenreContext } from "../../config/genreRules";
 
 export type PacingMode = 'SLOW_BURN' | 'BALANCED' | 'CLIMAX';
 
@@ -168,8 +169,11 @@ export const generateSceneFromIngredients = async (
     constraintBlock += pacingInstruction + "\n";
     context += constraintBlock + "\n";
 
+    const genreContext = buildGenreContext(genre);
     const prompt = `
     小说类型: ${genre}
+    
+    ${genreContext}
     
     ${context}
 
@@ -276,6 +280,20 @@ export const polishDraft = async (
             break;
         case 'WEB_MEME':
             modeInstruction = "任务：【网文网感增强/吐槽化】。将平淡的文字重写为带梗、诙谐、具有现代网文生命力的风格。删除冗长景物，强化角色个性和吐槽感，增加潜台词。";
+            break;
+        case 'ANTI_DETECT':
+            modeInstruction = `任务：【反AI检测改写】。在保持剧情不变的前提下，降低AI生成可检测性。
+
+改写手法（附正例）：
+1. 打破句式规律：连续短句 → 长短交替，句式不可预测
+2. 口语化替代：✗"然而事情并没有那么简单" → ✓"哪有那么便宜的事"
+3. 减少"了"字密度：✗"他走了过去，拿了杯子" → ✓"他走过去，端起杯子"
+4. 转折词降频：✗"虽然…但是…" → ✓ 用角色内心吐槽或直接动作切换
+5. 情绪外化：✗"他感到愤怒" → ✓"他捏碎了茶杯，滚烫的茶水流过指缝"
+6. 删掉叙述者结论：✗"这一刻他终于明白了力量" → ✓ 只写行动，让读者自己感受
+7. 群像反应具体化：✗"全场震惊" → ✓"老陈的烟掉在裤子上，烫得他跳起来"
+8. 段落长度差异化：不再等长段落，有的段只有一句话，有的段七八行
+9. 消灭"不禁""仿佛""宛如"等AI标记词：换成具体感官描写`;
             break;
     }
 

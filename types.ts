@@ -354,7 +354,7 @@ export interface NarrativeInsight {
   logic: string;
 }
 
-export type PolishMode = 'SENSORY' | 'CINEMATIC' | 'PSYCHOLOGICAL' | 'MINIMALIST' | 'WEB_MEME';
+export type PolishMode = 'SENSORY' | 'CINEMATIC' | 'PSYCHOLOGICAL' | 'MINIMALIST' | 'WEB_MEME' | 'ANTI_DETECT';
 
 export type ViewMode = 'FORGE' | 'MANUSCRIPT';
 

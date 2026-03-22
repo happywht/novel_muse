@@ -9,6 +9,9 @@ import {
     analyzeStateChanges, generateTwistHooks, extractKnowledgeTriples,
     verifyLogicConflicts, summarizeChapter
 } from '../../services/geminiService';
+import { validatePostWrite, formatViolations, type PostWriteViolation } from '../../services/validators/postWriteValidator';
+import { analyzeAITells, type AITellResult } from '../../services/validators/aiTellDetector';
+import { getPostWriteOptionsFromGenre } from '../../config/genreRules';
 import {
     fetchUnresolvedForeshadowing, fetchRelatedSubgraph,
     fetchPhysicalStatus, mergeBranchApi,
@@ -98,6 +101,10 @@ export const useDraftingActions = ({
     // Logic Audit State
     const [isAuditingLogic, setIsAuditingLogic] = React.useState(false);
     const [logicConflicts, setLogicConflicts] = React.useState<any[]>([]);
+
+    // Post-write Validation State (from InkOS)
+    const [postWriteViolations, setPostWriteViolations] = React.useState<ReadonlyArray<PostWriteViolation>>([]);
+    const [aiTellResult, setAiTellResult] = React.useState<AITellResult | null>(null);
 
     // Forge Graph Context State
     const [useGraphContext, setUseGraphContext] = React.useState(true);
@@ -358,6 +365,8 @@ export const useDraftingActions = ({
             triggerStateAnalysis(result, activeCharacters);
             // 自动触发逻辑审计
             triggerLogicAudit(result);
+            // 自动触发写后验证 + AI痕迹检测（零LLM成本）
+            triggerPostWriteValidation(result);
         } catch (e) {
             toast.error("生成失败");
         } finally {
@@ -374,6 +383,7 @@ export const useDraftingActions = ({
             setGeneratedContent(result);
             const activeCharacters = (project.characters || []).filter(c => selectedChars.includes(c.id));
             triggerStateAnalysis(result, activeCharacters);
+            triggerPostWriteValidation(result);
         } catch (e) {
             toast.error("润色失败");
         } finally {
@@ -736,6 +746,22 @@ export const useDraftingActions = ({
         }
     };
 
+    // Post-write validation + AI-tell detection (zero LLM cost, from InkOS)
+    const triggerPostWriteValidation = (content: string) => {
+        // Strip HTML tags for validation
+        const plainText = content.replace(/<[^>]+>/g, '');
+        const genreOptions = getPostWriteOptionsFromGenre(project.genre);
+        const violations = validatePostWrite(plainText, genreOptions);
+        setPostWriteViolations(violations);
+        const aiResult = analyzeAITells(plainText);
+        setAiTellResult(aiResult);
+    };
+
+    const clearValidationResults = () => {
+        setPostWriteViolations([]);
+        setAiTellResult(null);
+    };
+
     return {
         // State
         viewMode, setViewMode,
@@ -790,6 +816,11 @@ export const useDraftingActions = ({
         logicConflicts,
         setLogicConflicts,
         handleVerifyLogic,
+
+        // Post-write Validation (from InkOS)
+        postWriteViolations,
+        aiTellResult,
+        clearValidationResults,
 
         // Forge Graph Context
         useGraphContext, setUseGraphContext,
