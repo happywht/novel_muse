@@ -141,6 +141,31 @@ export const CreativeCompassView: React.FC<CreativeCompassViewProps> = ({ projec
                                     className="w-full bg-slate-900/60 border border-slate-700/50 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-orange-500/50 focus:border-orange-500/50 outline-none placeholder-slate-600 transition-all"
                                     placeholder="预想受众：硬科幻老饕..."
                                 />
+                                <div className="mt-3">
+                                    <label className="block text-[10px] font-medium text-slate-500 mb-2 uppercase tracking-wider">
+                                        题材规则 (Genre Rules)
+                                    </label>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {Object.values(GENRE_RULES).map(rule => (
+                                            <button
+                                                key={rule.id}
+                                                onClick={() => updateProject({ genre: rule.id === project.genre ? '' : rule.id })}
+                                                className={`text-[10px] px-2 py-1 rounded-md border transition-all ${
+                                                    project.genre === rule.id
+                                                        ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-sm'
+                                                        : 'bg-slate-800/80 border-slate-700/50 text-slate-400 hover:border-slate-500 hover:text-slate-300'
+                                                }`}
+                                            >
+                                                {rule.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {project.genre && GENRE_RULES[project.genre] && (
+                                        <div className="mt-2 text-[9px] text-cyan-400/60 bg-cyan-900/15 p-2 rounded border border-cyan-500/15">
+                                            已激活：疲劳词{GENRE_RULES[project.genre].fatigueWords.length}个、禁忌{GENRE_RULES[project.genre].taboos.length}条、语言铁律{GENRE_RULES[project.genre].languageRules.length}条
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -162,9 +187,42 @@ export const CreativeCompassView: React.FC<CreativeCompassViewProps> = ({ projec
                             className="w-full min-h-[220px] bg-slate-900/80 border border-slate-700/50 rounded-2xl p-6 text-base text-amber-100/90 focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 outline-none placeholder-slate-700 custom-scrollbar resize-none transition-all shadow-inner leading-relaxed font-serif"
                             placeholder="举例：&#13;&#10;“风滚草越过生锈的轨道。他没有拔枪，只是压了压帽檐。阳光很毒，毒得像酒馆里那个女人的眼神。除了风声，只有秒针走动的声音——滴答，滴答。”&#13;&#10;(AI 吸收后生成的正文，会自然带上这种极简硬汉风)"
                         />
+                        {styleProfile && (
+                            <div className="mt-4 bg-emerald-900/15 border border-emerald-500/25 rounded-xl p-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="text-xs font-bold text-emerald-400">文风指纹报告</span>
+                                    <button onClick={() => setStyleProfile(null)} className="text-[10px] text-emerald-500 hover:text-emerald-400">收起</button>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+                                    <div className="bg-slate-900/50 rounded-lg p-2 text-center">
+                                        <div className="text-lg font-bold text-emerald-300">{styleProfile.avgSentenceLength}</div>
+                                        <div className="text-[9px] text-slate-500">平均句长</div>
+                                    </div>
+                                    <div className="bg-slate-900/50 rounded-lg p-2 text-center">
+                                        <div className="text-lg font-bold text-emerald-300">{styleProfile.sentenceLengthStdDev}</div>
+                                        <div className="text-[9px] text-slate-500">句长标准差</div>
+                                    </div>
+                                    <div className="bg-slate-900/50 rounded-lg p-2 text-center">
+                                        <div className="text-lg font-bold text-emerald-300">{styleProfile.avgParagraphLength}</div>
+                                        <div className="text-[9px] text-slate-500">平均段长</div>
+                                    </div>
+                                    <div className="bg-slate-900/50 rounded-lg p-2 text-center">
+                                        <div className="text-lg font-bold text-emerald-300">{(styleProfile.vocabularyDiversity * 100).toFixed(1)}%</div>
+                                        <div className="text-[9px] text-slate-500">词汇多样性</div>
+                                    </div>
+                                </div>
+                                {styleProfile.topPatterns.length > 0 && (
+                                    <div className="text-[10px] text-slate-400 mb-2">
+                                        <span className="text-slate-500">高频句首：</span>
+                                        {styleProfile.topPatterns.map((p, i) => <span key={i} className="ml-2 text-emerald-300/70 bg-emerald-900/20 px-1.5 py-0.5 rounded">{p}</span>)}
+                                    </div>
+                                )}
+                                {styleProfile.rhetoricalFeatures.length > 0 && (
+                                    <div className="text-[10px] text-slate-400">
+                                        <span className="text-slate-500">修辞特征：</span>
+                                        {styleProfile.rhetoricalFeatures.map((f, i) => <span key={i} className="ml-2 text-amber-300/70 bg-amber-900/20 px-1.5 py-0.5 rounded">{f}</span>)}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
-                </div>
-            </div>
-        </div>
-    );
-};

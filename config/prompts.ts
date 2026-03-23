@@ -255,6 +255,22 @@ export const buildPromptContent = (
 
         if (creativeSettings.referenceText && creativeSettings.referenceText.trim() !== '') {
             instruction += `\n\n【最高优先级·笔迹无缝模仿参考】\n请严格分析并模仿以下文本的句式长短、词汇偏好、标点习惯和整体行文节奏，在接下来的创作中保持与此高度一致：\n"""\n${creativeSettings.referenceText}\n"""`;
+
+            // Inject style fingerprint if available (from styleAnalyzer)
+            if ((creativeSettings as any).styleFingerprint) {
+                const fp = (creativeSettings as any).styleFingerprint;
+                instruction += `\n\n【文风指纹数据（请严格遵守）】\n`;
+                instruction += `- 目标平均句长: ${fp.avgSentenceLength}字 (标准差: ${fp.sentenceLengthStdDev})\n`;
+                instruction += `- 目标平均段长: ${fp.avgParagraphLength}字 (范围: ${fp.paragraphLengthRange.min}-${fp.paragraphLengthRange.max}字)\n`;
+                instruction += `- 词汇多样性(TTR): ${(fp.vocabularyDiversity * 100).toFixed(1)}%\n`;
+                if (fp.topPatterns && fp.topPatterns.length > 0) {
+                    instruction += `- 常用句首模式: ${fp.topPatterns.join(', ')}\n`;
+                }
+                if (fp.rhetoricalFeatures && fp.rhetoricalFeatures.length > 0) {
+                    instruction += `- 修辞倾向: ${fp.rhetoricalFeatures.join(', ')}\n`;
+                }
+                instruction += `\n请确保你生成的文本在上述统计指标上与参考文本高度接近。`;
+            }
         }
     }
 

@@ -8,6 +8,7 @@ import {
 import { formatContext } from "./helpers";
 import { API_BASE } from "../apiService";
 import { buildPromptContent } from "../../config/prompts";
+import { buildGenreContext } from "../../config/genreRules";
 
 /**
  * Deep plot auditing for logic and pacing
@@ -187,5 +188,90 @@ export const verifyLogicConflicts = async (
     } catch (error) {
         console.error("Failed to verify logic conflicts:", error);
         return [];
+    }
+};
+
+/**
+ * Comprehensive chapter content audit (ported from InkOS continuity auditor).
+ * Returns structured JSON with severity levels across 10 core dimensions.
+ */
+export const auditChapterContent = async (
+    genre: string,
+    chapterContent: string,
+    chapterTitle: string,
+    chapterNumber: number,
+    characters: Character[],
+    worldSettings: WorldSetting[],
+    previousChapters: Chapter[],
+    settings?: CreativeSettings
+): Promise<{
+    passed: boolean;
+    issues: Array<{ severity: 'critical' | 'warning' | 'info'; category: string; description: string; suggestion: string }>;
+    summary: string;
+}> => {
+    const contextStr = formatContext(characters, worldSettings);
+    const genreContext = buildGenreContext(genre);
+
+    const recentChapters = previousChapters
+        .filter(c => c.order < chapterNumber)
+        .sort((a, b) => b.order - a.order)
+        .slice(0, 3);
+    const prevContext = recentChapters.length > 0
+        ? recentChapters.map(c => `[第${c.order}章: ${c.title}]\n${c.summary || c.content?.slice(0, 500) || '(无摘要)'}`).join('\n\n')
+        : '(无前文)';
+
+    const prompt = `你是一位严格的${genre || ''}小说审稿编辑。请审查以下章节内容。
+
+审查维度（共10个核心维度）：
+1. OOC检查 - 角色行为是否符合设定性格和动机
+2. 时间线检查 - 时间顺序是否合理，有无前后矛盾
+3. 设定冲突 - 是否违反已建立的世界观规则
+4. 战力崩坏 - 战斗体系是否前后一致（如有）
+5. 伏笔检查 - 已埋伏笔是否被遗忘或矛盾
+6. 节奏检查 - 是否存在拖沓或节奏失衡
+7. 文风检查 - 是否出现AI痕迹（等长段落、套话、公式转折）
+8. 词汇疲劳 - 是否重复使用特定词汇过于频繁
+9. 读者期待管理 - 章尾是否有钩子，爽点是否兑现
+10. 大纲偏离 - 内容是否偏离预期走向
+
+${contextStr}
+${genreContext}
+
+【前文摘要】：
+${prevContext}
+
+【待审章节】：第${chapterNumber}章 - ${chapterTitle}
+${chapterContent}
+
+输出格式必须为纯 JSON：
+{
+  "passed": true,
+  "issues": [
+    { "severity": "critical|warning|info", "category": "维度名称", "description": "具体问题", "suggestion": "修改建议" }
+  ],
+  "summary": "一句话总结"
+}
+
+只有当存在 critical 级别问题时，passed 才为 false。禁止包含任何其他文字。`;
+
+    try {
+        const responseText = await executeModelTask(
+            'auditChapterContent',
+            '',
+            prompt,
+            await getModelName('pro'),
+            0.2,
+            true,
+            4096
+        );
+
+        const match = responseText.match(/\{[\s\S]*\}/);
+        if (match) {
+            return JSON.parse(match[0]);
+        }
+        return { passed: true, issues: [], summary: '审稿输出解析失败' };
+    } catch (e) {
+        console.error("Chapter Content Audit Error:", e);
+        return { passed: true, issues: [], summary: '审稿失败' };
     }
 };

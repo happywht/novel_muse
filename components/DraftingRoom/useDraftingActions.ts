@@ -408,6 +408,7 @@ export const useDraftingActions = ({
     const triggerStateAnalysis = async (content: string, chars: Character[]) => {
         setIsAnalyzingState(true);
         try {
+            // Phase 1: Extract state changes (Echoes)
             const changes = await analyzeStateChanges(content, chars, project.worldSettings || []);
             if (changes.length > 0) {
                 const newEchoes = changes.map(c => ({
@@ -419,11 +420,22 @@ export const useDraftingActions = ({
                     reason: c.reason,
                     status: 'PENDING' as const,
                     timestamp: Date.now(),
-                    // MVP: 准确性提升字段
                     confidence: c.confidence,
                     extractionEvidence: c.extractionEvidence
                 }));
                 updateProject({ echoes: [...(project.echoes || []), ...(newEchoes as Echo[])] });
+            }
+
+            // Phase 2: Extract knowledge triples for graph enrichment (Two-stage writer)
+            if (useBackend && useGraphContext) {
+                const plainText = content.replace(/<[^>]+>/g, '');
+                const triples = await extractKnowledgeTriples(plainText);
+                if (triples.length > 0) {
+                    setExtractedEchoes(prev => prev.map(e => ({
+                        ...e,
+                        triples: e.triples || triples
+                    })));
+                }
             }
         } finally {
             setIsAnalyzingState(false);
