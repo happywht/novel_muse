@@ -1,8 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 
 // 公开路由白名单（不需要认证的路由）
+// 注意：由于中间件挂载在 /api 上，req.path 不包含 /api 前缀
 export const PUBLIC_ROUTES = [
-  '/api/health',           // 健康检查端点
+  '/health',               // 健康检查端点（相对路径，不含 /api 前缀）
+  '/api/health',           // 兼容完整路径
 ];
 
 // 检查路径是否匹配公开路由

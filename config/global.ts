@@ -328,18 +328,32 @@ export const mergeConfig = (base: GlobalConfig, override: Partial<GlobalConfig>)
 
 // 获取全局配置（从存储中读取）
 export const getGlobalConfig = async (): Promise<GlobalConfig> => {
+    const tryGetConfig = async (): Promise<Partial<GlobalConfig> | null> => {
+        try {
+            const localforage = await import('localforage');
+            return await localforage.getItem<Partial<GlobalConfig>>(STORAGE_KEYS.GLOBAL_CONFIG);
+        } catch {
+            return null;
+        }
+    };
+
     try {
-        // 使用 localforage 读取配置
-        const localforage = await import('localforage');
-        const savedConfig = await localforage.getItem<Partial<GlobalConfig>>(STORAGE_KEYS.GLOBAL_CONFIG);
-        
+        // 首次尝试
+        let savedConfig = await tryGetConfig();
+
+        // 如果失败，等待一小段时间后重试（IndexedDB 可能还在初始化）
+        if (savedConfig === null) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            savedConfig = await tryGetConfig();
+        }
+
         if (savedConfig) {
             return mergeConfig(DEFAULT_CONFIG, savedConfig);
         }
-        
+
         return DEFAULT_CONFIG;
     } catch (error) {
-        console.warn('Failed to load global config:', error);
+        // 静默失败，返回默认配置
         return DEFAULT_CONFIG;
     }
 };
