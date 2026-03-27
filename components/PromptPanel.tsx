@@ -19,6 +19,31 @@ const DRAFTING_PROMPT_KEYS = [
   'world_echo_extraction',
 ];
 
+// Outliner模块相关的prompt keys
+const OUTLINER_PROMPT_KEYS = [
+  'plot_fission',
+  'plot_rewrite',
+  'audit_plot',
+];
+
+// Character模块相关的prompt keys
+const CHARACTER_PROMPT_KEYS = [
+  'character_gen',
+];
+
+// Echoes模块相关的prompt keys
+const ECHOES_PROMPT_KEYS = [
+  'world_echo_extraction',
+  'plot_analysis',
+];
+
+// World模块相关的prompt keys
+const WORLD_PROMPT_KEYS = [
+  'batch_generate_settings',
+  'expand_world_lore',
+  'deduce_world_consequences',
+];
+
 export const PromptPanel: React.FC<PromptPanelProps> = ({
   moduleId,
   compact = false,
@@ -40,6 +65,18 @@ export const PromptPanel: React.FC<PromptPanelProps> = ({
   const relevantPromptKeys = useMemo(() => {
     if (moduleId === AppSection.DRAFTING) {
       return DRAFTING_PROMPT_KEYS;
+    }
+    if (moduleId === AppSection.OUTLINER) {
+      return OUTLINER_PROMPT_KEYS;
+    }
+    if (moduleId === AppSection.CHARACTERS) {
+      return CHARACTER_PROMPT_KEYS;
+    }
+    if (moduleId === AppSection.ECHOES) {
+      return ECHOES_PROMPT_KEYS;
+    }
+    if (moduleId === AppSection.WORLD) {
+      return WORLD_PROMPT_KEYS;
     }
     // 其他模块可以根据需要扩展
     return [];

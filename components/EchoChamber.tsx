@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ProjectState, Character, WorldSetting, Echo } from '../types';
+import { ProjectState, Character, WorldSetting, Echo, AppSection } from '../types';
 import {
     X, Activity, Clock, User, Globe, Sparkles,
     Filter, Zap, PlayCircle, Brain, CheckCircle,
@@ -17,6 +17,7 @@ import {
 } from '../services/apiService';
 import { EchoDeepReview } from './Echo/EchoDeepReview';
 import { EchoIntegrityReport } from './Echo/EchoIntegrityReport';
+import { PromptPanel } from './PromptPanel';
 import { useProjectStore } from '../store/useProjectStore';
 import { useToast } from '../hooks/useToast';
 import { RELATIONSHIP_CONFIG } from '../config/constants';
@@ -814,6 +815,11 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                         </div>
                     </>
                 )}
+            </div>
+
+            {/* Right Sidebar: Prompt Panel */}
+            <div className="w-72 flex-shrink-0">
+                <PromptPanel moduleId={AppSection.ECHOES} />
             </div>
 
             {/* Deep Review Panel */}

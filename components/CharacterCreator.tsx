@@ -1,10 +1,11 @@
 import React from 'react';
-import { ProjectState } from '../types';
+import { ProjectState, AppSection } from '../types';
 import { CharacterCreatorProvider, useCharacterCreator } from './CharacterCreator/CharacterCreatorContext';
 import { CharacterList } from './CharacterCreator/CharacterList';
 import { CharacterDetail } from './CharacterCreator/CharacterDetail';
 import { CharacterChat } from './CharacterCreator/CharacterChat';
 import { CharacterDraftZone } from './CharacterCreator/CharacterDraftZone';
+import { PromptPanel } from './PromptPanel';
 
 interface CharacterCreatorProps {
   project: ProjectState;
@@ -45,8 +46,15 @@ function CharacterCreatorContent() {
       {/* 左侧：角色列表 */}
       <CharacterList />
 
-      {/* 右侧：详情或草稿 */}
-      {draftCharacter ? <CharacterDraftZone /> : <CharacterDetail />}
+      {/* 中间：详情或草稿 */}
+      <div className="flex-1">
+        {draftCharacter ? <CharacterDraftZone /> : <CharacterDetail />}
+      </div>
+
+      {/* 右侧：Prompt配置面板 */}
+      <div className="w-80 flex-shrink-0">
+        <PromptPanel moduleId={AppSection.CHARACTERS} />
+      </div>
 
       {/* 聊天弹窗 */}
       <CharacterChat />

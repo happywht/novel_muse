@@ -41,6 +41,7 @@ import {
     DEFAULT_TARGET_WORD_COUNT
 } from '../../utils/wordCount';
 import { useToast } from '../../hooks/useToast';
+import { PromptPanel } from '../PromptPanel';
 
 
 interface ChapterOutlinerProps {
@@ -379,7 +380,7 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                 </div>
             </div>
 
-            {/* Right Area: Chapter Fission */}
+            {/* Center Area: Chapter Fission */}
             <div className="flex-1 flex flex-col min-w-0">
                 {selectedPlotNode ? (
                     <>
@@ -757,6 +758,11 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                         </p>
                     </div>
                 )}
+            </div>
+
+            {/* Right Panel: Prompt Configuration */}
+            <div className="w-80 flex-shrink-0">
+                <PromptPanel moduleId={AppSection.OUTLINER} />
             </div>
 
             {/* Graph Visualization Modal */}

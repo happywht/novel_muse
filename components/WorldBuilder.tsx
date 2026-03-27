@@ -1,5 +1,5 @@
 import React from 'react';
-import { ProjectState } from '../types';
+import { ProjectState, AppSection } from '../types';
 import {
   WorldBuilderProvider,
   WorldList,
@@ -10,6 +10,7 @@ import {
   WorldLoadingOverlay,
   useWorldBuilder,
 } from './WorldBuilder/index';
+import { PromptPanel } from './PromptPanel';
 
 // ============================================================
 // 类型定义
@@ -44,8 +45,13 @@ const WorldBuilderContent: React.FC = () => {
       <WorldList />
 
       {/* 内容区域 */}
-      <div className="w-2/3 bg-slate-900 rounded-xl border border-slate-800 p-8 overflow-y-auto relative custom-scrollbar shadow-inner flex flex-col">
+      <div className="flex-1 bg-slate-900 rounded-xl border border-slate-800 p-8 overflow-y-auto relative custom-scrollbar shadow-inner flex flex-col">
         {renderContent()}
+      </div>
+
+      {/* Prompt 配置侧边栏 */}
+      <div className="w-72 flex-shrink-0">
+        <PromptPanel moduleId={AppSection.WORLD} />
       </div>
 
       {/* 加载遮罩 */}

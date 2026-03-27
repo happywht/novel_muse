@@ -240,24 +240,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="py-3 px-2 space-y-1 shrink-0">
                 {tools.map((tool) => {
                     const Icon = tool.icon;
+                    const isPromptTuner = tool.label === 'AI 调教台';
                     return (
-                        <button
-                            key={tool.label}
-                            onClick={tool.onClick}
-                            className={`group w-full flex items-center gap-3 rounded-xl transition-all duration-200 ${expanded ? 'px-3 py-2' : 'px-0 py-2 justify-center'
-                                } text-slate-500 hover:text-slate-300 hover:bg-slate-800/50`}
-                            title={expanded ? undefined : tool.label}
-                        >
-                            <div className="shrink-0 p-1.5 rounded-lg group-hover:bg-slate-800 transition-colors">
-                                <Icon size={16} className={tool.color} />
-                            </div>
-                            <span
-                                className={`text-xs font-medium whitespace-nowrap transition-all duration-300 overflow-hidden ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'
-                                    }`}
+                        <div key={tool.label} className="relative group/tool">
+                            <button
+                                onClick={tool.onClick}
+                                className={`w-full flex items-center gap-3 rounded-xl transition-all duration-200 ${expanded ? 'px-3 py-2' : 'px-0 py-2 justify-center'
+                                    } text-slate-500 hover:text-slate-300 hover:bg-slate-800/50`}
+                                title={!expanded ? (isPromptTuner ? 'AI 调教台 (已迁移至创作罗盘)' : tool.label) : undefined}
                             >
-                                {tool.label}
-                            </span>
-                        </button>
+                                <div className="relative shrink-0 p-1.5 rounded-lg group-hover/tool:bg-slate-800 transition-colors">
+                                    <Icon size={16} className={tool.color} />
+                                    {/* PromptTuner 收起状态时的小圆点提示 */}
+                                    {isPromptTuner && !expanded && (
+                                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400 rounded-full animate-pulse shadow-[0_0_6px_rgba(251,191,36,0.8)]" />
+                                    )}
+                                </div>
+                                <span
+                                    className={`text-xs font-medium whitespace-nowrap transition-all duration-300 overflow-hidden ${expanded ? 'opacity-100 w-auto' : 'opacity-0 w-0'
+                                        }`}
+                                >
+                                    {tool.label}
+                                </span>
+                                {/* PromptTuner 迁移提示 Badge */}
+                                {isPromptTuner && expanded && (
+                                    <span className="ml-auto px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded border border-amber-500/30 whitespace-nowrap">
+                                        已迁移
+                                    </span>
+                                )}
+                            </button>
+                            {/* PromptTuner 展开状态时的悬停提示 */}
+                            {isPromptTuner && expanded && (
+                                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 bg-slate-800 text-[11px] text-slate-300 rounded-lg shadow-xl opacity-0 group-hover/tool:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 border border-slate-700">
+                                    功能已迁移至「创作罗盘」，将在后续版本移除
+                                    <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-slate-800" />
+                                </div>
+                            )}
+                        </div>
                     );
                 })}
             </div>
