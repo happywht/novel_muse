@@ -450,6 +450,901 @@ Target word count: approximately {{targetWordCount}} characters.`,
 };
 
 // ============================================================
+// Batch Generate Characters Template
+// ============================================================
+
+/**
+ * Batch Generate Characters Template
+ *
+ * Used for generating multiple characters at once based on premise, genre, and setting.
+ */
+const BATCH_GENERATE_CHARACTERS_TEMPLATE: PromptTemplate = {
+  id: 'batch_generate_characters',
+  name: 'Batch Generate Characters',
+  description: 'Generate multiple characters at once based on story premise and genre',
+  category: 'generation',
+  systemInstruction: `You are an expert character designer for novels and creative writing. Your task is to create compelling, multi-dimensional characters that:
+
+1. Fit naturally within the story's genre and world setting
+2. Have clear motivations, flaws, and character arcs
+3. Possess distinctive voices and personalities
+4. Maintain internal consistency with their backgrounds
+5. Serve the narrative while feeling like real people
+
+Create characters that readers will remember and care about.`,
+
+  userPromptBlocks: [
+    // Block 1: Story Context
+    {
+      id: 'story_context',
+      title: 'Story Context',
+      order: 1,
+      template: `[Story Premise]
+{{premise}}
+
+[Genre]
+{{genre}}
+
+[World Setting]
+{{settingText}}`,
+    },
+
+    // Block 2: Character Configuration Requirements
+    {
+      id: 'character_config',
+      title: 'Character Configuration Requirements',
+      order: 2,
+      template: `[Character Configuration Requirements]
+Please generate a diverse cast of characters based on the story context above. Each character should include:
+
+1. **Basic Information**: Name, age, gender, role in story
+2. **Physical Description**: Distinctive appearance traits
+3. **Personality**: Core traits, strengths, and flaws
+4. **Background**: Origin, history, and formative experiences
+5. **Motivations**: Goals, desires, and what drives them
+6. **Relationships**: Key connections to other characters
+7. **Character Arc**: Potential growth trajectory
+
+Ensure characters complement each other and create interesting dynamics.`,
+    },
+
+    // Block 3: Core Requirements
+    {
+      id: 'core_requirements',
+      title: 'Core Requirements',
+      order: 3,
+      template: `[Core Requirements]
+- Characters should feel authentic and three-dimensional
+- Avoid stereotypes and cliches
+- Each character should have a unique voice and perspective
+- Consider how characters will interact and create conflict
+- Ensure diversity in personality, background, and motivation
+- Characters should serve the story while feeling independent
+
+Output each character in a structured format that can be easily parsed and integrated into the story management system.`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'premise',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The story premise/logline for character generation',
+      display: 'Story Premise',
+    },
+    {
+      name: 'genre',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'The novel genre for character style guidance',
+      display: 'Novel Genre',
+    },
+    {
+      name: 'settingText',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'World setting description for character context',
+      display: 'World Setting',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-27',
+    tags: ['character', 'generation', 'batch', 'creative-writing'],
+  },
+};
+
+// ============================================================
+// Batch Generate Settings Template
+// ============================================================
+
+/**
+ * Batch Generate Settings Template
+ *
+ * Used for generating multiple world settings at once based on premise, genre, and category.
+ */
+const BATCH_GENERATE_SETTINGS_TEMPLATE: PromptTemplate = {
+  id: 'batch_generate_settings',
+  name: 'Batch Generate World Settings',
+  description: 'Generate multiple world settings/lore entries at once based on story context',
+  category: 'generation',
+  systemInstruction: `You are a world-building expert for novels and creative writing. Your task is to create rich, immersive world settings that:
+
+1. Establish clear rules and logic for the fictional world
+2. Create atmosphere and mood that supports the story
+3. Provide interesting opportunities for plot and conflict
+4. Maintain internal consistency across all settings
+5. Feel authentic and lived-in, not just backdrop
+
+Build worlds that readers will want to explore and understand.`,
+
+  userPromptBlocks: [
+    // Block 1: Story Context
+    {
+      id: 'story_context',
+      title: 'Story Context',
+      order: 1,
+      template: `[Story Premise]
+{{premise}}
+
+[Genre]
+{{genre}}
+
+[Category]
+{{category}}
+
+[Number of Entries to Generate]
+{{count}}`,
+    },
+
+    // Block 2: Category Guidance
+    {
+      id: 'category_guidance',
+      title: 'Category Guidance',
+      order: 2,
+      template: `[Category-Specific Guidance]
+{{categoryGuidance}}`,
+      condition: 'categoryGuidance != null && categoryGuidance !== ""',
+    },
+
+    // Block 3: General Requirements
+    {
+      id: 'general_requirements',
+      title: 'General Requirements',
+      order: 3,
+      template: `[General Requirements for World Settings]
+Each setting entry should include:
+
+1. **Title**: A clear, memorable name for this setting element
+2. **Category**: The type of world element (e.g., geography, culture, magic system, history)
+3. **Content**: Detailed description with concrete details and examples
+4. **Implications**: How this setting affects the story and characters
+5. **Connections**: Links to other world elements or potential plot hooks
+
+Requirements:
+- Settings should feel organic and interconnected
+- Avoid info-dump style descriptions; make them feel discoverable
+- Include sensory details and concrete specifics
+- Consider how settings create story opportunities
+- Maintain consistency with the established genre and tone
+
+Output {{count}} distinct setting entries in the specified category.`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'premise',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The story premise for world-building context',
+      display: 'Story Premise',
+    },
+    {
+      name: 'genre',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'The novel genre for setting style guidance',
+      display: 'Novel Genre',
+    },
+    {
+      name: 'category',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The category of world settings to generate',
+      display: 'Setting Category',
+    },
+    {
+      name: 'count',
+      type: 'number',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Number of setting entries to generate',
+      display: 'Entry Count',
+      defaultValue: 5,
+    },
+    // === OPTIONAL VARIABLES ===
+    {
+      name: 'categoryGuidance',
+      type: 'string',
+      tier: 'optional',
+      source: 'user_input',
+      required: false,
+      description: 'Additional guidance specific to the category',
+      display: 'Category Guidance',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-27',
+    tags: ['world-building', 'settings', 'generation', 'batch', 'creative-writing'],
+  },
+};
+
+// ============================================================
+// Expand World Lore Template
+// ============================================================
+
+/**
+ * Expand World Lore Template
+ *
+ * Used for expanding existing world settings with more detail.
+ */
+const EXPAND_WORLD_LORE_TEMPLATE: PromptTemplate = {
+  id: 'expand_world_lore',
+  name: 'Expand World Lore',
+  description: 'Expand and deepen existing world setting entries with more detail',
+  category: 'refinement',
+  systemInstruction: `You are a world-building specialist focused on deepening and enriching existing world lore. Your task is to expand world settings with:
+
+1. Greater detail and specificity
+2. New connections and implications
+3. Deeper historical or cultural context
+4. More vivid sensory descriptions
+5. Additional plot-relevant elements
+
+Expand while maintaining consistency with the existing content.`,
+
+  userPromptBlocks: [
+    // Block 1: Genre Context
+    {
+      id: 'genre_context',
+      title: 'Genre Context',
+      order: 1,
+      template: `[Genre]
+{{genre}}
+
+[Setting Title]
+{{title}}`,
+    },
+
+    // Block 2: Current Setting Content
+    {
+      id: 'current_content',
+      title: 'Current Setting Content',
+      order: 2,
+      template: `[Current Setting Content]
+{{currentContent}}`,
+    },
+
+    // Block 3: Task Requirements
+    {
+      id: 'task_requirements',
+      title: 'Task Requirements',
+      order: 3,
+      template: `[Expansion Requirements]
+Please expand and deepen the above world setting by:
+
+1. **Adding Detail**: Elaborate on existing points with concrete examples, names, dates, or sensory details
+2. **Deepening Context**: Add historical background, cultural significance, or cause-and-effect relationships
+3. **Creating Connections**: Link to other potential world elements or story opportunities
+4. **Enhancing Atmosphere**: Include more vivid descriptions that create mood and setting
+5. **Practical Implications**: Explain how this affects daily life, characters, or plot possibilities
+
+Requirements:
+- Maintain consistency with the original content
+- Do not contradict established facts
+- Add depth without unnecessary length
+- Make the world feel more lived-in and real
+- Keep the genre and tone in mind
+
+Output the expanded setting in a clear, organized format.`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'genre',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'The novel genre for tone and style guidance',
+      display: 'Novel Genre',
+    },
+    {
+      name: 'title',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Title of the setting to expand',
+      display: 'Setting Title',
+    },
+    {
+      name: 'currentContent',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Current content of the setting to expand',
+      display: 'Current Content',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-27',
+    tags: ['world-building', 'expansion', 'refinement', 'lore', 'creative-writing'],
+  },
+};
+
+// ============================================================
+// Generate Plot Template
+// ============================================================
+
+/**
+ * Generate Plot Template
+ *
+ * Used for generating story plot outlines based on premise, characters, and settings.
+ */
+const GENERATE_PLOT_TEMPLATE: PromptTemplate = {
+  id: 'generate_plot',
+  name: 'Generate Plot Outline',
+  description: 'Generate structured plot outlines based on story context and elements',
+  category: 'generation',
+  systemInstruction: `You are a master storyteller and narrative architect. Your task is to create compelling plot outlines that:
+
+1. Follow sound narrative structure and pacing principles
+2. Create meaningful conflict and tension
+3. Develop character arcs alongside plot progression
+4. Utilize world-building elements organically
+5. Balance predictability with surprise
+6. Serve the story's themes and emotional journey
+
+Create plots that are both structurally sound and emotionally resonant.`,
+
+  userPromptBlocks: [
+    // Block 1: Core Premise
+    {
+      id: 'core_premise',
+      title: 'Core Premise',
+      order: 1,
+      template: `[Story Premise]
+{{premise}}
+
+[Genre]
+{{genre}}`,
+    },
+
+    // Block 2: Character Information
+    {
+      id: 'character_info',
+      title: 'Character Information',
+      order: 2,
+      template: `[Character Context]
+{{contextStr}}`,
+      condition: 'contextStr != null && contextStr !== ""',
+    },
+
+    // Block 3: World Settings
+    {
+      id: 'world_settings',
+      title: 'World Settings',
+      order: 3,
+      template: `[Relevant World Settings]
+{{relevantSettings}}`,
+      condition: 'relevantSettings != null && relevantSettings !== ""',
+    },
+
+    // Block 4: Graph Context
+    {
+      id: 'graph_context',
+      title: 'Knowledge Graph Context',
+      order: 4,
+      template: `[Knowledge Graph Context]
+{{graphContext}}`,
+      condition: 'graphContext != null && graphContext !== ""',
+    },
+
+    // Block 5: Lookup Table
+    {
+      id: 'lookup_table',
+      title: 'Reference Information',
+      order: 5,
+      template: `[Reference Information]
+{{lookupTable}}`,
+      condition: 'lookupTable != null && lookupTable !== ""',
+    },
+
+    // Block 6: Task Requirements
+    {
+      id: 'task_requirements',
+      title: 'Task Requirements',
+      order: 6,
+      template: `[Plot Generation Requirements]
+Using the template structure below, generate a comprehensive plot outline:
+
+{{template}}
+
+Requirements:
+- Each plot point should be specific and actionable
+- Include emotional beats and character development moments
+- Ensure cause-and-effect logic between plot points
+- Balance setup, conflict, and resolution
+- Consider pacing and reader engagement
+- Utilize the world settings and character relationships provided
+
+Output the plot outline in a clear, structured format.`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'premise',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The story premise/logline',
+      display: 'Story Premise',
+    },
+    {
+      name: 'genre',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'The novel genre',
+      display: 'Novel Genre',
+    },
+    {
+      name: 'template',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Plot structure template to follow',
+      display: 'Plot Template',
+    },
+    // === IMPORTANT VARIABLES ===
+    {
+      name: 'contextStr',
+      type: 'string',
+      tier: 'important',
+      source: 'computed',
+      required: false,
+      description: 'Character context and relationships',
+      display: 'Character Context',
+    },
+    {
+      name: 'relevantSettings',
+      type: 'string',
+      tier: 'important',
+      source: 'computed',
+      required: false,
+      description: 'Relevant world settings for the plot',
+      display: 'World Settings',
+    },
+    // === OPTIONAL VARIABLES ===
+    {
+      name: 'graphContext',
+      type: 'string',
+      tier: 'optional',
+      source: 'computed',
+      required: false,
+      description: 'Knowledge graph context for plot coherence',
+      display: 'Graph Context',
+    },
+    {
+      name: 'lookupTable',
+      type: 'string',
+      tier: 'optional',
+      source: 'computed',
+      required: false,
+      description: 'Reference lookup table for consistency',
+      display: 'Lookup Table',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-27',
+    tags: ['plot', 'generation', 'outline', 'storytelling', 'creative-writing'],
+  },
+};
+
+// ============================================================
+// Rewrite Plot Template
+// ============================================================
+
+/**
+ * Rewrite Plot Template
+ *
+ * Used for rewriting existing plot outlines based on modification directives.
+ */
+const REWRITE_PLOT_TEMPLATE: PromptTemplate = {
+  id: 'rewrite_plot',
+  name: 'Rewrite Plot',
+  description: 'Rewrite existing plot outlines based on modification directives',
+  category: 'refinement',
+  systemInstruction: `You are a narrative revision specialist. Your task is to rewrite plot outlines while:
+
+1. Preserving the core elements that work well
+2. Implementing requested changes thoughtfully
+3. Maintaining narrative consistency and logic
+4. Improving pacing and emotional impact
+5. Ensuring character arcs remain coherent
+
+Rewrite plots to better serve the story's goals while respecting established elements.`,
+
+  userPromptBlocks: [
+    // Block 1: Genre Context
+    {
+      id: 'genre_context',
+      title: 'Genre Context',
+      order: 1,
+      template: `[Genre]
+{{genre}}`,
+    },
+
+    // Block 2: Character Context
+    {
+      id: 'character_context',
+      title: 'Character Context',
+      order: 2,
+      template: `[Character Context]
+{{contextStr}}`,
+      condition: 'contextStr != null && contextStr !== ""',
+    },
+
+    // Block 3: Reference Information
+    {
+      id: 'lookup_table',
+      title: 'Reference Information',
+      order: 3,
+      template: `[Reference Information]
+{{lookupTable}}`,
+      condition: 'lookupTable != null && lookupTable !== ""',
+    },
+
+    // Block 4: Current Plot
+    {
+      id: 'current_plot',
+      title: 'Current Plot',
+      order: 4,
+      template: `[Current Plot Outline]
+{{currentPlot}}`,
+    },
+
+    // Block 5: Modification Directive
+    {
+      id: 'modification_directive',
+      title: 'Modification Directive',
+      order: 5,
+      template: `[Modification Directive]
+{{directive}}
+
+Please rewrite the plot outline according to the above directive while:
+- Maintaining consistency with character information and world settings
+- Preserving plot points that are not directly affected by the modification
+- Ensuring logical cause-and-effect relationships
+- Improving overall narrative flow where possible
+
+Output the revised plot outline in a clear, structured format.`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'genre',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'The novel genre',
+      display: 'Novel Genre',
+    },
+    {
+      name: 'currentPlot',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Current plot outline to rewrite',
+      display: 'Current Plot',
+    },
+    {
+      name: 'directive',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Modification directive for the rewrite',
+      display: 'Modification Directive',
+    },
+    // === IMPORTANT VARIABLES ===
+    {
+      name: 'contextStr',
+      type: 'string',
+      tier: 'important',
+      source: 'computed',
+      required: false,
+      description: 'Character context for consistency',
+      display: 'Character Context',
+    },
+    // === OPTIONAL VARIABLES ===
+    {
+      name: 'lookupTable',
+      type: 'string',
+      tier: 'optional',
+      source: 'computed',
+      required: false,
+      description: 'Reference lookup table',
+      display: 'Lookup Table',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-27',
+    tags: ['plot', 'rewrite', 'revision', 'refinement', 'creative-writing'],
+  },
+};
+
+// ============================================================
+// Polish Draft Template
+// ============================================================
+
+/**
+ * Polish Draft Template
+ *
+ * Used for polishing and refining draft content.
+ */
+const POLISH_DRAFT_TEMPLATE: PromptTemplate = {
+  id: 'polish_draft',
+  name: 'Polish Draft',
+  description: 'Polish and refine draft content for improved quality',
+  category: 'refinement',
+  systemInstruction: `You are an expert prose editor and stylist. Your task is to polish draft content by:
+
+1. Improving sentence flow and rhythm
+2. Enhancing word choice and imagery
+3. Strengthening voice and tone consistency
+4. Eliminating redundancy and awkward phrasing
+5. Maintaining the author's original intent and style
+
+Polish while preserving the unique voice and vision of the original work.`,
+
+  userPromptBlocks: [
+    // Block 1: Polish Instructions
+    {
+      id: 'polish_instructions',
+      title: 'Polish Instructions',
+      order: 1,
+      template: `[Polish Instructions]
+{{modeInstruction}}
+
+Apply the above instructions to improve the following draft content.`,
+    },
+
+    // Block 2: Content to Polish
+    {
+      id: 'content_to_polish',
+      title: 'Content to Polish',
+      order: 2,
+      template: `[Draft Content]
+{{content}}
+
+Please polish the above content according to the instructions. Focus on:
+- Sentence-level improvements
+- Word choice and imagery enhancement
+- Pacing and rhythm
+- Voice and tone consistency
+- Clarity and impact
+
+Output the polished version while preserving the core meaning and style of the original.`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'content',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The draft content to polish',
+      display: 'Draft Content',
+    },
+    {
+      name: 'modeInstruction',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Specific polishing mode instructions',
+      display: 'Polish Mode',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-27',
+    tags: ['polish', 'refinement', 'editing', 'prose', 'creative-writing'],
+  },
+};
+
+// ============================================================
+// Chat With Persona Template
+// ============================================================
+
+/**
+ * Chat With Persona Template
+ *
+ * Used for role-playing conversations with characters.
+ */
+const CHAT_WITH_PERSONA_TEMPLATE: PromptTemplate = {
+  id: 'chat_with_persona',
+  name: 'Chat With Persona',
+  description: 'Role-play conversations with story characters in character',
+  category: 'utility',
+  systemInstruction: `You are an immersive role-playing AI that embodies story characters with complete authenticity. Your task is to:
+
+1. Stay completely in character throughout the conversation
+2. Reflect the character's unique voice, speech patterns, and personality
+3. Respond based on the character's knowledge, experiences, and worldview
+4. Maintain emotional consistency with the character's current state
+5. React authentically to the user's messages as the character would
+
+Become the character completely. Never break character or acknowledge being an AI.`,
+
+  userPromptBlocks: [
+    // Block 1: Character Profile
+    {
+      id: 'character_profile',
+      title: 'Character Profile',
+      order: 1,
+      template: `[Character Profile]
+Name: {{characterName}}
+Role: {{characterRole}}
+
+[Character Description]
+{{characterDescription}}
+
+[Character Relationships]
+{{characterRelationships}}`,
+    },
+
+    // Block 2: Conversation History
+    {
+      id: 'conversation_history',
+      title: 'Conversation History',
+      order: 2,
+      template: `[Previous Conversation]
+{{historyText}}`,
+      condition: 'historyText != null && historyText !== ""',
+    },
+
+    // Block 3: Current Message
+    {
+      id: 'current_message',
+      title: 'Current Message',
+      order: 3,
+      template: `[User's Message]
+{{message}}
+
+Respond as {{characterName}} would. Stay true to their personality, knowledge, and emotional state. Express their unique voice and perspective in your response.`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'characterName',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Name of the character to role-play',
+      display: 'Character Name',
+    },
+    {
+      name: 'message',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The user message to respond to',
+      display: 'User Message',
+    },
+    // === IMPORTANT VARIABLES ===
+    {
+      name: 'characterRole',
+      type: 'string',
+      tier: 'important',
+      source: 'project_state',
+      required: false,
+      description: 'Role of the character in the story',
+      display: 'Character Role',
+    },
+    {
+      name: 'characterDescription',
+      type: 'string',
+      tier: 'important',
+      source: 'project_state',
+      required: false,
+      description: 'Detailed character description and personality',
+      display: 'Character Description',
+    },
+    {
+      name: 'characterRelationships',
+      type: 'string',
+      tier: 'important',
+      source: 'computed',
+      required: false,
+      description: 'Character relationships with others',
+      display: 'Character Relationships',
+    },
+    // === OPTIONAL VARIABLES ===
+    {
+      name: 'historyText',
+      type: 'string',
+      tier: 'optional',
+      source: 'computed',
+      required: false,
+      description: 'Previous conversation history',
+      display: 'Conversation History',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-27',
+    tags: ['chat', 'role-play', 'persona', 'character', 'interactive'],
+  },
+};
+
+// ============================================================
 // Export Default Templates
 // ============================================================
 
@@ -458,6 +1353,13 @@ Target word count: approximately {{targetWordCount}} characters.`,
  */
 export const DEFAULT_TEMPLATES: Record<string, PromptTemplate> = {
   scene_generation: SCENE_GENERATION_TEMPLATE,
+  batch_generate_characters: BATCH_GENERATE_CHARACTERS_TEMPLATE,
+  batch_generate_settings: BATCH_GENERATE_SETTINGS_TEMPLATE,
+  expand_world_lore: EXPAND_WORLD_LORE_TEMPLATE,
+  generate_plot: GENERATE_PLOT_TEMPLATE,
+  rewrite_plot: REWRITE_PLOT_TEMPLATE,
+  polish_draft: POLISH_DRAFT_TEMPLATE,
+  chat_with_persona: CHAT_WITH_PERSONA_TEMPLATE,
 };
 
 // ============================================================
