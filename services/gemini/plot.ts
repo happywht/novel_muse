@@ -13,6 +13,7 @@ import {
 import { formatContext, filterRelevantSettings, formatEntityLookupTable } from "./helpers";
 import { getDisplayRelationships } from "../../utils/characterRelations";
 import { buildPromptContent } from "../../config/prompts";
+import { renderUserPromptBlocks } from "../../config/templates/defaults";
 
 export interface PlotRhythmPoint {
     beat: string;
@@ -149,6 +150,9 @@ ${graphContext.characterRelationships.map(r =>
   禁止包含任何开场白或解释文字。
   `;
 
+    // Prepare template data
+    const templateData = { premise, genre, contextStr, relevantSettings, graphContext, lookupTable, template };
+
     try {
         const responseText = await executeModelTask(
             'generatePlot',
@@ -157,7 +161,9 @@ ${graphContext.characterRelationships.map(r =>
             'gemini-3-pro-preview',
             0.6,
             AiPlotNodeArraySchema,
-            4096
+            4096,
+            undefined,
+            { templateId: 'generate_plot', templateData }
         );
 
         const result = safeParseAiJson(responseText, AiPlotNodeArraySchema, "Plot Generation") || [];
@@ -219,6 +225,9 @@ ${contextStr}
 禁止包含任何开场白或解释文字。
 `;
 
+    // Prepare template data
+    const templateData = { genre, contextStr, lookupTable, currentPlot, directive };
+
     try {
         const responseText = await executeModelTask(
             'rewritePlot',
@@ -227,7 +236,9 @@ ${contextStr}
             'gemini-3-pro-preview',
             0.3,
             AiPlotNodeArraySchema,
-            4096
+            4096,
+            undefined,
+            { templateId: 'rewrite_plot', templateData }
         );
 
         const result = safeParseAiJson(responseText, AiPlotNodeArraySchema, "Plot Rewrite") || [];
