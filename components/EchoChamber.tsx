@@ -20,6 +20,7 @@ import { EchoIntegrityReport } from './Echo/EchoIntegrityReport';
 import { PromptPanel } from './PromptPanel';
 import { useProjectStore } from '../store/useProjectStore';
 import { useToast } from '../hooks/useToast';
+import { useAdvancedMode } from '../hooks/useAdvancedMode';
 import { RELATIONSHIP_CONFIG } from '../config/constants';
 
 interface EchoChamberProps {
@@ -58,6 +59,7 @@ interface ContradictionItem {
 
 export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject }) => {
     const { toast } = useToast();
+    const { isAdvanced } = useAdvancedMode();
     const [selectedEchoId, setSelectedEchoId] = useState<string | null>(null);
     const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
     const [viewFilter, setViewFilter] = useState<ViewFilter>('PENDING');
@@ -99,7 +101,7 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
         return project.echoes
             .filter(e => {
                 if (viewFilter === 'PENDING') {
-                    return e.status === 'PENDING' || e.status === 'PREDICTION';
+                    return e.status === 'PENDING';
                 } else {
                     return e.status === 'ACCEPTED' || e.status === 'ARCHIVED';
                 }
@@ -269,7 +271,7 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                 type: rec.targetType,
                 description: rec.suggestedUpdate,
                 reason: rec.reason,
-                status: 'PREDICTION',
+                status: 'PENDING',
                 timestamp: Date.now()
             }));
 
@@ -348,7 +350,6 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
         switch (status) {
             case 'ACCEPTED': return <CheckCircle size={14} className="text-emerald-400" />;
             case 'REJECTED': return <X size={14} className="text-rose-400" />;
-            case 'PREDICTION': return <Sparkles size={14} className="text-purple-400" />;
             case 'ARCHIVED': return <History size={14} className="text-slate-500" />;
             default: return <Clock size={14} className="text-amber-400" />;
         }
@@ -369,9 +370,9 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                                 onClick={() => setViewFilter('PENDING')}
                                 className={`px-3 py-1 text-xs rounded-md transition-all flex items-center gap-1.5 ${viewFilter === 'PENDING' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
                             >
-                                <Inbox size={14} /> 收件箱 {project.echoes.filter(e => e.status === 'PENDING' || e.status === 'PREDICTION').length > 0 &&
+                                <Inbox size={14} /> 收件箱 {project.echoes.filter(e => e.status === 'PENDING').length > 0 &&
                                     <span className="bg-muse-600 text-[10px] px-1.5 rounded-full font-bold">
-                                        {project.echoes.filter(e => e.status === 'PENDING' || e.status === 'PREDICTION').length}
+                                        {project.echoes.filter(e => e.status === 'PENDING').length}
                                     </span>}
                             </button>
                             <button
@@ -403,13 +404,15 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                         <span className="text-xs font-bold">图谱查询</span>
                     </button>
 
-                    <button
-                        onClick={() => setShowDeepReview(true)}
-                        className="bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/30 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-all shadow-lg active:scale-95"
-                    >
-                        <Search size={16} />
-                        <span className="text-xs font-bold">深度审核</span>
-                    </button>
+                    {isAdvanced && (
+                        <button
+                            onClick={() => setShowDeepReview(true)}
+                            className="bg-blue-900/50 hover:bg-blue-800 text-blue-200 border border-blue-500/30 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-all shadow-lg active:scale-95"
+                        >
+                            <Search size={16} />
+                            <span className="text-xs font-bold">深度审核</span>
+                        </button>
+                    )}
 
                     <button
                         onClick={() => setShowIntegrityReport(true)}
@@ -628,7 +631,7 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                                                 {echo.targetName}
                                             </h3>
                                             <div className="flex items-center gap-2 text-[10px] text-slate-500 uppercase tracking-wider font-medium">
-                                                {getStatusIcon(echo.status)} {echo.status === 'PREDICTION' ? '未来推演' : '实录回响'} • {new Date(echo.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                {getStatusIcon(echo.status)} 实录回响 • {new Date(echo.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </div>
                                         </div>
                                     </div>
@@ -822,19 +825,21 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                 <PromptPanel moduleId={AppSection.ECHOES} />
             </div>
 
-            {/* Deep Review Panel */}
-            <EchoDeepReview
-                isOpen={showDeepReview}
-                onClose={() => setShowDeepReview(false)}
-                echoes={project.echoes}
-                chapters={project.chapters}
-                characters={project.characters}
-                worldSettings={project.worldSettings}
-                onAccept={handleAcceptEcho}
-                onReject={handleRejectEcho}
-                onBatchAccept={handleBatchAccept}
-                onBatchReject={handleBatchReject}
-            />
+            {/* Deep Review Panel - Advanced Mode Only */}
+            {isAdvanced && (
+                <EchoDeepReview
+                    isOpen={showDeepReview}
+                    onClose={() => setShowDeepReview(false)}
+                    echoes={project.echoes}
+                    chapters={project.chapters}
+                    characters={project.characters}
+                    worldSettings={project.worldSettings}
+                    onAccept={handleAcceptEcho}
+                    onReject={handleRejectEcho}
+                    onBatchAccept={handleBatchAccept}
+                    onBatchReject={handleBatchReject}
+                />
+            )}
 
             {/* Integrity Report Panel */}
             <EchoIntegrityReport

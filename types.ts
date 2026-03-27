@@ -274,7 +274,7 @@ export interface Echo {
   targetName: string;
   description: string;
   reason: string;
-  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'PREDICTION' | 'ARCHIVED' | 'AUTO_ACCEPTED';
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'ARCHIVED' | 'AUTO_ACCEPTED';
   timestamp: number;
   triples?: KnowledgeTriple[]; // NEW: Structural changes associated with this echo
   branchId?: string; // NEW Task 2.2

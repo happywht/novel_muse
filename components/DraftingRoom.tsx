@@ -34,7 +34,6 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
     const actions = useDraftingActions({
         project,
         updateProject,
-        activeBranchId: project.activeBranchId || 'main',
         useBackend,
         activePlotNodeId,
         setActivePlotNodeId,
@@ -68,7 +67,6 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
                 <ForgeSidebar
                     actions={actions}
                     project={project}
-                    activeBranchId={project.activeBranchId || 'main'}
                 />
             )}
 

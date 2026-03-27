@@ -164,7 +164,7 @@ export const EchoChamberProvider: React.FC<EchoChamberProviderProps> = ({
         return project.echoes
             .filter(e => {
                 if (viewFilter === 'PENDING') {
-                    return e.status === 'PENDING' || e.status === 'PREDICTION';
+                    return e.status === 'PENDING';
                 } else {
                     return e.status === 'ACCEPTED' || e.status === 'ARCHIVED';
                 }
@@ -334,7 +334,7 @@ export const EchoChamberProvider: React.FC<EchoChamberProviderProps> = ({
                 type: rec.targetType,
                 description: rec.suggestedUpdate,
                 reason: rec.reason,
-                status: 'PREDICTION',
+                status: 'PENDING',
                 timestamp: Date.now()
             }));
 

@@ -14,7 +14,7 @@ import { analyzeAITells, type AITellResult } from '../../services/validators/aiT
 import { getPostWriteOptionsFromGenre } from '../../config/genreRules';
 import {
     fetchUnresolvedForeshadowing, fetchRelatedSubgraph,
-    fetchPhysicalStatus, mergeBranchApi,
+    fetchPhysicalStatus,
     fetchFactions, simulatePropagation,
     fetchNarrativeInsights, patchProject,
     fetchForgeContext, syncForgeResult, ForgeGraphContext
@@ -25,7 +25,6 @@ import { CREATIVE_CONFIG } from '../../config/constants';
 interface UseDraftingActionsProps {
     project: ProjectState;
     updateProject: (data: Partial<ProjectState>) => void;
-    activeBranchId: string;
     useBackend: boolean;
     activePlotNodeId: string | null;
     setActivePlotNodeId: (id: string | null) => void;
@@ -37,7 +36,6 @@ interface UseDraftingActionsProps {
 export const useDraftingActions = ({
     project,
     updateProject,
-    activeBranchId,
     useBackend,
     activePlotNodeId,
     setActivePlotNodeId,
@@ -75,7 +73,6 @@ export const useDraftingActions = ({
     const [isFetchingInsights, setIsFetchingInsights] = React.useState(false);
     const [pendingForeshadowing, setPendingForeshadowing] = React.useState<KnowledgeTriple[]>([]);
     const [isFetchingForeshadowing, setIsFetchingForeshadowing] = React.useState(false);
-    const [isMergingBranch, setIsMergingBranch] = React.useState(false);
     const [isEditingManuscript, setIsEditingManuscript] = React.useState(false);
     const [editingContent, setEditingContent] = React.useState('');
     const [isLoading, setIsLoading] = React.useState(false);
@@ -92,11 +89,6 @@ export const useDraftingActions = ({
     const [showButterflyPanel, setShowButterflyPanel] = React.useState(false);
     const [propagationRisks, setPropagationRisks] = React.useState<any[]>([]);
     const [isSimulatingPropagation, setIsSimulatingPropagation] = React.useState(false);
-
-    // Task 2.2: Branching Sandbox State
-    const [availableBranches, setAvailableBranches] = React.useState<string[]>(
-        project.availableBranches || ['main']
-    );
 
     // Logic Audit State
     const [isAuditingLogic, setIsAuditingLogic] = React.useState(false);
@@ -177,7 +169,7 @@ export const useDraftingActions = ({
         if (!useBackend) return;
         setIsFetchingForeshadowing(true);
         try {
-            const hooks = await fetchUnresolvedForeshadowing(project.id, activeBranchId);
+            const hooks = await fetchUnresolvedForeshadowing(project.id, 'main');
             setPendingForeshadowing(hooks);
         } catch (err) {
             console.error(err);
@@ -190,7 +182,7 @@ export const useDraftingActions = ({
         if (!useBackend) return;
         setIsFetchingInsights(true);
         try {
-            const insights = await fetchNarrativeInsights(project.id, activeBranchId);
+            const insights = await fetchNarrativeInsights(project.id, 'main');
             setNarrativeInsights(insights);
         } catch (err) {
             console.error(err);
@@ -210,20 +202,6 @@ export const useDraftingActions = ({
             console.error(err);
         } finally {
             setIsGeneratingTwists(false);
-        }
-    };
-
-    const handleMergeBranch = async () => {
-        if (activeBranchId === 'main' || !useBackend) return;
-        if (!confirm(`确定要将分支 ${activeBranchId} 合并回主线吗？这可能会覆盖主线的部分数据。`)) return;
-        setIsMergingBranch(true);
-        try {
-            await mergeBranchApi(project.id, activeBranchId);
-            toast.success("合并成功！");
-        } catch (err) {
-            toast.error("合并失败: " + (err as Error).message);
-        } finally {
-            setIsMergingBranch(false);
         }
     };
 
@@ -321,10 +299,10 @@ export const useDraftingActions = ({
                     console.error('Failed to fetch forge context, falling back to legacy APIs:', err);
                     // 降级到旧的API
                     const anchors = [...activeCharacters.map(c => c.name), ...activeSettings.map(s => s.title)];
-                    const promises: Promise<any>[] = [fetchUnresolvedForeshadowing(project.id, activeBranchId)];
+                    const promises: Promise<any>[] = [fetchUnresolvedForeshadowing(project.id, 'main')];
                     if (anchors.length > 0) {
-                        promises.push(fetchRelatedSubgraph(project.id, anchors, activeBranchId));
-                        promises.push(fetchPhysicalStatus(project.id, anchors, activeBranchId));
+                        promises.push(fetchRelatedSubgraph(project.id, anchors, 'main'));
+                        promises.push(fetchPhysicalStatus(project.id, anchors, 'main'));
                     }
                     const results = await Promise.all(promises);
                     unresolvedForeshadowing = results[0];
@@ -338,10 +316,10 @@ export const useDraftingActions = ({
             } else if (useBackend) {
                 // 旧逻辑：分别调用各个API
                 const anchors = [...activeCharacters.map(c => c.name), ...activeSettings.map(s => s.title)];
-                const promises: Promise<any>[] = [fetchUnresolvedForeshadowing(project.id, activeBranchId)];
+                const promises: Promise<any>[] = [fetchUnresolvedForeshadowing(project.id, 'main')];
                 if (anchors.length > 0) {
-                    promises.push(fetchRelatedSubgraph(project.id, anchors, activeBranchId));
-                    promises.push(fetchPhysicalStatus(project.id, anchors, activeBranchId));
+                    promises.push(fetchRelatedSubgraph(project.id, anchors, 'main'));
+                    promises.push(fetchPhysicalStatus(project.id, anchors, 'main'));
                 }
                 const results = await Promise.all(promises);
                 unresolvedForeshadowing = results[0];
@@ -701,39 +679,6 @@ export const useDraftingActions = ({
         }
     };
 
-    // Task 2.2: Branch Sandbox Handlers
-    const handleCreateBranch = () => {
-        const name = prompt("输入新分支名称 (例如: '主角黑化', '全员存活'):");
-        if (name) {
-            const newBranches = [...availableBranches, name];
-            setAvailableBranches(newBranches);
-            updateProject({ availableBranches: newBranches, activeBranchId: name });
-            // 切换到新分支后刷新上下文
-            handleFetchForeshadowing();
-            handleFetchInsights();
-        }
-    };
-
-    const handleSwitchBranch = (branchId: string) => {
-        updateProject({ activeBranchId: branchId });
-        // 分支切换时自动刷新伏笔和洞察
-        handleFetchForeshadowing();
-        handleFetchInsights();
-    };
-
-    const handleDeleteBranch = (e: React.MouseEvent, branchId: string) => {
-        e.stopPropagation();
-        if (branchId === 'main') return;
-        if (confirm(`确定要删除分歧 "${branchId}" 吗？该分支下未合并的专属数据将丢失。此操作无法撤销。`)) {
-            const newBranches = availableBranches.filter(b => b !== branchId);
-            setAvailableBranches(newBranches);
-            updateProject({ availableBranches: newBranches });
-            if (activeBranchId === branchId) {
-                handleSwitchBranch('main');
-            }
-        }
-    };
-
     // Logic Audit Handlers
     const triggerLogicAudit = async (content: string) => {
         if (!useBackend) return;
@@ -801,7 +746,6 @@ export const useDraftingActions = ({
         isFetchingInsights,
         pendingForeshadowing, setPendingForeshadowing,
         isFetchingForeshadowing,
-        isMergingBranch,
         isEditingManuscript, setIsEditingManuscript,
         editingContent, setEditingContent,
         isLoading,
@@ -816,12 +760,6 @@ export const useDraftingActions = ({
         showButterflyPanel, setShowButterflyPanel,
         propagationRisks, isSimulatingPropagation,
         handleSimulatePropagation: handleSimulatePropagationLocal,
-
-        // Task 2.2: Branching Sandbox
-        availableBranches,
-        handleCreateBranch,
-        handleSwitchBranch,
-        handleDeleteBranch,
 
         // Logic Audit
         isAuditingLogic,
@@ -857,7 +795,6 @@ export const useDraftingActions = ({
         handleDeleteChapter,
         handleFetchForeshadowing,
         handleFetchInsights,
-        handleGenerateTwists,
-        handleMergeBranch
+        handleGenerateTwists
     };
 };

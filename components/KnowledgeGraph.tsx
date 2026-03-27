@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GitBranch, RefreshCw, ZoomIn, ZoomOut, Maximize2, Loader, AlertCircle } from 'lucide-react';
 import { fetchGraph, GraphNode, GraphEdge } from '../services/apiService';
 import { useToast } from '../hooks/useToast';
+import { useAdvancedMode } from '../hooks/useAdvancedMode';
 import {
     GRAPH_CONFIG,
     GRAPH_NODE_COLORS,
@@ -28,6 +29,7 @@ interface SimNode extends GraphNode {
 
 export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBackend, projectData, updateProject }) => {
     const { toast } = useToast();
+    const { isAdvanced } = useAdvancedMode();
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const animRef = useRef<number>(0);
@@ -351,6 +353,9 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
     };
 
     const handleDoubleClick = (e: React.MouseEvent) => {
+        // 聚光灯模式仅限高级模式
+        if (!isAdvanced) return;
+
         const pos = getMousePos(e);
         const node = findNodeAt(pos.x, pos.y);
 
@@ -368,7 +373,8 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
         const node = findNodeAt(pos.x, pos.y);
 
         if (node) {
-            if (e.shiftKey) {
+            // Shift+拖拽创建边仅限高级模式
+            if (isAdvanced && e.shiftKey) {
                 // Start drawing an edge
                 setDrawingEdgeFrom(node);
                 setCurrentMousePos(pos);
@@ -472,25 +478,30 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
                     </span>
                 </div>
                 <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-1.5 bg-slate-950/50 px-2 py-1 rounded border border-slate-700/50">
-                        {Object.entries(GRAPH_LAYER_LABELS).map(([key, label]) => (
-                            <label key={key} className="flex items-center gap-1.5 cursor-pointer px-1.5 hover:bg-slate-800 rounded transition-colors group">
-                                <input
-                                    type="checkbox"
-                                    checked={activeLayers.includes(key)}
-                                    onChange={(e) => {
-                                        if (e.target.checked) setActiveLayers(prev => [...prev, key]);
-                                        else setActiveLayers(prev => prev.filter(l => l !== key));
-                                    }}
-                                    className="w-3 h-3 rounded border-slate-700 text-muse-500 focus:ring-muse-500 bg-slate-900"
-                                />
-                                <span className={`text-[10px] font-bold ${activeLayers.includes(key) ? 'text-slate-200' : 'text-slate-500 group-hover:text-slate-400'}`}>
-                                    {label}
-                                </span>
-                            </label>
-                        ))}
-                    </div>
-                    <div className="h-4 w-[1px] bg-slate-800" />
+                    {/* 高级模式：图层过滤器 */}
+                    {isAdvanced && (
+                        <>
+                            <div className="flex items-center gap-1.5 bg-slate-950/50 px-2 py-1 rounded border border-slate-700/50">
+                                {Object.entries(GRAPH_LAYER_LABELS).map(([key, label]) => (
+                                    <label key={key} className="flex items-center gap-1.5 cursor-pointer px-1.5 hover:bg-slate-800 rounded transition-colors group">
+                                        <input
+                                            type="checkbox"
+                                            checked={activeLayers.includes(key)}
+                                            onChange={(e) => {
+                                                if (e.target.checked) setActiveLayers(prev => [...prev, key]);
+                                                else setActiveLayers(prev => prev.filter(l => l !== key));
+                                            }}
+                                            className="w-3 h-3 rounded border-slate-700 text-muse-500 focus:ring-muse-500 bg-slate-900"
+                                        />
+                                        <span className={`text-[10px] font-bold ${activeLayers.includes(key) ? 'text-slate-200' : 'text-slate-500 group-hover:text-slate-400'}`}>
+                                            {label}
+                                        </span>
+                                    </label>
+                                ))}
+                            </div>
+                            <div className="h-4 w-[1px] bg-slate-800" />
+                        </>
+                    )}
                     <button onClick={() => setZoom(z => Math.min(3, z + 0.2))} className="p-1 text-slate-400 hover:text-white" title="放大">
                         <ZoomIn size={16} />
                     </button>
@@ -506,8 +517,8 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
                 </div>
             </div>
 
-            {/* Focus Mode Toast */}
-            {focusNodeId && (
+            {/* 高级模式：聚光灯模式提示 */}
+            {isAdvanced && focusNodeId && (
                 <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-muse-600/90 backdrop-blur-md text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-xl border border-muse-400/30 z-20 flex items-center gap-2 animate-bounce-subtle">
                     <span>已开启聚光灯模式 (双击空白处取消)</span>
                     <button onClick={() => setFocusNodeId(null)} className="hover:bg-white/20 rounded-full p-0.5"><Maximize2 size={12} /></button>

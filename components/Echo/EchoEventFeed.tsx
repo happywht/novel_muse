@@ -42,7 +42,6 @@ export const EchoEventFeed: React.FC = () => {
         switch (status) {
             case 'ACCEPTED': return <CheckCircle size={14} className="text-emerald-400" />;
             case 'REJECTED': return <Trash2 size={14} className="text-rose-400" />;
-            case 'PREDICTION': return <Sparkles size={14} className="text-purple-400" />;
             case 'ARCHIVED': return <History size={14} className="text-slate-500" />;
             default: return <Clock size={14} className="text-amber-400" />;
         }
@@ -61,9 +60,9 @@ export const EchoEventFeed: React.FC = () => {
                             onClick={() => setViewFilter('PENDING')}
                             className={`px-3 py-1 text-xs rounded-md transition-all flex items-center gap-1.5 ${viewFilter === 'PENDING' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200'}`}
                         >
-                            <Inbox size={14} /> 收件箱 {project.echoes.filter(e => e.status === 'PENDING' || e.status === 'PREDICTION').length > 0 &&
+                            <Inbox size={14} /> 收件箱 {project.echoes.filter(e => e.status === 'PENDING').length > 0 &&
                                 <span className="bg-muse-600 text-[10px] px-1.5 rounded-full font-bold">
-                                    {project.echoes.filter(e => e.status === 'PENDING' || e.status === 'PREDICTION').length}
+                                    {project.echoes.filter(e => e.status === 'PENDING').length}
                                 </span>}
                         </button>
                         <button
@@ -157,7 +156,7 @@ export const EchoEventFeed: React.FC = () => {
                                             {echo.targetName}
                                         </h3>
                                         <div className="flex items-center gap-2 text-[10px] text-slate-500 uppercase tracking-wider font-medium">
-                                            {getStatusIcon(echo.status)} {echo.status === 'PREDICTION' ? '未来推演' : '实录回响'} - {new Date(echo.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {getStatusIcon(echo.status)} 实录回响 - {new Date(echo.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </div>
                                     </div>
                                 </div>

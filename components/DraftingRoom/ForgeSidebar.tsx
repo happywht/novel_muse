@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import {
-    GitCommit, Brain, X, Zap, Sparkles, RefreshCw,
+    Brain, X, Zap, Sparkles, RefreshCw,
     Loader2, Users, Plus, Eye, MapPin, Gauge, FileText,
-    PenTool, Trash2, AlertTriangle, Sidebar, Network, CheckCircle2,
-    Settings, MessageSquare, Sliders
+    PenTool, Trash2, AlertTriangle, Network, Sliders
 } from 'lucide-react';
 import { ProjectState, Character, WorldSetting, Draft, KnowledgeTriple, NarrativeInsight, AppSection } from '../../types';
 import { ContinuityBanner } from '../panels/ContinuityBanner';
@@ -11,18 +10,14 @@ import { PromptPanel } from '../PromptPanel';
 
 interface ForgeSidebarProps {
     project: ProjectState;
-    activeBranchId: string;
     actions: any; // Using any for now to simplify, but ideally it should be ReturnType<typeof useDraftingActions>
 }
 
 export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
     project,
-    activeBranchId,
     actions
 }) => {
     const {
-        isMergingBranch,
-        handleMergeBranch,
         narrativeInsights,
         setNarrativeInsights,
         plotBeat,
@@ -59,10 +54,6 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
         activeDraftId,
         loadDraft,
         deleteDraft,
-        availableBranches,
-        handleCreateBranch,
-        handleSwitchBranch,
-        handleDeleteBranch,
         logicConflicts,
         setLogicConflicts,
         useGraphContext,
@@ -146,63 +137,6 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
                 </div>
             )}
 
-            {/* Task 2.2: What-If Branching Sandbox */}
-            <div className="bg-slate-800/80 p-4 rounded-xl border border-slate-700 shadow-xl mb-4">
-                <div className="flex items-center justify-between mb-3 text-muse-300 font-bold">
-                    <div className="flex items-center gap-2">
-                        <GitCommit size={18} className="text-amber-500" />
-                        <h3>分歧沙盘 (What-If Sandbox)</h3>
-                    </div>
-                    <button
-                        onClick={handleCreateBranch}
-                        className="text-[10px] bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-300 flex items-center gap-1"
-                    >
-                        <Plus size={12} /> 新分歧
-                    </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                    {availableBranches.map(branch => (
-                        <div key={branch} className="relative group flex items-stretch">
-                            <button
-                                onClick={() => handleSwitchBranch(branch)}
-                                className={`px-3 py-1 rounded-l-md text-[10px] font-bold transition-all border border-r-0 ${activeBranchId === branch
-                                    ? 'bg-amber-600/20 border-amber-500 text-amber-200 shadow-[0_0_10px_rgba(245,158,11,0.2)]'
-                                    : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-600 group-hover:bg-slate-800'
-                                    } ${branch === 'main' ? 'rounded-r-md border-r' : ''}`}
-                            >
-                                {branch === 'main' ? '🌐 主线剧情' : `🌱 ${branch}`}
-                            </button>
-                            {branch !== 'main' && (
-                                <button
-                                    onClick={(e) => handleDeleteBranch(e, branch)}
-                                    className={`px-1.5 py-1 rounded-r-md border border-l-0 transition-colors flex items-center justify-center ${activeBranchId === branch
-                                        ? 'bg-amber-600/20 border-amber-500 text-amber-400/50 hover:text-amber-300 hover:bg-amber-500/30'
-                                        : 'bg-slate-900 border-slate-800 text-slate-600 hover:text-red-400 hover:bg-red-900/30'
-                                        }`}
-                                    title="删除该分歧 (内容将被丢弃)"
-                                >
-                                    <X size={10} />
-                                </button>
-                            )}
-                        </div>
-                    ))}
-                </div>
-                {activeBranchId !== 'main' && (
-                    <div className="flex items-center justify-between mt-2 border-t border-slate-700/50 pt-2">
-                        <p className="text-[9px] text-amber-500/70 italic">
-                            当前处于分歧模式
-                        </p>
-                        <button
-                            onClick={handleMergeBranch}
-                            disabled={isMergingBranch}
-                            className="text-[10px] bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/30 px-2 py-1 rounded flex items-center gap-1 transition-all"
-                        >
-                            {isMergingBranch ? <Loader2 size={10} className="animate-spin" /> : <GitCommit size={10} />}
-                            合并至主线
-                        </button>
-                    </div>
-                )}
-            </div>
 
             {/* Continuity Gap Warnings */}
             <div className="mb-4">

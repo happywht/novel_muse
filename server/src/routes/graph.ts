@@ -39,7 +39,7 @@ interface EchoRequest {
     targetId: string;
     targetName: string;
     description: string;
-    status?: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'PREDICTION' | 'ARCHIVED' | 'AUTO_ACCEPTED';
+    status?: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'ARCHIVED' | 'AUTO_ACCEPTED';
     timestamp?: number;
     triples?: Array<{
         subject: string;
