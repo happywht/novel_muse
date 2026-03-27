@@ -1842,6 +1842,1850 @@ const WRITING_BASE_TEMPLATE: PromptTemplate = {
 };
 
 // ============================================================
+// Analyze State Changes Template
+// ============================================================
+
+/**
+ * Analyze State Changes Template
+ *
+ * Used for extracting state change recommendations from scene content.
+ * Based on analyzeStateChanges in services/gemini/world.ts
+ */
+const ANALYZE_STATE_CHANGES_TEMPLATE: PromptTemplate = {
+  id: 'analyze_state_changes',
+  name: 'Analyze State Changes',
+  description: 'Extract state change recommendations for characters and world settings from scene content',
+  category: 'analysis',
+  systemInstruction: `You are a professional novel setting analyst. Your task is to analyze text fragments and identify **permanent or significant events** that affect [character states] or [world environment].
+
+Focus on:
+1. Permanent character state changes (death, disability, gaining/losing abilities)
+2. Acquiring plot-significant items
+3. Qualitative changes in relationships
+4. World rule changes or violations
+5. Secrets being revealed
+
+Do NOT extract ordinary conversations, temporary states, or common items.`,
+
+  userPromptBlocks: [
+    // Block 1: Context
+    {
+      id: 'context',
+      title: 'Context Information',
+      order: 1,
+      template: `{{contextSection}}
+{{foreshadowingSection}}`,
+      condition: 'contextSection != null || foreshadowingSection != null',
+    },
+
+    // Block 2: Entity Lookup Table
+    {
+      id: 'lookup_table',
+      title: 'Entity Lookup Table',
+      order: 2,
+      template: `[Available Entities for Matching]:
+{{lookupTable}}`,
+    },
+
+    // Block 3: Scene Content
+    {
+      id: 'scene_content',
+      title: 'Text to Analyze',
+      order: 3,
+      template: `[Text to Analyze]:
+{{sceneContent}}`,
+    },
+
+    // Block 4: Task Requirements
+    {
+      id: 'task_requirements',
+      title: 'Extraction Requirements',
+      order: 4,
+      template: `[Major Event Definition] (Must meet at least one):
+1. Permanent character state change: death, disability, gaining/losing important abilities
+2. Acquiring plot-significant items: non-ordinary items that affect future plot
+3. Qualitative relationship changes: ally to enemy, new relationships, relationship breakdown
+4. World rules broken or changed: important location destruction, power structure changes
+5. Secrets revealed: important information affecting future plot
+
+[Non-Major Events] (Do NOT extract):
+- Ordinary conversations (even with emotional exchange)
+- Location movement (unless triggering major events above)
+- Temporary states (minor injuries that heal quickly)
+- Acquiring ordinary items (food, money, daily necessities)
+
+[Output Requirements]:
+1. targetId: Must match ID exactly from entity lookup table, leave empty if no match
+2. targetName: Entity name, must exactly match name in lookup table
+3. confidence: Confidence score
+   - 0.9-1.0: Very certain, explicit description in text
+   - 0.7-0.9: Fairly certain, reasonable inference
+   - 0.5-0.7: Generally certain, multiple possible interpretations
+   - <0.5: Uncertain, recommend not extracting
+4. extractionEvidence: Specific sentences from text supporting this extraction, must quote original text
+
+Output in JSON format. If no major events, return empty array [].`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'sceneContent',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The scene content text to analyze for state changes',
+      display: '场景内容',
+    },
+    {
+      name: 'lookupTable',
+      type: 'string',
+      tier: 'critical',
+      source: 'computed',
+      required: true,
+      description: 'Formatted entity lookup table for ID matching',
+      display: '实体映射表',
+    },
+    // === OPTIONAL VARIABLES ===
+    {
+      name: 'contextSection',
+      type: 'string',
+      tier: 'optional',
+      source: 'computed',
+      required: false,
+      description: 'Recent chapter summary context',
+      display: '前文背景',
+    },
+    {
+      name: 'foreshadowingSection',
+      type: 'string',
+      tier: 'optional',
+      source: 'computed',
+      required: false,
+      description: 'Unresolved foreshadowing clues',
+      display: '待回收伏笔',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-28',
+    tags: ['analysis', 'state-changes', 'echo', 'extraction'],
+  },
+};
+
+// ============================================================
+// Extract Echoes Template
+// ============================================================
+
+/**
+ * Extract Echoes Template
+ *
+ * Used for automatic Echo capture from generated text.
+ * Based on extractEchoesFromText in services/gemini/world.ts
+ */
+const EXTRACT_ECHOES_TEMPLATE: PromptTemplate = {
+  id: 'extract_echoes',
+  name: 'Extract Echoes',
+  description: 'Automatically extract Echo events (state changes) from novel text with knowledge graph integration',
+  category: 'analysis',
+  systemInstruction: `You are an expert narrative analyst specializing in tracking story continuity and state changes. Your task is to:
+
+1. Identify significant events that change character or world states
+2. Extract structured triples for knowledge graph integration
+3. Provide confidence scores for extraction quality
+4. Quote evidence from original text
+
+Focus on events that have lasting impact on the story world.`,
+
+  userPromptBlocks: [
+    // Block 1: Entity Lookup
+    {
+      id: 'entity_lookup',
+      title: 'Entity Reference',
+      order: 1,
+      template: `[Available Entities for Matching]:
+{{lookupTable}}`,
+    },
+
+    // Block 2: Text to Analyze
+    {
+      id: 'text_content',
+      title: 'Novel Text Fragment',
+      order: 2,
+      template: `[Novel Text Fragment]:
+{{text}}`,
+    },
+
+    // Block 3: Recent Changes Context
+    {
+      id: 'recent_changes',
+      title: 'Recent Confirmed Changes',
+      order: 3,
+      template: `[Recent Confirmed State Changes]:
+{{recentChangesSummary}}`,
+      condition: 'recentChangesSummary != null && recentChangesSummary !== ""',
+    },
+
+    // Block 4: Extraction Requirements
+    {
+      id: 'extraction_requirements',
+      title: 'Extraction Requirements',
+      order: 4,
+      template: `[Extraction Guidelines]:
+1. targetId: Match ID from entity table if possible
+2. targetName: Entity name (must match table)
+3. description: What happened? (Concise, e.g., "Lost left arm", "Obtained Magic Sword")
+4. reason: Why is this significant?
+5. confidence: 0-1 score (0.9+ = very certain, 0.7-0.9 = likely, <0.7 = uncertain)
+6. extractionEvidence: Exact sentence from text supporting extraction
+7. triples: Array of knowledge graph triples (subject, relation, object)
+
+Output in JSON format. If no significant events, return empty array [].`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'text',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Novel text to extract echoes from',
+      display: '小说正文',
+    },
+    {
+      name: 'lookupTable',
+      type: 'string',
+      tier: 'critical',
+      source: 'computed',
+      required: true,
+      description: 'Formatted entity lookup table',
+      display: '实体映射表',
+    },
+    // === OPTIONAL VARIABLES ===
+    {
+      name: 'recentChangesSummary',
+      type: 'string',
+      tier: 'optional',
+      source: 'computed',
+      required: false,
+      description: 'Summary of recent confirmed state changes',
+      display: '最近状态变化',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-28',
+    tags: ['analysis', 'echo', 'extraction', 'knowledge-graph'],
+  },
+};
+
+// ============================================================
+// Consolidate Memory Template
+// ============================================================
+
+/**
+ * Consolidate Memory Template
+ *
+ * Used for consolidating recent Echo events into static descriptions.
+ * Based on consolidateMemory in services/gemini/world.ts
+ */
+const CONSOLIDATE_MEMORY_TEMPLATE: PromptTemplate = {
+  id: 'consolidate_memory',
+  name: 'Consolidate Memory',
+  description: 'Integrate recent events (Echoes) into entity descriptions for long-term memory',
+  category: 'refinement',
+  systemInstruction: `You are an archivist responsible for maintaining novel world consistency. Your task is to permanently integrate [recent events] (short-term memory) into [entity descriptions] (long-term memory).
+
+Consolidation rules:
+1. Update state: If new memory changes entity state (injury, lost items, gained abilities), reflect in description
+2. Enrich background: Write occurred events as "past history"
+3. Maintain coherence: Don't simply append text, rewrite description to be smooth and natural
+4. Simplify: Remove no-longer-important details, keep core traits and key changes`,
+
+  userPromptBlocks: [
+    // Block 1: Entity Information
+    {
+      id: 'entity_info',
+      title: 'Entity Information',
+      order: 1,
+      template: `[Entity Name]: {{targetName}} ({{targetType}})`,
+    },
+
+    // Block 2: Current Description
+    {
+      id: 'current_description',
+      title: 'Current Archive Description',
+      order: 2,
+      template: `[Current Archive Description]:
+{{currentDescription}}`,
+    },
+
+    // Block 3: New Memories
+    {
+      id: 'new_memories',
+      title: 'New Memories to Consolidate',
+      order: 3,
+      template: `[New Memories to Consolidate (Recent Events)]:
+{{echoText}}`,
+    },
+
+    // Block 4: Task Requirements
+    {
+      id: 'task_requirements',
+      title: 'Consolidation Requirements',
+      order: 4,
+      template: `[Consolidation Rules]:
+1. **Update State**: If new memory changes entity state (injury, lost items, gained abilities), reflect in description
+2. **Enrich Background**: Write occurred events as "past history"
+3. **Maintain Coherence**: Don't simply append text, rewrite description to be smooth and natural
+4. **Simplify**: Remove no-longer-important details, keep core traits and key changes
+
+Output the consolidated [New Archive Description] directly (plain text, no Markdown format).`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'targetName',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Name of the entity (character or world setting)',
+      display: '实体名称',
+    },
+    {
+      name: 'targetType',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Type of entity: CHARACTER or WORLD',
+      display: '实体类型',
+    },
+    {
+      name: 'currentDescription',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Current description of the entity',
+      display: '当前描述',
+    },
+    {
+      name: 'echoText',
+      type: 'string',
+      tier: 'critical',
+      source: 'computed',
+      required: true,
+      description: 'Formatted list of recent events to consolidate',
+      display: '待整合记忆',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-28',
+    tags: ['memory', 'consolidation', 'refinement', 'archive'],
+  },
+};
+
+// ============================================================
+// Deduce World Consequences Template
+// ============================================================
+
+/**
+ * Deduce World Consequences Template
+ *
+ * Used for deducing world consequences based on recent echoes (Butterfly Effect).
+ * Based on deduceWorldConsequences in services/gemini/world.ts
+ */
+const DEDUCE_WORLD_CONSEQUENCES_TEMPLATE: PromptTemplate = {
+  id: 'deduce_world_consequences',
+  name: 'Deduce World Consequences',
+  description: 'Predict chain reactions and consequences based on recent events using butterfly effect logic',
+  category: 'analysis',
+  systemInstruction: `You are an omniscient world simulator (World Engine). Your task is to deduce **chain reactions** (Consequences) based on [recent events] (Triggers) and [dynamic knowledge graph] (Knowledge Graph) for the [world] and [characters].
+
+Deduction rules:
+1. Butterfly Effect: Small events can trigger big changes
+2. Entity Matching: Select affected entities from lookup table, return correct targetId
+3. Graph Integration: Use character relationships (hatred, kinship, subordination) or geographic attribution from knowledge graph to find chain reaction triggers
+4. Logical Consistency: Deductions must fit world settings
+5. Create Conflict: Predicted results should add tension and conflict to the story`,
+
+  userPromptBlocks: [
+    // Block 1: Genre Context
+    {
+      id: 'genre_context',
+      title: 'Genre Context',
+      order: 1,
+      template: `[Novel Genre]: {{genre}}`,
+    },
+
+    // Block 2: Trigger Events
+    {
+      id: 'trigger_events',
+      title: 'Recent Trigger Events',
+      order: 2,
+      template: `[Recent Events (Triggers)]:
+{{triggers}}`,
+    },
+
+    // Block 3: Entity Lookup
+    {
+      id: 'entity_lookup',
+      title: 'Available Entities',
+      order: 3,
+      template: `[Available Entities to Find Affected Targets]:
+{{lookupTable}}`,
+    },
+
+    // Block 4: Graph Context
+    {
+      id: 'graph_context',
+      title: 'Knowledge Graph Context',
+      order: 4,
+      template: `[Dynamic Knowledge Graph]:
+{{graphContext}}`,
+      condition: 'graphContext != null && graphContext !== ""',
+    },
+
+    // Block 5: Deduction Requirements
+    {
+      id: 'deduction_requirements',
+      title: 'Deduction Requirements',
+      order: 5,
+      template: `[Deduction Rules]:
+1. **Butterfly Effect**: Small event can trigger big change (e.g., king assassinated -> succession war -> civil war)
+2. **Entity Matching**: Must select affected entities from provided lookup table, return correct targetId
+3. **Graph Integration (Important)**: Must use character relationships (hatred, kinship, subordination) or geographic attribution from knowledge graph above to find chain reaction triggers
+4. **Logical Consistency**: Deductions must fit world settings
+5. **Create Conflict**: Predicted results should add tension and conflict to story
+6. **Mandatory Chinese Output**: All content in JSON result must use proper Chinese
+
+Output [Future Predictions] strictly in JSON format.`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'genre',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'Novel genre for context',
+      display: '小说类型',
+    },
+    {
+      name: 'triggers',
+      type: 'string',
+      tier: 'critical',
+      source: 'computed',
+      required: true,
+      description: 'Formatted list of recent trigger events',
+      display: '触发事件',
+    },
+    {
+      name: 'lookupTable',
+      type: 'string',
+      tier: 'critical',
+      source: 'computed',
+      required: true,
+      description: 'Entity lookup table for finding affected targets',
+      display: '实体映射表',
+    },
+    // === OPTIONAL VARIABLES ===
+    {
+      name: 'graphContext',
+      type: 'string',
+      tier: 'optional',
+      source: 'computed',
+      required: false,
+      description: 'Knowledge graph context for relationship inference',
+      display: '知识图谱上下文',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-28',
+    tags: ['analysis', 'consequences', 'butterfly-effect', 'prediction'],
+  },
+};
+
+// ============================================================
+// Generate Single Character Template
+// ============================================================
+
+/**
+ * Generate Single Character Template
+ *
+ * Used for generating a single character with full depth fields.
+ * Based on generateSingleCharacter in services/gemini/world.ts
+ */
+const GENERATE_SINGLE_CHARACTER_TEMPLATE: PromptTemplate = {
+  id: 'generate_single_character',
+  name: 'Generate Single Character',
+  description: 'Generate a single detailed character with depth fields (desire, fear, signature, weakness, alignment)',
+  category: 'generation',
+  systemInstruction: `You are an expert character designer for novels. Your task is to create a single, multi-dimensional character with deep psychological profile:
+
+1. Create characters with clear motivations, flaws, and growth potential
+2. Ensure psychological depth through desire/fear/weakness analysis
+3. Give distinctive signature traits that make characters memorable
+4. Define moral alignment for behavioral consistency
+5. Consider how the character serves the story while feeling authentic
+
+Create characters that readers will remember and care about.`,
+
+  userPromptBlocks: [
+    // Block 1: Story Context
+    {
+      id: 'story_context',
+      title: 'Story Context',
+      order: 1,
+      template: `[Story Premise]: {{premise}}
+[Genre]: {{genre}}
+{{settingText}}`,
+    },
+
+    // Block 2: Character Basics
+    {
+      id: 'character_basics',
+      title: 'Character Basic Information',
+      order: 2,
+      template: `[Character Name]: {{name}}
+[Character Role]: {{role}}`,
+    },
+
+    // Block 3: Generation Requirements
+    {
+      id: 'generation_requirements',
+      title: 'Character Generation Requirements',
+      order: 3,
+      template: `Please create a detailed character profile including:
+- Physical appearance traits
+- Core personality (moral alignment)
+- Motivation and goals (desire and fear)
+- Secrets and flaws
+- Abilities
+
+[Core Requirements]:
+- **Depth**: Must have clear desire, core fear, signature trait, weakness/flaw
+- **Moral Alignment**: Lawful good, chaotic evil, etc.
+- **Consistency**: Character should fit story genre and tone
+- **Memorability**: Signature traits should make character stand out
+
+Output character profile in structured format.`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'name',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Character name to generate',
+      display: '角色名称',
+    },
+    {
+      name: 'role',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Character role (protagonist, antagonist, mentor, ally, etc.)',
+      display: '角色定位',
+    },
+    {
+      name: 'premise',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Story premise for character context',
+      display: '故事梗概',
+    },
+    {
+      name: 'genre',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'Novel genre for character style',
+      display: '小说类型',
+    },
+    // === OPTIONAL VARIABLES ===
+    {
+      name: 'settingText',
+      type: 'string',
+      tier: 'optional',
+      source: 'computed',
+      required: false,
+      description: 'Style requirements from creative settings',
+      display: '风格要求',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-28',
+    tags: ['character', 'generation', 'single', 'depth', 'creative-writing'],
+  },
+};
+
+// ============================================================
+// Shura Field Conflict Template
+// ============================================================
+
+/**
+ * Shura Field Conflict Template
+ *
+ * Used for generating multi-character conflict scenarios (Shura Field).
+ * Based on generateConflictScenario in services/gemini/shuraField.ts
+ */
+const SHURA_FIELD_CONFLICT_TEMPLATE: PromptTemplate = {
+  id: 'shura_field_conflict',
+  name: 'Shura Field Conflict',
+  description: 'Generate high-density multi-character conflict scenarios with layered confrontations and reversals',
+  category: 'generation',
+  systemInstruction: `You are a master conflict scene designer specializing in multi-character confrontations, psychological warfare, and dramatic tension. Your task is to create compelling conflict scenes that:
+
+1. Feature multiple characters with clear and opposing goals
+2. Build tension through layered confrontations (minimum 3 rounds of conflict/reversal)
+3. Balance dialogue, action, and psychological insight
+4. Ensure each character acts consistently with their personality and motivations
+5. Deliver unexpected but logical outcomes that serve the narrative
+6. Maintain high dramatic stakes appropriate to the intensity level
+
+Create conflict scenes that readers cannot look away from.`,
+
+  userPromptBlocks: [
+    // Block 1: Character Profiles
+    {
+      id: 'character_profiles',
+      title: 'Character Profiles',
+      order: 1,
+      template: `[Shura Field Participants]
+{{characterContext}}`,
+    },
+
+    // Block 2: Location Context
+    {
+      id: 'location_context',
+      title: 'Location Context',
+      order: 2,
+      template: `[Scene Location]
+{{locationContext}}`,
+      condition: 'locationContext != null && locationContext !== ""',
+    },
+
+    // Block 3: World Context
+    {
+      id: 'world_context',
+      title: 'World Constraints',
+      order: 3,
+      template: `[World Constraints]
+{{worldContext}}`,
+      condition: 'worldContext != null && worldContext !== ""',
+    },
+
+    // Block 4: Plot Background
+    {
+      id: 'plot_background',
+      title: 'Plot Background',
+      order: 4,
+      template: `[Plot Background]
+{{plotContext}}`,
+    },
+
+    // Block 5: Generation Requirements
+    {
+      id: 'generation_requirements',
+      title: 'Conflict Scenario Requirements',
+      order: 5,
+      template: `[Task Requirements]:
+1. Design a high-density conflict scene between {{participantCount}} characters.
+2. Conflict intensity level: {{intensityLevel}}/10 ({{intensityDescription}})
+3. Each character must have clear goals, motivations, and secrets (or hidden information).
+4. The conflict must escalate through at least 3 rounds of confrontation or reversal.
+5. The ending must be unexpected but consistent with character personalities.
+6. Must clearly specify: core stakes, conflict type, and intensity level.
+
+[Conflict Type Definitions]:
+- CONFRONTATION: Direct confrontation, argument, debate, or negotiation
+- CLIMAX: Climactic conflict, decisive moment
+- TWIST: Reversal conflict, truth revelation, or betrayal
+
+[Output Format]:
+Please output a single plot node in the following JSON format:
+{
+  "title": "Plot title (highlighting the core conflict)",
+  "content": "Detailed multi-character conflict scene description, including:\n   - Opening atmosphere and character entrances\n   - Each party's stance and goals\n   - First round of confrontation/engagement\n   - Second round of confrontation/reversal\n   - Third round of confrontation/climax\n   - Outcome and subsequent impact",
+  "beatTag": "CLIMAX" | "PLOT_POINT_2" | "MIDPOINT",
+  "relatedCharacters": [{{relatedCharacterIds}}],
+  "relatedLocations": [{{relatedLocationId}}],
+  "conflictScenario": {
+    "type": "CONFRONTATION" | "CLIMAX" | "TWIST",
+    "participants": [{{relatedCharacterIds}}],
+    "stakes": "Core stakes of the conflict (e.g., throne succession, business control, romantic affiliation, family honor, survival opportunity, etc.)",
+    "intensity": {{intensityLevel}}
+  }
+}
+
+IMPORTANT: Output ONLY the JSON. No opening remarks, no explanations, no markdown code blocks.`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'characterContext',
+      type: 'string',
+      tier: 'critical',
+      source: 'computed',
+      required: true,
+      description: 'Formatted character profiles with relationships and potential conflict points',
+      display: '角色档案',
+    },
+    {
+      name: 'plotContext',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Plot background and context for the conflict scene',
+      display: '情节背景',
+    },
+    {
+      name: 'intensityLevel',
+      type: 'number',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Conflict intensity level from 1-10',
+      display: '冲突强度',
+      defaultValue: 7,
+    },
+    {
+      name: 'participantCount',
+      type: 'number',
+      tier: 'critical',
+      source: 'computed',
+      required: true,
+      description: 'Number of characters participating in the conflict',
+      display: '参与人数',
+    },
+    {
+      name: 'relatedCharacterIds',
+      type: 'string',
+      tier: 'critical',
+      source: 'computed',
+      required: true,
+      description: 'JSON array string of participating character IDs',
+      display: '角色ID列表',
+    },
+    {
+      name: 'intensityDescription',
+      type: 'string',
+      tier: 'critical',
+      source: 'computed',
+      required: true,
+      description: 'Human-readable intensity level description',
+      display: '强度描述',
+    },
+    // === IMPORTANT VARIABLES ===
+    {
+      name: 'genre',
+      type: 'string',
+      tier: 'important',
+      source: 'project_state',
+      required: false,
+      description: 'Novel genre for tone and style guidance',
+      display: '小说类型',
+    },
+    {
+      name: 'worldContext',
+      type: 'string',
+      tier: 'important',
+      source: 'computed',
+      required: false,
+      description: 'Relevant world setting constraints for the scene',
+      display: '世界观约束',
+    },
+    // === OPTIONAL VARIABLES ===
+    {
+      name: 'locationContext',
+      type: 'string',
+      tier: 'optional',
+      source: 'computed',
+      required: false,
+      description: 'Specific location details for the conflict scene',
+      display: '场景地点',
+    },
+    {
+      name: 'relatedLocationId',
+      type: 'string',
+      tier: 'optional',
+      source: 'computed',
+      required: false,
+      description: 'JSON array string of related location IDs',
+      display: '地点ID列表',
+      defaultValue: '',
+    },
+    {
+      name: 'allCharacters',
+      type: 'object',
+      tier: 'optional',
+      source: 'project_state',
+      required: false,
+      description: 'Full character list for relationship context',
+      display: '全部角色',
+    },
+    {
+      name: 'worldSettings',
+      type: 'object',
+      tier: 'optional',
+      source: 'project_state',
+      required: false,
+      description: 'World settings for context retrieval',
+      display: '世界观设定',
+    },
+    {
+      name: 'locationId',
+      type: 'string',
+      tier: 'optional',
+      source: 'user_input',
+      required: false,
+      description: 'Optional specific location ID for the scene',
+      display: '指定地点ID',
+    },
+    {
+      name: 'selectedCharacters',
+      type: 'object',
+      tier: 'optional',
+      source: 'user_input',
+      required: false,
+      description: 'Array of selected characters for the conflict',
+      display: '选中角色',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-28',
+    tags: ['shura-field', 'conflict', 'multi-character', 'confrontation', 'generation'],
+  },
+};
+
+// ============================================================
+// Audit Plot Template
+// ============================================================
+
+/**
+ * Audit Plot Template
+ *
+ * Used for deep plot auditing for logic and pacing.
+ */
+const AUDIT_PLOT_TEMPLATE: PromptTemplate = {
+  id: 'audit_plot',
+  name: 'Audit Plot',
+  description: 'Deep plot auditing for logic, pacing, and consistency',
+  category: 'analysis',
+  systemInstruction: `You are a senior narrative analyst specializing in plot logic, pacing, and story structure. Your task is to:
+
+1. Identify logical inconsistencies and plot holes
+2. Evaluate pacing and narrative flow
+3. Check character motivation consistency
+4. Assess world-building coherence
+5. Provide actionable improvement suggestions
+
+Be thorough, critical, and constructive. Focus on issues that impact reader immersion and story credibility.`,
+
+  userPromptBlocks: [
+    // Block 1: Core Premise
+    {
+      id: 'core_premise',
+      title: 'Core Premise',
+      order: 1,
+      template: `[Core Premise]
+{{premise}}`,
+    },
+
+    // Block 2: Context
+    {
+      id: 'context',
+      title: 'Character and World Context',
+      order: 2,
+      template: `{{contextStr}}`,
+      condition: 'contextStr != null && contextStr !== ""',
+    },
+
+    // Block 3: Current Plot
+    {
+      id: 'current_plot',
+      title: 'Current Plot Outline',
+      order: 3,
+      template: `[Current Plot Outline]
+{{currentPlot}}`,
+    },
+
+    // Block 4: Audit Instructions
+    {
+      id: 'audit_instructions',
+      title: 'Audit Task',
+      order: 4,
+      template: `Please conduct a comprehensive audit of the above plot outline. Focus on:
+
+1. **Logic Consistency**: Are there plot holes, contradictions, or implausible events?
+2. **Character Motivation**: Do character actions align with their established personalities and goals?
+3. **Pacing Analysis**: Is the narrative rhythm appropriate? Are there slow sections or rushed moments?
+4. **World-Building Coherence**: Does the plot respect established world rules and settings?
+5. **Narrative Structure**: Are plot beats properly connected with clear cause-and-effect?
+
+Please output your analysis in Markdown format. Ensure the report includes a clear "Actionable Suggestions List" at the end for automated fix procedures.`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'premise',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The core premise/logline of the story',
+      display: '核心梗概',
+    },
+    {
+      name: 'currentPlot',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The current plot outline to audit',
+      display: '当前剧情大纲',
+    },
+    // === IMPORTANT VARIABLES ===
+    {
+      name: 'contextStr',
+      type: 'string',
+      tier: 'important',
+      source: 'computed',
+      required: false,
+      description: 'Formatted context string with characters and world settings',
+      display: '上下文信息',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-28',
+    tags: ['audit', 'plot', 'analysis', 'logic', 'pacing'],
+  },
+};
+
+// ============================================================
+// Audit Chapter Plan Template
+// ============================================================
+
+/**
+ * Audit Chapter Plan Template
+ *
+ * Used for auditing chapter plans against plot node goals.
+ */
+const AUDIT_CHAPTER_PLAN_TEMPLATE: PromptTemplate = {
+  id: 'audit_chapter_plan',
+  name: 'Audit Chapter Plan',
+  description: 'Audit chapter plans against plot node goals for alignment and drift',
+  category: 'analysis',
+  systemInstruction: `You are a rigorous plot quality auditor. Your task is to verify that chapter plans faithfully implement their associated plot node requirements and identify any "drift" or excessive deviation.
+
+Focus on:
+1. Alignment checking: Do the chapters fulfill all core objectives of the plot node?
+2. Drift detection: Are there chapters introducing irrelevant subplots or deviating from character motivations?
+3. Logic contradictions: Are there logical inconsistencies between chapters?
+
+Output must be a valid JSON object with no additional text.`,
+
+  userPromptBlocks: [
+    // Block 1: Genre Information
+    {
+      id: 'genre_info',
+      title: 'Genre Information',
+      order: 1,
+      template: `[Novel Genre]
+{{genre}}`,
+    },
+
+    // Block 2: Context
+    {
+      id: 'context',
+      title: 'Character and World Context',
+      order: 2,
+      template: `{{contextStr}}`,
+      condition: 'contextStr != null && contextStr !== ""',
+    },
+
+    // Block 3: Target Node
+    {
+      id: 'target_node',
+      title: 'Target Plot Node',
+      order: 3,
+      template: `[Target Plot Node Goals]
+Title: {{targetNode.title}}
+Core Content: {{targetNode.content}}`,
+    },
+
+    // Block 4: Chapters
+    {
+      id: 'chapters',
+      title: 'Chapter Plans',
+      order: 4,
+      template: `[Current Chapter Plans]
+{{#each chapters}}
+[Chapter {{@index}}: {{this.title}}]
+Summary: {{this.summary}}
+Beats:
+{{#each this.beats}}
+- [{{this.type}}] {{this.description}}
+{{/each}}
+
+{{/each}}`,
+    },
+
+    // Block 5: Audit Task
+    {
+      id: 'audit_task',
+      title: 'Audit Task',
+      order: 5,
+      template: `Audit Tasks:
+1. **Alignment Check (Align)**: Do the chapter plans fulfill all core objectives set by the plot node?
+2. **Drift Detection (Drift)**: Are there chapters introducing irrelevant subplot unrelated to the main line, or deviating from character motivations set by the node?
+3. **Logic Contradictions (Contradiction)**: Are there logical inconsistencies between chapters?
+
+**Important Output Format**:
+You must return a JSON object:
+{
+  "isAligned": true/false,
+  "issues": [
+    { "type": "GAP/DRIFT/CONTRADICTION", "description": "Issue description", "suggestion": "Fix suggestion" },
+    ...
+  ]
+}
+Do not include any opening remarks or explanatory text.`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'genre',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'The novel genre',
+      display: '小说类型',
+    },
+    {
+      name: 'targetNode',
+      type: 'object',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The target plot node to audit against',
+      display: '目标情节节点',
+    },
+    {
+      name: 'chapters',
+      type: 'object',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Array of chapter plans to audit',
+      display: '章节规划列表',
+    },
+    // === IMPORTANT VARIABLES ===
+    {
+      name: 'contextStr',
+      type: 'string',
+      tier: 'important',
+      source: 'computed',
+      required: false,
+      description: 'Formatted context string with characters and world settings',
+      display: '上下文信息',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-28',
+    tags: ['audit', 'chapter', 'plan', 'alignment', 'drift'],
+  },
+};
+
+// ============================================================
+// Extract Knowledge Triples Template
+// ============================================================
+
+/**
+ * Extract Knowledge Triples Template
+ *
+ * Used for extracting knowledge triples from content for the knowledge graph.
+ */
+const EXTRACT_KNOWLEDGE_TRIPLES_TEMPLATE: PromptTemplate = {
+  id: 'extract_knowledge_triples',
+  name: 'Extract Knowledge Triples',
+  description: 'Extract knowledge triples (subject-relation-object) from content for knowledge graph',
+  category: 'analysis',
+  systemInstruction: `You are a novel editor expert in logical analysis. Your task is to extract core character locations, character relationships, and major facts as triples from given content, and evaluate relationship strength and trends.
+
+Focus on:
+1. Extracting factual statements like "A is at location B", "A has relationship C with B", "A possesses item B"
+2. Keeping subjects and objects as brief names (character names, location names)
+3. Using concise relation vocabulary (e.g., "located at", "at", "hates", "loves", "possesses")
+4. Providing quantitative evaluations (weight, trajectory, foreshadowing status)
+
+Output must be a valid JSON array with no additional text.`,
+
+  userPromptBlocks: [
+    // Block 1: Extraction Requirements
+    {
+      id: 'extraction_requirements',
+      title: 'Extraction Requirements',
+      order: 1,
+      template: `[Extraction Requirements]
+1. Focus on extracting facts like "A at location B", "A and B have relationship C", "A possesses item B"
+2. Keep Subject and Object as brief names (character names, location names)
+3. Use concise vocabulary for Relation (e.g., "located at", "at", "hates", "loves", "possesses")
+4. **Quantitative Evaluation**:
+   - **weight**: Numeric value 0-100, representing relationship strength or fact importance. E.g., "deep love" = 95, "nodding acquaintance" = 20
+   - **trajectory**: Trend analysis, values: ["rising", "falling", "stable"]
+   - **isForeshadowing**: Boolean. If this fact/relationship is a **foreshadowing** or unresolved suspense (e.g., obtained mysterious item, heard strange noise, made unfulfilled contract), set to true
+   - **status**: Foreshadowing initial status, values: ["OPEN", "RESOLVED", "ABANDONED"]. Default is "OPEN"`,
+    },
+
+    // Block 2: Content
+    {
+      id: 'content',
+      title: 'Content to Extract',
+      order: 2,
+      template: `[Content]
+{{content}}`,
+    },
+
+    // Block 3: Format Requirements
+    {
+      id: 'format_requirements',
+      title: 'Output Format',
+      order: 3,
+      template: `[Format Requirements]
+Must return a pure JSON array, format as follows:
+[
+  {"subject": "CharacterA", "relation": "located at", "object": "LocationB", "weight": 100, "trajectory": "stable", "isForeshadowing": false, "status": "OPEN"},
+  {"subject": "Ember", "relation": "possesses", "object": "rusty copper key", "weight": 70, "trajectory": "stable", "isForeshadowing": true, "status": "OPEN"}
+]`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'content',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The content text to extract knowledge triples from (will be truncated to 5000 chars)',
+      display: '正文内容',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-28',
+    tags: ['knowledge', 'triple', 'extraction', 'graph', 'analysis'],
+  },
+};
+
+// ============================================================
+// Audit Chapter Content Template
+// ============================================================
+
+/**
+ * Audit Chapter Content Template
+ *
+ * Used for comprehensive chapter content auditing across 10 core dimensions.
+ */
+const AUDIT_CHAPTER_CONTENT_TEMPLATE: PromptTemplate = {
+  id: 'audit_chapter_content',
+  name: 'Audit Chapter Content',
+  description: 'Comprehensive chapter content audit across 10 core dimensions with severity levels',
+  category: 'analysis',
+  systemInstruction: `You are a strict novel manuscript editor. Your task is to review chapter content across multiple quality dimensions and provide structured feedback with severity levels.
+
+Audit Dimensions (10 core dimensions):
+1. OOC Check - Character behavior consistency with established personality and motivation
+2. Timeline Check - Temporal sequence rationality and contradictions
+3. Setting Conflicts - Violations of established world-building rules
+4. Power System Consistency - Combat system consistency (if applicable)
+5. Foreshadowing Check - Forgotten or contradictory planted foreshadowing
+6. Pacing Check - Dragging or pacing imbalance
+7. Style Check - AI writing traces (equal-length paragraphs, clichés, formulaic transitions)
+8. Vocabulary Fatigue - Excessive repetition of specific words
+9. Reader Expectation Management - Chapter ending hooks and payoff delivery
+10. Outline Deviation - Content deviation from expected direction
+
+Output must be a valid JSON object with no additional text.`,
+
+  userPromptBlocks: [
+    // Block 1: Genre and Context
+    {
+      id: 'genre_context',
+      title: 'Genre and Context',
+      order: 1,
+      template: `[Novel Genre]
+{{genre}}
+
+{{contextStr}}`,
+    },
+
+    // Block 2: Genre Rules
+    {
+      id: 'genre_rules',
+      title: 'Genre-Specific Rules',
+      order: 2,
+      template: `{{genreContext}}`,
+      condition: 'genreContext != null && genreContext !== ""',
+    },
+
+    // Block 3: Previous Context
+    {
+      id: 'previous_context',
+      title: 'Previous Chapters Summary',
+      order: 3,
+      template: `[Previous Chapters Summary]
+{{prevContext}}`,
+      condition: 'prevContext != null && prevContext !== ""',
+    },
+
+    // Block 4: Current Chapter
+    {
+      id: 'current_chapter',
+      title: 'Chapter to Audit',
+      order: 4,
+      template: `[Chapter to Audit]: Chapter {{chapterNumber}} - {{chapterTitle}}
+{{chapterContent}}`,
+    },
+
+    // Block 5: Audit Instructions
+    {
+      id: 'audit_instructions',
+      title: 'Audit Instructions',
+      order: 5,
+      template: `Please audit the above chapter content.
+
+Audit Dimensions (10 core dimensions):
+1. OOC Check - Character behavior consistency with established personality and motivation
+2. Timeline Check - Temporal sequence rationality and contradictions
+3. Setting Conflicts - Violations of established world-building rules
+4. Power System Consistency - Combat system consistency (if applicable)
+5. Foreshadowing Check - Forgotten or contradictory planted foreshadowing
+6. Pacing Check - Dragging or pacing imbalance
+7. Style Check - AI writing traces (equal-length paragraphs, clichés, formulaic transitions)
+8. Vocabulary Fatigue - Excessive repetition of specific words
+9. Reader Expectation Management - Chapter ending hooks and payoff delivery
+10. Outline Deviation - Content deviation from expected direction
+
+Output format must be pure JSON:
+{
+  "passed": true,
+  "issues": [
+    { "severity": "critical|warning|info", "category": "Dimension Name", "description": "Specific Issue", "suggestion": "Fix Suggestion" }
+  ],
+  "summary": "One-sentence summary"
+}
+
+Only when there are critical-level issues should "passed" be false. Do not include any other text.`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'genre',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'The novel genre',
+      display: '小说类型',
+    },
+    {
+      name: 'chapterContent',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The chapter content to audit',
+      display: '章节内容',
+    },
+    {
+      name: 'chapterTitle',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The chapter title',
+      display: '章节标题',
+    },
+    {
+      name: 'chapterNumber',
+      type: 'number',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The chapter number',
+      display: '章节序号',
+    },
+    // === IMPORTANT VARIABLES ===
+    {
+      name: 'contextStr',
+      type: 'string',
+      tier: 'important',
+      source: 'computed',
+      required: false,
+      description: 'Formatted context string with characters and world settings',
+      display: '上下文信息',
+    },
+    {
+      name: 'genreContext',
+      type: 'string',
+      tier: 'important',
+      source: 'computed',
+      required: false,
+      description: 'Genre-specific rules and guidelines',
+      display: '类型规则',
+    },
+    {
+      name: 'prevContext',
+      type: 'string',
+      tier: 'important',
+      source: 'computed',
+      required: false,
+      description: 'Summary of previous chapters for continuity',
+      display: '前文摘要',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-28',
+    tags: ['audit', 'chapter', 'content', 'quality', 'multi-dimensional'],
+  },
+};
+
+// ============================================================
+// Analyze Plot Rhythm Template
+// ============================================================
+
+/**
+ * Analyze Plot Rhythm Template
+ *
+ * Used for analyzing plot rhythm and tension.
+ * Based on analyzePlotRhythm in services/gemini/plot.ts
+ */
+const ANALYZE_PLOT_RHYTHM_TEMPLATE: PromptTemplate = {
+  id: 'analyze_plot_rhythm',
+  name: 'Analyze Plot Rhythm',
+  description: 'Analyze plot outline rhythm and tension curve',
+  category: 'analysis',
+  systemInstruction: `You are an expert story analyst specializing in narrative pacing and tension dynamics. Your task is to:
+
+1. Break down the plot outline into key beats
+2. Evaluate tension level for each beat (0-100)
+3. Identify pacing patterns and rhythm
+4. Provide actionable insights
+
+Output structured JSON analysis.`,
+
+  userPromptBlocks: [
+    {
+      id: 'task_description',
+      title: 'Analysis Task',
+      order: 1,
+      template: `Please analyze the plot outline's rhythm and tension dynamics.
+Break down into key beats and evaluate tension level for each.
+
+[Tension Rating Scale]:
+0-20: Calm, setup, daily life
+21-40: Small waves, foreshadowing, dialogue
+41-60: Conflict escalation, obstacles appear
+61-80: Major twists, crisis, battles
+81-100: Ultimate climax, life-or-death, core reveals`,
+    },
+    {
+      id: 'plot_content',
+      title: 'Plot Outline',
+      order: 2,
+      template: `[Plot Outline]:
+{{plotOutline}}`,
+    },
+    {
+      id: 'output_format',
+      title: 'Output Format',
+      order: 3,
+      template: `Output JSON array with at least 5-10 key points:
+[
+  {
+    "beat": "Chapter name or key plot point",
+    "tension": 0-100,
+    "description": "Brief description of this beat"
+  }
+]`,
+    },
+  ],
+
+  variables: [
+    {
+      name: 'plotOutline',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'The complete plot outline to analyze',
+      display: '剧情大纲',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-28',
+    tags: ['analysis', 'plot', 'rhythm', 'tension', 'pacing'],
+  },
+};
+
+// ============================================================
+// Split Plot Node Into Chapters Template
+// ============================================================
+
+/**
+ * Split Plot Node Into Chapters Template
+ *
+ * Used for splitting a plot node into detailed chapter outlines.
+ * Based on splitPlotNodeIntoChapters in services/gemini/plot.ts
+ */
+const SPLIT_PLOT_NODE_INTO_CHAPTERS_TEMPLATE: PromptTemplate = {
+  id: 'split_plot_node_into_chapters',
+  name: 'Split Plot Node Into Chapters',
+  description: 'Split a plot beat into detailed chapter outlines with scene beats',
+  category: 'generation',
+  systemInstruction: `You are a master story architect specializing in chapter structure and scene beats. Your task is to:
+
+1. Split plot beats into 2-3 detailed chapter outlines
+2. Create clear chapter titles and summaries
+3. Define POV characters for each chapter
+4. Include 3-5 scene beats per chapter (CONTENT/ACTION/DIALOGUE/TWIST)
+
+Ensure logical flow and dramatic tension across chapters.`,
+
+  userPromptBlocks: [
+    {
+      id: 'genre_info',
+      title: 'Genre Information',
+      order: 1,
+      template: `Novel Genre: {{genre}}`,
+    },
+    {
+      id: 'global_context',
+      title: 'Global Story Context',
+      order: 2,
+      template: `[Global Plot Overview]:
+{{fullPlotSummary}}`,
+    },
+    {
+      id: 'character_context',
+      title: 'Character & World Context',
+      order: 3,
+      template: `{{contextStr}}`,
+    },
+    {
+      id: 'target_node',
+      title: 'Target Plot Beat',
+      order: 4,
+      template: `[Current Plot Beat to Split]:
+Title: {{targetNode.title}}
+Content: {{targetNode.content}}`,
+    },
+    {
+      id: 'task_requirements',
+      title: 'Task Requirements',
+      order: 5,
+      template: `Task: Split this plot beat into {{countInstruction}} detailed chapter outlines.
+
+Requirements:
+1. Each chapter must have a clear [Title]
+2. Provide detailed [Summary] describing core reversals, key dialogues or actions
+3. Specify appropriate [Expected POV] character
+4. Include 3-5 scene beats per chapter
+
+[Beat Types]:
+- CONTENT: Setup/description
+- ACTION: Action/events
+- DIALOGUE: Key conversations
+- TWIST: Turns/suspense
+
+Output JSON array format. No preamble.`,
+    },
+  ],
+
+  variables: [
+    {
+      name: 'genre',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'Novel genre',
+      display: '小说类型',
+    },
+    {
+      name: 'fullPlotSummary',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'Global plot summary',
+      display: '全局剧情概览',
+    },
+    {
+      name: 'targetNode',
+      type: 'object',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The plot node to split',
+      display: '目标情节节点',
+    },
+    {
+      name: 'contextStr',
+      type: 'string',
+      tier: 'important',
+      source: 'computed',
+      required: false,
+      description: 'Formatted character and world context',
+      display: '上下文',
+    },
+    {
+      name: 'fissionCount',
+      type: 'number',
+      tier: 'optional',
+      source: 'user_input',
+      required: false,
+      description: 'Number of chapters to split into',
+      display: '拆分数量',
+    },
+    {
+      name: 'countInstruction',
+      type: 'string',
+      tier: 'computed',
+      source: 'computed',
+      required: false,
+      description: 'Formatted count instruction',
+      display: '数量指令',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-28',
+    tags: ['generation', 'chapter', 'outline', 'fission', 'plot'],
+  },
+};
+
+// ============================================================
+// Regenerate Chapter Outline Template
+// ============================================================
+
+/**
+ * Regenerate Chapter Outline Template
+ *
+ * Used for regenerating a single chapter outline.
+ * Based on regenerateChapterOutline in services/gemini/plot.ts
+ */
+const REGENERATE_CHAPTER_OUTLINE_TEMPLATE: PromptTemplate = {
+  id: 'regenerate_chapter_outline',
+  name: 'Regenerate Chapter Outline',
+  description: 'Regenerate a single chapter outline based on context',
+  category: 'refinement',
+  systemInstruction: `You are a skilled story editor specializing in chapter revision. Your task is to:
+
+1. Rewrite the chapter outline to fix issues
+2. Maintain continuity with previous and next chapters
+3. Align with the parent plot beat
+4. Preserve or optimize title and POV
+
+Output only the revised chapter in JSON array format.`,
+
+  userPromptBlocks: [
+    {
+      id: 'genre_info',
+      title: 'Genre Information',
+      order: 1,
+      template: `Novel Genre: {{genre}}`,
+    },
+    {
+      id: 'global_context',
+      title: 'Global Story Context',
+      order: 2,
+      template: `[Global Plot Overview]:
+{{fullPlotSummary}}`,
+    },
+    {
+      id: 'character_context',
+      title: 'Character & World Context',
+      order: 3,
+      template: `{{contextStr}}`,
+    },
+    {
+      id: 'parent_node',
+      title: 'Parent Plot Beat',
+      order: 4,
+      template: `[Parent Plot Beat]:
+Title: {{targetNode.title}}
+Content: {{targetNode.content}}`,
+    },
+    {
+      id: 'previous_chapter',
+      title: 'Previous Chapter',
+      order: 5,
+      template: `[Previous Chapter Outline]:
+Title: {{previousChapter.title}}
+Content: {{previousChapter.summary}}`,
+      condition: 'previousChapter != null',
+    },
+    {
+      id: 'next_chapter',
+      title: 'Next Chapter',
+      order: 6,
+      template: `[Next Chapter Outline]:
+Title: {{nextChapter.title}}
+Content: {{nextChapter.summary}}`,
+      condition: 'nextChapter != null',
+    },
+    {
+      id: 'current_chapter',
+      title: 'Chapter to Rewrite',
+      order: 7,
+      template: `[Current Chapter to Rewrite]:
+Title: {{chapterToRewrite.title}}
+Original Content: {{chapterToRewrite.summary}}
+Original POV: {{chapterToRewrite.expectedPOV}}`,
+    },
+    {
+      id: 'task_requirements',
+      title: 'Task Requirements',
+      order: 8,
+      template: `Task: Rewrite this chapter outline based on context.
+
+Requirements:
+1. Provide detailed [Summary] with core reversals, dialogues, actions
+2. Ensure perfect connection with previous and next chapters
+3. Align with parent plot beat
+4. Keep or optimize title and POV
+
+Output JSON array with single chapter. No preamble.`,
+    },
+  ],
+
+  variables: [
+    {
+      name: 'genre',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'Novel genre',
+      display: '小说类型',
+    },
+    {
+      name: 'fullPlotSummary',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'Global plot summary',
+      display: '全局剧情概览',
+    },
+    {
+      name: 'targetNode',
+      type: 'object',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Parent plot node',
+      display: '父情节节点',
+    },
+    {
+      name: 'chapterToRewrite',
+      type: 'object',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Chapter to rewrite',
+      display: '待重写章节',
+    },
+    {
+      name: 'previousChapter',
+      type: 'object',
+      tier: 'important',
+      source: 'project_state',
+      required: false,
+      description: 'Previous chapter for continuity',
+      display: '上一章',
+    },
+    {
+      name: 'nextChapter',
+      type: 'object',
+      tier: 'important',
+      source: 'project_state',
+      required: false,
+      description: 'Next chapter for continuity',
+      display: '下一章',
+    },
+    {
+      name: 'contextStr',
+      type: 'string',
+      tier: 'important',
+      source: 'computed',
+      required: false,
+      description: 'Formatted character and world context',
+      display: '上下文',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-28',
+    tags: ['refinement', 'chapter', 'outline', 'rewrite'],
+  },
+};
+
+// ============================================================
+// Generate Twist Hooks Template
+// ============================================================
+
+/**
+ * Generate Twist Hooks Template
+ *
+ * Used for generating plot twist inspiration.
+ * Based on generateTwistHooks in services/gemini/plot.ts
+ */
+const GENERATE_TWIST_HOOKS_TEMPLATE: PromptTemplate = {
+  id: 'generate_twist_hooks',
+  name: 'Generate Twist Hooks',
+  description: 'Generate plot twist inspiration and dramatic hooks',
+  category: 'generation',
+  systemInstruction: `You are a master story planner specializing in dramatic twists and narrative hooks. Your task is to:
+
+1. Generate 3 highly dramatic plot hooks or twist ideas
+2. Ensure logical consistency within the story world
+3. Maximize dramatic impact and character relationship dynamics
+4. Match the genre style (fantasy, urban, mystery, etc.)
+
+Output 3 numbered ideas directly. No preamble.`,
+
+  userPromptBlocks: [
+    {
+      id: 'requirements',
+      title: 'Requirements',
+      order: 1,
+      template: `[Twist Requirements]:
+1. Logical: Unexpected but reasonable within story logic
+2. Dramatic: Instantly elevates tension or shifts character dynamics
+3. Style-matched: Adapt to genre (fantasy/urban/mystery/etc.)`,
+    },
+    {
+      id: 'story_context',
+      title: 'Story Context',
+      order: 2,
+      template: `[Story Background/Memory]:
+{{context}}`,
+    },
+    {
+      id: 'plot_target',
+      title: 'Plot Target',
+      order: 3,
+      template: `[Plot Goal]:
+{{plotBeat}}`,
+    },
+    {
+      id: 'output_format',
+      title: 'Output Format',
+      order: 4,
+      template: `Output 3 ideas, one per line, numbered (e.g., "1. ..."). No extra commentary.`,
+    },
+  ],
+
+  variables: [
+    {
+      name: 'context',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'Story background and memory context',
+      display: '故事背景',
+    },
+    {
+      name: 'plotBeat',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'Target plot beat for twist generation',
+      display: '情节目标',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-28',
+    tags: ['generation', 'twist', 'inspiration', 'drama', 'hooks'],
+  },
+};
+
+// ============================================================
 // Export Default Templates
 // ============================================================
 
@@ -1863,6 +3707,24 @@ export const DEFAULT_TEMPLATES: Record<string, PromptTemplate> = {
   summarize_chapter: SUMMARIZE_CHAPTER_TEMPLATE,
   balance_suggestions: BALANCE_SUGGESTIONS_TEMPLATE,
   writing_base: WRITING_BASE_TEMPLATE,
+  // New templates for world.ts integration
+  analyze_state_changes: ANALYZE_STATE_CHANGES_TEMPLATE,
+  extract_echoes: EXTRACT_ECHOES_TEMPLATE,
+  consolidate_memory: CONSOLIDATE_MEMORY_TEMPLATE,
+  deduce_world_consequences: DEDUCE_WORLD_CONSEQUENCES_TEMPLATE,
+  generate_single_character: GENERATE_SINGLE_CHARACTER_TEMPLATE,
+  // New template for shuraField.ts integration
+  shura_field_conflict: SHURA_FIELD_CONFLICT_TEMPLATE,
+  // New templates for audit.ts integration
+  audit_plot: AUDIT_PLOT_TEMPLATE,
+  audit_chapter_plan: AUDIT_CHAPTER_PLAN_TEMPLATE,
+  extract_knowledge_triples: EXTRACT_KNOWLEDGE_TRIPLES_TEMPLATE,
+  audit_chapter_content: AUDIT_CHAPTER_CONTENT_TEMPLATE,
+  // New templates for plot.ts integration
+  analyze_plot_rhythm: ANALYZE_PLOT_RHYTHM_TEMPLATE,
+  split_plot_node_into_chapters: SPLIT_PLOT_NODE_INTO_CHAPTERS_TEMPLATE,
+  regenerate_chapter_outline: REGENERATE_CHAPTER_OUTLINE_TEMPLATE,
+  generate_twist_hooks: GENERATE_TWIST_HOOKS_TEMPLATE,
 };
 
 // ============================================================
