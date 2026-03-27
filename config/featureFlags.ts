@@ -23,6 +23,9 @@ export const DEFAULT_FEATURE_FLAGS: Record<UserTier, FeatureFlags> = {
   },
 };
 
+// Alias for compatibility
+export const TIER_FEATURES = DEFAULT_FEATURE_FLAGS;
+
 // 获取当前用户等级
 export function getUserTier(): UserTier {
   if (typeof window === 'undefined') {
@@ -50,4 +53,40 @@ export function isFeatureEnabled(feature: keyof FeatureFlags): boolean {
 export function getCurrentFeatureFlags(): FeatureFlags {
   const tier = getUserTier();
   return DEFAULT_FEATURE_FLAGS[tier];
+}
+
+/**
+ * FeatureFlagService - Singleton service for feature flag management
+ */
+export class FeatureFlagService {
+  private static instance: FeatureFlagService;
+  private userTier: UserTier = 'FREE';
+
+  private constructor() {
+    this.userTier = getUserTier();
+  }
+
+  static getInstance(): FeatureFlagService {
+    if (!FeatureFlagService.instance) {
+      FeatureFlagService.instance = new FeatureFlagService();
+    }
+    return FeatureFlagService.instance;
+  }
+
+  isEnabled(feature: keyof FeatureFlags): boolean {
+    return DEFAULT_FEATURE_FLAGS[this.userTier][feature];
+  }
+
+  getTier(): UserTier {
+    return this.userTier;
+  }
+
+  setTier(tier: UserTier): void {
+    this.userTier = tier;
+    setUserTier(tier);
+  }
+
+  getAllFlags(): FeatureFlags {
+    return DEFAULT_FEATURE_FLAGS[this.userTier];
+  }
 }

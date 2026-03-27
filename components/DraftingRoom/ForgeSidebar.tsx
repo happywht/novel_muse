@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     GitCommit, Brain, X, Zap, Sparkles, RefreshCw,
     Loader2, Users, Plus, Eye, MapPin, Gauge, FileText,
-    PenTool, Trash2, AlertTriangle, Sidebar, Network, CheckCircle2
+    PenTool, Trash2, AlertTriangle, Sidebar, Network, CheckCircle2,
+    Settings, MessageSquare, Sliders
 } from 'lucide-react';
-import { ProjectState, Character, WorldSetting, Draft, KnowledgeTriple, NarrativeInsight } from '../../types';
+import { ProjectState, Character, WorldSetting, Draft, KnowledgeTriple, NarrativeInsight, AppSection } from '../../types';
 import { ContinuityBanner } from '../panels/ContinuityBanner';
+import { PromptPanel } from '../PromptPanel';
 
 interface ForgeSidebarProps {
     project: ProjectState;
@@ -68,6 +70,10 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
         isFetchingGraphContext,
         isSyncingToGraph,
     } = actions;
+
+    // Tab state for Params/Reference/Prompt tabs
+    const [activeTab, setActiveTab] = useState<'params' | 'reference' | 'prompt'>('params');
+
     return (
         <div className="w-1/3 flex flex-col gap-4 overflow-y-auto pr-2 custom-scrollbar pt-10 pb-10">
             {/* Logic Conflict Alerts */}
@@ -364,21 +370,62 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
                 </div>
             </div>
 
-            {/* Expandable Advanced Params Panel */}
-            <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
-                <button
-                    onClick={() => setShowAdvancedParams(!showAdvancedParams)}
-                    className="w-full flex justify-between items-center text-slate-400 hover:text-white"
-                >
-                    <div className="flex items-center gap-2 font-serif font-bold text-sm">
-                        <Sparkles size={16} className={showAdvancedParams ? "text-muse-400" : ""} />
-                        高级生信参数控制 (Advanced Directives)
+            {/* Tabbed Control Panel: Params / Reference / Prompt */}
+            <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+                {/* Tab Headers */}
+                <div className="border-b border-slate-700 bg-slate-800/30">
+                    <div className="flex">
+                        <button
+                            onClick={() => setActiveTab('params')}
+                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all relative ${
+                                activeTab === 'params'
+                                    ? 'text-white'
+                                    : 'text-slate-400 hover:text-slate-300'
+                            }`}
+                        >
+                            <Sliders size={14} />
+                            参数
+                            {activeTab === 'params' && (
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-muse-400 rounded-full" />
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('reference')}
+                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all relative ${
+                                activeTab === 'reference'
+                                    ? 'text-white'
+                                    : 'text-slate-400 hover:text-slate-300'
+                            }`}
+                        >
+                            <FileText size={14} />
+                            参考
+                            {activeTab === 'reference' && (
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-muse-400 rounded-full" />
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('prompt')}
+                            className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium transition-all relative ${
+                                activeTab === 'prompt'
+                                    ? 'text-white'
+                                    : 'text-slate-400 hover:text-slate-300'
+                            }`}
+                        >
+                            <Sparkles size={14} />
+                            Prompt
+                            <span className="text-[8px] px-1 py-0.5 bg-purple-500/30 text-purple-300 rounded-full">New</span>
+                            {activeTab === 'prompt' && (
+                                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-muse-400 rounded-full" />
+                            )}
+                        </button>
                     </div>
-                    <div className={`transition-transform ${showAdvancedParams ? 'rotate-180' : ''}`}>▼</div>
-                </button>
+                </div>
 
-                {showAdvancedParams && (
-                    <div className="mt-4 pt-4 border-t border-slate-700 space-y-4 animate-fade-in custom-scrollbar">
+                {/* Tab Content */}
+                <div className="p-4">
+                    {/* Params Tab */}
+                    {activeTab === 'params' && (
+                        <div className="space-y-4 animate-fade-in custom-scrollbar">
                         {/* Step 2.5: POV Mode */}
                         {selectedChars.length > 0 && (
                             <div className="bg-gradient-to-r from-indigo-900/20 to-purple-900/20 p-3 rounded-xl border border-indigo-500/20">
@@ -511,8 +558,27 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
                                 />
                             </div>
                         </div>
-                    </div>
-                )}
+                        </div>
+                    )}
+
+                    {/* Reference Tab */}
+                    {activeTab === 'reference' && (
+                        <div className="space-y-4 animate-fade-in">
+                            <div className="text-center py-8">
+                                <FileText size={32} className="mx-auto text-slate-600 mb-3" />
+                                <p className="text-xs text-slate-400">参考内容功能即将上线</p>
+                                <p className="text-[10px] text-slate-500 mt-1">可在此处配置场景参考文本、风格模板等</p>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Prompt Tab */}
+                    {activeTab === 'prompt' && (
+                        <div className="animate-fade-in">
+                            <PromptPanel moduleId={AppSection.DRAFTING} defaultCollapsed={false} />
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Phase 5: Faction Dynamics Button */}

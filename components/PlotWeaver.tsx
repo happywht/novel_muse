@@ -16,7 +16,7 @@ interface PlotWeaverProps {
     updateProject: (data: Partial<ProjectState>) => void;
 }
 
-export type TabMode = 'ANALYSIS' | 'OPTIMIZE' | 'STRUCTURE' | 'CARDS';
+export type TabMode = 'ANALYSIS' | 'OPTIMIZE' | 'STRUCTURE' | 'CARDS' | 'PROMPT';
 
 export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }) => {
     const { setActiveSection } = useProjectStore();

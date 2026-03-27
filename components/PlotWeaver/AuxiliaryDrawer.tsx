@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity, TrendingUp, Lightbulb, Sidebar, X, User, Globe, Zap, Info, Swords, Flame, BarChart3 } from 'lucide-react';
+import { Activity, TrendingUp, Lightbulb, Sidebar, X, User, Globe, Zap, Info, Swords, Flame, BarChart3, Sparkles } from 'lucide-react';
 import { TabMode } from '../PlotWeaver';
 import { ProjectState, PlotNode } from '../../types';
 import { PlotAnalysisPanel } from '../PlotWeaver/PlotAnalysisPanel';
@@ -8,6 +8,7 @@ import { PlotStructureAssistant } from '../PlotWeaver/PlotStructureAssistant';
 import { Loader } from '../Loader';
 import { ConflictVisualization } from '../ConflictVisualization';
 import { useFeature } from '../../hooks/useFeature';
+import { PlotPromptPanel } from '../PromptPanel/PlotPromptPanel';
 
 interface AuxiliaryDrawerProps {
     showRightSidebar: boolean;
@@ -53,6 +54,7 @@ export const AuxiliaryDrawer: React.FC<AuxiliaryDrawerProps> = ({
                 <div className="flex items-center gap-3">
                     {activeTab === 'ANALYSIS' && <><Activity className="text-muse-400" size={20} /> <span className="font-bold text-white uppercase tracking-wider text-sm italic">剧情诊断报告</span></>}
                     {activeTab === 'STRUCTURE' && <><Lightbulb className="text-amber-400" size={20} /> <span className="font-bold text-white uppercase tracking-wider text-sm italic">创作结构助手</span></>}
+                    {activeTab === 'PROMPT' && <><Sparkles className="text-purple-400" size={20} /> <span className="font-bold text-white uppercase tracking-wider text-sm italic">Prompt 管理</span></>}
                 </div>
                 <button onClick={() => setShowRightSidebar(false)} className="text-slate-500 hover:text-white p-1.5 hover:bg-slate-800 rounded-xl transition-all"><X size={20} /></button>
             </div>
@@ -188,6 +190,10 @@ export const AuxiliaryDrawer: React.FC<AuxiliaryDrawerProps> = ({
                         </div>
                         </>
                     )}
+
+                {activeTab === 'PROMPT' && (
+                    <PlotPromptPanel />
+                )}
 
             {/* Global Loading Overlay for Right Panels */}
             {isAnalyzing && (
