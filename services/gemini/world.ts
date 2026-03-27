@@ -15,6 +15,7 @@ import { formatContext, formatEntityLookupTable } from "./helpers";
 import { buildPromptContent } from "../../config/prompts";
 import { fetchRelatedSubgraph } from "../apiService";
 import { getDisplayRelationships } from "../../utils/characterRelations";
+import { renderUserPromptBlocks } from "../../config/templates/defaults";
 
 /**
  * Image generation for characters
@@ -114,6 +115,9 @@ export const batchGenerateCharacters = async (premise: string, genre: string, se
 - **archetype字段**: 必须填写，使用上述角色原型之一。
 - 请使用中文输出。`;
 
+    // Prepare template data
+    const templateData = { premise, genre, settingText };
+
     try {
         console.log('【batchGenerateCharacters】开始调用AI，prompt:', prompt);
         const responseText = await executeModelTask(
@@ -122,7 +126,10 @@ export const batchGenerateCharacters = async (premise: string, genre: string, se
             prompt,
             'gemini-3-flash-preview',
             0.6,  // 修复: 降低temperature提高一致性
-            characterSchema
+            characterSchema,
+            undefined,
+            undefined,
+            { templateId: 'batch_generate_characters', templateData }
         );
         console.log('【batchGenerateCharacters】AI原始响应:', responseText);
 
@@ -235,6 +242,9 @@ ${settingText}
 - 能够为剧情提供冲突或背景支持。
 - 请使用中文输出。`;
 
+    // Prepare template data
+    const templateData = { premise, genre, category, count, categoryGuidance, settingText };
+
     try {
         console.log(`【batchGenerateWorldSettingsByCategory】开始生成 ${category} 类设定`);
         const responseText = await executeModelTask(
@@ -243,7 +253,10 @@ ${settingText}
             prompt,
             'gemini-3-flash-preview',
             0.5,  // 修复: 降低temperature提高一致性
-            worldSchema
+            worldSchema,
+            undefined,
+            undefined,
+            { templateId: 'batch_generate_settings', templateData }
         );
 
         if (!responseText) {
@@ -289,13 +302,20 @@ export const expandWorldLore = async (title: string, currentContent: string, gen
   
   请直接输出扩充后的设定内容（Markdown 格式）。`;
 
+    // Prepare template data
+    const templateData = { title, currentContent, genre };
+
     try {
         return await executeModelTask(
             'expandWorldLore',
             instruction,
             prompt,
             'gemini-3-flash-preview',
-            0.8
+            0.8,
+            undefined,
+            undefined,
+            undefined,
+            { templateId: 'expand_world_lore', templateData }
         ) || "扩充失败。";
     } catch (error) {
         console.error("Gemini Lore Expansion Error:", error);
@@ -791,13 +811,26 @@ export const chatWithPersona = async (character: Character, message: string, his
         ? `【之前的对话】\n${historyText}\n\n【用户最新消息】\n${message}`
         : message;
 
+    // Prepare template data
+    const templateData = {
+        characterName: character.name,
+        characterRole: character.role,
+        characterDescription: character.description,
+        characterRelationships: displayRels,
+        historyText,
+        message
+    };
+
     try {
         const result = await executeModelTask(
             'chatWithPersona',
             systemInstruction,
             fullPrompt,
             await getModelName('flash'),
-            0.9
+            0.9,
+            undefined,
+            undefined,
+            { templateId: 'chat_with_persona', templateData }
         );
         return result || "...";
     } catch (e) {
