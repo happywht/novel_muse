@@ -6,10 +6,11 @@ import {
 import { useProjectStore } from "../../store/useProjectStore";
 import {
     executeModelTask,
-    getInstructionWithSettings, getModelName
+    getInstructionWithSettings, getModelName, TemplateOptions
 } from "./core";
 import { formatContext, buildTieredMemory, filterRelevantSettings } from "./helpers";
 import { buildGenreContext } from "../../config/genreRules";
+import { renderUserPromptBlocks } from "../../config/templates/defaults";
 
 export type PacingMode = 'SLOW_BURN' | 'BALANCED' | 'CLIMAX';
 
@@ -36,6 +37,12 @@ export const generateText = async (prompt: string, promptKey: string = 'writing_
 
 /**
  * Full scene generation with ingredient-based context building
+ *
+ * MIGRATED TO TEMPLATE SYSTEM:
+ * - Uses template-based prompt rendering instead of manual string concatenation
+ * - Passes structured templateData to executeModelTask
+ * - Template ID: 'scene_generation'
+ * - Backward compatible: still builds context locally for now
  */
 export const generateSceneFromIngredients = async (
     genre: string,
@@ -56,6 +63,7 @@ export const generateSceneFromIngredients = async (
     physicalStatus: PhysicalStatus[] = [],
     unresolvedForeshadowing: KnowledgeTriple[] = []
 ): Promise<string> => {
+    // === 1. Build Pacing Instruction ===
     const profile = settings?.promptProfile || 'LITERARY';
     let pacingInstruction = "";
 
@@ -85,14 +93,7 @@ export const generateSceneFromIngredients = async (
         }
     }
 
-    const instruction = getInstructionWithSettings('scene_generation', settings);
-
-    // Build context
-    let context = "";
-    if (rollingSummary) {
-        context += `【📚 全局故事脉络 (Global Story Arc)】\n(以下是目前为止整部小说的情节摘要，请确保当前创作符合整体走向，并注意前后呼应)\n${rollingSummary}\n\n`;
-    }
-
+    // === 2. Build Tiered Context (same as before) ===
     const activeEchoes = echoes.filter(e => e.status === 'ACCEPTED');
     const { project } = useProjectStore.getState();
     const currentChapter = activeChapterId ? project.chapters.find(c => c.id === activeChapterId) : null;
@@ -107,102 +108,90 @@ export const generateSceneFromIngredients = async (
         activeEchoes,
         graphContext
     );
-    context += tieredContext;
 
-    if (physicalStatus && physicalStatus.length > 0) {
-        context += `【🔒 逻辑锚点: 角色目前状态 (Logic Anchors)】\n`;
-        context += `注意：以下事实由系统图谱强制提供，如有冲突必须以下文为准，严禁无交代瞬移或复活：\n`;
-        physicalStatus.forEach(ps => {
-            const statusStr = ps.isDead ? '已死亡' : `${ps.state}`;
-            context += `- [${ps.name}]: 目前位于 [${ps.location}]，生理/精神状态：[${statusStr}]\n`;
-        });
-        context += `\n`;
-    }
-
-    if (unresolvedForeshadowing && unresolvedForeshadowing.length > 0) {
-        context += `【🎭 契诃夫之枪: 未回收的伏笔 (Chekhov's Gun)】\n`;
-        context += `注意：以下是之前章节埋下的悬念或钩子，请尽量在本次创作中推进、提及或回收（填坑）：\n`;
-        unresolvedForeshadowing.forEach(uf => {
-            context += `- [${uf.subject}] ${uf.relation} [${uf.object}]\n`;
-        });
-        context += `\n`;
-    }
-
-    if (activeSettings && activeSettings.length > 0) {
-        context += `【当前锚定世界设定/场景 (Active Settings)】\n`;
-        activeSettings.forEach(setting => {
-            const locEchoes = activeEchoes.filter(e => e.targetId === setting.id).sort((a, b) => a.timestamp - b.timestamp);
-            context += `- [${setting.category}] ${setting.title}: ${setting.content}\n`;
-            if (locEchoes.length > 0) {
-                context += `  ⚡ [环境/设定变更]: ${locEchoes.map(e => e.description).join('; ')}\n`;
-            }
-        });
-        context += "\n";
-    }
-
+    // === 3. Build Relevant Settings with Category Grouping ===
     const otherSettings = allWorldSettings.filter(w => !activeSettings || !activeSettings.find(s => s.id === w.id));
     const queryContextForRAG = `${plotBeat} ${previousStoryContext || ''} ${activeCharacters.map(c => c.name).join(' ')}`;
     const relevantSettings = filterRelevantSettings(otherSettings, queryContextForRAG, 20);
 
-    if (relevantSettings.length > 0) {
-        context += "【世界观法则与背景 (World Context)】\n";
-        context += "*请在写作时参考以下规则，确保逻辑自洽：*\n";
-        const categories = Array.from(new Set(relevantSettings.map(w => w.category)));
-        categories.forEach(cat => {
-            const items = relevantSettings.filter(w => w.category === cat);
-            if (items.length > 0) {
-                context += `[${cat}]:\n`;
-                items.forEach(w => context += `  - ${w.title}: ${w.content.slice(0, 1000)}${w.content.length > 1000 ? '...' : ''}\n`);
-            }
-        });
-        context += "\n";
-    }
+    // Group relevant settings by category for template rendering
+    const relevantSettingsByCategory = Array.from(new Set(relevantSettings.map(w => w.category))).map(category => ({
+        category,
+        items: relevantSettings.filter(w => w.category === category).map(w => ({
+            title: w.title,
+            content: w.content.length > 1000 ? w.content.slice(0, 1000) + '...' : w.content
+        }))
+    }));
 
-    let constraintBlock = `【🚨 创作核心限制 (Absolute Constraints)】\n`;
-    if (povName) {
-        constraintBlock += `- **视角锁定**: 必须严格以【${povName}】的第一人称或限制性第三人称视角叙事。\n`;
-        constraintBlock += `  * 严禁描写该角色感知范围（视角、听力、触觉等）之外的任何信息。\n`;
-        constraintBlock += `  * 严禁上帝视角，严禁切换到其他角色的内心活动。\n`;
-    }
-    constraintBlock += pacingInstruction + "\n";
-    context += constraintBlock + "\n";
+    // === 4. Prepare Active Settings with Echo Changes ===
+    const activeSettingsWithEchoes = activeSettings.map(setting => {
+        const locEchoes = activeEchoes.filter(e => e.targetId === setting.id).sort((a, b) => a.timestamp - b.timestamp);
+        return {
+            category: setting.category,
+            title: setting.title,
+            content: setting.content,
+            echoChanges: locEchoes.length > 0 ? locEchoes.map(e => e.description).join('; ') : undefined
+        };
+    });
 
+    // === 5. Build Genre Context ===
     const genreContext = buildGenreContext(genre);
-    const prompt = `
-    小说类型: ${genre}
-    
-    ${genreContext}
-    
-    ${context}
 
-    ${twistHook ? `【⚠️ 剧情反转指令 (Twist Hook)】: \n${twistHook}\n` : ''}
-    
-    【本场戏的情节目标 (Plot Beat)】:
-    ${plotBeat}
-    
-    请根据以上要素，撰写一段约 ${targetWordCount} 字的小说正文片段。
-    
-    【🚨 质量与网文调性红线（绝对禁止）】：
-    1. **拒绝套路化开局**：绝对不要以"天气、风景、光线"（如"云梦泽的雾浓得化不开"、"阳光透过树叶的缝隙"）作为本段正文的开头。请**直接以人物的动作、核心冲突或极具张力的台词切入**！
-    2. **拒绝好莱坞式说教结尾**：绝对不要在片段末尾加上类似"而这，只是一个开始"、"这将是属于他的时代"、"命运的齿轮开始转动"等假大空的总结性/史诗感旁白。
-    
-    【🚨 章节结尾强制约束】：
-    3. **必须完成情节目标**：本章结尾必须**完成上面"情节目标(Plot Beat)"中规定的核心任务**，不能偏离或跳过。如果情节目标是"林远说服芈岚结盟"，结尾必须是结盟成功或明确失败，不能悬而未决。
-    4. **关联下一章**：在完成本章情节目标的前提下，可以在结尾处**自然地引出下一章的悬念**，但必须确保本章的目标是完成的。严禁为了悬念而牺牲本章完整性。
-    
-    【指令】：
-    请务必拓展真实的互动细节和动作，撑起框架，使真实情节密度支撑起字数要求。直接开始正文，不要输出任何标题、概述或解释文字。
-    `;
+    // === 6. Prepare Template Data ===
+    const templateData = {
+        // Critical variables
+        genre,
+        plotBeat,
+        genreContext,
 
+        // Important variables
+        rollingSummary,
+        tieredContext,
+        physicalStatus,
+        unresolvedForeshadowing,
+        activeSettings: activeSettingsWithEchoes,
+        relevantSettings,
+        relevantSettingsByCategory,
+        pacingInstruction,
+        povName,
+        targetWordCount,
+
+        // Optional variables
+        twistHook,
+        activeCharacters,
+        allWorldSettings,
+        previousStoryContext,
+        echoes,
+        activeChapterId,
+        pacing,
+        settings,
+        graphContext,
+    };
+
+    // === 7. Render System Instruction ===
+    const instruction = getInstructionWithSettings('scene_generation', settings);
+
+    // === 8. Render User Prompt from Template (NEW: using template system) ===
+    let userPrompt = '';
+    try {
+        userPrompt = renderUserPromptBlocks('scene_generation', templateData);
+    } catch (error) {
+        console.error('Failed to render scene_generation template:', error);
+        // Fallback to empty prompt (will be handled by the model)
+        userPrompt = '';
+    }
+
+    // === 9. Execute Model Task with Template Options ===
     try {
         return await executeModelTask(
-            'generateText',
+            'scene_generation',  // Changed from 'generateText' to 'scene_generation'
             instruction,
-            prompt,
+            userPrompt,  // Rendered from template
             'gemini-3-flash-preview',
             settings?.creativity || 0.9,
             undefined,
-            2048
+            2048,
+            { templateId: 'scene_generation', templateData }  // NEW: template options
         ) || "生成失败";
     } catch (e) {
         console.error("Scene Generation Error", e);

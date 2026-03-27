@@ -23,6 +23,7 @@ export type LLMTaskType =
     | 'expandWorldLore'
     | 'polishDraft'
     | 'generateText'
+    | 'scene_generation'  // NEW: Template-based scene generation
     | 'rewriteLocalText'
     | 'analyzePlotRhythm'
     | 'summarizeChapter'

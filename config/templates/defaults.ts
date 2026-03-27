@@ -532,3 +532,276 @@ export function getVariableDisplayNames(
   });
   return result;
 }
+
+/**
+ * Render user prompt from template blocks
+ * @param templateId Template ID
+ * @param variables Variables to render
+ * @returns Rendered user prompt string
+ */
+export function renderUserPromptBlocks(
+  templateId: string,
+  variables: Record<string, any>
+): string {
+  const template = getTemplate(templateId);
+  if (!template) {
+    throw new Error(`Template not found: ${templateId}`);
+  }
+
+  // Sort blocks by order
+  const sortedBlocks = [...template.userPromptBlocks].sort((a, b) => a.order - b.order);
+
+  // Render each block
+  const renderedBlocks: string[] = [];
+
+  for (const block of sortedBlocks) {
+    // Check condition if present
+    if (block.condition) {
+      try {
+        // Simple condition evaluation
+        const shouldRender = evaluateCondition(block.condition, variables);
+        if (!shouldRender) continue;
+      } catch (error) {
+        console.warn(`Failed to evaluate condition for block ${block.id}:`, error);
+        continue;
+      }
+    }
+
+    // Render the block template
+    let renderedBlock = block.template;
+
+    // IMPORTANT: Process loops FIRST before variable replacement
+    // to avoid replacing {{this.xxx}} variables prematurely
+
+    // Process loops {{#each variable}}...{{/each}}
+    // Support nested loops by processing from innermost to outermost
+    const processLoops = (template: string, vars: Record<string, any>): string => {
+      // First, process nested loops ({{#each this.items}} inside outer loops)
+      let result = template;
+
+      // Process inner loops ({{#each this.xxx}})
+      result = result.replace(/\{\{#each\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g, (match, prop, content) => {
+        // This will be handled by the outer loop processor
+        // Just mark it for now
+        return `__NESTED_LOOP_${prop}__${content}__END_NESTED_LOOP__`;
+      });
+
+      // Process outer loops ({{#each variable}})
+      result = result.replace(/\{\{#each\s+(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g, (match, varName, content) => {
+        const items = vars[varName];
+        if (!Array.isArray(items) || items.length === 0) {
+          return '';
+        }
+
+        return items.map((item, index) => {
+          let itemContent = content;
+
+          // Handle nested loops
+          itemContent = itemContent.replace(/__NESTED_LOOP_(\w+)__([\s\S]*?)__END_NESTED_LOOP__/g, (nestedMatch, prop, nestedContent) => {
+            const nestedItems = item[prop];
+            if (!Array.isArray(nestedItems) || nestedItems.length === 0) {
+              return '';
+            }
+
+            return nestedItems.map((nestedItem, nestedIndex) => {
+              let nestedItemContent = nestedContent;
+
+              // Replace {{this}} for nested items
+              if (typeof nestedItem === 'string' || typeof nestedItem === 'number') {
+                nestedItemContent = nestedItemContent.replace(/\{\{this\}\}/g, String(nestedItem));
+              } else if (typeof nestedItem === 'object' && nestedItem !== null) {
+                // Process nested conditionals
+                nestedItemContent = nestedItemContent.replace(/\{\{#if\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (condMatch, condProp, condContent) => {
+                  const value = nestedItem[condProp];
+                  return isTruthy(value) ? condContent : '';
+                });
+
+                // Replace nested object properties
+                Object.keys(nestedItem).forEach(key => {
+                  const thisPattern = new RegExp(`\\{\\{this\\.${key}\\}\\}`, 'g');
+                  nestedItemContent = nestedItemContent.replace(thisPattern, String(nestedItem[key] ?? ''));
+                });
+              }
+
+              // Replace {{@index}} with nested index
+              nestedItemContent = nestedItemContent.replace(/\{\{@index\}\}/g, String(nestedIndex));
+
+              return nestedItemContent;
+            }).join('');
+          });
+
+          // Replace {{this}} with string representation
+          if (typeof item === 'string' || typeof item === 'number') {
+            itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
+          } else if (typeof item === 'object' && item !== null) {
+            // First, process nested conditionals within the loop
+            itemContent = itemContent.replace(/\{\{#if\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (condMatch, prop, condContent) => {
+              const value = item[prop];
+              if (isTruthy(value)) {
+                return condContent;
+              }
+              return '';
+            });
+
+            // Replace object properties - handle {{this.key}} pattern
+            Object.keys(item).forEach(key => {
+              const thisPattern = new RegExp(`\\{\\{this\\.${key}\\}\\}`, 'g');
+              itemContent = itemContent.replace(thisPattern, String(item[key] ?? ''));
+            });
+          }
+
+          // Replace {{@index}} with index
+          itemContent = itemContent.replace(/\{\{@index\}\}/g, String(index));
+
+          return itemContent;
+        }).join('');
+      });
+
+      return result;
+    };
+
+    renderedBlock = processLoops(renderedBlock, variables);
+
+    // Process conditionals {{#if variable}}...{{/if}}
+    renderedBlock = renderedBlock.replace(/\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (match, varName, content) => {
+      const value = variables[varName];
+      if (isTruthy(value)) {
+        return content;
+      }
+      return '';
+    });
+
+    // Replace simple variables {{variable}} - AFTER loops and conditionals
+    renderedBlock = renderedBlock.replace(/\{\{([^#/][^}]*)\}\}/g, (match, varPath) => {
+      const trimmedPath = varPath.trim();
+      // Skip if it's a this.xxx pattern (should have been handled in loop)
+      if (trimmedPath.startsWith('this.')) {
+        return match; // Leave it as is (shouldn't happen if loops are processed correctly)
+      }
+      const value = getNestedValue(variables, trimmedPath);
+      return value !== undefined && value !== null ? String(value) : '';
+    });
+    renderedBlock = renderedBlock.replace(/\{\{#each\s+(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g, (match, varName, content) => {
+      const items = variables[varName];
+      if (!Array.isArray(items) || items.length === 0) {
+        return '';
+      }
+
+      return items.map((item, index) => {
+        let itemContent = content;
+
+        // Replace {{this}} with string representation
+        if (typeof item === 'string' || typeof item === 'number') {
+          itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
+        } else if (typeof item === 'object' && item !== null) {
+          // First, process nested conditionals within the loop
+          itemContent = itemContent.replace(/\{\{#if\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (condMatch, prop, condContent) => {
+            const value = item[prop];
+            if (isTruthy(value)) {
+              return condContent;
+            }
+            return '';
+          });
+
+          // Replace object properties - handle {{this.key}} pattern
+          Object.keys(item).forEach(key => {
+            const thisPattern = new RegExp(`\\{\\{this\\.${key}\\}\\}`, 'g');
+            itemContent = itemContent.replace(thisPattern, String(item[key] ?? ''));
+          });
+        }
+
+        // Replace {{@index}} with index
+        itemContent = itemContent.replace(/\{\{@index\}\}/g, String(index));
+
+        return itemContent;
+      }).join('');
+    });
+
+    // Only add non-empty blocks
+    if (renderedBlock.trim()) {
+      renderedBlocks.push(renderedBlock);
+    }
+  }
+
+  return renderedBlocks.join('\n\n');
+}
+
+/**
+ * Simple condition evaluator
+ */
+function evaluateCondition(condition: string, variables: Record<string, any>): boolean {
+  // Handle simple comparisons
+  const comparisonMatch = condition.match(/^(\w+)\s*(===|!==|==|!=|>=|<=|>|<)\s*(.+)$/);
+  if (comparisonMatch) {
+    const [, varName, operator, valueStr] = comparisonMatch;
+    const varValue = variables[varName];
+    let compareValue: any = valueStr.trim();
+
+    // Parse value
+    if (compareValue === 'null') compareValue = null;
+    else if (compareValue === 'undefined') compareValue = undefined;
+    else if (compareValue === 'true') compareValue = true;
+    else if (compareValue === 'false') compareValue = false;
+    else if (!isNaN(Number(compareValue))) compareValue = Number(compareValue);
+    else if (compareValue.startsWith('"') && compareValue.endsWith('"')) {
+      compareValue = compareValue.slice(1, -1);
+    } else if (compareValue.startsWith("'") && compareValue.endsWith("'")) {
+      compareValue = compareValue.slice(1, -1);
+    }
+
+    switch (operator) {
+      case '===': return varValue === compareValue;
+      case '!==': return varValue !== compareValue;
+      case '==': return varValue == compareValue;
+      case '!=': return varValue != compareValue;
+      case '>': return varValue > compareValue;
+      case '>=': return varValue >= compareValue;
+      case '<': return varValue < compareValue;
+      case '<=': return varValue <= compareValue;
+    }
+  }
+
+  // Handle '&&' (and)
+  if (condition.includes('&&')) {
+    const parts = condition.split('&&').map(p => p.trim());
+    return parts.every(part => evaluateCondition(part, variables));
+  }
+
+  // Handle '||' (or)
+  if (condition.includes('||')) {
+    const parts = condition.split('||').map(p => p.trim());
+    return parts.some(part => evaluateCondition(part, variables));
+  }
+
+  // Handle simple truthy checks
+  const value = getNestedValue(variables, condition.trim());
+  return isTruthy(value);
+}
+
+/**
+ * Get nested value from object
+ */
+function getNestedValue(obj: Record<string, any>, path: string): any {
+  const parts = path.split('.');
+  let value: any = obj;
+
+  for (const part of parts) {
+    if (value === undefined || value === null) return undefined;
+    value = value[part];
+  }
+
+  return value;
+}
+
+/**
+ * Check if value is truthy
+ */
+function isTruthy(value: any): boolean {
+  if (value === undefined || value === null) return false;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') return value.length > 0;
+  if (typeof value === 'number') return value !== 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'object') return Object.keys(value).length > 0;
+  return Boolean(value);
+}

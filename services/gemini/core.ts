@@ -122,11 +122,21 @@ export const getInstructionWithSettings = (promptKey: string, settings?: Creativ
 };
 
 /**
+ * Template options for AI calls
+ */
+export interface TemplateOptions {
+  templateId: string;
+  templateData: Record<string, any>;
+}
+
+/**
  * Unified execution wrapper for Multi-Agent routing
- * 
+ *
  * Now supports caching based on global config:
  * - cache.enabled: Controls whether caching is active
  * - cache.ttl: Controls cache expiration time in milliseconds
+ *
+ * @param templateOptions - Optional template options for structured prompt rendering
  */
 export const executeModelTask = async (
     task: LLMTaskType,
@@ -135,7 +145,8 @@ export const executeModelTask = async (
     geminiModel: string,
     temperature: number,
     responseSchema?: any,
-    thinkingBudget?: number
+    thinkingBudget?: number,
+    templateOptions?: TemplateOptions
 ): Promise<string> => {
     // === 拦截器检查 ===
     const interceptContext: AICallContext = {
@@ -146,6 +157,9 @@ export const executeModelTask = async (
         temperature,
         responseSchema,
         thinkingBudget,
+        // 模板信息（向后兼容：当未提供时为 undefined）
+        templateId: templateOptions?.templateId,
+        templateData: templateOptions?.templateData,
     };
 
     const interceptResult = await interceptAICall(interceptContext);
