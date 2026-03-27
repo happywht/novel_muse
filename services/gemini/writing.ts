@@ -5,7 +5,7 @@ import {
 } from "../../types";
 import { useProjectStore } from "../../store/useProjectStore";
 import {
-    getAIClient, retryOperation, executeModelTask,
+    executeModelTask,
     getInstructionWithSettings, getModelName
 } from "./core";
 import { formatContext, buildTieredMemory, filterRelevantSettings } from "./helpers";
@@ -15,21 +15,19 @@ export type PacingMode = 'SLOW_BURN' | 'BALANCED' | 'CLIMAX';
 
 /**
  * Basic text generation with standard retry and instruction logic
+ * 修复: 使用 executeModelTask 以支持高级模式拦截
  */
 export const generateText = async (prompt: string, promptKey: string = 'writing_base', settings?: CreativeSettings): Promise<string> => {
-    const ai = await getAIClient();
     const instruction = getInstructionWithSettings(promptKey, settings);
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-            config: {
-                systemInstruction: instruction,
-                temperature: settings?.creativity || 0.8,
-            }
-        }));
-        return (response as GenerateContentResponse).text || "未生成任何内容。";
+        return await executeModelTask(
+            'generateText',
+            instruction,
+            prompt,
+            'gemini-3-flash-preview',
+            settings?.creativity || 0.8
+        ) || "未生成任何内容。";
     } catch (error) {
         console.error("Gemini Text Generation Error:", error);
         throw error;

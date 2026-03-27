@@ -767,9 +767,9 @@ export const deduceWorldConsequences = async (
 
 /**
  * Interactive chat with a character persona
+ * 修复: 使用 executeModelTask 以支持高级模式拦截
  */
 export const chatWithPersona = async (character: Character, message: string, history: { role: string, content: string }[]): Promise<string> => {
-    const ai = await getAIClient();
     const displayRels = getDisplayRelationships(character.structuredRelations) || character.relationships || '';
     const systemInstruction = `
     你现在必须完全扮演以下角色进行对话。不要暴露你是AI。
@@ -785,20 +785,21 @@ export const chatWithPersona = async (character: Character, message: string, his
     请用中文回复。
     `;
 
-    try {
-        const chat = (ai as any).chats.create({
-            model: await getModelName('flash'),
-            config: {
-                systemInstruction: systemInstruction,
-            },
-            history: history.map(h => ({
-                role: h.role,
-                parts: [{ text: h.content }]
-            }))
-        });
+    // 将聊天历史整合到 prompt 中
+    const historyText = history.map(h => `${h.role === 'user' ? '用户' : character.name}: ${h.content}`).join('\n');
+    const fullPrompt = historyText
+        ? `【之前的对话】\n${historyText}\n\n【用户最新消息】\n${message}`
+        : message;
 
-        const result = await chat.sendMessage({ message: message });
-        return result.text || "...";
+    try {
+        const result = await executeModelTask(
+            'chatWithPersona',
+            systemInstruction,
+            fullPrompt,
+            await getModelName('flash'),
+            0.9
+        );
+        return result || "...";
     } catch (e) {
         console.error("Persona Chat Error", e);
         throw e;
