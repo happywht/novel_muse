@@ -30,6 +30,8 @@ ${currentPlot}
 
 请使用 Markdown 格式输出。请确保报告包含一个明确的“可操作建议列表”，以便后续自动修复程序调用。`;
 
+    const templateData = { premise, currentPlot, characters, worldSettings, settings, echoes };
+
     try {
         return await executeModelTask(
             'analyzePlot',
@@ -38,7 +40,8 @@ ${currentPlot}
             'gemini-3-pro-preview',
             0.1,
             undefined,
-            2048
+            2048,
+            { templateId: 'audit_plot', templateData }
         ) || "无法分析剧情。";
     } catch (error) {
         console.error("Gemini Plot Analysis Error:", error);
@@ -95,6 +98,8 @@ export const auditChapterPlan = async (
     禁止包含任何开场白或解释文字。
     `;
 
+    const templateData = { genre, targetNode, chapters, characters, worldSettings, settings };
+
     try {
         const responseText = await executeModelTask(
             'auditChapterPlan',
@@ -103,7 +108,8 @@ export const auditChapterPlan = async (
             await getModelName('pro'),
             0.1,
             true, // Enable JSON mode
-            2048
+            2048,
+            { templateId: 'audit_chapter_plan', templateData }
         );
 
         const parsed = JSON.parse(responseText || '{}');
@@ -147,13 +153,18 @@ export const extractKnowledgeTriples = async (
 ${content.slice(0, 5000)}
     `;
 
+    const templateData = { content };
+
     try {
         const responseText = await executeModelTask(
             'extractKnowledgeTriples',
             '',
             prompt,
             await getModelName('flash'),
-            0.1
+            0.1,
+            undefined,
+            undefined,
+            { templateId: 'extract_knowledge_triples', templateData }
         );
 
         const match = responseText.match(/\[[\s\S]*\]/);
@@ -254,6 +265,17 @@ ${chapterContent}
 
 只有当存在 critical 级别问题时，passed 才为 false。禁止包含任何其他文字。`;
 
+    const templateData = {
+        genre,
+        chapterContent,
+        chapterTitle,
+        chapterNumber,
+        characters,
+        worldSettings,
+        previousChapters,
+        settings
+    };
+
     try {
         const responseText = await executeModelTask(
             'auditChapterContent',
@@ -262,7 +284,8 @@ ${chapterContent}
             await getModelName('pro'),
             0.2,
             true,
-            4096
+            4096,
+            { templateId: 'audit_chapter_content', templateData }
         );
 
         const match = responseText.match(/\{[\s\S]*\}/);

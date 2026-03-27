@@ -405,6 +405,14 @@ export const analyzeStateChanges = async (
     请输出 JSON 格式。如果没有重大事件，返回空数组 []。
     `;
 
+    // Prepare template data
+    const templateData = {
+        sceneContent,
+        lookupTable,
+        contextSection,
+        foreshadowingSection
+    };
+
     try {
         const responseText = await executeModelTask(
             'analyzeStateChanges',
@@ -412,7 +420,10 @@ export const analyzeStateChanges = async (
             prompt,
             'gemini-3-flash-preview',
             0.1,
-            responseSchema
+            responseSchema,
+            undefined,
+            undefined,
+            { templateId: 'analyze_state_changes', templateData }
         );
 
         const raw = safeParseAiJson(responseText, AiStateChangeArraySchema, 'analyzeStateChanges');
@@ -544,6 +555,13 @@ ${recentChangesSummary ? `【最近已确认的状态变化】:\n${recentChanges
 
 请输出 JSON 格式的事件及三元组列表。如果没有重大事件，返回空数组。`;
 
+    // Prepare template data
+    const templateData = {
+        lookupTable,
+        text: text.substring(0, 15000),
+        recentChangesSummary
+    };
+
     try {
         const responseText = await executeModelTask(
             'extractEchoes',
@@ -551,7 +569,10 @@ ${recentChangesSummary ? `【最近已确认的状态变化】:\n${recentChanges
             prompt,
             await getModelName('flash'),
             0.1,
-            responseSchema
+            responseSchema,
+            undefined,
+            undefined,
+            { templateId: 'extract_echoes', templateData }
         );
 
         const raw = safeParseAiJson(responseText, AiEchoArraySchema, 'extractEchoesFromText');
@@ -652,13 +673,25 @@ export const consolidateMemory = async (
     请直接输出整合后的【新档案描述】（纯文本，不要 Markdown 格式）。
     `;
 
+    // Prepare template data
+    const templateData = {
+        targetName,
+        targetType,
+        currentDescription,
+        echoText
+    };
+
     try {
         const responseText = await executeModelTask(
             'generateText',
             '',
             prompt,
             await getModelName('flash'),
-            0.3
+            0.3,
+            undefined,
+            undefined,
+            undefined,
+            { templateId: 'consolidate_memory', templateData }
         );
 
         return responseText.trim() || currentDescription;
@@ -738,6 +771,14 @@ export const deduceWorldConsequences = async (
     请严格按照 JSON 格式输出【未来预测】。
     `;
 
+    // Prepare template data
+    const templateData = {
+        genre,
+        triggers,
+        lookupTable,
+        graphContext
+    };
+
     try {
         const responseText = await executeModelTask(
             'deduceWorldConsequences',
@@ -745,7 +786,10 @@ export const deduceWorldConsequences = async (
             prompt,
             await getModelName('pro'),
             0.4,
-            responseSchema
+            responseSchema,
+            undefined,
+            undefined,
+            { templateId: 'deduce_world_consequences', templateData }
         );
 
         const raw = safeParseAiJson(responseText, AiStateChangeArraySchema, 'deduceWorldConsequences');
@@ -887,6 +931,9 @@ ${settingText}
 - 道德阵营 (alignment): 守序善良/混乱邪恶等
 - 请使用中文输出。`;
 
+    // Prepare template data
+    const templateData = { name, role, premise, genre, settingText };
+
     try {
         console.log('[generateSingleCharacter] 开始生成角色:', name);
         const responseText = await executeModelTask(
@@ -895,7 +942,10 @@ ${settingText}
             prompt,
             'gemini-3-flash-preview',
             0.6,
-            characterSchema
+            characterSchema,
+            undefined,
+            undefined,
+            { templateId: 'generate_single_character', templateData }
         );
         console.log('[generateSingleCharacter] AI原始响应:', responseText);
 

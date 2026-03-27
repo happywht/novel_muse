@@ -287,6 +287,9 @@ export const analyzePlotRhythm = async (plotOutline: string): Promise<PlotRhythm
     请输出 JSON 格式的分析结果，包含至少 5-10 个关键点。
     `;
 
+    // Prepare template data
+    const templateData = { plotOutline };
+
     try {
         const responseText = await executeModelTask(
             'analyzePlotRhythm',
@@ -294,7 +297,10 @@ export const analyzePlotRhythm = async (plotOutline: string): Promise<PlotRhythm
             prompt,
             await getModelName('flash'),
             0.2,
-            responseSchema
+            responseSchema,
+            undefined,
+            undefined,
+            { templateId: 'analyze_plot_rhythm', templateData }
         );
 
         const parsed = safeParseAiJson(responseText, SchemaPlotRhythm, 'analyzePlotRhythm');
@@ -362,6 +368,9 @@ export const splitPlotNodeIntoChapters = async (
     禁止包含任何开场白或解释文字。
     `;
 
+    // Prepare template data
+    const templateData = { genre, fullPlotSummary, targetNode, characters, worldSettings, echoes, fissionCount };
+
     try {
         const responseText = await executeModelTask(
             'splitPlotNodeIntoChapters',
@@ -369,7 +378,10 @@ export const splitPlotNodeIntoChapters = async (
             prompt,
             await getModelName('pro'),
             settings?.creativity || 0.85,
-            AiChapterOutlineArraySchema
+            AiChapterOutlineArraySchema,
+            undefined,
+            undefined,
+            { templateId: 'split_plot_node_into_chapters', templateData }
         );
 
         const raw = safeParseAiJson(responseText, AiChapterOutlineArraySchema, "Chapter Fission");
@@ -449,6 +461,19 @@ export const regenerateChapterOutline = async (
     禁止包含任何开场白或解释文字。
     `;
 
+    // Prepare template data
+    const templateData = {
+        genre,
+        fullPlotSummary,
+        targetNode,
+        chapterToRewrite,
+        previousChapter,
+        nextChapter,
+        characters,
+        worldSettings,
+        echoes
+    };
+
     try {
         const responseText = await executeModelTask(
             'regenerateChapterOutline',
@@ -456,7 +481,10 @@ export const regenerateChapterOutline = async (
             prompt,
             await getModelName('pro'),
             settings?.creativity || 0.85,
-            AiChapterOutlineArraySchema
+            AiChapterOutlineArraySchema,
+            undefined,
+            undefined,
+            { templateId: 'regenerate_chapter_outline', templateData }
         );
 
         const raw = safeParseAiJson(responseText, AiChapterOutlineArraySchema, "Chapter Regeneration");
@@ -503,13 +531,20 @@ ${plotBeat}
 请直接返回 3 条灵感，每条占一行，以数字开头（如 1. ...）。不要包含多余的废话。
     `;
 
+    // Prepare template data
+    const templateData = { context, plotBeat };
+
     try {
         const responseText = await executeModelTask(
             'generateTwistHooks',
             '',
             prompt,
             await getModelName('pro'),
-            0.9
+            0.9,
+            undefined,
+            undefined,
+            undefined,
+            { templateId: 'generate_twist_hooks', templateData }
         );
 
         return responseText.split('\n').filter(line => /^\d\./.test(line.trim())).map(line => line.replace(/^\d\.\s*/, '').trim());

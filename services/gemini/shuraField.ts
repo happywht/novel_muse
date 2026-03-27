@@ -124,6 +124,15 @@ ${plotContext}
     `;
 
     try {
+        const templateData = {
+            selectedCharacters,
+            plotContext,
+            genre,
+            allCharacters,
+            worldSettings,
+            locationId,
+            intensityLevel
+        };
         const responseText = await executeModelTask(
             'generateConflictScenario',
             instruction,
@@ -131,7 +140,9 @@ ${plotContext}
             'gemini-3-pro-preview',
             settings?.creativity || 0.8,
             AiPlotNodeArraySchema,
-            4096
+            4096,
+            undefined,  // jsonMode
+            { templateId: 'shura_field_conflict', templateData }
         );
 
         // AI返回的是数组，但我们只需要第一个元素
