@@ -13,7 +13,13 @@ export const STORAGE_KEYS = {
     GLM_API_KEY: 'muse_glm_api_key', // Future proofing
     MODEL_OVERRIDE: 'muse_model_override',
     SETTINGS: 'muse_settings',
-    GLOBAL_CONFIG: 'muse_global_config', // 新增：全局配置
+    GLOBAL_CONFIG: 'muse_global_config', // 全局配置
+
+    // 高级版专属存储键
+    CUSTOM_PROMPTS: 'muse_custom_prompts',           // 自定义prompt库
+    PROMPT_VERSIONS: 'muse_prompt_versions',         // prompt版本历史
+    CALL_HISTORY: 'muse_call_history',               // AI调用确认历史
+    CALL_CONFIRMATION_CACHE: 'muse_call_confirmation_cache', // 调用确认缓存
 };
 
 /**

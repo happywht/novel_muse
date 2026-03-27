@@ -20,6 +20,7 @@ import { storageService, STORAGE_KEYS } from './services/storageService';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useFeature } from './hooks/useFeature';
 import { ConfirmDialogProvider } from './hooks/useConfirm';
+import { PromptConfirmDialog } from './components/common/PromptConfirmDialog';
 
 const MUSE_FILE_VERSION = '1.0';
 
@@ -286,6 +287,9 @@ const App: React.FC = () => {
 
       {/* Prompt Tuner Modal */}
       {showPromptTuner && <PromptTuner onClose={() => setShowPromptTuner(false)} />}
+
+      {/* AI Call Confirmation Dialog (Global) */}
+      <PromptConfirmDialog />
     </div>
     </ConfirmDialogProvider>
     </ErrorBoundary>

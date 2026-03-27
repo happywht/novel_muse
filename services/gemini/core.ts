@@ -7,6 +7,7 @@ import { getProviderForTask, LLMTaskType, Provider } from "../llmRouter";
 import { storageService, STORAGE_KEYS } from "../storageService";
 import { DEFAULT_CONFIG } from "../../config/global";
 import { cacheManager, generateCacheKey } from "../cacheManager";
+import { interceptAICall, AICallContext } from "../aiCallInterceptor";
 
 const STORAGE_KEY_GLOBAL_CONFIG = STORAGE_KEYS.GLOBAL_CONFIG;
 
@@ -136,6 +137,29 @@ export const executeModelTask = async (
     responseSchema?: any,
     thinkingBudget?: number
 ): Promise<string> => {
+    // === 拦截器检查 ===
+    const interceptContext: AICallContext = {
+        taskType: task,
+        systemInstruction,
+        userPrompt: prompt,
+        model: geminiModel,
+        temperature,
+        responseSchema,
+        thinkingBudget,
+    };
+
+    const interceptResult = await interceptAICall(interceptContext);
+
+    if (!interceptResult.approved) {
+        throw new Error('AI调用被用户取消');
+    }
+
+    // 使用可能被修改的值
+    systemInstruction = interceptResult.modifiedSystemInstruction || systemInstruction;
+    prompt = interceptResult.modifiedUserPrompt || prompt;
+    temperature = interceptResult.modifiedTemperature ?? temperature;
+    // === 拦截器结束 ===
+
     // Generate cache key from task parameters
     const cacheKey = generateCacheKey(
         task,

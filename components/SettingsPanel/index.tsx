@@ -4,22 +4,24 @@
  */
 
 import React, { useState } from 'react';
-import { Settings, X, Cpu, Database, Sliders, Info } from 'lucide-react';
+import { Settings, X, Cpu, Database, Sliders, Info, Sparkles } from 'lucide-react';
 import { AIModelTab } from './AIModelTab';
 import { StorageTab } from './StorageTab';
 import { AdvancedTab } from './AdvancedTab';
+import { AdvancedModeTab } from './AdvancedModeTab';
 import { AboutTab } from './AboutTab';
 
 interface SettingsPanelProps {
     onClose: () => void;
 }
 
-type TabId = 'ai' | 'storage' | 'advanced' | 'about';
+type TabId = 'ai' | 'storage' | 'advanced' | 'mode' | 'about';
 
 const TABS = [
     { id: 'ai' as TabId, label: 'AI模型', icon: Cpu },
     { id: 'storage' as TabId, label: '存储同步', icon: Database },
     { id: 'advanced' as TabId, label: '高级', icon: Sliders },
+    { id: 'mode' as TabId, label: '模式', icon: Sparkles },
     { id: 'about' as TabId, label: '关于', icon: Info },
 ];
 
@@ -40,6 +42,8 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
                 return <StorageTab showToast={showToast} />;
             case 'advanced':
                 return <AdvancedTab showToast={showToast} />;
+            case 'mode':
+                return <AdvancedModeTab />;
             case 'about':
                 return <AboutTab />;
             default:

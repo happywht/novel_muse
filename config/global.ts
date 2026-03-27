@@ -4,6 +4,7 @@
  */
 
 import { STORAGE_KEYS } from '../services/storageService';
+import { UserTier } from './featureFlags';
 
 // LLM任务类型枚举 - 用于任务模型覆盖配置
 export type LLMTaskType =
@@ -37,6 +38,9 @@ export enum Provider {
 }
 
 export interface GlobalConfig {
+    // 0. 用户等级（新增）
+    tier: UserTier;
+
     // 1. AI模型配置
     ai: {
         providers: {
@@ -60,7 +64,7 @@ export interface GlobalConfig {
             topK: number;
         };
     };
-    
+
     // 2. 存储配置
     storage: {
         backend: 'indexeddb' | 'mysql';
@@ -70,7 +74,7 @@ export interface GlobalConfig {
             interval: number;
         };
     };
-    
+
     // 4. 知识图谱配置
     graph: {
         neo4j: {
@@ -85,7 +89,7 @@ export interface GlobalConfig {
             retentionDays: number;
         };
     };
-    
+
     // 5. 性能配置
     performance: {
         virtualScrollThreshold: number;
@@ -99,7 +103,7 @@ export interface GlobalConfig {
             ttl: number;
         };
     };
-    
+
     // 6. 功能开关
     features: {
         enableEchoSystem: boolean;
@@ -110,7 +114,7 @@ export interface GlobalConfig {
         debugMode: boolean;
         logLevel: 'none' | 'error' | 'warn' | 'info' | 'debug';
     };
-    
+
     // 7. 外观配置
     appearance: {
         theme: 'dark' | 'light' | 'auto';
@@ -119,7 +123,7 @@ export interface GlobalConfig {
         editorFont: string;
         sidebarWidth: number;
     };
-    
+
     // 8. 快捷键配置
     shortcuts: {
         save: string;
@@ -127,10 +131,32 @@ export interface GlobalConfig {
         sync: string;
         refreshGraph: string;
     };
+
+    // 9. 高级版专属功能配置（新增）
+    advancedFeatures: {
+        promptEditor: {
+            enabled: boolean;
+            autoSave: boolean;
+            showDiffOnSave: boolean;
+        };
+        callConfirmation: {
+            enabled: boolean;
+            showCostEstimate: boolean;
+            allowEditBeforeCall: boolean;
+            timeout: number; // 确认超时时间（毫秒）
+        };
+        callHistory: {
+            enabled: boolean;
+            retentionDays: number;
+            maxRecords: number;
+        };
+    };
 }
 
 // 默认值
 export const DEFAULT_CONFIG: GlobalConfig = {
+    tier: 'FREE',
+
     ai: {
         providers: {
             gemini: {
@@ -232,6 +258,25 @@ export const DEFAULT_CONFIG: GlobalConfig = {
         generate: 'Ctrl+G',
         sync: 'Ctrl+Shift+S',
         refreshGraph: 'Ctrl+R',
+    },
+
+    advancedFeatures: {
+        promptEditor: {
+            enabled: false,
+            autoSave: true,
+            showDiffOnSave: true,
+        },
+        callConfirmation: {
+            enabled: false,
+            showCostEstimate: true,
+            allowEditBeforeCall: true,
+            timeout: 60000,
+        },
+        callHistory: {
+            enabled: false,
+            retentionDays: 30,
+            maxRecords: 1000,
+        },
     },
 };
 

@@ -1,6 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ProjectState, CreativeSettings } from '../types';
 import { BookOpen, Sparkles, Sliders } from 'lucide-react';
+import { GENRE_RULES } from '../config/genreRules';
+
+interface StyleProfile {
+    avgSentenceLength: number;
+    sentenceLengthStdDev: number;
+    avgParagraphLength: number;
+    vocabularyDiversity: number;
+    topPatterns: string[];
+    rhetoricalFeatures: string[];
+}
 
 interface CreativeCompassViewProps {
     project: ProjectState;
@@ -8,6 +18,8 @@ interface CreativeCompassViewProps {
 }
 
 export const CreativeCompassView: React.FC<CreativeCompassViewProps> = ({ project, updateProject }) => {
+    const [styleProfile, setStyleProfile] = useState<StyleProfile | null>(null);
+
     const handleUpdateSettings = (key: keyof CreativeSettings, value: string | number | string[]) => {
         updateProject({
             creativeSettings: {
@@ -226,3 +238,8 @@ export const CreativeCompassView: React.FC<CreativeCompassViewProps> = ({ projec
                             </div>
                         )}
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+};
