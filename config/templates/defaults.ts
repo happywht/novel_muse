@@ -1345,6 +1345,503 @@ Respond as {{characterName}} would. Stay true to their personality, knowledge, a
 };
 
 // ============================================================
+// Expand Scene Template
+// ============================================================
+
+/**
+ * Expand Scene Template
+ *
+ * Used for expanding scene from a premise and plot outline.
+ */
+const EXPAND_SCENE_TEMPLATE: PromptTemplate = {
+  id: 'expand_scene',
+  name: 'Expand Scene',
+  description: 'Expand scene from a premise and plot outline with context',
+  category: 'generation',
+  systemInstruction: `You are a creative writing assistant specializing in scene expansion. Your task is to:
+
+1. Transform brief plot outlines into vivid, immersive scenes
+2. Incorporate character details and world settings naturally
+3. Maintain narrative flow and pacing
+4. Balance dialogue, action, and description
+5. Create engaging prose that brings the story to life
+
+Write compelling scenes that honor the source material while adding depth and texture.`,
+
+  userPromptBlocks: [
+    // Block 1: Story Context
+    {
+      id: 'story_context',
+      title: 'Story Context',
+      order: 1,
+      template: `[Novel Genre]
+{{genre}}
+
+[Core Premise]
+{{premise}}`,
+    },
+
+    // Block 2: Character and World Context
+    {
+      id: 'context_info',
+      title: 'Character and World Context',
+      order: 2,
+      template: `{{contextStr}}`,
+      condition: 'contextStr != null && contextStr !== ""',
+    },
+
+    // Block 3: Plot Outline
+    {
+      id: 'plot_outline',
+      title: 'Plot Outline',
+      order: 3,
+      template: `[Current Plot Outline Context]
+{{plotOutline}}`,
+    },
+
+    // Block 4: Writing Task
+    {
+      id: 'writing_task',
+      title: 'Writing Task',
+      order: 4,
+      template: `[Writing Task]
+{{userPrompt}}
+
+[Requirements]
+- Expand the above task into a complete scene
+- Incorporate the provided context naturally
+- Start directly with the prose, no introductory remarks
+- Maintain consistency with established characters and settings
+- Create vivid, engaging prose`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'genre',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'The novel genre',
+      display: 'Novel Genre',
+    },
+    {
+      name: 'premise',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The core premise/logline of the story',
+      display: 'Core Premise',
+    },
+    {
+      name: 'plotOutline',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The current plot outline context',
+      display: 'Plot Outline',
+    },
+    {
+      name: 'userPrompt',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The specific writing task',
+      display: 'Writing Task',
+    },
+    // === IMPORTANT VARIABLES ===
+    {
+      name: 'contextStr',
+      type: 'string',
+      tier: 'important',
+      source: 'computed',
+      required: false,
+      description: 'Formatted context string with characters and world settings',
+      display: 'Context',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-27',
+    tags: ['scene', 'expansion', 'generation', 'creative-writing'],
+  },
+};
+
+// ============================================================
+// Rewrite Local Template
+// ============================================================
+
+/**
+ * Rewrite Local Template
+ *
+ * Used for localized text rewriting with context awareness.
+ */
+const REWRITE_LOCAL_TEMPLATE: PromptTemplate = {
+  id: 'rewrite_local',
+  name: 'Rewrite Local Text',
+  description: 'Rewrite selected text with context awareness',
+  category: 'refinement',
+  systemInstruction: `You are an expert text revision assistant for novels. Your task is to:
+
+1. Rewrite text according to user instructions precisely
+2. Maintain seamless connection with surrounding context
+3. Preserve the author's voice and style
+4. Output ONLY the rewritten text - no explanations or formatting
+5. Ensure the result can be directly inserted into the original text
+
+You must output clean, ready-to-insert text with no markdown formatting or meta-commentary.`,
+
+  userPromptBlocks: [
+    // Block 1: Genre Context
+    {
+      id: 'genre_context',
+      title: 'Genre Context',
+      order: 1,
+      template: `You are a professional novel editing assistant (Genre: {{genre}}).`,
+    },
+
+    // Block 2: User Instructions
+    {
+      id: 'user_instructions',
+      title: 'User Instructions',
+      order: 2,
+      template: `[User Instructions]
+{{instruction}}`,
+    },
+
+    // Block 3: Context
+    {
+      id: 'surrounding_context',
+      title: 'Surrounding Context',
+      order: 3,
+      template: `[Surrounding Context]
+To ensure your rewrite maintains coherence, here is the context before and after the selected text (for reference only - DO NOT repeat this in your output):
+[Before]: "...{{contextBefore}}"
+[After]: "{{contextAfter}}..."`,
+    },
+
+    // Block 4: Text to Rewrite
+    {
+      id: 'text_to_rewrite',
+      title: 'Text to Rewrite',
+      order: 4,
+      template: `[Original Text to Rewrite]
+"{{selectedText}}"
+
+[Requirements]
+1. Follow the user's instructions EXACTLY - rewrite/polish/expand/condense ONLY the "Original Text to Rewrite"
+2. The result must seamlessly connect with [Before] and [After] context
+3. CRITICAL: Output ONLY the rewritten plain text! No markdown formatting (no \`\`\` or **), no introductory remarks like "Here is the rewritten text:" or "Below is...". Your output will be directly inserted into the original text.`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'genre',
+      type: 'string',
+      tier: 'critical',
+      source: 'project_state',
+      required: true,
+      description: 'The novel genre',
+      display: 'Novel Genre',
+    },
+    {
+      name: 'selectedText',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The text to rewrite',
+      display: 'Selected Text',
+    },
+    {
+      name: 'instruction',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The rewrite instructions',
+      display: 'Rewrite Instructions',
+    },
+    // === IMPORTANT VARIABLES ===
+    {
+      name: 'contextBefore',
+      type: 'string',
+      tier: 'important',
+      source: 'user_input',
+      required: false,
+      description: 'Text context before the selection',
+      display: 'Context Before',
+    },
+    {
+      name: 'contextAfter',
+      type: 'string',
+      tier: 'important',
+      source: 'user_input',
+      required: false,
+      description: 'Text context after the selection',
+      display: 'Context After',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-27',
+    tags: ['rewrite', 'local', 'refinement', 'editing', 'creative-writing'],
+  },
+};
+
+// ============================================================
+// Summarize Chapter Template
+// ============================================================
+
+/**
+ * Summarize Chapter Template
+ *
+ * Used for generating concise chapter summaries.
+ */
+const SUMMARIZE_CHAPTER_TEMPLATE: PromptTemplate = {
+  id: 'summarize_chapter',
+  name: 'Summarize Chapter',
+  description: 'Generate a concise summary of a chapter',
+  category: 'utility',
+  systemInstruction: `You are a professional literary editor. Your task is to create extremely concise chapter summaries (100-200 characters) that:
+
+1. Extract all key plot turning points
+2. Record important emotional/relationship state changes between characters
+3. Note any new foreshadowing or core items introduced
+4. Use objective, efficient language
+5. Serve as "medium-term memory" reference for future writing
+
+Create summaries that capture the essence without unnecessary detail.`,
+
+  userPromptBlocks: [
+    // Block 1: Chapter Info
+    {
+      id: 'chapter_info',
+      title: 'Chapter Information',
+      order: 1,
+      template: `[Chapter Title]
+{{title}}
+
+[Chapter Content]
+{{content}}`,
+    },
+
+    // Block 2: Summary Requirements
+    {
+      id: 'summary_requirements',
+      title: 'Summary Requirements',
+      order: 2,
+      template: `[Summary Requirements]
+1. Extract all key plot turning points (Plot Points)
+2. Record important emotional/relationship state changes between characters
+3. Note any new foreshadowing or core items
+4. Use objective, efficient language as "medium-term memory" reference for future writing
+
+Output a concise summary (100-200 characters).`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'title',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The chapter title',
+      display: 'Chapter Title',
+    },
+    {
+      name: 'content',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The chapter content to summarize',
+      display: 'Chapter Content',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-27',
+    tags: ['summary', 'chapter', 'utility', 'editing'],
+  },
+};
+
+// ============================================================
+// Balance Suggestions Template
+// ============================================================
+
+/**
+ * Balance Suggestions Template
+ *
+ * Used for generating AI-powered chapter balance analysis and suggestions.
+ */
+const BALANCE_SUGGESTIONS_TEMPLATE: PromptTemplate = {
+  id: 'balance_suggestions',
+  name: 'AI Balance Suggestions',
+  description: 'Analyze chapter structure and provide optimization suggestions',
+  category: 'utility',
+  systemInstruction: `You are a senior novel editor and structure consultant specializing in chapter structure balance analysis. Your task is to:
+
+1. Analyze chapter structure from multiple dimensions
+2. Identify potential issues and imbalances
+3. Provide actionable, prioritized optimization suggestions
+4. Consider narrative pacing, character distribution, and structural coherence
+5. Give concrete, practical advice rather than vague generalities
+
+Provide professional analysis that helps authors improve their work.`,
+
+  userPromptBlocks: [
+    // Block 1: Chapter Data
+    {
+      id: 'chapter_data',
+      title: 'Chapter Data',
+      order: 1,
+      template: `[Chapter Data]
+{{chapterInfo}}`,
+    },
+
+    // Block 2: Character and Plot Context
+    {
+      id: 'context_info',
+      title: 'Context Information',
+      order: 2,
+      template: `[Character List]
+{{characterNames}}
+
+[Plot Node Count]
+{{plotBeatCount}}`,
+    },
+
+    // Block 3: Analysis Requirements
+    {
+      id: 'analysis_requirements',
+      title: 'Analysis Requirements',
+      order: 3,
+      template: `[Analysis Requirements]
+Please provide professional suggestions from the following dimensions:
+
+1. **Word Count Balance**: Which chapters are too long or too short? How should they be adjusted?
+
+2. **Pacing Control**: Is the narrative pacing reasonable? Are there places that need more conflict or relief?
+
+3. **Character Appearance**: Is the appearance frequency of main characters balanced? Which characters appear too much or too little?
+
+4. **POV Perspective**: Is the POV character distribution reasonable? Does the POV rotation pattern need adjustment?
+
+5. **Structural Optimization**: Based on plot nodes, suggestions for chapter splitting or merging.
+
+[Output Format]
+Please output analysis in a clear structure, including:
+- Overall rating (0-100 points)
+- Main issues (if any)
+- Specific optimization suggestions (sorted by priority)
+- Expected improvement effects
+
+Output the analysis results directly, without any additional explanations or notes.`,
+    },
+  ],
+
+  variables: [
+    // === CRITICAL VARIABLES ===
+    {
+      name: 'chapterInfo',
+      type: 'string',
+      tier: 'critical',
+      source: 'computed',
+      required: true,
+      description: 'JSON stringified chapter information',
+      display: 'Chapter Info',
+    },
+    {
+      name: 'characterNames',
+      type: 'string',
+      tier: 'critical',
+      source: 'computed',
+      required: true,
+      description: 'Comma-separated list of character names',
+      display: 'Characters',
+    },
+    {
+      name: 'plotBeatCount',
+      type: 'number',
+      tier: 'critical',
+      source: 'computed',
+      required: true,
+      description: 'Number of plot nodes',
+      display: 'Plot Beat Count',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-27',
+    tags: ['balance', 'analysis', 'suggestions', 'structure', 'utility'],
+  },
+};
+
+// ============================================================
+// Writing Base Template
+// ============================================================
+
+/**
+ * Writing Base Template
+ *
+ * Generic template for basic text generation tasks.
+ */
+const WRITING_BASE_TEMPLATE: PromptTemplate = {
+  id: 'writing_base',
+  name: 'Writing Base',
+  description: 'Generic template for basic text generation',
+  category: 'generation',
+  systemInstruction: `You are a creative writing assistant. Generate high-quality content based on the user's prompt. Be creative, engaging, and maintain consistency with any provided context.`,
+
+  userPromptBlocks: [
+    {
+      id: 'user_prompt',
+      title: 'User Prompt',
+      order: 1,
+      template: `{{prompt}}`,
+    },
+  ],
+
+  variables: [
+    {
+      name: 'prompt',
+      type: 'string',
+      tier: 'critical',
+      source: 'user_input',
+      required: true,
+      description: 'The user prompt for text generation',
+      display: 'Prompt',
+    },
+  ],
+
+  metadata: {
+    version: '1.0.0',
+    author: 'Muse System',
+    lastUpdated: '2026-03-27',
+    tags: ['writing', 'base', 'generation', 'generic'],
+  },
+};
+
+// ============================================================
 // Export Default Templates
 // ============================================================
 
@@ -1360,6 +1857,12 @@ export const DEFAULT_TEMPLATES: Record<string, PromptTemplate> = {
   rewrite_plot: REWRITE_PLOT_TEMPLATE,
   polish_draft: POLISH_DRAFT_TEMPLATE,
   chat_with_persona: CHAT_WITH_PERSONA_TEMPLATE,
+  // New templates for writing.ts integration
+  expand_scene: EXPAND_SCENE_TEMPLATE,
+  rewrite_local: REWRITE_LOCAL_TEMPLATE,
+  summarize_chapter: SUMMARIZE_CHAPTER_TEMPLATE,
+  balance_suggestions: BALANCE_SUGGESTIONS_TEMPLATE,
+  writing_base: WRITING_BASE_TEMPLATE,
 };
 
 // ============================================================

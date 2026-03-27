@@ -17,17 +17,37 @@ export type PacingMode = 'SLOW_BURN' | 'BALANCED' | 'CLIMAX';
 /**
  * Basic text generation with standard retry and instruction logic
  * 修复: 使用 executeModelTask 以支持高级模式拦截
+ *
+ * MIGRATED TO TEMPLATE SYSTEM:
+ * - Uses template-based prompt rendering
+ * - Template ID: 'writing_base' (or custom promptKey)
+ * - Backward compatible: accepts custom promptKey
  */
 export const generateText = async (prompt: string, promptKey: string = 'writing_base', settings?: CreativeSettings): Promise<string> => {
     const instruction = getInstructionWithSettings(promptKey, settings);
+
+    // Prepare template data
+    const templateData = { prompt };
+
+    // Render user prompt from template (with fallback)
+    let userPrompt = prompt;
+    try {
+        userPrompt = renderUserPromptBlocks('writing_base', templateData);
+    } catch (error) {
+        // Fallback to raw prompt if template rendering fails
+        console.warn('Failed to render writing_base template, using raw prompt:', error);
+    }
 
     try {
         return await executeModelTask(
             'generateText',
             instruction,
-            prompt,
+            userPrompt,
             'gemini-3-flash-preview',
-            settings?.creativity || 0.8
+            settings?.creativity || 0.8,
+            undefined,
+            undefined,
+            { templateId: 'writing_base', templateData }
         ) || "未生成任何内容。";
     } catch (error) {
         console.error("Gemini Text Generation Error:", error);
@@ -201,6 +221,11 @@ export const generateSceneFromIngredients = async (
 
 /**
  * Expand scene from a premise and plot outline
+ *
+ * MIGRATED TO TEMPLATE SYSTEM:
+ * - Uses template-based prompt rendering instead of manual string concatenation
+ * - Template ID: 'expand_scene'
+ * - Backward compatible: still builds context locally
  */
 export const expandScene = async (
     premise: string,
@@ -212,30 +237,50 @@ export const expandScene = async (
     settings?: CreativeSettings,
     echoes: Echo[] = []
 ): Promise<string> => {
-    const instruction = getInstructionWithSettings('scene_expansion', settings);
+    const instruction = getInstructionWithSettings('expand_scene', settings);
     const contextStr = formatContext(characters, worldSettings, echoes);
 
-    const prompt = `
+    // Prepare template data
+    const templateData = {
+        genre,
+        premise,
+        plotOutline,
+        userPrompt,
+        contextStr,
+    };
+
+    // Render user prompt from template
+    let userPromptRendered = '';
+    try {
+        userPromptRendered = renderUserPromptBlocks('expand_scene', templateData);
+    } catch (error) {
+        console.error('Failed to render expand_scene template:', error);
+        // Fallback to legacy prompt
+        userPromptRendered = `
   小说类型: ${genre}
   核心梗概: ${premise}
-  
+
   ${contextStr}
-  
+
   当前剧情大纲上下文:
   ${plotOutline}
-  
+
   写作任务:
   ${userPrompt}
-  
+
   请直接开始撰写正文内容，无需过多的开场白。`;
+    }
 
     try {
         return await executeModelTask(
             'expandScene',
             instruction,
-            prompt,
+            userPromptRendered,
             'gemini-3-flash-preview',
-            settings?.creativity || 0.9
+            settings?.creativity || 0.9,
+            undefined,
+            undefined,
+            { templateId: 'expand_scene', templateData }
         ) || "生成失败。";
     } catch (error) {
         console.error("Gemini Scene Expansion Error:", error);
@@ -310,6 +355,11 @@ export const polishDraft = async (
 
 /**
  * Localized Text Rewrite
+ *
+ * MIGRATED TO TEMPLATE SYSTEM:
+ * - Uses template-based prompt rendering
+ * - Template ID: 'rewrite_local'
+ * - Backward compatible: same function signature
  */
 export const rewriteLocalText = async (
     genre: string,
@@ -319,34 +369,55 @@ export const rewriteLocalText = async (
     instruction: string,
     settings?: CreativeSettings
 ): Promise<string> => {
-    const sysInstruction = getInstructionWithSettings('scene_generation', settings);
-    const prompt = `
-    你现在是一个极其专业的小说润色助手（类型：${genre}）。
+    const sysInstruction = getInstructionWithSettings('rewrite_local', settings);
 
-    【用户指令】
-    ${instruction}
+    // Prepare template data
+    const templateData = {
+        genre,
+        selectedText,
+        contextBefore,
+        contextAfter,
+        instruction,
+    };
 
-    【上下文环境】
-    为了保证你重写的连贯性，这里提供选中文字的前后文（仅作参考，绝对不要在你的输出中重复这段前后文！）：
-    [前文]: "...${contextBefore}"
-    [后文]: "${contextAfter}..."
+    // Render user prompt from template
+    let userPrompt = '';
+    try {
+        userPrompt = renderUserPromptBlocks('rewrite_local', templateData);
+    } catch (error) {
+        console.error('Failed to render rewrite_local template:', error);
+        // Fallback to manual prompt
+        userPrompt = `
+你现在是一个极其专业的小说润色助手（类型：${genre}）。
 
-    【需要你重写的原文】
-    "${selectedText}"
+【用户指令】
+${instruction}
 
-    【任务要求】
-    1. 请严格按照用户的指令，**仅**对"需要你重写的原文"进行重造/润色/扩写/精简。
-    2. 生成结果必须能在语义和语境上与 [前文] 和 [后文] 完美、无缝地拼接在一起。
-    3. **极其重要**：直接输出重写后的纯文本素材！绝对不要包含任何 Markdown 格式包裹（如 \`\`\` 或 ** 等），绝对不要自作主张添加"这段话已经重写完毕："或"以下是..."等废话引导语。你的输出将被程序直接插入原文替换原有片段。
-    `;
+【上下文环境】
+为了保证你重写的连贯性，这里提供选中文字的前后文(仅作参考,绝对不要在你的输出中重复这段前后文!):
+[前文]: "...${contextBefore}"
+[后文]: "${contextAfter}..."
+
+【需要你重写的原文】
+"${selectedText}"
+
+【任务要求】
+1. 请严格按照用户的指令,**仅**对"需要你重写的原文"进行重造/润色/扩写/精简。
+2. 生成结果必须能在语义和语境上与 [前文] 和 [后文] 完美、无缝地拼接在一起。
+3. **极其重要**:直接输出重写后的纯文本素材!绝对不要包含任何 Markdown 格式包裹(如 \`\`\` 或 ** 等),绝对不要自作主张添加"这段话已经重写完毕:"或"以下是..."等废话引导语。你的输出将被程序直接插入原文替换原有片段。
+        `;
+    }
 
     try {
         const responseText = await executeModelTask(
             'rewriteLocalText',
             sysInstruction,
-            prompt,
+            userPrompt,
             await getModelName('flash'),
-            settings?.creativity || 0.7
+            settings?.creativity || 0.7,
+            undefined,
+            undefined,
+            { templateId: 'rewrite_local', templateData }
         );
 
         let newText = responseText.trim();
@@ -360,13 +431,31 @@ export const rewriteLocalText = async (
 
 /**
  * Chapter Summarization
+ *
+ * MIGRATED TO TEMPLATE SYSTEM:
+ * - Uses template-based prompt rendering
+ * - Template ID: 'summarize_chapter'
+ * - Backward compatible: same function signature
  */
 export const summarizeChapter = async (
     title: string,
     content: string,
     settings?: CreativeSettings
 ): Promise<string> => {
-    const prompt = `
+    // Prepare template data (limit content to 10000 chars)
+    const templateData = {
+        title,
+        content: content.slice(0, 10000),
+    };
+
+    // Render user prompt from template
+    let userPrompt = '';
+    try {
+        userPrompt = renderUserPromptBlocks('summarize_chapter', templateData);
+    } catch (error) {
+        console.error('Failed to render summarize_chapter template:', error);
+        // Fallback to manual prompt
+        userPrompt = `
 你是一位专业的文学编辑。请对以下小说章节进行【极度精简】的摘要（100-200字）。
 要求：
 1. 提取所有关键的剧情转折点（Plot Points）。
@@ -377,15 +466,19 @@ export const summarizeChapter = async (
 章节标题: ${title}
 正文内容:
 ${content.slice(0, 10000)}
-    `;
+        `;
+    }
 
     try {
         const responseText = await executeModelTask(
             'summarizeChapter',
             '',
-            prompt,
+            userPrompt,
             await getModelName('flash'),
-            0.3
+            0.3,
+            undefined,
+            undefined,
+            { templateId: 'summarize_chapter', templateData }
         );
         return responseText.trim();
     } catch (error) {
