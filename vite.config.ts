@@ -185,11 +185,10 @@ export default defineConfig(({ mode }) => {
         'react-dom',
         'zustand',
         'localforage',
+        // p-retry 是 CommonJS，需要预构建以支持 ESM named exports
+        'p-retry',
       ],
-      exclude: [
-        // 排除大型依赖，让它们按需加载
-        '@google/genai',
-      ]
+      // 不再排除 @google/genai，让其依赖 p-retry 被正确预构建
     }
   };
 });
