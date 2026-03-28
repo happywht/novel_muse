@@ -23,4 +23,5 @@ server/.env
 *.njsproj
 *.sln
 *.sw?
-inkos/
+# inkos CLI tool (external project)
+/inkos/
