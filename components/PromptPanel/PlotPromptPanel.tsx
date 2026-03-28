@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo, useCallback } from 'react';
-import { PromptPanel, PromptItem, MODULE_PROMPT_MAP } from './PromptPanel';
+import { PromptPanel, PromptItem, MODULE_PROMPT_MAP } from './index';
 import { useProjectStore } from '../../store/useProjectStore';
 import { PROMPT_REGISTRY_LITERARY, PROMPT_REGISTRY_WEB_NOVEL } from '../../config/prompts';
 

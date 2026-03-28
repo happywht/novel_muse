@@ -30,7 +30,9 @@ export type LLMTaskType =
     | 'inspectLogicConflicts'
     | 'generateTwistHooks'
     | 'generateConflictScenario'
-    | 'generateAIBalanceSuggestions';
+    | 'generateAIBalanceSuggestions'
+    | 'auditChapterContent'     // NEW: Chapter content auditing
+    | 'chatWithPersona';        // NEW: Persona-based chat
 
 // A strict rule-based router based on the MAS report
 export const getProviderForTask = (task: LLMTaskType): Provider => {
@@ -40,6 +42,7 @@ export const getProviderForTask = (task: LLMTaskType): Provider => {
         case 'analyzeStateChanges':             // 状态提取 (长上下文)
         case 'deduceWorldConsequences':         // 全局推演
         case 'auditChapterPlan':                // 严谨逻辑审计
+        case 'auditChapterContent':             // 章节内容审计
         case 'extractEchoes':                   // 设定维护/实体追踪
             return Provider.GEMINI;
 
@@ -62,6 +65,7 @@ export const getProviderForTask = (task: LLMTaskType): Provider => {
         case 'extractKnowledgeTriples':         // 知识三元组提取 (Direction One)
         case 'inspectLogicConflicts':           // 逻辑冲突审计 (Direction One)
         case 'generateTwistHooks':              // 反转提示词生成 (Direction Three)
+        case 'chatWithPersona':                 // 角色对话 (Flash可胜任)
             return Provider.GEMINI;
 
         default:

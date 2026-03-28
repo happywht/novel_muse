@@ -7,6 +7,8 @@ export interface FeatureFlags {
   promptConfirmBeforeAI: boolean;  // AI调用前确认
   promptEditor: boolean;            // Prompt编辑器
   callHistory: boolean;             // 调用历史
+  promptEditing: boolean;           // Prompt编辑功能
+  customPromptLibrary: boolean;     // 自定义Prompt库
 }
 
 // 默认配置
@@ -15,11 +17,15 @@ export const DEFAULT_FEATURE_FLAGS: Record<UserTier, FeatureFlags> = {
     promptConfirmBeforeAI: false,
     promptEditor: false,
     callHistory: false,
+    promptEditing: false,
+    customPromptLibrary: false,
   },
   PREMIUM: {
     promptConfirmBeforeAI: true,
     promptEditor: true,
     callHistory: true,
+    promptEditing: true,
+    customPromptLibrary: true,
   },
 };
 
@@ -61,6 +67,7 @@ export function getCurrentFeatureFlags(): FeatureFlags {
 export class FeatureFlagService {
   private static instance: FeatureFlagService;
   private userTier: UserTier = 'FREE';
+  private initialized: boolean = false;
 
   private constructor() {
     this.userTier = getUserTier();
@@ -71,6 +78,18 @@ export class FeatureFlagService {
       FeatureFlagService.instance = new FeatureFlagService();
     }
     return FeatureFlagService.instance;
+  }
+
+  /**
+   * 初始化服务
+   */
+  async initialize(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+    // 可以在这里添加从远程加载配置的逻辑
+    this.userTier = getUserTier();
+    this.initialized = true;
   }
 
   isEnabled(feature: keyof FeatureFlags): boolean {
@@ -88,5 +107,15 @@ export class FeatureFlagService {
 
   getAllFlags(): FeatureFlags {
     return DEFAULT_FEATURE_FLAGS[this.userTier];
+  }
+
+  /**
+   * 检查是否为高级用户，如果不是则抛出错误
+   * @param featureName 功能名称，用于错误提示
+   */
+  requirePremium(featureName: string): void {
+    if (this.userTier !== 'PREMIUM') {
+      throw new Error(`"${featureName}" 功能仅限高级版用户使用`);
+    }
   }
 }

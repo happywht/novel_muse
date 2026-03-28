@@ -141,7 +141,6 @@ ${plotContext}
             settings?.creativity || 0.8,
             AiPlotNodeArraySchema,
             4096,
-            undefined,  // jsonMode
             { templateId: 'shura_field_conflict', templateData }
         );
 

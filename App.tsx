@@ -1,26 +1,38 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
 import { AppSection, ProjectState, WorldGenConfig } from './types';
-import { Dashboard } from './components/Dashboard';
-import { WorldBuilder } from './components/WorldBuilder';
-import { CharacterCreator } from './components/CharacterCreator';
-import { PlotWeaver } from './components/PlotWeaver';
-import { ChapterOutliner } from './components/ChapterOutliner/ChapterOutliner';
-import { DraftingRoom } from './components/DraftingRoom';
-import { EchoChamber } from './components/EchoChamber';
-import { UserGuide } from './components/UserGuide';
+// 懒加载主要业务模块以优化首屏性能
 import { Sidebar } from './components/Sidebar';
 import { FolderOpen, Plus, Trash2, Save, X, Check, Download, Upload, Database, HardDrive, RefreshCw, BookOpen, AlertCircle } from 'lucide-react';
-import { SettingsPanel } from './components/SettingsPanel/index';
-import { KnowledgeGraph } from './components/KnowledgeGraph';
-import { PromptTuner } from './components/PromptTuner';
-import { CreativeCompassView } from './components/CreativeCompassView';
-import { ProjectLobby } from './components/ProjectLobby';
 import { useProjectStore, INITIAL_PROJECT } from './store/useProjectStore';
 import { storageService, STORAGE_KEYS } from './services/storageService';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useFeature } from './hooks/useFeature';
 import { ConfirmDialogProvider } from './hooks/useConfirm';
 import { PromptConfirmDialog } from './components/common/PromptConfirmDialog';
+import { Loader } from './components/Loader';
+
+// ==================== 懒加载组件 ====================
+// 主要业务模块 - 按需加载，减少首屏 bundle 大小
+const Dashboard = lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
+const WorldBuilder = lazy(() => import('./components/WorldBuilder').then(m => ({ default: m.WorldBuilder })));
+const CharacterCreator = lazy(() => import('./components/CharacterCreator').then(m => ({ default: m.CharacterCreator })));
+const PlotWeaver = lazy(() => import('./components/PlotWeaver').then(m => ({ default: m.PlotWeaver })));
+const ChapterOutliner = lazy(() => import('./components/ChapterOutliner/ChapterOutliner').then(m => ({ default: m.ChapterOutliner })));
+const DraftingRoom = lazy(() => import('./components/DraftingRoom').then(m => ({ default: m.DraftingRoom })));
+const EchoChamber = lazy(() => import('./components/EchoChamber').then(m => ({ default: m.EchoChamber })));
+const UserGuide = lazy(() => import('./components/UserGuide').then(m => ({ default: m.UserGuide })));
+const SettingsPanel = lazy(() => import('./components/SettingsPanel/index').then(m => ({ default: m.SettingsPanel })));
+const KnowledgeGraph = lazy(() => import('./components/KnowledgeGraph').then(m => ({ default: m.KnowledgeGraph })));
+const PromptTuner = lazy(() => import('./components/PromptTuner').then(m => ({ default: m.PromptTuner })));
+const CreativeCompassView = lazy(() => import('./components/CreativeCompassView').then(m => ({ default: m.CreativeCompassView })));
+const ProjectLobby = lazy(() => import('./components/ProjectLobby').then(m => ({ default: m.ProjectLobby })));
+
+// 加载状态组件
+const LoadingFallback = () => (
+  <div className="flex items-center justify-center min-h-[400px] w-full">
+    <Loader text="加载中..." />
+  </div>
+);
 
 const MUSE_FILE_VERSION = '1.0';
 
@@ -144,15 +156,17 @@ const App: React.FC = () => {
   if (activeSection === AppSection.LOBBY) {
     return (
       <ErrorBoundary>
-        <ProjectLobby
-          projects={savedProjects}
-          currentProjectId={project.id}
-          onSwitchProject={handleSwitchProject}
-          onCreateProject={handleCreateProject}
-          onImportProject={() => importFileRef.current?.click()}
-          onExportProject={handleExportProject}
-          onDeleteProject={(id) => deleteProject(id)}
-        />
+        <Suspense fallback={<LoadingFallback />}>
+          <ProjectLobby
+            projects={savedProjects}
+            currentProjectId={project.id}
+            onSwitchProject={handleSwitchProject}
+            onCreateProject={handleCreateProject}
+            onImportProject={() => importFileRef.current?.click()}
+            onExportProject={handleExportProject}
+            onDeleteProject={(id) => deleteProject(id)}
+          />
+        </Suspense>
       </ErrorBoundary>
     );
   }
@@ -231,62 +245,76 @@ const App: React.FC = () => {
 
         {/* Main Content Area */}
         <main className="flex-1 p-6 overflow-auto">
-          {activeSection === AppSection.DASHBOARD && (
-            <Dashboard project={project} updateProject={updateProject} onImportProject={() => importFileRef.current?.click()} />
-          )}
-          {activeSection === AppSection.WORLD && (
-            <WorldBuilder project={project} updateProject={updateProject} />
-          )}
-          {activeSection === AppSection.CHARACTERS && (
-            <CharacterCreator project={project} updateProject={updateProject} />
-          )}
-          {activeSection === AppSection.PLOT && (
-            <PlotWeaver project={project} updateProject={updateProject} />
-          )}
-          {activeSection === AppSection.OUTLINER && (
-            <ChapterOutliner project={project} updateProject={updateProject} />
-          )}
-          {activeSection === AppSection.DRAFTING && (
-            <DraftingRoom project={project} updateProject={updateProject} />
-          )}
-          {activeSection === AppSection.ECHOES && (
-            enableEchoSystem ? (
-              <EchoChamber project={project} updateProject={updateProject} />
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center min-h-0 bg-[#0b1222] animate-fade-in p-6">
-                <AlertCircle size={48} className="text-slate-600 mb-4" />
-                <h3 className="text-lg font-bold text-slate-400 mb-2">Echo系统已禁用</h3>
-                <p className="text-sm text-slate-500">请在「设置 → 高级 → 功能开关」中启用Echo系统</p>
-              </div>
-            )
-          )}
-          {activeSection === AppSection.GRAPH && (
-            enableKnowledgeGraph ? (
-              <div className="flex-1 flex flex-col min-h-0 bg-[#0b1222] animate-fade-in relative z-10 p-6">
-                <KnowledgeGraph projectId={project.id} useBackend={useBackend} projectData={project} updateProject={updateProject} />
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center min-h-0 bg-[#0b1222] animate-fade-in p-6">
-                <AlertCircle size={48} className="text-slate-600 mb-4" />
-                <h3 className="text-lg font-bold text-slate-400 mb-2">知识图谱已禁用</h3>
-                <p className="text-sm text-slate-500">请在「设置 → 高级 → 功能开关」中启用知识图谱</p>
-              </div>
-            )
-          )}
-          {activeSection === AppSection.CREATIVE_COMPASS && (
-            <CreativeCompassView project={project} updateProject={updateProject} />
-          )}
+          <Suspense fallback={<LoadingFallback />}>
+            {activeSection === AppSection.DASHBOARD && (
+              <Dashboard project={project} updateProject={updateProject} onImportProject={() => importFileRef.current?.click()} />
+            )}
+            {activeSection === AppSection.WORLD && (
+              <WorldBuilder project={project} updateProject={updateProject} />
+            )}
+            {activeSection === AppSection.CHARACTERS && (
+              <CharacterCreator project={project} updateProject={updateProject} />
+            )}
+            {activeSection === AppSection.PLOT && (
+              <PlotWeaver project={project} updateProject={updateProject} />
+            )}
+            {activeSection === AppSection.OUTLINER && (
+              <ChapterOutliner project={project} updateProject={updateProject} />
+            )}
+            {activeSection === AppSection.DRAFTING && (
+              <DraftingRoom project={project} updateProject={updateProject} />
+            )}
+            {activeSection === AppSection.ECHOES && (
+              enableEchoSystem ? (
+                <EchoChamber project={project} updateProject={updateProject} />
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center min-h-0 bg-[#0b1222] animate-fade-in p-6">
+                  <AlertCircle size={48} className="text-slate-600 mb-4" />
+                  <h3 className="text-lg font-bold text-slate-400 mb-2">Echo系统已禁用</h3>
+                  <p className="text-sm text-slate-500">请在「设置 → 高级 → 功能开关」中启用Echo系统</p>
+                </div>
+              )
+            )}
+            {activeSection === AppSection.GRAPH && (
+              enableKnowledgeGraph ? (
+                <div className="flex-1 flex flex-col min-h-0 bg-[#0b1222] animate-fade-in relative z-10 p-6">
+                  <KnowledgeGraph projectId={project.id} useBackend={useBackend} projectData={project} updateProject={updateProject} />
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center min-h-0 bg-[#0b1222] animate-fade-in p-6">
+                  <AlertCircle size={48} className="text-slate-600 mb-4" />
+                  <h3 className="text-lg font-bold text-slate-400 mb-2">知识图谱已禁用</h3>
+                  <p className="text-sm text-slate-500">请在「设置 → 高级 → 功能开关」中启用知识图谱</p>
+                </div>
+              )
+            )}
+            {activeSection === AppSection.CREATIVE_COMPASS && (
+              <CreativeCompassView project={project} updateProject={updateProject} />
+            )}
+          </Suspense>
         </main>
       </div>
 
       {/* User Guide Modal */}
-      {showGuide && <UserGuide onClose={() => setShowGuide(false)} />}
+      {showGuide && (
+        <Suspense fallback={<LoadingFallback />}>
+          <UserGuide onClose={() => setShowGuide(false)} />
+        </Suspense>
+      )}
 
       {/* Settings Panel Modal */}
-      {showSettings && <SettingsPanel onClose={() => setShowSettings(false)} />}
+      {showSettings && (
+        <Suspense fallback={<LoadingFallback />}>
+          <SettingsPanel onClose={() => setShowSettings(false)} />
+        </Suspense>
+      )}
 
       {/* Prompt Tuner Modal */}
-      {showPromptTuner && <PromptTuner onClose={() => setShowPromptTuner(false)} />}
+      {showPromptTuner && (
+        <Suspense fallback={<LoadingFallback />}>
+          <PromptTuner onClose={() => setShowPromptTuner(false)} />
+        </Suspense>
+      )}
 
       {/* AI Call Confirmation Dialog (Global) */}
       <PromptConfirmDialog />

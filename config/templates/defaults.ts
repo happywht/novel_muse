@@ -3415,7 +3415,7 @@ Output JSON array format. No preamble.`,
     {
       name: 'countInstruction',
       type: 'string',
-      tier: 'computed',
+      tier: 'important',
       source: 'computed',
       required: false,
       description: 'Formatted count instruction',

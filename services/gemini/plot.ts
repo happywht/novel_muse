@@ -162,7 +162,6 @@ ${graphContext.characterRelationships.map(r =>
             0.6,
             AiPlotNodeArraySchema,
             4096,
-            undefined,
             { templateId: 'generate_plot', templateData }
         );
 
@@ -237,7 +236,6 @@ ${contextStr}
             0.3,
             AiPlotNodeArraySchema,
             4096,
-            undefined,
             { templateId: 'rewrite_plot', templateData }
         );
 
@@ -298,7 +296,6 @@ export const analyzePlotRhythm = async (plotOutline: string): Promise<PlotRhythm
             await getModelName('flash'),
             0.2,
             responseSchema,
-            undefined,
             undefined,
             { templateId: 'analyze_plot_rhythm', templateData }
         );
@@ -379,7 +376,6 @@ export const splitPlotNodeIntoChapters = async (
             await getModelName('pro'),
             settings?.creativity || 0.85,
             AiChapterOutlineArraySchema,
-            undefined,
             undefined,
             { templateId: 'split_plot_node_into_chapters', templateData }
         );
@@ -483,7 +479,6 @@ export const regenerateChapterOutline = async (
             settings?.creativity || 0.85,
             AiChapterOutlineArraySchema,
             undefined,
-            undefined,
             { templateId: 'regenerate_chapter_outline', templateData }
         );
 
@@ -541,7 +536,6 @@ ${plotBeat}
             prompt,
             await getModelName('pro'),
             0.9,
-            undefined,
             undefined,
             undefined,
             { templateId: 'generate_twist_hooks', templateData }

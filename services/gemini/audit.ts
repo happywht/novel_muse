@@ -107,7 +107,7 @@ export const auditChapterPlan = async (
             prompt,
             await getModelName('pro'),
             0.1,
-            true, // Enable JSON mode
+            undefined,
             2048,
             { templateId: 'audit_chapter_plan', templateData }
         );
@@ -283,7 +283,7 @@ ${chapterContent}
             prompt,
             await getModelName('pro'),
             0.2,
-            true,
+            undefined,
             4096,
             { templateId: 'audit_chapter_content', templateData }
         );

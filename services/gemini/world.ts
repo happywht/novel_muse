@@ -128,7 +128,6 @@ export const batchGenerateCharacters = async (premise: string, genre: string, se
             0.6,  // 修复: 降低temperature提高一致性
             characterSchema,
             undefined,
-            undefined,
             { templateId: 'batch_generate_characters', templateData }
         );
         console.log('【batchGenerateCharacters】AI原始响应:', responseText);
@@ -255,7 +254,6 @@ ${settingText}
             0.5,  // 修复: 降低temperature提高一致性
             worldSchema,
             undefined,
-            undefined,
             { templateId: 'batch_generate_settings', templateData }
         );
 
@@ -312,7 +310,6 @@ export const expandWorldLore = async (title: string, currentContent: string, gen
             prompt,
             'gemini-3-flash-preview',
             0.8,
-            undefined,
             undefined,
             undefined,
             { templateId: 'expand_world_lore', templateData }
@@ -421,7 +418,6 @@ export const analyzeStateChanges = async (
             'gemini-3-flash-preview',
             0.1,
             responseSchema,
-            undefined,
             undefined,
             { templateId: 'analyze_state_changes', templateData }
         );
@@ -571,7 +567,6 @@ ${recentChangesSummary ? `【最近已确认的状态变化】:\n${recentChanges
             0.1,
             responseSchema,
             undefined,
-            undefined,
             { templateId: 'extract_echoes', templateData }
         );
 
@@ -690,7 +685,6 @@ export const consolidateMemory = async (
             0.3,
             undefined,
             undefined,
-            undefined,
             { templateId: 'consolidate_memory', templateData }
         );
 
@@ -787,7 +781,6 @@ export const deduceWorldConsequences = async (
             await getModelName('pro'),
             0.4,
             responseSchema,
-            undefined,
             undefined,
             { templateId: 'deduce_world_consequences', templateData }
         );
@@ -943,7 +936,6 @@ ${settingText}
             'gemini-3-flash-preview',
             0.6,
             characterSchema,
-            undefined,
             undefined,
             { templateId: 'generate_single_character', templateData }
         );
