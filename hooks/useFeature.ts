@@ -6,12 +6,13 @@
 import { useState, useEffect } from 'react';
 import { getGlobalConfig } from '../config/global';
 
-type FeatureFlag = 
+type FeatureFlag =
     | 'enableEchoSystem'
     | 'enableKnowledgeGraph'
     | 'enableChapterBalance'
     | 'enableConflictVisualization'
     | 'enableVirtualScrolling'
+    | 'enableInkosIntegration'
     | 'debugMode';
 
 /**
@@ -42,6 +43,7 @@ export function useFeatures() {
         enableChapterBalance: true,
         enableConflictVisualization: true,
         enableVirtualScrolling: true,
+        enableInkosIntegration: false,
         debugMode: false,
     });
 

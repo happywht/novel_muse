@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
     Rocket, Sparkles, Wand2, BookOpen, AlertCircle, CheckCircle,
     X, Zap, Target, Download, Copy, Check, ArrowRight, GitBranch,
-    Clock, Users, Globe, FileText, Lightbulb, TrendingUp
+    Clock, Users, Globe, FileText, Lightbulb, TrendingUp, Bot, RefreshCw
 } from 'lucide-react';
 import { ProjectState, WorldSetting, NarrativeInsight } from '../types';
 import { generateText, batchGenerateCharacters, batchGenerateWorldSettingsByCategory, generatePlotFromContext } from '../services/geminiService';
@@ -13,6 +13,8 @@ import {
     ProjectStatistics, GraphData
 } from '../services/apiService';
 import { useToast } from '../hooks/useToast';
+import { useFeature } from '../hooks/useFeature';
+import { useInkos } from '../hooks/useInkos';
 
 interface DashboardProps {
     project: ProjectState;
@@ -33,6 +35,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject, on
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const [copySuccess, setCopySuccess] = useState(false);
+
+    // inkos integration
+    const enableInkosIntegration = useFeature('enableInkosIntegration');
+    const inkos = useInkos();
 
     // 图谱和统计数据状态
     const [graphData, setGraphData] = useState<GraphData | null>(null);
@@ -705,6 +711,196 @@ export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject, on
                     </div>
                 </div>
             </div>
+
+            {/* Inkos Integration Card */}
+            {enableInkosIntegration && (
+                <div className="bg-gradient-to-br from-purple-900/15 to-slate-900 rounded-xl border border-purple-500/20 p-6 space-y-4">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center border border-purple-500/20">
+                                <Bot className="text-purple-400" size={20} />
+                            </div>
+                            <div>
+                                <h3 className="text-white font-bold text-sm">inkos 自动化写作</h3>
+                                <p className="text-[10px] text-slate-500 mt-0.5">将项目导入inkos，启用AI自动写作</p>
+                            </div>
+                        </div>
+                        {inkos.isRunning && (
+                            <div className="flex items-center gap-2 text-purple-300 text-xs">
+                                <RefreshCw size={12} className="animate-spin" />
+                                <span>运行中</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Task Progress */}
+                    {inkos.progress && (
+                        <div className="bg-slate-900/50 rounded-lg p-4 space-y-2">
+                            <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-400">{inkos.progress.message}</span>
+                                <span className="text-purple-400 font-mono">{inkos.progress.percentage}%</span>
+                            </div>
+                            <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                                <div
+                                    className="bg-gradient-to-r from-purple-500 to-pink-500 h-full transition-all duration-300"
+                                    style={{ width: `${inkos.progress.percentage}%` }}
+                                />
+                            </div>
+                            <div className="flex items-center justify-between text-[10px] text-slate-500">
+                                <span>阶段: {inkos.progress.phase}</span>
+                                {inkos.progress.chapterNumber && (
+                                    <span>章节: {inkos.progress.chapterNumber}</span>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Current Task Status */}
+                    {inkos.currentTask && !inkos.progress && (
+                        <div className="bg-slate-900/50 rounded-lg p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${
+                                    inkos.currentTask.status === 'complete' ? 'bg-emerald-400' :
+                                    inkos.currentTask.status === 'error' ? 'bg-red-400' :
+                                    inkos.currentTask.status === 'cancelled' ? 'bg-slate-400' :
+                                    'bg-purple-400 animate-pulse'
+                                }`} />
+                                <span className="text-xs text-slate-300">
+                                    {inkos.currentTask.status === 'complete' ? '任务完成' :
+                                     inkos.currentTask.status === 'error' ? '任务失败' :
+                                     inkos.currentTask.status === 'cancelled' ? '已取消' :
+                                     '处理中...'}
+                                </span>
+                            </div>
+                            {inkos.currentTask.message && (
+                                <span className="text-[10px] text-slate-500">{inkos.currentTask.message}</span>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Error Display */}
+                    {inkos.error && (
+                        <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 flex items-start gap-2">
+                            <AlertCircle size={14} className="text-red-400 mt-0.5 shrink-0" />
+                            <div className="flex-1">
+                                <p className="text-xs text-red-300">{inkos.error}</p>
+                            </div>
+                            <button
+                                onClick={inkos.clearError}
+                                className="text-red-400 hover:text-red-300 transition-colors"
+                            >
+                                <X size={14} />
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="grid grid-cols-3 gap-2">
+                        <button
+                            onClick={async () => {
+                                try {
+                                    const result = await inkos.importProject({
+                                        projectId: project.id,
+                                        options: {
+                                            includeChapters: true,
+                                            includeCharacters: true,
+                                            includeWorldSettings: true,
+                                        }
+                                    });
+                                    inkos.subscribeToTask(result.taskId, project.id);
+                                    toast.success('项目导出到inkos成功');
+                                } catch (error) {
+                                    toast.error('导出失败: ' + (error instanceof Error ? error.message : '未知错误'));
+                                }
+                            }}
+                            disabled={inkos.isRunning || !project.id}
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 transition-all border border-purple-500/20 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Download size={12} />
+                            导出到inkos
+                        </button>
+
+                        <button
+                            onClick={async () => {
+                                try {
+                                    const result = await inkos.exportProject({
+                                        projectId: project.id,
+                                    });
+                                    inkos.subscribeToTask(result.taskId, project.id);
+                                    toast.success('从inkos同步成功');
+                                } catch (error) {
+                                    toast.error('同步失败: ' + (error instanceof Error ? error.message : '未知错误'));
+                                }
+                            }}
+                            disabled={inkos.isRunning || !project.id}
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 transition-all border border-sky-500/20 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <RefreshCw size={12} />
+                            从inkos同步
+                        </button>
+
+                        <button
+                            onClick={async () => {
+                                if (!project.id || project.chapters.length === 0) {
+                                    toast.warning('请先创建章节');
+                                    return;
+                                }
+                                const nextChapter = project.chapters.length + 1;
+                                try {
+                                    const result = await inkos.writeChapter({
+                                        projectId: project.id,
+                                        chapterNumber: nextChapter,
+                                    });
+                                    inkos.subscribeToTask(result.taskId, project.id);
+                                    toast.success(`开始写作第${nextChapter}章`);
+                                } catch (error) {
+                                    toast.error('写作失败: ' + (error instanceof Error ? error.message : '未知错误'));
+                                }
+                            }}
+                            disabled={inkos.isRunning || !project.id || project.chapters.length === 0}
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-all border border-amber-500/20 text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Zap size={12} />
+                            写下一章
+                        </button>
+                    </div>
+
+                    {/* Cancel Button */}
+                    {inkos.isRunning && (
+                        <button
+                            onClick={async () => {
+                                const cancelled = await inkos.cancelTask();
+                                if (cancelled) {
+                                    toast.info('任务已取消');
+                                }
+                            }}
+                            className="w-full px-3 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-300 transition-all border border-red-500/20 text-xs font-medium"
+                        >
+                            取消当前任务
+                        </button>
+                    )}
+
+                    {/* Stats */}
+                    <div className="grid grid-cols-3 gap-3 pt-3 border-t border-slate-700/50">
+                        <div className="text-center">
+                            <div className="text-lg font-mono text-white">{project.chapters.length}</div>
+                            <div className="text-[10px] text-slate-500">已完成章节</div>
+                        </div>
+                        <div className="text-center">
+                            <div className="text-lg font-mono text-purple-400">
+                                {inkos.currentTask?.status === 'complete' ? 1 : 0}
+                            </div>
+                            <div className="text-[10px] text-slate-500">写作任务</div>
+                        </div>
+                        <div className="text-center">
+                            <div className="text-lg font-mono text-emerald-400">
+                                {inkos.currentTask?.result?.auditScore || '--'}
+                            </div>
+                            <div className="text-[10px] text-slate-500">审计评分</div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Confirmation Modal */}
             {showConfirmModal && (
