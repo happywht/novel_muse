@@ -8,6 +8,7 @@ import { storageService, STORAGE_KEYS } from './services/storageService';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useFeature } from './hooks/useFeature';
 import { ConfirmDialogProvider } from './hooks/useConfirm';
+import { FeatureFlagProvider } from './contexts/FeatureFlagContext';
 import { PromptConfirmDialog } from './components/common/PromptConfirmDialog';
 import { Loader } from './components/Loader';
 
@@ -173,7 +174,8 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-    <ConfirmDialogProvider>
+    <FeatureFlagProvider>
+      <ConfirmDialogProvider>
     <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans selection:bg-muse-500/30 selection:text-muse-100 flex">
       {/* Hidden file input for import */}
       <input
@@ -320,6 +322,7 @@ const App: React.FC = () => {
       <PromptConfirmDialog />
     </div>
     </ConfirmDialogProvider>
+    </FeatureFlagProvider>
     </ErrorBoundary>
   );
 };
