@@ -3,6 +3,7 @@ import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import { projectsRouter } from './routes/projects';
 import { graphRouter } from './routes/graph';
+import { inkosRouter } from './routes/inkos';
 import { initNeo4j, closeNeo4j } from './services/neo4jService';
 import { apiKeyAuth } from './middleware/auth';
 
@@ -47,6 +48,7 @@ app.use('/api', apiKeyAuth);
 
 // Routes
 app.use('/api/projects', projectsRouter);
+app.use('/api/inkos', inkosRouter);
 
 // Health check (public route, no auth required)
 app.get('/api/health', (_req, res) => {

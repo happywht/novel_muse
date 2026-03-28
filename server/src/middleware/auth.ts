@@ -5,6 +5,9 @@ import { Request, Response, NextFunction } from 'express';
 export const PUBLIC_ROUTES = [
   '/health',               // 健康检查端点（相对路径，不含 /api 前缀）
   '/api/health',           // 兼容完整路径
+  '/inkos/health',         // inkos 健康检查
+  '/inkos/genres',         // inkos 类型列表（只读）
+  '/inkos/dimensions',     // inkos 审计维度列表（只读）
 ];
 
 // 检查路径是否匹配公开路由
