@@ -182,8 +182,8 @@ export class InkosService {
       });
       sendTaskProgress(projectId, task.taskId, 60, 'Writing project files...');
 
-      // Run inkos init if needed
-      const result = await this.executeInkos(['init', '--path', taskDir], {
+      // Run inkos init in the task directory (init doesn't support --path, use cwd)
+      const result = await this.executeInkos(['init'], {
         cwd: taskDir,
       });
 
@@ -308,12 +308,11 @@ export class InkosService {
         throw new Error('Project not found in workspace');
       }
 
-      // Build inkos write command
-      const args = [
-        'write',
-        '--chapter', String(request.chapterNumber),
-        '--path', projectPath,
-      ];
+      // Build inkos write command (write next doesn't support --path, use cwd)
+      const args = ['write', 'next'];
+
+      // Note: chapter number is auto-detected by inkos, but we can specify book-id if needed
+      // args.push(String(request.chapterNumber));
 
       if (request.options?.model) {
         args.push('--model', request.options.model);
@@ -407,11 +406,11 @@ export class InkosService {
         throw new Error('Project not found in workspace');
       }
 
-      // Build audit command
-      const args = ['audit', '--path', projectPath];
+      // Build audit command (audit doesn't support --path, use cwd)
+      const args = ['audit'];
       if (request.chapterId) {
         // Find chapter number from chapterId
-        args.push('--chapter', request.chapterId);
+        args.push(request.chapterId);
       }
 
       taskStore.update(task.taskId, {
