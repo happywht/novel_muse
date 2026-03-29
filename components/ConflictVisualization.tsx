@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
 import { PlotNode, Chapter, Character } from '../types';
-import { generateConflictVisualization, ConflictVisualizationReport, getConflictIntensityColor, getConflictTypeLabel, getConflictPatternDescription, determinePrimaryConflictType } from '../services/conflictVisualization';
+import {
+  generateConflictVisualization,
+  ConflictVisualizationReport,
+  getConflictIntensityColor,
+  getConflictTypeLabel,
+  getConflictPatternDescription,
+  determinePrimaryConflictType,
+} from '../services/conflictVisualization';
 import { Zap, Flame, Users, Activity, Target, AlertCircle } from 'lucide-react';
 
 interface ConflictVisualizationProps {
@@ -12,10 +19,12 @@ interface ConflictVisualizationProps {
 export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
   plotNodes,
   chapters,
-  characters
+  characters,
 }) => {
   const report = generateConflictVisualization(plotNodes, chapters, characters);
-  const [selectedTab, setSelectedTab] = useState<'heatmap' | 'stress' | 'distribution' | 'timeline' | 'climax'>('heatmap');
+  const [selectedTab, setSelectedTab] = useState<
+    'heatmap' | 'stress' | 'distribution' | 'timeline' | 'climax'
+  >('heatmap');
 
   return (
     <div className="bg-slate-900 rounded-xl border border-slate-800 p-6 space-y-6">
@@ -25,24 +34,24 @@ export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
           <h2 className="text-2xl font-serif font-bold text-white">冲突场景可视化</h2>
           <p className="text-slate-400 mt-1">分析冲突分布、角色压力与叙事节奏</p>
         </div>
-        
+
         {/* Conflict Stats */}
         <div className="flex gap-4">
-          <StatCard 
-            label="总冲突数" 
-            value={report.distribution.total.toString()} 
+          <StatCard
+            label="总冲突数"
+            value={report.distribution.total.toString()}
             color="text-orange-400"
             icon={<Flame className="w-4 h-4" />}
           />
-          <StatCard 
-            label="修罗场节点" 
-            value={report.climaxNodes.length.toString()} 
+          <StatCard
+            label="修罗场节点"
+            value={report.climaxNodes.length.toString()}
             color="text-red-400"
             icon={<Zap className="w-4 h-4" />}
           />
-          <StatCard 
-            label="最激烈章节" 
-            value={report.insights.mostIntenseChapter || '-'} 
+          <StatCard
+            label="最激烈章节"
+            value={report.insights.mostIntenseChapter || '-'}
             color="text-purple-400"
             icon={<Target className="w-4 h-4" />}
           />
@@ -57,7 +66,7 @@ export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
           { id: 'distribution', label: '类型分布', icon: <Zap className="w-4 h-4" /> },
           { id: 'timeline', label: '时间线', icon: <Users className="w-4 h-4" /> },
           { id: 'climax', label: '修罗场节点', icon: <AlertCircle className="w-4 h-4" /> },
-        ].map(tab => (
+        ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setSelectedTab(tab.id as any)}
@@ -85,17 +94,17 @@ export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
                   const intensity = report.heatmap.intensities[idx];
                   const count = report.heatmap.conflictCounts[idx];
                   const color = getConflictIntensityColor(intensity);
-                  
+
                   return (
                     <div key={idx} className="flex items-center gap-3">
                       <div className="w-32 text-sm text-slate-300 truncate">{chapterTitle}</div>
                       <div className="flex-1 flex items-center gap-3">
                         <div className="w-24 bg-slate-700 rounded-full h-2">
-                          <div 
+                          <div
                             className="h-2 rounded-full transition-all"
-                            style={{ 
+                            style={{
                               width: `${Math.min(intensity * 10, 100)}%`,
-                              backgroundColor: color
+                              backgroundColor: color,
                             }}
                           />
                         </div>
@@ -116,11 +125,15 @@ export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
               <h3 className="font-semibold text-white mb-3">冲突模式分析</h3>
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
-                  <div className={`text-lg font-bold ${
-                    report.insights.conflictPattern === 'EVEN' ? 'text-emerald-400' :
-                    report.insights.conflictPattern === 'CLUSTERED' ? 'text-yellow-400' :
-                    'text-blue-400'
-                  }`}>
+                  <div
+                    className={`text-lg font-bold ${
+                      report.insights.conflictPattern === 'EVEN'
+                        ? 'text-emerald-400'
+                        : report.insights.conflictPattern === 'CLUSTERED'
+                          ? 'text-yellow-400'
+                          : 'text-blue-400'
+                    }`}
+                  >
                     {report.insights.conflictPattern}
                   </div>
                   <div className="text-xs text-slate-400">分布模式</div>
@@ -133,9 +146,11 @@ export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
                 </div>
                 <div className="text-center">
                   <div className="text-lg font-bold text-white">
-                    {getConflictTypeLabel(determinePrimaryConflictType(
-                      plotNodes.filter(n => n.beatTag?.includes('conflict'))
-                    ))}
+                    {getConflictTypeLabel(
+                      determinePrimaryConflictType(
+                        plotNodes.filter((n) => n.beatTag?.includes('conflict'))
+                      )
+                    )}
                   </div>
                   <div className="text-xs text-slate-400">主要类型</div>
                 </div>
@@ -150,7 +165,7 @@ export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
             <div className="bg-slate-800/30 rounded-lg p-4">
               <h3 className="font-semibold text-white mb-3">角色压力曲线</h3>
               <div className="space-y-4">
-                {report.characterStress.map(char => (
+                {report.characterStress.map((char) => (
                   <div key={char.characterId} className="space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -171,7 +186,7 @@ export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
                             className="flex-1 h-6 rounded flex items-center justify-center"
                             style={{
                               backgroundColor: getConflictIntensityColor(stress),
-                              opacity: 0.8
+                              opacity: 0.8,
                             }}
                             title={`章节${idx + 1}: 压力值${stress.toFixed(1)}`}
                           >
@@ -195,7 +210,8 @@ export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
                   <h4 className="font-semibold">压力最大角色</h4>
                 </div>
                 <p className="text-sm text-slate-300">
-                  {report.insights.mostStressedCharacter} 在多个章节中承受高压力，建议适当调整冲突分配
+                  {report.insights.mostStressedCharacter}{' '}
+                  在多个章节中承受高压力，建议适当调整冲突分配
                 </p>
               </div>
             )}
@@ -211,14 +227,21 @@ export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
                 <PieChart
                   data={[
                     { label: '内心冲突', value: report.distribution.inner, color: '#8b5cf6' },
-                    { label: '人际冲突', value: report.distribution.interpersonal, color: '#f97316' },
-                    { label: '外部冲突', value: report.distribution.external, color: '#ef4444' }
+                    {
+                      label: '人际冲突',
+                      value: report.distribution.interpersonal,
+                      color: '#f97316',
+                    },
+                    { label: '外部冲突', value: report.distribution.external, color: '#ef4444' },
                   ]}
                 />
               </div>
               <div className="flex justify-center gap-6 mt-6">
                 <LegendItem color="#8b5cf6" label={`内心冲突 (${report.distribution.inner})`} />
-                <LegendItem color="#f97316" label={`人际冲突 (${report.distribution.interpersonal})`} />
+                <LegendItem
+                  color="#f97316"
+                  label={`人际冲突 (${report.distribution.interpersonal})`}
+                />
                 <LegendItem color="#ef4444" label={`外部冲突 (${report.distribution.external})`} />
               </div>
             </div>
@@ -234,7 +257,10 @@ export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
                 </div>
                 <div>
                   <div className="text-lg font-bold text-orange-400">
-                    {Math.round((report.distribution.interpersonal / report.distribution.total) * 100)}%
+                    {Math.round(
+                      (report.distribution.interpersonal / report.distribution.total) * 100
+                    )}
+                    %
                   </div>
                   <div className="text-xs text-slate-400">人际冲突占比</div>
                 </div>
@@ -258,7 +284,7 @@ export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
                 <LineChart
                   data={report.timeline.chapterOrders.map((order, idx) => ({
                     x: `章节${order}`,
-                    y: report.timeline.conflictDensity[idx]
+                    y: report.timeline.conflictDensity[idx],
                   }))}
                 />
               </div>
@@ -268,16 +294,18 @@ export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
               <h4 className="font-semibold text-white mb-3">张力曲线</h4>
               <div className="space-y-2">
                 {report.timeline.tensionCurve.map((tension, idx) => {
-                  const chapter = chapters.find(ch => ch.order === report.timeline.chapterOrders[idx]);
+                  const chapter = chapters.find(
+                    (ch) => ch.order === report.timeline.chapterOrders[idx]
+                  );
                   return (
                     <div key={idx} className="flex items-center gap-3">
                       <div className="w-20 text-sm text-slate-400">章节{idx + 1}</div>
                       <div className="flex-1 bg-slate-700 rounded-full h-2">
-                        <div 
+                        <div
                           className="h-2 rounded-full transition-all"
-                          style={{ 
+                          style={{
                             width: `${tension * 10}%`,
-                            backgroundColor: getConflictIntensityColor(tension)
+                            backgroundColor: getConflictIntensityColor(tension),
                           }}
                         />
                       </div>
@@ -303,13 +331,13 @@ export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
               {report.climaxNodes.length > 0 ? (
                 <div className="space-y-3">
                   {report.climaxNodes.map((climax, idx) => (
-                    <div 
-                      key={idx} 
+                    <div
+                      key={idx}
                       className="bg-slate-800/50 rounded-lg p-4 border border-slate-700 hover:border-orange-500/50 transition-all"
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <div 
+                          <div
                             className="w-3 h-3 rounded-full"
                             style={{ backgroundColor: getConflictIntensityColor(climax.intensity) }}
                           />
@@ -322,15 +350,15 @@ export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
                           节点 ID: {climax.nodeId.slice(0, 8)}
                         </div>
                       </div>
-                      
+
                       {climax.involvedCharacters.length > 0 && (
                         <div className="mt-2">
                           <div className="text-xs text-slate-400 mb-1">涉及角色:</div>
                           <div className="flex flex-wrap gap-1">
-                            {climax.involvedCharacters.map(charId => {
-                              const char = characters.find(c => c.id === charId);
+                            {climax.involvedCharacters.map((charId) => {
+                              const char = characters.find((c) => c.id === charId);
                               return char ? (
-                                <span 
+                                <span
                                   key={charId}
                                   className="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-200"
                                 >
@@ -384,7 +412,17 @@ export const ConflictVisualization: React.FC<ConflictVisualizationProps> = ({
 };
 
 // 统计卡片组件
-const StatCard = ({ value, label, color, icon }: { value: string; label: string; color: string; icon: React.ReactNode }) => (
+const StatCard = ({
+  value,
+  label,
+  color,
+  icon,
+}: {
+  value: string;
+  label: string;
+  color: string;
+  icon: React.ReactNode;
+}) => (
   <div className="text-center">
     <div className={`text-2xl font-bold ${color}`}>{value}</div>
     <div className="text-xs text-slate-400 uppercase tracking-wider flex items-center gap-1 justify-center">
@@ -404,13 +442,13 @@ const LegendItem = ({ color, label }: { color: string; label: string }) => (
 
 // 简单的图表组件（在实际项目中使用完整图表库如Chart.js或D3.js）
 const LineChart = ({ data }: { data: Array<{ x: string; y: number }> }) => {
-  const maxY = Math.max(...data.map(d => d.y), 1);
-  
+  const maxY = Math.max(...data.map((d) => d.y), 1);
+
   return (
     <div className="w-full h-full">
       <svg viewBox="0 0 100 100" className="w-full h-full">
         {/* Grid lines */}
-        {[0, 25, 50, 75, 100].map(y => (
+        {[0, 25, 50, 75, 100].map((y) => (
           <line
             key={y}
             x1="0"
@@ -421,32 +459,26 @@ const LineChart = ({ data }: { data: Array<{ x: string; y: number }> }) => {
             strokeWidth="0.5"
           />
         ))}
-        
+
         {/* Line */}
         <polyline
           fill="none"
           stroke="#8b5cf6"
           strokeWidth="2"
-          points={data.map((point, idx) => {
-            const x = (idx / (data.length - 1)) * 100;
-            const y = 100 - (point.y / maxY) * 100;
-            return `${x},${y}`;
-          }).join(' ')}
+          points={data
+            .map((point, idx) => {
+              const x = (idx / (data.length - 1)) * 100;
+              const y = 100 - (point.y / maxY) * 100;
+              return `${x},${y}`;
+            })
+            .join(' ')}
         />
-        
+
         {/* Points */}
         {data.map((point, idx) => {
           const x = (idx / (data.length - 1)) * 100;
           const y = 100 - (point.y / maxY) * 100;
-          return (
-            <circle
-              key={idx}
-              cx={x}
-              cy={y}
-              r="2"
-              fill="#8b5cf6"
-            />
-          );
+          return <circle key={idx} cx={x} cy={y} r="2" fill="#8b5cf6" />;
         })}
       </svg>
     </div>
@@ -456,7 +488,7 @@ const LineChart = ({ data }: { data: Array<{ x: string; y: number }> }) => {
 const PieChart = ({ data }: { data: Array<{ label: string; value: number; color: string }> }) => {
   const total = data.reduce((sum, item) => sum + item.value, 0);
   let currentAngle = 0;
-  
+
   return (
     <div className="w-64 h-64 mx-auto">
       <svg viewBox="0 0 100 100" className="w-full h-full">
@@ -466,13 +498,13 @@ const PieChart = ({ data }: { data: Array<{ label: string; value: number; color:
           const startAngle = currentAngle;
           const endAngle = startAngle + angle;
           currentAngle += angle;
-          
-          const x1 = 50 + 35 * Math.cos((startAngle - 90) * Math.PI / 180);
-          const y1 = 50 + 35 * Math.sin((startAngle - 90) * Math.PI / 180);
-          const x2 = 50 + 35 * Math.cos((endAngle - 90) * Math.PI / 180);
-          const y2 = 50 + 35 * Math.sin((endAngle - 90) * Math.PI / 180);
+
+          const x1 = 50 + 35 * Math.cos(((startAngle - 90) * Math.PI) / 180);
+          const y1 = 50 + 35 * Math.sin(((startAngle - 90) * Math.PI) / 180);
+          const x2 = 50 + 35 * Math.cos(((endAngle - 90) * Math.PI) / 180);
+          const y2 = 50 + 35 * Math.sin(((endAngle - 90) * Math.PI) / 180);
           const largeArcFlag = angle > 180 ? 1 : 0;
-          
+
           return (
             <path
               key={idx}

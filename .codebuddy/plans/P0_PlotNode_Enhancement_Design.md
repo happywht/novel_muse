@@ -46,6 +46,7 @@ export interface PlotNode {
 ```
 
 **现有图谱同步** (`server/src/services/graph/sync.ts:309-406`):
+
 - PlotNode 节点已创建
 - INVOLVES 关系已建立 (PlotNode -> Character)
 - LOCATED_IN 关系已建立 (PlotNode -> WorldSetting)
@@ -53,6 +54,7 @@ export interface PlotNode {
 - HAS_CONFLICT_PARTICIPANT 关系已建立
 
 **当前问题**:
+
 1. `conflictScenario` 作为 PlotNode 的内嵌字段，无法独立查询和管理
 2. 缺乏情节之间的多样化依赖关系（仅 PRECEDES）
 3. 冲突解决建议、依赖链分析等高级查询未实现
@@ -60,13 +62,13 @@ export interface PlotNode {
 
 ### 1.2 设计目标
 
-| 目标 | 描述 | 优先级 |
-|------|------|--------|
-| 独立冲突节点 | 将 conflictScenario 提升为独立 Conflict 节点 | P0 |
-| 依赖关系增强 | 新增 CAUSES, ENABLES, BLOCKS 等关系类型 | P0 |
-| 高级查询 API | 实现依赖链、冲突建议、高强度冲突等查询 | P0 |
-| 可视化增强 | 冲突热力图、依赖关系图、参与者网络图 | P1 |
-| 模块联动 | 与 Character 模块深度整合 | P1 |
+| 目标         | 描述                                         | 优先级 |
+| ------------ | -------------------------------------------- | ------ |
+| 独立冲突节点 | 将 conflictScenario 提升为独立 Conflict 节点 | P0     |
+| 依赖关系增强 | 新增 CAUSES, ENABLES, BLOCKS 等关系类型      | P0     |
+| 高级查询 API | 实现依赖链、冲突建议、高强度冲突等查询       | P0     |
+| 可视化增强   | 冲突热力图、依赖关系图、参与者网络图         | P1     |
+| 模块联动     | 与 Character 模块深度整合                    | P1     |
 
 ---
 
@@ -89,21 +91,21 @@ conflictScenario?: {
 
 ```typescript
 interface ConflictScenario {
-  id: string;                      // 冲突唯一ID
-  type: ConflictType;              // 冲突类型
-  participants: string[];          // 参与角色ID
-  stakes: string;                  // 赌注
-  intensity: number;               // 强度 1-10
+  id: string; // 冲突唯一ID
+  type: ConflictType; // 冲突类型
+  participants: string[]; // 参与角色ID
+  stakes: string; // 赌注
+  intensity: number; // 强度 1-10
 
   // 扩展字段
-  status: 'PENDING' | 'ACTIVE' | 'RESOLVED' | 'ABANDONED';  // 冲突状态
-  resolution?: string;             // 解决方式描述
-  triggeredAt?: string;            // 触发时间（故事内时间）
-  resolvedAt?: string;             // 解决时间
-  relatedConflicts?: string[];     // 关联冲突ID
-  tags?: string[];                 // 冲突标签
-  emotionalImpact?: number;        // 情感影响度 1-10
-  narrativeWeight?: number;        // 叙事权重 1-10
+  status: 'PENDING' | 'ACTIVE' | 'RESOLVED' | 'ABANDONED'; // 冲突状态
+  resolution?: string; // 解决方式描述
+  triggeredAt?: string; // 触发时间（故事内时间）
+  resolvedAt?: string; // 解决时间
+  relatedConflicts?: string[]; // 关联冲突ID
+  tags?: string[]; // 冲突标签
+  emotionalImpact?: number; // 情感影响度 1-10
+  narrativeWeight?: number; // 叙事权重 1-10
 }
 ```
 
@@ -200,26 +202,26 @@ import { getDriver } from '../services/graph/client';
  * 从现有 PlotNode.conflictScenario 提取独立 Conflict 节点
  */
 export async function migrateConflictNodes(projectId: string): Promise<void> {
-    const driver = getDriver();
-    const session = driver.session();
+  const driver = getDriver();
+  const session = driver.session();
 
-    try {
-        // 1. 查找所有包含 conflictScenario 的 PlotNode
-        const result = await session.run(
-            `MATCH (pn:PlotNode {projectId: $projectId})
+  try {
+    // 1. 查找所有包含 conflictScenario 的 PlotNode
+    const result = await session.run(
+      `MATCH (pn:PlotNode {projectId: $projectId})
              WHERE pn.conflictScenario IS NOT NULL
              RETURN pn.id as plotNodeId, pn.conflictScenario as conflict`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        for (const record of result.records) {
-            const plotNodeId = record.get('plotNodeId');
-            const conflict = record.get('conflict');
+    for (const record of result.records) {
+      const plotNodeId = record.get('plotNodeId');
+      const conflict = record.get('conflict');
 
-            // 2. 创建独立 Conflict 节点
-            const conflictId = `conflict_${plotNodeId}`;
-            await session.run(
-                `CREATE (c:Conflict {
+      // 2. 创建独立 Conflict 节点
+      const conflictId = `conflict_${plotNodeId}`;
+      await session.run(
+        `CREATE (c:Conflict {
                     id: $conflictId,
                     projectId: $projectId,
                     title: $title,
@@ -236,23 +238,23 @@ export async function migrateConflictNodes(projectId: string): Promise<void> {
                 UNWIND $participants as participantId
                 MATCH (char:Character {id: participantId, projectId: $projectId})
                 CREATE (c)-[:INVOLVES_PARTICIPANT {role: 'PARTICIPANT'}]->(char)`,
-                {
-                    conflictId,
-                    projectId,
-                    plotNodeId,
-                    title: `冲突: ${conflict.type || '未知类型'}`,
-                    type: conflict.type || 'CONFRONTATION',
-                    stakes: conflict.stakes || '',
-                    intensity: conflict.intensity || 5,
-                    participants: conflict.participants || []
-                }
-            );
+        {
+          conflictId,
+          projectId,
+          plotNodeId,
+          title: `冲突: ${conflict.type || '未知类型'}`,
+          type: conflict.type || 'CONFRONTATION',
+          stakes: conflict.stakes || '',
+          intensity: conflict.intensity || 5,
+          participants: conflict.participants || [],
         }
-
-        console.log(`Migrated ${result.records.length} conflict nodes for project ${projectId}`);
-    } finally {
-        await session.close();
+      );
     }
+
+    console.log(`Migrated ${result.records.length} conflict nodes for project ${projectId}`);
+  } finally {
+    await session.close();
+  }
 }
 ```
 
@@ -266,15 +268,15 @@ export async function migrateConflictNodes(projectId: string): Promise<void> {
 
 **需要补充的因果关系**:
 
-| 关系类型 | 含义 | 示例 |
-|----------|------|------|
-| `CAUSES` | A 直接导致 B | 谋杀导致调查 |
-| `ENABLES` | A 为 B 创造条件 | 获得钥匙允许开门 |
-| `BLOCKS` | A 阻碍 B | 误会阻止合作 |
-| `TRIGGERS` | A 触发 B 的发生 | 爆发触发战争 |
-| `RESOLVES` | A 解决 B | 和谈解决冲突 |
-| `FORESHADOWS` | A 伏笔预示 B | 早期线索预示反转 |
-| `CALLBACK_TO` | A 回应 B | 后期事件回应早期伏笔 |
+| 关系类型      | 含义            | 示例                 |
+| ------------- | --------------- | -------------------- |
+| `CAUSES`      | A 直接导致 B    | 谋杀导致调查         |
+| `ENABLES`     | A 为 B 创造条件 | 获得钥匙允许开门     |
+| `BLOCKS`      | A 阻碍 B        | 误会阻止合作         |
+| `TRIGGERS`    | A 触发 B 的发生 | 爆发触发战争         |
+| `RESOLVES`    | A 解决 B        | 和谈解决冲突         |
+| `FORESHADOWS` | A 伏笔预示 B    | 早期线索预示反转     |
+| `CALLBACK_TO` | A 回应 B        | 后期事件回应早期伏笔 |
 
 ### 3.2 PRECEDES 关系增强
 
@@ -310,23 +312,23 @@ SET r.temporalGap = $temporalGap,
 // types.ts 扩展
 
 export type PlotDependencyType =
-  | 'PRECEDES'      // 时序前驱
-  | 'CAUSES'        // 因果导致
-  | 'ENABLES'       // 条件允许
-  | 'BLOCKS'        // 阻碍
-  | 'TRIGGERS'      // 触发
-  | 'RESOLVES'      // 解决
-  | 'FORESHADOWS'   // 伏笔
-  | 'CALLBACK_TO';  // 回应
+  | 'PRECEDES' // 时序前驱
+  | 'CAUSES' // 因果导致
+  | 'ENABLES' // 条件允许
+  | 'BLOCKS' // 阻碍
+  | 'TRIGGERS' // 触发
+  | 'RESOLVES' // 解决
+  | 'FORESHADOWS' // 伏笔
+  | 'CALLBACK_TO'; // 回应
 
 export interface PlotDependency {
   sourceId: string;
   targetId: string;
   type: PlotDependencyType;
   description?: string;
-  strength?: number;           // 依赖强度 1-10
-  isOptional?: boolean;        // 是否可选依赖
-  condition?: string;          // 触发条件
+  strength?: number; // 依赖强度 1-10
+  isOptional?: boolean; // 是否可选依赖
+  condition?: string; // 触发条件
 }
 ```
 
@@ -465,27 +467,27 @@ export const getPlotDependencies = async (
       nodeId: nodeResult.records[0].get('id'),
       nodeTitle: nodeResult.records[0].get('title'),
       dependencies: [
-        ...incomingResult.records.map(r => ({
+        ...incomingResult.records.map((r) => ({
           direction: 'INCOMING' as const,
           type: r.get('relType') as PlotDependencyType,
           relatedNode: {
             id: r.get('sourceId'),
-            title: r.get('sourceTitle')
+            title: r.get('sourceTitle'),
           },
           description: r.get('description'),
-          strength: r.get('strength')?.toNumber()
+          strength: r.get('strength')?.toNumber(),
         })),
-        ...outgoingResult.records.map(r => ({
+        ...outgoingResult.records.map((r) => ({
           direction: 'OUTGOING' as const,
           type: r.get('relType') as PlotDependencyType,
           relatedNode: {
             id: r.get('targetId'),
-            title: r.get('targetTitle')
+            title: r.get('targetTitle'),
           },
           description: r.get('description'),
-          strength: r.get('strength')?.toNumber()
-        }))
-      ]
+          strength: r.get('strength')?.toNumber(),
+        })),
+      ],
     };
   } finally {
     await session.close();
@@ -511,7 +513,7 @@ export interface ConflictResolutionSuggestion {
       narrativeImpact: string;
       recommendedFollowingPlot: string;
     };
-    probability: number;  // 0-1
+    probability: number; // 0-1
     narrativeCost: number; // 1-10
   }[];
 }
@@ -554,24 +556,24 @@ export const getConflictResolutionSuggestions = async (
     );
 
     // 3. 分析参与者关系模式
-    const participants = participantsResult.records.map(r => ({
+    const participants = participantsResult.records.map((r) => ({
       id: r.get('charId'),
       name: r.get('charName'),
       role: r.get('role'),
-      relationships: r.get('relationships')
+      relationships: r.get('relationships'),
     }));
 
     // 4. 生成解决建议（基于关系模式分析）
     const suggestions = generateResolutionSuggestions(participants, {
       type: conflict.get('type'),
       stakes: conflict.get('stakes'),
-      intensity: conflict.get('intensity')?.toNumber() || 5
+      intensity: conflict.get('intensity')?.toNumber() || 5,
     });
 
     return {
       conflictId: conflict.get('id'),
       conflictTitle: conflict.get('title'),
-      suggestions
+      suggestions,
     };
   } finally {
     await session.close();
@@ -588,13 +590,13 @@ function generateResolutionSuggestions(
   const suggestions: ConflictResolutionSuggestion['suggestions'] = [];
 
   // 分析参与者之间的敌对/盟友关系
-  const hasEnemyRelation = participants.some(p =>
+  const hasEnemyRelation = participants.some((p) =>
     p.relationships.some((r: any) => r.type === 'ENEMY_OF')
   );
-  const hasKinRelation = participants.some(p =>
+  const hasKinRelation = participants.some((p) =>
     p.relationships.some((r: any) => r.type === 'KIN_OF')
   );
-  const hasLoveRelation = participants.some(p =>
+  const hasLoveRelation = participants.some((p) =>
     p.relationships.some((r: any) => r.type === 'LOVES')
   );
 
@@ -604,12 +606,12 @@ function generateResolutionSuggestions(
       type: 'RECONCILIATION',
       description: '基于血缘关系，双方可能通过家庭调解实现和解',
       impactAnalysis: {
-        affectedCharacters: participants.map(p => p.name),
+        affectedCharacters: participants.map((p) => p.name),
         narrativeImpact: '情感深度增加，为后续家庭剧情铺垫',
-        recommendedFollowingPlot: '安排家庭聚会或回忆场景'
+        recommendedFollowingPlot: '安排家庭聚会或回忆场景',
       },
       probability: 0.7,
-      narrativeCost: 3
+      narrativeCost: 3,
     });
   }
 
@@ -618,12 +620,12 @@ function generateResolutionSuggestions(
       type: 'COMPROMISE',
       description: '基于感情纽带，双方可能选择各退一步',
       impactAnalysis: {
-        affectedCharacters: participants.map(p => p.name),
+        affectedCharacters: participants.map((p) => p.name),
         narrativeImpact: '关系得到修复，为感情发展创造空间',
-        recommendedFollowingPlot: '安排私下对话或表白场景'
+        recommendedFollowingPlot: '安排私下对话或表白场景',
       },
       probability: 0.6,
-      narrativeCost: 4
+      narrativeCost: 4,
     });
   }
 
@@ -632,24 +634,24 @@ function generateResolutionSuggestions(
       type: 'VICTORY',
       description: '通过正面对抗决出胜负',
       impactAnalysis: {
-        affectedCharacters: participants.map(p => p.name),
+        affectedCharacters: participants.map((p) => p.name),
         narrativeImpact: '明确力量对比，推动主线发展',
-        recommendedFollowingPlot: '安排决战或关键对峙场景'
+        recommendedFollowingPlot: '安排决战或关键对峙场景',
       },
       probability: 0.5,
-      narrativeCost: 7
+      narrativeCost: 7,
     });
 
     suggestions.push({
       type: 'ESCALATION',
       description: '冲突升级，卷入更多势力',
       impactAnalysis: {
-        affectedCharacters: participants.map(p => p.name),
+        affectedCharacters: participants.map((p) => p.name),
         narrativeImpact: '扩大冲突规模，增加故事张力',
-        recommendedFollowingPlot: '引入第三方势力或更大危机'
+        recommendedFollowingPlot: '引入第三方势力或更大危机',
       },
       probability: 0.4,
-      narrativeCost: 8
+      narrativeCost: 8,
     });
   }
 
@@ -658,12 +660,12 @@ function generateResolutionSuggestions(
     type: 'EXTERNAL',
     description: '外部事件或第三方介入改变冲突走向',
     impactAnalysis: {
-      affectedCharacters: participants.map(p => p.name),
+      affectedCharacters: participants.map((p) => p.name),
       narrativeImpact: '引入意外因素，增加故事不可预测性',
-      recommendedFollowingPlot: '设计外部危机或新角色登场'
+      recommendedFollowingPlot: '设计外部危机或新角色登场',
     },
     probability: 0.3,
-    narrativeCost: 5
+    narrativeCost: 5,
   });
 
   return suggestions.sort((a, b) => b.probability - a.probability);
@@ -695,7 +697,7 @@ export interface HighIntensityConflictResult {
     id: string;
     name: string;
     role: string;
-    faction?: string;  // 所属阵营
+    faction?: string; // 所属阵营
   }[];
   relatedConflicts: {
     id: string;
@@ -724,9 +726,7 @@ export const getHighIntensityConflictsEnhanced = async (
   const session = d.session();
 
   try {
-    const statusFilter = includeResolved
-      ? ''
-      : 'AND c.status IN ["PENDING", "ACTIVE"]';
+    const statusFilter = includeResolved ? '' : 'AND c.status IN ["PENDING", "ACTIVE"]';
 
     const result = await session.run(
       `MATCH (pn:PlotNode {projectId: $projectId})-[:HAS_CONFLICT]->(c:Conflict)
@@ -771,27 +771,27 @@ export const getHighIntensityConflictsEnhanced = async (
       { projectId, minIntensity }
     );
 
-    return result.records.map(record => ({
+    return result.records.map((record) => ({
       conflict: {
         id: record.get('conflictId'),
         title: record.get('conflictTitle'),
         type: record.get('conflictType'),
         intensity: record.get('intensity')?.toNumber() || 0,
         stakes: record.get('stakes'),
-        status: record.get('status')
+        status: record.get('status'),
       },
       plotNode: {
         id: record.get('plotNodeId'),
         title: record.get('plotNodeTitle'),
-        order: record.get('plotNodeOrder')?.toNumber() || 0
+        order: record.get('plotNodeOrder')?.toNumber() || 0,
       },
       participants: record.get('participants').filter((p: any) => p.id),
       relatedConflicts: record.get('relatedConflicts').filter((r: any) => r.id),
       narrativeContext: {
         precedingPlot: record.get('precedingPlot'),
         followingPlot: record.get('followingPlot'),
-        chaptersInvolved: record.get('chaptersInvolved')
-      }
+        chaptersInvolved: record.get('chaptersInvolved'),
+      },
     }));
   } finally {
     await session.close();
@@ -818,19 +818,16 @@ interface ConflictHeatmapProps {
   onNodeClick?: (nodeId: string) => void;
 }
 
-export const ConflictHeatmap: React.FC<ConflictHeatmapProps> = ({
-  plotNodes,
-  onNodeClick
-}) => {
+export const ConflictHeatmap: React.FC<ConflictHeatmapProps> = ({ plotNodes, onNodeClick }) => {
   // 计算热力图数据
   const heatmapData = useMemo(() => {
-    return plotNodes.map(node => ({
+    return plotNodes.map((node) => ({
       id: node.id,
       title: node.title,
       order: node.order,
       intensity: node.conflictScenario?.intensity || 0,
       type: node.conflictScenario?.type || null,
-      participants: node.conflictScenario?.participants?.length || 0
+      participants: node.conflictScenario?.participants?.length || 0,
     }));
   }, [plotNodes]);
 
@@ -846,10 +843,14 @@ export const ConflictHeatmap: React.FC<ConflictHeatmapProps> = ({
   // 获取冲突类型图标
   const getTypeIcon = (type: string | null): string => {
     switch (type) {
-      case 'CONFRONTATION': return '⚔️';
-      case 'CLIMAX': return '🔥';
-      case 'TWIST': return '🔄';
-      default: return '○';
+      case 'CONFRONTATION':
+        return '⚔️';
+      case 'CLIMAX':
+        return '🔥';
+      case 'TWIST':
+        return '🔄';
+      default:
+        return '○';
     }
   };
 
@@ -899,7 +900,7 @@ export const ConflictHeatmap: React.FC<ConflictHeatmapProps> = ({
         <div>
           <span className="block text-slate-500">总冲突数</span>
           <span className="text-lg font-bold text-white">
-            {heatmapData.filter(d => d.intensity > 0).length}
+            {heatmapData.filter((d) => d.intensity > 0).length}
           </span>
         </div>
         <div>
@@ -911,7 +912,7 @@ export const ConflictHeatmap: React.FC<ConflictHeatmapProps> = ({
         <div>
           <span className="block text-slate-500">高风险冲突</span>
           <span className="text-lg font-bold text-red-400">
-            {heatmapData.filter(d => d.intensity >= 7).length}
+            {heatmapData.filter((d) => d.intensity >= 7).length}
           </span>
         </div>
       </div>
@@ -959,38 +960,38 @@ interface GraphLink {
 export const DependencyGraph: React.FC<DependencyGraphProps> = ({
   plotNodes,
   dependencies,
-  onNodeClick
+  onNodeClick,
 }) => {
   const graphRef = useRef<any>(null);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
 
   // 构建图数据
   const graphData = {
-    nodes: plotNodes.map(node => ({
+    nodes: plotNodes.map((node) => ({
       id: node.id,
       name: node.title || `情节 ${node.order + 1}`,
       order: node.order,
-      hasConflict: !!node.conflictScenario
+      hasConflict: !!node.conflictScenario,
     })),
-    links: dependencies.map(dep => ({
+    links: dependencies.map((dep) => ({
       source: dep.source,
       target: dep.target,
       type: dep.type,
-      strength: dep.strength || 5
-    }))
+      strength: dep.strength || 5,
+    })),
   };
 
   // 获取关系颜色
   const getLinkColor = (type: string): string => {
     const colors: Record<string, string> = {
-      'PRECEDES': '#64748b',
-      'CAUSES': '#ef4444',
-      'ENABLES': '#22c55e',
-      'BLOCKS': '#f59e0b',
-      'TRIGGERS': '#8b5cf6',
-      'RESOLVES': '#06b6d4',
-      'FORESHADOWS': '#ec4899',
-      'CALLBACK_TO': '#84cc16'
+      PRECEDES: '#64748b',
+      CAUSES: '#ef4444',
+      ENABLES: '#22c55e',
+      BLOCKS: '#f59e0b',
+      TRIGGERS: '#8b5cf6',
+      RESOLVES: '#06b6d4',
+      FORESHADOWS: '#ec4899',
+      CALLBACK_TO: '#84cc16',
     };
     return colors[type] || '#64748b';
   };
@@ -1032,7 +1033,7 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({
 
   // 自定义边渲染
   const paintLink = (link: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
-    const lineWidth = (link.strength / 5) * 2 / globalScale;
+    const lineWidth = ((link.strength / 5) * 2) / globalScale;
 
     ctx.beginPath();
     ctx.moveTo(link.source.x, link.source.y);
@@ -1075,8 +1076,8 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({
           { type: 'ENABLES', label: '允许', color: '#22c55e' },
           { type: 'BLOCKS', label: '阻碍', color: '#f59e0b' },
           { type: 'TRIGGERS', label: '触发', color: '#8b5cf6' },
-          { type: 'FORESHADOWS', label: '伏笔', color: '#ec4899' }
-        ].map(item => (
+          { type: 'FORESHADOWS', label: '伏笔', color: '#ec4899' },
+        ].map((item) => (
           <span key={item.type} className="flex items-center gap-1">
             <span className="w-3 h-0.5" style={{ backgroundColor: item.color }}></span>
             {item.label}
@@ -1105,11 +1106,11 @@ export const DependencyGraph: React.FC<DependencyGraphProps> = ({
       {selectedNode && (
         <div className="mt-4 p-3 bg-slate-800/50 rounded-lg">
           <div className="text-sm text-slate-300">
-            选中: {plotNodes.find(n => n.id === selectedNode)?.title}
+            选中: {plotNodes.find((n) => n.id === selectedNode)?.title}
           </div>
           <div className="text-xs text-slate-500 mt-1">
-            入向依赖: {dependencies.filter(d => d.target === selectedNode).length} |
-            出向依赖: {dependencies.filter(d => d.source === selectedNode).length}
+            入向依赖: {dependencies.filter((d) => d.target === selectedNode).length} | 出向依赖:{' '}
+            {dependencies.filter((d) => d.source === selectedNode).length}
           </div>
         </div>
       )}
@@ -1151,7 +1152,7 @@ interface NetworkLink {
 export const ConflictParticipantNetwork: React.FC<ConflictParticipantNetworkProps> = ({
   plotNodes,
   characters,
-  selectedConflictId
+  selectedConflictId,
 }) => {
   // 构建网络数据
   const { nodes, links } = useMemo(() => {
@@ -1159,7 +1160,7 @@ export const ConflictParticipantNetwork: React.FC<ConflictParticipantNetworkProp
     const networkLinks: NetworkLink[] = [];
 
     // 添加冲突节点
-    plotNodes.forEach(node => {
+    plotNodes.forEach((node) => {
       if (node.conflictScenario) {
         const conflictId = `conflict_${node.id}`;
         networkNodes.push({
@@ -1167,26 +1168,26 @@ export const ConflictParticipantNetwork: React.FC<ConflictParticipantNetworkProp
           name: node.title || `冲突`,
           type: 'conflict',
           intensity: node.conflictScenario.intensity,
-          conflictType: node.conflictScenario.type || undefined
+          conflictType: node.conflictScenario.type || undefined,
         });
 
         // 添加参与者链接
-        node.conflictScenario.participants?.forEach(participantId => {
-          const char = characters.find(c => c.id === participantId);
+        node.conflictScenario.participants?.forEach((participantId) => {
+          const char = characters.find((c) => c.id === participantId);
           if (char) {
             // 确保角色节点只添加一次
-            if (!networkNodes.find(n => n.id === char.id)) {
+            if (!networkNodes.find((n) => n.id === char.id)) {
               networkNodes.push({
                 id: char.id,
                 name: char.name,
-                type: 'character'
+                type: 'character',
               });
             }
 
             networkLinks.push({
               source: conflictId,
               target: char.id,
-              type: 'PARTICIPATES_IN'
+              type: 'PARTICIPATES_IN',
             });
           }
         });
@@ -1199,7 +1200,7 @@ export const ConflictParticipantNetwork: React.FC<ConflictParticipantNetworkProp
   // 按冲突强度排序
   const conflictsByIntensity = useMemo(() => {
     return nodes
-      .filter(n => n.type === 'conflict')
+      .filter((n) => n.type === 'conflict')
       .sort((a, b) => (b.intensity || 0) - (a.intensity || 0));
   }, [nodes]);
 
@@ -1220,36 +1221,37 @@ export const ConflictParticipantNetwork: React.FC<ConflictParticipantNetworkProp
 
       {/* 冲突列表 */}
       <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar">
-        {conflictsByIntensity.map(conflict => (
+        {conflictsByIntensity.map((conflict) => (
           <div
             key={conflict.id}
             className={`
               p-3 rounded-lg border transition-all cursor-pointer
-              ${selectedConflictId === conflict.id
-                ? 'border-muse-400 bg-muse-400/10'
-                : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+              ${
+                selectedConflictId === conflict.id
+                  ? 'border-muse-400 bg-muse-400/10'
+                  : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
               }
             `}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className={`
+                <span
+                  className={`
                   w-2 h-2 rounded-full
                   ${getConflictColor(conflict.intensity)}
-                `}></span>
+                `}
+                ></span>
                 <span className="text-sm text-white">{conflict.name}</span>
               </div>
-              <span className="text-xs text-slate-400">
-                强度: {conflict.intensity}
-              </span>
+              <span className="text-xs text-slate-400">强度: {conflict.intensity}</span>
             </div>
 
             {/* 参与者 */}
             <div className="mt-2 flex flex-wrap gap-1">
               {links
-                .filter(l => l.source === conflict.id)
-                .map(link => {
-                  const char = nodes.find(n => n.id === link.target);
+                .filter((l) => l.source === conflict.id)
+                .map((link) => {
+                  const char = nodes.find((n) => n.id === link.target);
                   return char ? (
                     <span
                       key={link.target}
@@ -1269,21 +1271,23 @@ export const ConflictParticipantNetwork: React.FC<ConflictParticipantNetworkProp
         <h4 className="text-xs text-slate-500 mb-2">角色参与冲突数</h4>
         <div className="space-y-1">
           {characters
-            .map(char => ({
+            .map((char) => ({
               name: char.name,
-              conflictCount: links.filter(l => l.target === char.id).length
+              conflictCount: links.filter((l) => l.target === char.id).length,
             }))
-            .filter(c => c.conflictCount > 0)
+            .filter((c) => c.conflictCount > 0)
             .sort((a, b) => b.conflictCount - a.conflictCount)
             .slice(0, 5)
-            .map(char => (
+            .map((char) => (
               <div key={char.name} className="flex items-center justify-between text-xs">
                 <span className="text-slate-300">{char.name}</span>
                 <div className="flex items-center gap-2">
                   <div className="w-20 h-1 bg-slate-700 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-purple-500"
-                      style={{ width: `${(char.conflictCount / conflictsByIntensity.length) * 100}%` }}
+                      style={{
+                        width: `${(char.conflictCount / conflictsByIntensity.length) * 100}%`,
+                      }}
                     ></div>
                   </div>
                   <span className="text-slate-400 w-4 text-right">{char.conflictCount}</span>
@@ -1374,8 +1378,8 @@ export interface ConflictCharacterRelation {
   characterName: string;
   conflictId: string;
   conflictTitle: string;
-  role: string;              // 参与角色
-  side?: string;             // 站队
+  role: string; // 参与角色
+  side?: string; // 站队
   relationChanges: {
     targetCharacterId: string;
     targetCharacterName: string;
@@ -1426,14 +1430,14 @@ export const getConflictCharacterRelations = async (
       { projectId, conflictId }
     );
 
-    return result.records.map(record => ({
+    return result.records.map((record) => ({
       characterId: record.get('characterId'),
       characterName: record.get('characterName'),
       conflictId: record.get('conflictId'),
       conflictTitle: record.get('conflictTitle'),
       role: record.get('role'),
       side: record.get('side'),
-      relationChanges: record.get('relationChanges').filter((r: any) => r.targetCharacterId)
+      relationChanges: record.get('relationChanges').filter((r: any) => r.targetCharacterId),
     }));
   } finally {
     await session.close();
@@ -1487,12 +1491,14 @@ RETURN {
 #### 任务清单
 
 - [ ] **T1.1** 扩展 `types.ts` 中的 `ConflictScenario` 接口
+
   ```typescript
   // 文件: types.ts
   // 添加扩展字段: id, status, resolution, emotionalImpact, narrativeWeight
   ```
 
 - [ ] **T1.2** 定义 `PlotDependencyType` 枚举和相关接口
+
   ```typescript
   // 文件: types.ts
   // 添加 PlotDependencyType, PlotDependency 接口
@@ -1509,18 +1515,21 @@ RETURN {
 #### 任务清单
 
 - [ ] **T2.1** 创建独立 Conflict 节点同步逻辑
+
   ```typescript
   // 文件: server/src/services/graph/sync.ts
   // 添加 syncConflictNodes() 函数
   ```
 
 - [ ] **T2.2** 实现情节依赖关系同步
+
   ```typescript
   // 文件: server/src/services/graph/sync.ts
   // 扩展 syncProjectToGraph() 支持 CAUSES, ENABLES, BLOCKS 等关系
   ```
 
 - [ ] **T2.3** 创建数据迁移脚本
+
   ```typescript
   // 文件: server/src/migrations/extractConflictNodes.ts
   // 从现有 conflictScenario 提取独立 Conflict 节点
@@ -1537,24 +1546,28 @@ RETURN {
 #### 任务清单
 
 - [ ] **T3.1** 实现 `getPlotDependencies()` API
+
   ```typescript
   // 文件: server/src/services/graph/queries.ts
   // 获取情节依赖关系（入向/出向）
   ```
 
 - [ ] **T3.2** 实现 `getConflictResolutionSuggestions()` API
+
   ```typescript
   // 文件: server/src/services/graph/queries.ts
   // 基于关系模式生成冲突解决建议
   ```
 
 - [ ] **T3.3** 增强 `getHighIntensityConflicts()` API
+
   ```typescript
   // 文件: server/src/services/graph/queries.ts
   // 添加关联冲突、叙事上下文等信息
   ```
 
 - [ ] **T3.4** 实现 `getConflictCharacterRelations()` API
+
   ```typescript
   // 文件: server/src/services/graph/queries.ts
   // 获取冲突期间的角色关系变化
@@ -1571,24 +1584,28 @@ RETURN {
 #### 任务清单
 
 - [ ] **T4.1** 实现 `ConflictHeatmap` 组件
+
   ```typescript
   // 文件: components/PlotWeaver/ConflictHeatmap.tsx
   // 冲突强度热力图
   ```
 
 - [ ] **T4.2** 实现 `DependencyGraph` 组件
+
   ```typescript
   // 文件: components/PlotWeaver/DependencyGraph.tsx
   // 情节依赖关系图（力导向图）
   ```
 
 - [ ] **T4.3** 实现 `ConflictParticipantNetwork` 组件
+
   ```typescript
   // 文件: components/PlotWeaver/ConflictParticipantNetwork.tsx
   // 冲突参与者网络图
   ```
 
 - [ ] **T4.4** 集成到 `PlotWeaver` 主界面
+
   ```typescript
   // 文件: components/PlotWeaver.tsx
   // 在 AuxiliaryDrawer 中添加新标签页
@@ -1605,18 +1622,21 @@ RETURN {
 #### 任务清单
 
 - [ ] **T5.1** 编写单元测试
+
   ```typescript
   // 文件: server/src/__tests__/graph/queries.test.ts
   // 测试新查询 API
   ```
 
 - [ ] **T5.2** 编写集成测试
+
   ```typescript
   // 文件: server/src/__tests__/integration/plotEnhancement.test.ts
   // 测试完整数据流
   ```
 
 - [ ] **T5.3** 更新 API 文档
+
   ```markdown
   // 文件: server/docs/api.md
   // 记录新增的 API 端点
@@ -1634,12 +1654,12 @@ RETURN {
 
 ### 8.1 技术风险
 
-| 风险 | 等级 | 缓解措施 |
-|------|------|---------|
-| 数据迁移失败 | 高 | 1. 先备份；2. 渐进迁移；3. 提供回滚脚本 |
-| 图谱查询性能 | 中 | 1. 添加索引；2. 限制查询深度；3. 使用缓存 |
-| 前端渲染性能 | 中 | 1. 虚拟化长列表；2. 限制节点数量；3. WebGL 渲染 |
-| API 兼容性 | 低 | 保持旧 API 可用，新 API 独立 |
+| 风险         | 等级 | 缓解措施                                        |
+| ------------ | ---- | ----------------------------------------------- |
+| 数据迁移失败 | 高   | 1. 先备份；2. 渐进迁移；3. 提供回滚脚本         |
+| 图谱查询性能 | 中   | 1. 添加索引；2. 限制查询深度；3. 使用缓存       |
+| 前端渲染性能 | 中   | 1. 虚拟化长列表；2. 限制节点数量；3. WebGL 渲染 |
+| API 兼容性   | 低   | 保持旧 API 可用，新 API 独立                    |
 
 ### 8.2 数据迁移风险
 
@@ -1648,24 +1668,24 @@ RETURN {
 // server/src/migrations/rollbackConflictNodes.ts
 
 export async function rollbackConflictNodes(projectId: string): Promise<void> {
-    const driver = getDriver();
-    const session = driver.session();
+  const driver = getDriver();
+  const session = driver.session();
 
-    try {
-        // 删除所有独立 Conflict 节点
-        await session.run(
-            `MATCH (c:Conflict {projectId: $projectId})
+  try {
+    // 删除所有独立 Conflict 节点
+    await session.run(
+      `MATCH (c:Conflict {projectId: $projectId})
              DETACH DELETE c`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        // 恢复 PlotNode.conflictScenario 字段（从备份）
-        // ... 实现恢复逻辑
+    // 恢复 PlotNode.conflictScenario 字段（从备份）
+    // ... 实现恢复逻辑
 
-        console.log(`Rolled back conflict nodes for project ${projectId}`);
-    } finally {
-        await session.close();
-    }
+    console.log(`Rolled back conflict nodes for project ${projectId}`);
+  } finally {
+    await session.close();
+  }
 }
 ```
 
@@ -1686,24 +1706,25 @@ FOR (c:Conflict) ON (c.projectId, c.status, c.intensity);
 
 ## 附录：关键文件清单
 
-| 文件路径 | 改动类型 | 说明 |
-|----------|---------|------|
-| `types.ts` | 修改 | 扩展 ConflictScenario, 添加 PlotDependency |
-| `services/schemas.ts` | 修改 | 更新 Zod 验证规则 |
-| `server/src/services/graph/sync.ts` | 修改 | 添加 Conflict 节点同步, 依赖关系同步 |
-| `server/src/services/graph/queries.ts` | 修改 | 添加新查询 API |
-| `server/src/routes/graph.ts` | 修改 | 添加 REST API 路由 |
-| `components/PlotWeaver.tsx` | 修改 | 集成可视化组件 |
-| `components/PlotWeaver/ConflictHeatmap.tsx` | 新增 | 冲突热力图组件 |
-| `components/PlotWeaver/DependencyGraph.tsx` | 新增 | 依赖关系图组件 |
-| `components/PlotWeaver/ConflictParticipantNetwork.tsx` | 新增 | 参与者网络图组件 |
-| `server/src/migrations/extractConflictNodes.ts` | 新增 | 数据迁移脚本 |
+| 文件路径                                               | 改动类型 | 说明                                       |
+| ------------------------------------------------------ | -------- | ------------------------------------------ |
+| `types.ts`                                             | 修改     | 扩展 ConflictScenario, 添加 PlotDependency |
+| `services/schemas.ts`                                  | 修改     | 更新 Zod 验证规则                          |
+| `server/src/services/graph/sync.ts`                    | 修改     | 添加 Conflict 节点同步, 依赖关系同步       |
+| `server/src/services/graph/queries.ts`                 | 修改     | 添加新查询 API                             |
+| `server/src/routes/graph.ts`                           | 修改     | 添加 REST API 路由                         |
+| `components/PlotWeaver.tsx`                            | 修改     | 集成可视化组件                             |
+| `components/PlotWeaver/ConflictHeatmap.tsx`            | 新增     | 冲突热力图组件                             |
+| `components/PlotWeaver/DependencyGraph.tsx`            | 新增     | 依赖关系图组件                             |
+| `components/PlotWeaver/ConflictParticipantNetwork.tsx` | 新增     | 参与者网络图组件                           |
+| `server/src/migrations/extractConflictNodes.ts`        | 新增     | 数据迁移脚本                               |
 
 ---
 
 **文档结束**
 
 **审阅者**: 请在实施前确认以下决策点：
+
 1. [ ] Conflict 节点是否需要独立的 UI 管理界面
 2. [ ] 依赖关系类型是否需要根据项目类型调整
 3. [ ] 可视化组件的默认渲染方式（Canvas vs SVG）

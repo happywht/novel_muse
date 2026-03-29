@@ -7,7 +7,11 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Sparkles, Info, ChevronDown, ChevronUp, Save, RotateCcw } from 'lucide-react';
 import { AppSection } from '../types';
 import { PromptPanelProps } from '../types/promptPanel';
-import { PROMPT_REGISTRY_LITERARY, PROMPT_REGISTRY_WEB_NOVEL, PromptTemplate } from '../config/prompts';
+import {
+  PROMPT_REGISTRY_LITERARY,
+  PROMPT_REGISTRY_WEB_NOVEL,
+  PromptTemplate,
+} from '../config/prompts';
 import { PromptService } from '../services/promptService';
 import { useFeatureFlags } from '../contexts/FeatureFlagContext';
 
@@ -20,22 +24,13 @@ const DRAFTING_PROMPT_KEYS = [
 ];
 
 // Outliner模块相关的prompt keys
-const OUTLINER_PROMPT_KEYS = [
-  'plot_fission',
-  'plot_rewrite',
-  'audit_plot',
-];
+const OUTLINER_PROMPT_KEYS = ['plot_fission', 'plot_rewrite', 'audit_plot'];
 
 // Character模块相关的prompt keys
-const CHARACTER_PROMPT_KEYS = [
-  'character_gen',
-];
+const CHARACTER_PROMPT_KEYS = ['character_gen'];
 
 // Echoes模块相关的prompt keys
-const ECHOES_PROMPT_KEYS = [
-  'world_echo_extraction',
-  'plot_analysis',
-];
+const ECHOES_PROMPT_KEYS = ['world_echo_extraction', 'plot_analysis'];
 
 // World模块相关的prompt keys
 const WORLD_PROMPT_KEYS = [
@@ -104,7 +99,7 @@ export const PromptPanel: React.FC<PromptPanelProps> = ({
         setEditedInstruction(template.instruction);
         // 初始化参数默认值
         const defaults: Record<string, any> = {};
-        template.parameters?.forEach(param => {
+        template.parameters?.forEach((param) => {
           defaults[param.name] = param.default;
         });
         setParameterValues(defaults);
@@ -120,7 +115,7 @@ export const PromptPanel: React.FC<PromptPanelProps> = ({
       setEditedInstruction(template.instruction);
       // 重置参数为默认值
       const defaults: Record<string, any> = {};
-      template.parameters?.forEach(param => {
+      template.parameters?.forEach((param) => {
         defaults[param.name] = param.default;
       });
       setParameterValues(defaults);
@@ -129,7 +124,7 @@ export const PromptPanel: React.FC<PromptPanelProps> = ({
 
   // 参数变更处理
   const handleParameterChange = (paramName: string, value: any) => {
-    setParameterValues(prev => ({
+    setParameterValues((prev) => ({
       ...prev,
       [paramName]: value,
     }));
@@ -229,10 +224,8 @@ export const PromptPanel: React.FC<PromptPanelProps> = ({
               {/* Parameters */}
               {selectedPrompt.parameters && selectedPrompt.parameters.length > 0 && (
                 <div className="space-y-2">
-                  <label className="text-[10px] text-slate-400 font-medium">
-                    参数配置
-                  </label>
-                  {selectedPrompt.parameters.map(param => (
+                  <label className="text-[10px] text-slate-400 font-medium">参数配置</label>
+                  {selectedPrompt.parameters.map((param) => (
                     <div key={param.name} className="flex items-center justify-between gap-2">
                       <span className="text-[10px] text-slate-300">{param.label}</span>
                       {param.type === 'slider' && (
@@ -243,7 +236,9 @@ export const PromptPanel: React.FC<PromptPanelProps> = ({
                             max={param.max}
                             step={param.step}
                             value={parameterValues[param.name] ?? param.default}
-                            onChange={(e) => handleParameterChange(param.name, parseFloat(e.target.value))}
+                            onChange={(e) =>
+                              handleParameterChange(param.name, parseFloat(e.target.value))
+                            }
                             className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
                           />
                           <span className="text-[9px] text-slate-400 w-8 text-right font-mono">
@@ -257,7 +252,7 @@ export const PromptPanel: React.FC<PromptPanelProps> = ({
                           onChange={(e) => handleParameterChange(param.name, e.target.value)}
                           className="bg-slate-900/50 border border-slate-700 rounded px-2 py-1 text-[10px] text-slate-300 outline-none focus:border-purple-500"
                         >
-                          {param.options?.map(opt => (
+                          {param.options?.map((opt) => (
                             <option key={opt.value} value={opt.value}>
                               {opt.label}
                             </option>
@@ -266,7 +261,9 @@ export const PromptPanel: React.FC<PromptPanelProps> = ({
                       )}
                       {param.type === 'toggle' && (
                         <button
-                          onClick={() => handleParameterChange(param.name, !parameterValues[param.name])}
+                          onClick={() =>
+                            handleParameterChange(param.name, !parameterValues[param.name])
+                          }
                           className={`relative w-8 h-4 rounded-full transition-colors ${
                             parameterValues[param.name] ? 'bg-purple-600' : 'bg-slate-700'
                           }`}

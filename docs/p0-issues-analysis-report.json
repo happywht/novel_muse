@@ -1,0 +1,723 @@
+{
+  "reportMetadata": {
+    "title": "Muse + inkos P0 Issues Technical Analysis Report",
+    "generatedAt": "2026-03-29T10:00:00Z",
+    "author": "Backend Technical Lead",
+    "project": "Muse Novel Architect + inkos CLI Integration",
+    "techStack": ["React", "TypeScript", "Express.js", "IndexedDB", "Neo4j", "inkos CLI"],
+    "codebaseVersion": "feature/character-knowledge-graph"
+  },
+  "executiveSummary": {
+    "totalIssues": 4,
+    "criticalIssues": 4,
+    "estimatedTotalHours": 18,
+    "recommendedExecutionDays": 3,
+    "riskLevel": "MEDIUM",
+    "topPriority": "#1 - types.ts File Corruption"
+  },
+  "issues": {
+    "#1": {
+      "id": "#1",
+      "title": "[P0] 修复 types.ts 文件内容损坏",
+      "priority": "P0",
+      "category": "DATA_INTEGRITY",
+      "status": "OPEN",
+      "technicalAnalysis": {
+        "problemDescription": "项目中的 services/inkos/types.ts 文件已损坏。该文件内容被 mkdir 命令覆盖，原本应该是 TypeScript 类型定义文件，现在变成了一个错误的 shell 命令文本。",
+        "rootCause": "文件内容被错误地替换为 shell 命令 'mkdir -p \"D:/家庭/副业探索/小说项目/小说开题/remix_-muse_-小说架构师_022302/services/inkos\" -p \"D:/家庭/副业探索/小说项目/小说开题/remix_-muse_-小说架构师_022302/services/inkos/types.ts\"'。这可能是由于错误的工具调用或脚本执行导致的。",
+        "affectedFiles": [
+          "services/inkos/types.ts",
+          "services/inkos/storage/interface.ts (import dependency)",
+          "services/inkos/storage/index.ts (import dependency)"
+        ],
+        "impactAssessment": {
+          "severity": "CRITICAL",
+          "scope": "Build failure, TypeScript compilation errors",
+          "affectedComponents": ["inkos storage adapters", "type definitions", "import chains"],
+          "userImpact": "Application cannot compile or run"
+        },
+        "currentFileState": "Corrupted - contains shell command instead of TypeScript code"
+      },
+      "recommendedSolution": {
+        "approach": "RESTORE_AND_VERIFY",
+        "steps": [
+          {
+            "step": 1,
+            "action": "Restore types.ts content",
+            "description": "基于 server/src/types/inkos.ts 和 types/inkos.ts 中的现有定义，重建 services/inkos/types.ts 文件",
+            "referenceFiles": [
+              "server/src/types/inkos.ts (complete Zod schemas)",
+              "types/inkos.ts (frontend type definitions)"
+            ]
+          },
+          {
+            "step": 2,
+            "action": "Define storage adapter types",
+            "description": "确保定义 StorageAdapterType, StorageAdapterConfig, SyncOptions 等类型"
+          },
+          {
+            "step": 3,
+            "action": "Verify import chain",
+            "description": "确保所有依赖文件可以正确导入类型"
+          },
+          {
+            "step": 4,
+            "action": "Run TypeScript compilation",
+            "description": "执行 tsc --noEmit 验证无编译错误"
+          }
+        ],
+        "codeStructure": {
+          "requiredTypes": [
+            "StorageAdapterType",
+            "StorageAdapterConfig",
+            "SyncOptions",
+            "SyncProgress",
+            "SyncResult",
+            "StorageEventListener",
+            "StorageEvent",
+            "StorageEventType"
+          ],
+          "imports": [
+            "import { z } from 'zod' (optional, for validation)"
+          ],
+          "exports": [
+            "All storage-related type definitions"
+          ]
+        }
+      },
+      "estimatedEffort": {
+        "hours": 2,
+        "complexity": "LOW",
+        "confidence": "HIGH"
+      },
+      "dependencies": {
+        "blockedBy": [],
+        "blocks": ["#2", "#3", "#4"],
+        "reason": "types.ts 是基础类型文件，其他 Issues 的实现都依赖于正确的类型定义"
+      },
+      "riskAssessment": {
+        "level": "LOW",
+        "factors": [
+          "有完整的参考文件可以复制",
+          "类型定义相对简单",
+          "不影响运行时数据"
+        ],
+        "mitigation": "从现有文件复制类型定义，确保与 storage/interface.ts 一致"
+      },
+      "acceptanceCriteria": [
+        "services/inkos/types.ts 包含有效的 TypeScript 代码",
+        "所有导入该文件的模块可以成功编译",
+        "tsc --noEmit 无错误",
+        "npm run typecheck 通过"
+      ]
+    },
+    "#2": {
+      "id": "#2",
+      "title": "[P0] 统一存储格式（Markdown/JSON）",
+      "priority": "P0",
+      "category": "DATA_ARCHITECTURE",
+      "status": "OPEN",
+      "technicalAnalysis": {
+        "problemDescription": "项目中存在多种存储格式混用的情况：1) inkos CLI 使用 YAML (project.yaml) 和 Markdown (outline.md, chapters/*.md)；2) Muse 前端使用 IndexedDB 存储 JSON 数据；3) 服务端使用 Prisma + SQLite/PostgreSQL。这种格式不一致导致数据转换复杂、出错风险高。",
+        "rootCause": "Muse 和 inkos 是两个独立开发的项目，集成时没有统一存储格式策略",
+        "currentFormats": {
+          "inkos": {
+            "config": "YAML (project.yaml)",
+            "outline": "Markdown (outline.md)",
+            "chapters": "Markdown (chapters/*.md)",
+            "characters": "JSON (characters.json)",
+            "world": "JSON (world.json)"
+          },
+          "muse": {
+            "projects": "IndexedDB (localforage)",
+            "state": "JSON in IndexedDB"
+          },
+          "server": {
+            "database": "Prisma Schema (SQLite/PostgreSQL)",
+            "graph": "Neo4j"
+          }
+        },
+        "impactAssessment": {
+          "severity": "HIGH",
+          "scope": "Data import/export, synchronization, consistency",
+          "affectedComponents": [
+            "services/inkos/storage/*Adapter.ts",
+            "server/src/services/inkosService.ts",
+            "inkos/packages/core/src/state/manager.ts"
+          ],
+          "userImpact": "数据丢失风险、导入导出失败、数据不一致"
+        }
+      },
+      "recommendedSolution": {
+        "approach": "HYBRID_ADAPTER_PATTERN",
+        "description": "实现统一的存储适配器模式，支持双向格式转换",
+        "architecture": {
+          "pattern": "Adapter Pattern + Strategy Pattern",
+          "components": [
+            {
+              "name": "StorageAdapter Interface",
+              "responsibility": "定义统一的存储接口",
+              "file": "services/inkos/storage/interface.ts"
+            },
+            {
+              "name": "IndexedDBStorageAdapter",
+              "responsibility": "Web 端 IndexedDB 存储",
+              "file": "services/inkos/storage/indexeddbAdapter.ts"
+            },
+            {
+              "name": "FileStorageAdapter",
+              "responsibility": "CLI 端文件系统存储 (YAML/MD/JSON)",
+              "file": "services/inkos/storage/fileAdapter.ts"
+            },
+            {
+              "name": "HybridStorageAdapter",
+              "responsibility": "双向同步适配器",
+              "file": "services/inkos/storage/hybridAdapter.ts"
+            }
+          ]
+        },
+        "implementation": {
+          "phase1": {
+            "name": "Interface Unification",
+            "tasks": [
+              "完善 StorageAdapter 接口定义",
+              "添加格式转换方法 toJSON()/fromJSON()",
+              "添加同步方法 sync()"
+            ]
+          },
+          "phase2": {
+            "name": "Adapter Implementation",
+            "tasks": [
+              "实现 FileStorageAdapter 的 YAML/MD 解析",
+              "实现 IndexedDBStorageAdapter 的 CRUD",
+              "实现 HybridStorageAdapter 的双向同步"
+            ]
+          },
+          "phase3": {
+            "name": "Integration Testing",
+            "tasks": [
+              "单元测试各适配器",
+              "集成测试数据同步",
+              "边界条件测试"
+            ]
+          }
+        },
+        "dataFlowExample": {
+          "museToInkos": "Muse Project (IndexedDB JSON) -> FileStorageAdapter -> YAML/MD files",
+          "inkosToMuse": "inkos files (YAML/MD) -> FileStorageAdapter -> JSON -> IndexedDB"
+        }
+      },
+      "estimatedEffort": {
+        "hours": 6,
+        "complexity": "MEDIUM",
+        "confidence": "MEDIUM"
+      },
+      "dependencies": {
+        "blockedBy": ["#1"],
+        "blocks": [],
+        "parallelWith": ["#3"]
+      },
+      "riskAssessment": {
+        "level": "MEDIUM",
+        "factors": [
+          "需要处理多种格式的边界情况",
+          "Markdown 解析可能有歧义",
+          "双向同步可能导致数据冲突"
+        ],
+        "mitigation": "实现版本控制和冲突解决策略，添加数据校验"
+      },
+      "acceptanceCriteria": [
+        "所有存储适配器通过单元测试",
+        "Muse 项目可以成功导入到 inkos 格式",
+        "inkos 项目可以成功导出到 Muse 格式",
+        "数据同步无丢失",
+        "添加格式转换的集成测试"
+      ]
+    },
+    "#3": {
+      "id": "#3",
+      "title": "[P0] 添加 API 认证机制",
+      "priority": "P0",
+      "category": "SECURITY",
+      "status": "OPEN",
+      "technicalAnalysis": {
+        "problemDescription": "当前 API 认证机制存在以下问题：1) 生产环境未强制要求 API Keys 配置；2) 开发环境默认跳过认证；3) 缺少 JWT/Token 过期机制；4) 缺少细粒度的权限控制；5) 速率限制未启用。",
+        "currentImplementation": {
+          "file": "server/src/middleware/auth.ts",
+          "mechanism": "Static API Key via X-API-Key header",
+          "issues": [
+            "API Keys 存储在环境变量中，无轮换机制",
+            "缺少 Token 过期和刷新逻辑",
+            "缺少用户级别的认证（只有 API 级别）",
+            "速率限制代码存在但未启用",
+            "缺少审计日志"
+          ]
+        },
+        "securityGaps": [
+          {
+            "gap": "No JWT/Session Management",
+            "severity": "HIGH",
+            "description": "API Keys 永久有效，无法撤销或过期"
+          },
+          {
+            "gap": "Missing Rate Limiting",
+            "severity": "MEDIUM",
+            "description": "authRateLimit 中间件已定义但未应用"
+          },
+          {
+            "gap": "No Audit Trail",
+            "severity": "MEDIUM",
+            "description": "认证失败只记录 console.warn，缺少持久化审计日志"
+          },
+          {
+            "gap": "Development Mode Bypass",
+            "severity": "LOW",
+            "description": "SKIP_AUTH=true 可完全绕过认证"
+          }
+        ],
+        "impactAssessment": {
+          "severity": "HIGH",
+          "scope": "API Security, Data Protection",
+          "complianceRisk": "May violate security best practices",
+          "userImpact": "Potential unauthorized access to user data"
+        }
+      },
+      "recommendedSolution": {
+        "approach": "ENHANCED_API_KEY_AUTH",
+        "description": "增强现有 API Key 认证机制，添加速率限制和审计日志",
+        "architecture": {
+          "authenticationFlow": [
+            "1. Client sends request with X-API-Key header",
+            "2. apiKeyAuth middleware validates key",
+            "3. authRateLimit middleware checks rate limits",
+            "4. Request proceeds to route handler"
+          ],
+          "components": [
+            {
+              "name": "Enhanced apiKeyAuth",
+              "changes": [
+                "Add API key hash comparison (bcrypt)",
+                "Add key expiration support",
+                "Add key metadata (created_at, last_used, created_by)"
+              ]
+            },
+            {
+              "name": "authRateLimit",
+              "changes": [
+                "Apply middleware in server/src/index.ts",
+                "Configure limits per endpoint",
+                "Add Redis backend for distributed rate limiting (future)"
+              ]
+            },
+            {
+              "name": "Audit Logger",
+              "changes": [
+                "Log all authentication attempts to database",
+                "Include IP, user-agent, timestamp, result",
+                "Add alerting for suspicious activity"
+              ]
+            }
+          ]
+        },
+        "implementation": {
+          "phase1": {
+            "name": "Enable Rate Limiting",
+            "tasks": [
+              "Add authRateLimit to middleware chain in index.ts",
+              "Configure rate limits (10 attempts per 15 minutes)",
+              "Add X-RateLimit-* headers to responses"
+            ],
+            "codeChange": "app.use('/api', authRateLimit(), apiKeyAuth);"
+          },
+          "phase2": {
+            "name": "Enhance API Key Management",
+            "tasks": [
+              "Create APIKey table in Prisma schema",
+              "Add key hashing with bcrypt",
+              "Add key rotation endpoint",
+              "Add last_used tracking"
+            ]
+          },
+          "phase3": {
+            "name": "Add Audit Logging",
+            "tasks": [
+              "Create AuditLog table in Prisma schema",
+              "Log all auth attempts",
+              "Add audit log query endpoint (admin only)"
+            ]
+          }
+        },
+        "securityBestPractices": [
+          "Store API keys hashed, not plain text",
+          "Use environment variables for sensitive config",
+          "Implement key rotation policy",
+          "Add CORS restrictions",
+          "Enable HTTPS in production"
+        ]
+      },
+      "estimatedEffort": {
+        "hours": 5,
+        "complexity": "MEDIUM",
+        "confidence": "HIGH"
+      },
+      "dependencies": {
+        "blockedBy": ["#1"],
+        "blocks": [],
+        "parallelWith": ["#2"]
+      },
+      "riskAssessment": {
+        "level": "MEDIUM",
+        "factors": [
+          "需要修改现有认证流程",
+          "可能影响现有 API 客户端",
+          "数据库迁移需要谨慎执行"
+        ],
+        "mitigation": "分阶段实施，保持向后兼容，添加功能开关"
+      },
+      "acceptanceCriteria": [
+        "速率限制中间件已启用并测试",
+        "API Key 存储使用 bcrypt 哈希",
+        "所有认证尝试记录到审计日志",
+        "生产环境强制要求 API Keys 配置",
+        "添加 API Key 管理的单元测试",
+        "安全测试通过（无未授权访问）"
+      ]
+    },
+    "#4": {
+      "id": "#4",
+      "title": "[P0] 添加 CLI 执行超时控制",
+      "priority": "P0",
+      "category": "RELIABILITY",
+      "status": "OPEN",
+      "technicalAnalysis": {
+        "problemDescription": "server/src/services/inkosService.ts 中的 executeInkos 和 executeInkosWithStreaming 方法使用 spawn 执行 CLI 命令，但没有超时控制机制。如果 inkos CLI 进程挂起或运行时间过长，会导致：1) 服务器资源被占用；2) 任务永远处于 running 状态；3) 用户无法得到反馈。",
+        "currentImplementation": {
+          "file": "server/src/services/inkosService.ts",
+          "methods": ["executeInkos", "executeInkosWithStreaming"],
+          "issue": "No timeout parameter, no process kill logic"
+        },
+        "codeAnalysis": {
+          "executeInkos": {
+            "lineRange": "106-143",
+            "currentBehavior": "Spawn process and wait indefinitely",
+            "missingFeatures": ["Timeout parameter", "Process kill on timeout", "Cleanup handlers"]
+          },
+          "executeInkosWithStreaming": {
+            "lineRange": "635-692",
+            "currentBehavior": "Spawn process with streaming output, wait indefinitely",
+            "missingFeatures": ["Timeout parameter", "Process kill on timeout", "Stream cleanup"]
+          }
+        },
+        "riskScenarios": [
+          {
+            "scenario": "LLM API hang",
+            "probability": "MEDIUM",
+            "impact": "Process never completes, task stuck in 'running'"
+          },
+          {
+            "scenario": "Large chapter generation",
+            "probability": "HIGH",
+            "impact": "Process runs for hours without feedback"
+          },
+          {
+            "scenario": "Memory exhaustion",
+            "probability": "LOW",
+            "impact": "Server crash"
+          }
+        ],
+        "impactAssessment": {
+          "severity": "HIGH",
+          "scope": "Task execution, server resources, user experience",
+          "affectedComponents": [
+            "InkosService",
+            "TaskStore",
+            "SSE middleware"
+          ],
+          "userImpact": "Tasks may hang indefinitely, no feedback, server degradation"
+        }
+      },
+      "recommendedSolution": {
+        "approach": "TIMEOUT_WITH_GRACEFUL_SHUTDOWN",
+        "description": "为 CLI 执行添加可配置的超时机制，包括优雅关闭和强制终止",
+        "architecture": {
+          "timeoutStrategy": {
+            "defaultTimeout": 300000,
+            "maxTimeout": 1800000,
+            "gracePeriod": 10000,
+            "configurable": true
+          },
+          "flowControl": [
+            "1. Start process with timeout timer",
+            "2. On timeout, send SIGTERM (graceful shutdown)",
+            "3. Wait grace period",
+            "4. If still running, send SIGKILL (force terminate)",
+            "5. Update task status to 'failed' with timeout error",
+            "6. Clean up resources"
+          ]
+        },
+        "implementation": {
+          "interface": {
+            "ExecuteOptions": {
+              "timeout": "number (default: 300000ms)",
+              "signal": "AbortSignal (for cancellation)",
+              "onProgress": "(progress, message) => void"
+            }
+          },
+          "codeChanges": {
+            "executeInkos": [
+              "Add timeout parameter with default value",
+              "Create setTimeout timer",
+              "Add SIGTERM handler",
+              "Add SIGKILL fallback",
+              "Update TaskStore on timeout"
+            ],
+            "executeInkosWithStreaming": [
+              "Same timeout logic",
+              "Add stream cleanup on timeout",
+              "Notify SSE clients of timeout"
+            ]
+          },
+          "exampleCode": {
+            "timeoutHandler": "const timeoutId = setTimeout(() => { proc.kill('SIGTERM'); }, timeout);"
+          }
+        },
+        "configuration": {
+          "environmentVariables": {
+            "INKOS_DEFAULT_TIMEOUT": "300000 (5 minutes)",
+            "INKOS_MAX_TIMEOUT": "1800000 (30 minutes)",
+            "INKOS_GRACE_PERIOD": "10000 (10 seconds)"
+          },
+          "perTaskOverride": "Allow timeout in WriteChapterRequest.options"
+        }
+      },
+      "estimatedEffort": {
+        "hours": 5,
+        "complexity": "MEDIUM",
+        "confidence": "HIGH"
+      },
+      "dependencies": {
+        "blockedBy": ["#1"],
+        "blocks": [],
+        "parallelWith": []
+      },
+      "riskAssessment": {
+        "level": "LOW",
+        "factors": [
+          "超时逻辑相对独立",
+          "不影响现有成功路径",
+          "可增量添加"
+        ],
+        "mitigation": "使用功能开关控制，默认启用，允许禁用"
+      },
+      "acceptanceCriteria": [
+        "executeInkos 支持 timeout 参数",
+        "超时后进程被正确终止",
+        "任务状态更新为 'failed' 并包含超时信息",
+        "SSE 客户端收到超时通知",
+        "添加超时场景的单元测试",
+        "添加集成测试验证超时行为"
+      ]
+    }
+  },
+  "optimalFixOrder": [
+    {
+      "order": 1,
+      "issueId": "#1",
+      "reason": "types.ts 是基础设施，其他所有 Issues 都依赖于正确的类型定义",
+      "parallelWith": []
+    },
+    {
+      "order": 2,
+      "issueId": "#2",
+      "reason": "存储格式统一是数据层的基础，与 #3 可以并行",
+      "parallelWith": ["#3"]
+    },
+    {
+      "order": 2,
+      "issueId": "#3",
+      "reason": "API 认证是安全层，与 #2 可以并行开发",
+      "parallelWith": ["#2"]
+    },
+    {
+      "order": 3,
+      "issueId": "#4",
+      "reason": "CLI 超时控制依赖于正确的类型定义和存储适配器",
+      "parallelWith": []
+    }
+  ],
+  "implementationTimeline": {
+    "totalEstimatedHours": 18,
+    "workingDays": 3,
+    "hoursPerDay": 6,
+    "phases": [
+      {
+        "phase": 1,
+        "name": "Foundation Repair",
+        "day": 1,
+        "duration": "2 hours",
+        "tasks": [
+          {
+            "issueId": "#1",
+            "task": "Restore types.ts file",
+            "duration": "2h"
+          }
+        ],
+        "deliverables": ["Valid TypeScript compilation", "All imports working"]
+      },
+      {
+        "phase": 2,
+        "name": "Core Features (Parallel)",
+        "day": 1-2,
+        "duration": "11 hours",
+        "parallelTracks": [
+          {
+            "track": "A",
+            "tasks": [
+              {
+                "issueId": "#2",
+                "task": "Storage Adapter Implementation",
+                "duration": "6h",
+                "breakdown": [
+                  "Interface refinement: 1h",
+                  "FileStorageAdapter: 2h",
+                  "HybridStorageAdapter: 2h",
+                  "Testing: 1h"
+                ]
+              }
+            ]
+          },
+          {
+            "track": "B",
+            "tasks": [
+              {
+                "issueId": "#3",
+                "task": "API Authentication Enhancement",
+                "duration": "5h",
+                "breakdown": [
+                  "Rate limiting: 1h",
+                  "API Key hashing: 2h",
+                  "Audit logging: 2h"
+                ]
+              }
+            ]
+          }
+        ],
+        "deliverables": [
+          "Working storage adapters with tests",
+          "Enhanced API authentication",
+          "Rate limiting enabled"
+        ]
+      },
+      {
+        "phase": 3,
+        "name": "Reliability Improvement",
+        "day": 2-3,
+        "duration": "5 hours",
+        "tasks": [
+          {
+            "issueId": "#4",
+            "task": "CLI Timeout Control",
+            "duration": "5h",
+            "breakdown": [
+              "Timeout implementation: 2h",
+              "Graceful shutdown: 1h",
+              "Testing: 2h"
+            ]
+          }
+        ],
+        "deliverables": [
+          "Timeout mechanism for CLI execution",
+          "Integration tests",
+          "Documentation updates"
+        ]
+      }
+    ]
+  },
+  "dependencyGraph": {
+    "nodes": [
+      {"id": "#1", "label": "types.ts Repair", "level": 0},
+      {"id": "#2", "label": "Storage Format", "level": 1},
+      {"id": "#3", "label": "API Auth", "level": 1},
+      {"id": "#4", "label": "CLI Timeout", "level": 2}
+    ],
+    "edges": [
+      {"from": "#1", "to": "#2", "type": "blocks"},
+      {"from": "#1", "to": "#3", "type": "blocks"},
+      {"from": "#1", "to": "#4", "type": "blocks"}
+    ]
+  },
+  "resourceAllocation": {
+    "recommended": {
+      "developers": 2,
+      "parallelization": "Track A + Track B can run in parallel after #1",
+      "codeReview": "Required after each phase"
+    },
+    "skills": {
+      "trackA": ["TypeScript", "Storage Systems", "Data Transformation"],
+      "trackB": ["Security", "Express.js", "Authentication"],
+      "common": ["Testing", "Documentation"]
+    }
+  },
+  "testingStrategy": {
+    "unitTests": {
+      "coverage": "80%+",
+      "frameworks": ["Jest (server)", "Vitest (inkos)"],
+      "focus": ["Adapter methods", "Auth middleware", "Timeout logic"]
+    },
+    "integrationTests": {
+      "scenarios": [
+        "Muse -> inkos import flow",
+        "inkos -> Muse export flow",
+        "API authentication flow",
+        "CLI timeout scenarios"
+      ]
+    },
+    "securityTests": {
+      "scenarios": [
+        "Invalid API key rejection",
+        "Rate limit enforcement",
+        "Audit log verification"
+      ]
+    }
+  },
+  "rollbackPlan": {
+    "strategy": "Feature flags for each issue",
+    "flags": {
+      "#2": "FEATURE_HYBRID_STORAGE",
+      "#3": "FEATURE_RATE_LIMITING",
+      "#4": "FEATURE_CLI_TIMEOUT"
+    },
+    "rollbackProcedure": "Set flag to false, deploy, verify system stability"
+  },
+  "appendix": {
+    "relevantFiles": {
+      "#1": [
+        "services/inkos/types.ts",
+        "services/inkos/storage/interface.ts",
+        "services/inkos/storage/index.ts",
+        "server/src/types/inkos.ts",
+        "types/inkos.ts"
+      ],
+      "#2": [
+        "services/inkos/storage/*.ts",
+        "server/src/services/inkosService.ts",
+        "inkos/packages/core/src/state/manager.ts"
+      ],
+      "#3": [
+        "server/src/middleware/auth.ts",
+        "server/src/index.ts",
+        "server/prisma/schema.prisma"
+      ],
+      "#4": [
+        "server/src/services/inkosService.ts",
+        "server/src/middleware/sse.ts",
+        "server/src/types/inkos.ts"
+      ]
+    },
+    "commands": {
+      "verifyTypes": "cd D:/家庭/副业探索/小说项目/小说开题/remix_-muse_-小说架构师_022302 && npm run typecheck",
+      "runServerTests": "cd server && npm test",
+      "checkAuth": "curl -H 'X-API-Key: invalid' http://localhost:3001/api/projects"
+    }
+  }
+}

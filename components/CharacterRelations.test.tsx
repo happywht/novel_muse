@@ -261,9 +261,26 @@ export const testUtils = {
    * 验证关系类型颜色映射
    */
   testColorMapping: () => {
-    const types: Array<'ENEMY_OF' | 'ALLY_OF' | 'LOVES' | 'KIN_OF' | 'MENTORS' | 'RIVAL_OF' | 'SERVES' | 'FRIEND_OF' | 'RELATED_TO'> = [
-      'ENEMY_OF', 'ALLY_OF', 'LOVES', 'KIN_OF', 'MENTORS',
-      'RIVAL_OF', 'SERVES', 'FRIEND_OF', 'RELATED_TO'
+    const types: Array<
+      | 'ENEMY_OF'
+      | 'ALLY_OF'
+      | 'LOVES'
+      | 'KIN_OF'
+      | 'MENTORS'
+      | 'RIVAL_OF'
+      | 'SERVES'
+      | 'FRIEND_OF'
+      | 'RELATED_TO'
+    > = [
+      'ENEMY_OF',
+      'ALLY_OF',
+      'LOVES',
+      'KIN_OF',
+      'MENTORS',
+      'RIVAL_OF',
+      'SERVES',
+      'FRIEND_OF',
+      'RELATED_TO',
     ];
 
     console.log('测试所有关系类型的颜色映射:');

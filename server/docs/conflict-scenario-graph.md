@@ -26,6 +26,7 @@ conflictScenario?: {
 ```
 
 关系属性：
+
 - `conflictType`: 冲突类型（CONFRONTATION | CLIMAX | TWIST）
 - `stakes`: 赌注/冲突核心描述
 - `intensity`: 强度等级（1-10）
@@ -37,26 +38,27 @@ conflictScenario?: {
 **端点**: `GET /api/graph/:projectId/conflicts/character/:characterId`
 
 **返回示例**:
+
 ```json
 [
-    {
-        "plotNode": {
-            "id": "plot-1",
-            "title": "初次相遇",
-            "content": "张三和李四初次相遇",
-            "order": 1
-        },
-        "conflictType": "CONFRONTATION",
-        "stakes": "两人之间的第一次冲突，争夺关键资源",
-        "intensity": 6,
-        "otherParticipants": [
-            {
-                "id": "char-2",
-                "name": "李四",
-                "role": "反派"
-            }
-        ]
-    }
+  {
+    "plotNode": {
+      "id": "plot-1",
+      "title": "初次相遇",
+      "content": "张三和李四初次相遇",
+      "order": 1
+    },
+    "conflictType": "CONFRONTATION",
+    "stakes": "两人之间的第一次冲突，争夺关键资源",
+    "intensity": 6,
+    "otherParticipants": [
+      {
+        "id": "char-2",
+        "name": "李四",
+        "role": "反派"
+      }
+    ]
+  }
 ]
 ```
 
@@ -65,31 +67,32 @@ conflictScenario?: {
 **端点**: `GET /api/graph/:projectId/conflicts/high-intensity`
 
 **返回示例**:
+
 ```json
 [
-    {
-        "plotNode": {
-            "id": "plot-2",
-            "title": "高潮对决",
-            "content": "最终决战",
-            "order": 2
-        },
-        "conflictType": "CLIMAX",
-        "stakes": "生死的较量，决定整个故事的走向",
-        "intensity": 10,
-        "participants": [
-            {
-                "id": "char-1",
-                "name": "张三",
-                "role": "主角"
-            },
-            {
-                "id": "char-2",
-                "name": "李四",
-                "role": "反派"
-            }
-        ]
-    }
+  {
+    "plotNode": {
+      "id": "plot-2",
+      "title": "高潮对决",
+      "content": "最终决战",
+      "order": 2
+    },
+    "conflictType": "CLIMAX",
+    "stakes": "生死的较量，决定整个故事的走向",
+    "intensity": 10,
+    "participants": [
+      {
+        "id": "char-1",
+        "name": "张三",
+        "role": "主角"
+      },
+      {
+        "id": "char-2",
+        "name": "李四",
+        "role": "反派"
+      }
+    ]
+  }
 ]
 ```
 

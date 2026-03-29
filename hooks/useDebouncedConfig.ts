@@ -11,57 +11,54 @@ import { getGlobalConfig } from '../config/global';
  * @param value - The value to debounce
  * @param configKey - The key in performance.debounce ('input' | 'search' | 'sync')
  */
-export function useDebouncedValue<T>(
-    value: T,
-    configKey: 'input' | 'search' | 'sync'
-): T {
-    const [debouncedValue, setDebouncedValue] = useState<T>(value);
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+export function useDebouncedValue<T>(value: T, configKey: 'input' | 'search' | 'sync'): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    useEffect(() => {
-        // Load delay from global config
-        getGlobalConfig().then(config => {
-            const delay = config.performance.debounce[configKey];
-            
-            if (timerRef.current) {
-                clearTimeout(timerRef.current);
-            }
+  useEffect(() => {
+    // Load delay from global config
+    getGlobalConfig().then((config) => {
+      const delay = config.performance.debounce[configKey];
 
-            timerRef.current = setTimeout(() => {
-                setDebouncedValue(value);
-            }, delay);
-        });
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
 
-        return () => {
-            if (timerRef.current) {
-                clearTimeout(timerRef.current);
-            }
-        };
-    }, [value, configKey]);
+      timerRef.current = setTimeout(() => {
+        setDebouncedValue(value);
+      }, delay);
+    });
 
-    return debouncedValue;
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, [value, configKey]);
+
+  return debouncedValue;
 }
 
 /**
  * Debounced callback hook that reads delay from global config
  */
 export function useDebouncedCallback(
-    callback: (...args: any[]) => void,
-    configKey: 'input' | 'search' | 'sync'
+  callback: (...args: any[]) => void,
+  configKey: 'input' | 'search' | 'sync'
 ): (...args: any[]) => void {
-    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    return (...args: any[]) => {
-        getGlobalConfig().then(config => {
-            const delay = config.performance.debounce[configKey];
+  return (...args: any[]) => {
+    getGlobalConfig().then((config) => {
+      const delay = config.performance.debounce[configKey];
 
-            if (timerRef.current) {
-                clearTimeout(timerRef.current);
-            }
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
 
-            timerRef.current = setTimeout(() => {
-                callback(...args);
-            }, delay);
-        });
-    };
+      timerRef.current = setTimeout(() => {
+        callback(...args);
+      }, delay);
+    });
+  };
 }

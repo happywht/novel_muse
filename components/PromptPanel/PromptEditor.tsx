@@ -62,10 +62,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
   const [editContent, setEditContent] = useState('');
 
   // 计算当前生效层级
-  const effectLevel: EffectLevel = getEffectLevel(
-    !!item.moduleOverride,
-    !!item.projectOverride
-  );
+  const effectLevel: EffectLevel = getEffectLevel(!!item.moduleOverride, !!item.projectOverride);
 
   // 获取当前生效的内容
   const activeContent = item.moduleOverride || item.projectOverride || item.instruction;
@@ -136,11 +133,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
           {item.parameters && item.parameters.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-slate-900/40 rounded-lg border border-slate-700/30">
               {item.parameters.map((param) => (
-                <ParameterControl
-                  key={param.key}
-                  config={param}
-                  disabled={disabled}
-                />
+                <ParameterControl key={param.key} config={param} disabled={disabled} />
               ))}
             </div>
           )}
@@ -184,9 +177,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
                 disabled={disabled}
               />
               <div className="flex justify-between items-center">
-                <span className="text-[10px] text-slate-600">
-                  {editContent.length} / 2000 字
-                </span>
+                <span className="text-[10px] text-slate-600">{editContent.length} / 2000 字</span>
                 <div className="flex gap-2">
                   <button
                     onClick={handleCancelEdit}

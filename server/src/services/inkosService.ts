@@ -6,7 +6,6 @@
 import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs/promises';
-import { v4 as uuidv4 } from 'uuid';
 import {
   TaskInfo,
   TaskStatus,
@@ -19,17 +18,28 @@ import {
   AuditRequest,
   AuditResult,
   InkosConfig,
+  ExecuteOptions,
+  ExecuteResult,
+  CliTimeoutError,
+  CLI_TIMEOUT,
 } from '../types/inkos';
 import { sendTaskProgress, sendWriteChunk, sendAuditDimension } from '../middleware/sse';
+import { taskPersistence } from './taskPersistence';
 
 /**
- * Task storage (in-memory for now, can be replaced with Redis/DB)
+ * Legacy in-memory TaskStore for backward compatibility
+ * Used as fallback when persistent storage fails
  */
-class TaskStore {
-  private tasks: Map<string, TaskInfo> = new Map();
+class MemoryTaskStore {
+  tasks: Map<string, TaskInfo> = new Map();
 
   create(type: TaskInfo['type'], projectId: string): TaskInfo {
-    const taskId = uuidv4();
+    const taskId = crypto.randomUUID ? crypto.randomUUID() :
+      'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
     const now = new Date().toISOString();
     const task: TaskInfo = {
       taskId,
@@ -63,6 +73,178 @@ class TaskStore {
 
   delete(taskId: string): boolean {
     return this.tasks.delete(taskId);
+  }
+
+  values(): IterableIterator<TaskInfo> {
+    return this.tasks.values();
+  }
+}
+
+/**
+ * Hybrid TaskStore that uses persistent storage with memory fallback
+ * Provides backward compatibility when persistent storage fails
+ */
+class TaskStore {
+  private memoryFallback: MemoryTaskStore;
+  private usePersistence: boolean = true;
+
+  constructor() {
+    this.memoryFallback = new MemoryTaskStore();
+    // Restore tasks from disk on startup
+    this.initPersistence();
+  }
+
+  /**
+   * Initialize persistent storage and restore tasks
+   */
+  private async initPersistence(): Promise<void> {
+    try {
+      const result = await taskPersistence.restore();
+      console.log(`[TaskStore] Persistence initialized: ${result.restored} tasks restored`);
+      this.usePersistence = true;
+
+      // Schedule periodic cleanup
+      this.scheduleCleanup();
+    } catch (error) {
+      console.error('[TaskStore] Failed to initialize persistence, using memory fallback:', error);
+      this.usePersistence = false;
+    }
+  }
+
+  /**
+   * Schedule periodic cleanup of expired tasks
+   */
+  private scheduleCleanup(): void {
+    // Run cleanup every hour
+    const CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+
+    setInterval(async () => {
+      try {
+        const result = await taskPersistence.cleanup();
+        if (result.removed > 0) {
+          console.log(`[TaskStore] Periodic cleanup: ${result.removed} expired tasks removed`);
+        }
+      } catch (error) {
+        console.error('[TaskStore] Cleanup failed:', error);
+      }
+    }, CLEANUP_INTERVAL_MS);
+
+    // Also run cleanup on startup after a short delay
+    setTimeout(async () => {
+      try {
+        await taskPersistence.cleanup();
+      } catch (error) {
+        console.error('[TaskStore] Initial cleanup failed:', error);
+      }
+    }, 5000);
+  }
+
+  /**
+   * Create a new task
+   */
+  create(type: TaskInfo['type'], projectId: string): TaskInfo {
+    if (this.usePersistence) {
+      // Use async version but return synchronously for backward compatibility
+      taskPersistence.create(type, projectId).then((task) => {
+        // Cache in memory for fast access
+        this.memoryFallback.tasks.set(task.taskId, task);
+      }).catch((error) => {
+        console.error('[TaskStore] Failed to persist task, using memory:', error);
+      });
+    }
+    // Always create in memory for immediate access
+    return this.memoryFallback.create(type, projectId);
+  }
+
+  /**
+   * Get task by ID
+   */
+  get(taskId: string): TaskInfo | undefined {
+    // Try memory first (faster)
+    const memoryTask = this.memoryFallback.get(taskId);
+    if (memoryTask) {
+      return memoryTask;
+    }
+
+    // If not in memory and using persistence, we should wait for async
+    // For backward compatibility, return undefined
+    return undefined;
+  }
+
+  /**
+   * Update task
+   */
+  update(taskId: string, updates: Partial<TaskInfo>): TaskInfo | undefined {
+    const memoryTask = this.memoryFallback.get(taskId);
+    if (!memoryTask) {
+      return undefined;
+    }
+
+    // Update memory first for immediate access
+    const updated = this.memoryFallback.update(taskId, updates);
+
+    // Persist asynchronously
+    if (this.usePersistence && updated) {
+      taskPersistence.update(taskId, updates).catch((error) => {
+        console.error('[TaskStore] Failed to persist task update:', error);
+      });
+    }
+
+    return updated;
+  }
+
+  /**
+   * Delete task
+   */
+  delete(taskId: string): boolean {
+    // Delete from memory
+    const deleted = this.memoryFallback.delete(taskId);
+
+    // Delete from persistence
+    if (this.usePersistence) {
+      taskPersistence.delete(taskId).catch((error) => {
+        console.error('[TaskStore] Failed to delete task from persistence:', error);
+      });
+    }
+
+    return deleted;
+  }
+
+  /**
+   * List all tasks (async version for API endpoints)
+   */
+  async list(filter?: { projectId?: string; status?: TaskStatus[] }): Promise<TaskInfo[]> {
+    if (this.usePersistence) {
+      try {
+        return await taskPersistence.list(filter);
+      } catch (error) {
+        console.error('[TaskStore] Failed to list from persistence, using memory:', error);
+      }
+    }
+
+    // Fallback to memory
+    const tasks = Array.from(this.memoryFallback.values());
+    if (filter?.projectId) {
+      return tasks.filter((t) => (t as any).projectId === filter.projectId);
+    }
+    if (filter?.status) {
+      return tasks.filter((t) => filter.status!.includes(t.status));
+    }
+    return tasks;
+  }
+
+  /**
+   * Get task asynchronously (for API endpoints)
+   */
+  async getAsync(taskId: string): Promise<TaskInfo | null> {
+    if (this.usePersistence) {
+      try {
+        return await taskPersistence.get(taskId);
+      } catch (error) {
+        console.error('[TaskStore] Failed to get from persistence, using memory:', error);
+      }
+    }
+    return this.memoryFallback.get(taskId) || null;
   }
 }
 
@@ -101,19 +283,25 @@ export class InkosService {
   }
 
   /**
-   * Execute inkos CLI command
+   * Execute inkos CLI command with timeout control
    */
   private async executeInkos(
     args: string[],
-    options: { cwd?: string; env?: Record<string, string> } = {}
-  ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+    options: ExecuteOptions = {}
+  ): Promise<ExecuteResult> {
+    const timeoutMs = options.timeoutMs ?? CLI_TIMEOUT.DEFAULT;
+    const cliPath = this.getCliPath();
+    const env = {
+      ...process.env,
+      ...options.env,
+      NODE_ENV: 'production',
+    };
+
     return new Promise((resolve, reject) => {
-      const cliPath = this.getCliPath();
-      const env = {
-        ...process.env,
-        ...options.env,
-        NODE_ENV: 'production',
-      };
+      let timeoutId: NodeJS.Timeout | null = null;
+      let stdout = '';
+      let stderr = '';
+      let hasResolved = false;
 
       const proc: ChildProcess = spawn('node', [cliPath, ...args], {
         cwd: options.cwd || this.inkosPath,
@@ -121,8 +309,24 @@ export class InkosService {
         stdio: ['pipe', 'pipe', 'pipe'],
       });
 
-      let stdout = '';
-      let stderr = '';
+      // Set up timeout handler
+      timeoutId = setTimeout(() => {
+        if (!hasResolved) {
+          hasResolved = true;
+          // Kill the process and all its children
+          proc.kill('SIGTERM');
+
+          // Force kill after 5 seconds if still running
+          setTimeout(() => {
+            if (!proc.killed) {
+              proc.kill('SIGKILL');
+            }
+          }, 5000);
+
+          const timeoutError = new CliTimeoutError(timeoutMs, `inkos ${args.join(' ')}`);
+          reject(timeoutError);
+        }
+      }, timeoutMs);
 
       proc.stdout?.on('data', (data) => {
         stdout += data.toString();
@@ -133,11 +337,25 @@ export class InkosService {
       });
 
       proc.on('close', (exitCode) => {
-        resolve({ stdout, stderr, exitCode: exitCode || 0 });
+        if (!hasResolved) {
+          hasResolved = true;
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          resolve({ stdout, stderr, exitCode: exitCode ?? 0, timedOut: false });
+        }
       });
 
       proc.on('error', (error) => {
-        reject(new Error(`Failed to execute inkos: ${error.message}`));
+        if (!hasResolved) {
+          hasResolved = true;
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          reject(new Error(`执行 inkos CLI 失败: ${error.message}`));
+        }
       });
     });
   }
@@ -145,10 +363,7 @@ export class InkosService {
   /**
    * Import Muse project to inkos format
    */
-  async importProject(
-    request: ImportRequest,
-    projectId: string
-  ): Promise<{ taskId: string }> {
+  async importProject(request: ImportRequest, projectId: string): Promise<{ taskId: string }> {
     await this.ensureWorkspace();
 
     const task = taskStore.create('import', projectId);
@@ -185,6 +400,7 @@ export class InkosService {
       // Run inkos init in the task directory (init doesn't support --path, use cwd)
       const result = await this.executeInkos(['init'], {
         cwd: taskDir,
+        timeoutMs: CLI_TIMEOUT.SHORT,
       });
 
       if (result.exitCode !== 0) {
@@ -211,7 +427,7 @@ export class InkosService {
 
       return { taskId: task.taskId };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = this.formatErrorMessage(error);
       taskStore.update(task.taskId, {
         status: 'failed',
         error: errorMessage,
@@ -225,10 +441,7 @@ export class InkosService {
   /**
    * Export inkos project to Muse format
    */
-  async exportProject(
-    request: ExportRequest,
-    projectId: string
-  ): Promise<{ taskId: string }> {
+  async exportProject(request: ExportRequest, projectId: string): Promise<{ taskId: string }> {
     const task = taskStore.create('export', projectId);
 
     try {
@@ -248,7 +461,7 @@ export class InkosService {
       sendTaskProgress(projectId, task.taskId, 40, 'Reading inkos project...');
 
       // Convert to Muse format
-      const museProject = await this.convertInkosToMuse(inkosProject) as any;
+      const museProject = (await this.convertInkosToMuse(inkosProject)) as any;
       taskStore.update(task.taskId, {
         progress: 70,
         message: 'Converting to Muse format...',
@@ -274,7 +487,7 @@ export class InkosService {
 
       return { taskId: task.taskId };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = this.formatErrorMessage(error);
       taskStore.update(task.taskId, {
         status: 'failed',
         error: errorMessage,
@@ -288,10 +501,7 @@ export class InkosService {
   /**
    * Write chapter using inkos writer agent
    */
-  async writeChapter(
-    request: WriteChapterRequest,
-    projectId: string
-  ): Promise<{ taskId: string }> {
+  async writeChapter(request: WriteChapterRequest, projectId: string): Promise<{ taskId: string }> {
     const task = taskStore.create('write', projectId);
 
     try {
@@ -339,7 +549,8 @@ export class InkosService {
           if (data?.chunk) {
             sendWriteChunk(projectId, task.taskId, data.chunk, data.wordCount || 0);
           }
-        }
+        },
+        CLI_TIMEOUT.LONG // Use longer timeout for write operations
       );
 
       if (result.exitCode !== 0) {
@@ -372,7 +583,7 @@ export class InkosService {
 
       return { taskId: task.taskId };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = this.formatErrorMessage(error);
       taskStore.update(task.taskId, {
         status: 'failed',
         error: errorMessage,
@@ -386,10 +597,7 @@ export class InkosService {
   /**
    * Run 33-dimension audit
    */
-  async runAudit(
-    request: AuditRequest,
-    projectId: string
-  ): Promise<{ taskId: string }> {
+  async runAudit(request: AuditRequest, projectId: string): Promise<{ taskId: string }> {
     const task = taskStore.create('audit', projectId);
 
     try {
@@ -437,7 +645,8 @@ export class InkosService {
               data.issues || []
             );
           }
-        }
+        },
+        CLI_TIMEOUT.AUDIT // Use audit-specific timeout
       );
 
       if (result.exitCode !== 0) {
@@ -458,7 +667,7 @@ export class InkosService {
 
       return { taskId: task.taskId };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = this.formatErrorMessage(error);
       taskStore.update(task.taskId, {
         status: 'failed',
         error: errorMessage,
@@ -497,6 +706,19 @@ export class InkosService {
   // ============================================
   // Private Helper Methods
   // ============================================
+
+  /**
+   * Format error message for user-friendly display
+   */
+  private formatErrorMessage(error: unknown): string {
+    if (error instanceof CliTimeoutError) {
+      return error.message;
+    }
+    if (error instanceof Error) {
+      return error.message;
+    }
+    return 'Unknown error';
+  }
 
   /**
    * Get project path by ID
@@ -539,7 +761,7 @@ export class InkosService {
           synopsis: ch.synopsis || '',
         })),
       },
-      characters: (request.characters || []).map(char => ({
+      characters: (request.characters || []).map((char) => ({
         id: char.id,
         name: char.name,
         role: char.role || 'supporting',
@@ -556,7 +778,9 @@ export class InkosService {
   /**
    * Convert inkos project to Muse format
    */
-  private async convertInkosToMuse(inkosProject: Record<string, unknown>): Promise<Record<string, unknown>> {
+  private async convertInkosToMuse(
+    inkosProject: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
     // This is a simplified conversion - expand based on actual inkos format
     return {
       project: {
@@ -640,24 +864,46 @@ export class InkosService {
   }
 
   /**
-   * Execute inkos with streaming progress
+   * Execute inkos with streaming progress and timeout control
    */
   private async executeInkosWithStreaming(
     args: string[],
     cwd: string,
-    onProgress: (progress: number, message: string, data?: any) => void
-  ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    return new Promise((resolve, reject) => {
-      const cliPath = this.getCliPath();
-      let stdout = '';
-      let stderr = '';
-      let progress = 0;
+    onProgress: (progress: number, message: string, data?: any) => void,
+    timeoutMs: number = CLI_TIMEOUT.LONG
+  ): Promise<ExecuteResult> {
+    const cliPath = this.getCliPath();
+    let stdout = '';
+    let stderr = '';
+    let progress = 0;
+    let hasResolved = false;
+    let timeoutId: NodeJS.Timeout | null = null;
 
+    return new Promise((resolve, reject) => {
       const proc: ChildProcess = spawn('node', [cliPath, ...args], {
         cwd,
         env: process.env,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
+
+      // Set up timeout handler
+      timeoutId = setTimeout(() => {
+        if (!hasResolved) {
+          hasResolved = true;
+          // Kill the process and all its children
+          proc.kill('SIGTERM');
+
+          // Force kill after 5 seconds if still running
+          setTimeout(() => {
+            if (!proc.killed) {
+              proc.kill('SIGKILL');
+            }
+          }, 5000);
+
+          const timeoutError = new CliTimeoutError(timeoutMs, `inkos ${args.join(' ')}`);
+          reject(timeoutError);
+        }
+      }, timeoutMs);
 
       proc.stdout?.on('data', (data) => {
         const text = data.toString();
@@ -692,11 +938,25 @@ export class InkosService {
       });
 
       proc.on('close', (exitCode) => {
-        resolve({ stdout, stderr, exitCode: exitCode || 0 });
+        if (!hasResolved) {
+          hasResolved = true;
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          resolve({ stdout, stderr, exitCode: exitCode ?? 0, timedOut: false });
+        }
       });
 
       proc.on('error', (error) => {
-        reject(new Error(`Failed to execute inkos: ${error.message}`));
+        if (!hasResolved) {
+          hasResolved = true;
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+            timeoutId = null;
+          }
+          reject(new Error(`执行 inkos CLI 失败: ${error.message}`));
+        }
       });
     });
   }
@@ -800,7 +1060,9 @@ export class InkosService {
   private parseOutlineMarkdown(md: string): Record<string, unknown> {
     // Basic markdown parser
     const sections: Record<string, unknown> = {};
-    const chapterMatches = md.matchAll(/### Chapter (\d+): (.+?)\n\n([\s\S]*?)(?=### Chapter|\n*$)/g);
+    const chapterMatches = md.matchAll(
+      /### Chapter (\d+): (.+?)\n\n([\s\S]*?)(?=### Chapter|\n*$)/g
+    );
     const chapters: Array<{ number: number; title: string; synopsis: string }> = [];
 
     for (const match of chapterMatches) {

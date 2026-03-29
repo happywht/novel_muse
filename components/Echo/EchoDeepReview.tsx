@@ -1,17 +1,27 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Echo, Chapter, Character, WorldSetting } from '../../types';
 import {
-  X, Check, CheckCircle2, XCircle, Zap,
-  ChevronDown, FileText, Search,
-  ArrowUpDown, Edit3, Eye, Save, RotateCcw,
-  ClipboardCheck
+  X,
+  Check,
+  CheckCircle2,
+  XCircle,
+  Zap,
+  ChevronDown,
+  FileText,
+  Search,
+  ArrowUpDown,
+  Edit3,
+  Eye,
+  Save,
+  RotateCcw,
+  ClipboardCheck,
 } from 'lucide-react';
 import {
   categorizeEchoes,
   getConfidenceConfig,
   getConfidenceBarColor,
   formatConfidence,
-  CategorizedEchoes
+  CategorizedEchoes,
 } from './echoUtils';
 import { EchoIntegrityReport } from './EchoIntegrityReport';
 
@@ -52,7 +62,7 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
   onBatchReject,
   onUpdate,
   onSimulate,
-  onPublishConfirm
+  onPublishConfirm,
 }) => {
   // 筛选状态
   const [chapterFilter, setChapterFilter] = useState<string>('ALL');
@@ -66,7 +76,7 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [editingState, setEditingState] = useState<EditingState>({
     description: '',
-    reason: ''
+    reason: '',
   });
 
   // 完整性报告模态框状态
@@ -90,7 +100,7 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
 
   // 当echoes变化时重置activeEchoId
   useEffect(() => {
-    if (activeEchoId && !echoes.find(e => e.id === activeEchoId)) {
+    if (activeEchoId && !echoes.find((e) => e.id === activeEchoId)) {
       setActiveEchoId(null);
       setIsEditing(false);
     }
@@ -123,8 +133,8 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
 
     // 按角色筛选
     if (characterFilter !== 'ALL') {
-      result = result.filter(echo =>
-        echo.type === 'CHARACTER' && echo.targetId === characterFilter
+      result = result.filter(
+        (echo) => echo.type === 'CHARACTER' && echo.targetId === characterFilter
       );
     }
 
@@ -140,14 +150,16 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
 
   // 当前选中的Echo
   const activeEcho = useMemo(() => {
-    return echoes.find(e => e.id === activeEchoId) || null;
+    return echoes.find((e) => e.id === activeEchoId) || null;
   }, [echoes, activeEchoId]);
 
   // 统计当前筛选结果的状态
   const filterStats = useMemo(() => {
-    const accepted = filteredEchoes.filter(e => e.status === 'ACCEPTED' || e.status === 'AUTO_ACCEPTED').length;
-    const pending = filteredEchoes.filter(e => e.status === 'PENDING').length;
-    const rejected = filteredEchoes.filter(e => e.status === 'REJECTED').length;
+    const accepted = filteredEchoes.filter(
+      (e) => e.status === 'ACCEPTED' || e.status === 'AUTO_ACCEPTED'
+    ).length;
+    const pending = filteredEchoes.filter((e) => e.status === 'PENDING').length;
+    const rejected = filteredEchoes.filter((e) => e.status === 'REJECTED').length;
     return { accepted, pending, rejected, total: filteredEchoes.length };
   }, [filteredEchoes]);
 
@@ -167,7 +179,7 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
     if (selectedIds.size === filteredEchoes.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredEchoes.map(e => e.id)));
+      setSelectedIds(new Set(filteredEchoes.map((e) => e.id)));
     }
   };
 
@@ -178,22 +190,22 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
 
   // 批量采纳
   const handleBatchAccept = () => {
-    const selected = filteredEchoes.filter(e => selectedIds.has(e.id));
+    const selected = filteredEchoes.filter((e) => selectedIds.has(e.id));
     if (onBatchAccept) {
       onBatchAccept(selected);
     } else {
-      selected.forEach(e => onAccept(e));
+      selected.forEach((e) => onAccept(e));
     }
     setSelectedIds(new Set());
   };
 
   // 批量拒绝
   const handleBatchReject = () => {
-    const selected = filteredEchoes.filter(e => selectedIds.has(e.id));
+    const selected = filteredEchoes.filter((e) => selectedIds.has(e.id));
     if (onBatchReject) {
       onBatchReject(selected);
     } else {
-      selected.forEach(e => onReject(e));
+      selected.forEach((e) => onReject(e));
     }
     setSelectedIds(new Set());
   };
@@ -204,7 +216,7 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
     setIsEditing(false);
     setEditingState({
       description: echo.description,
-      reason: echo.reason
+      reason: echo.reason,
     });
   };
 
@@ -213,7 +225,7 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
     if (activeEcho) {
       setEditingState({
         description: activeEcho.description,
-        reason: activeEcho.reason
+        reason: activeEcho.reason,
       });
       setIsEditing(true);
     }
@@ -225,7 +237,7 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
       onUpdate({
         ...activeEcho,
         description: editingState.description,
-        reason: editingState.reason
+        reason: editingState.reason,
       });
       setIsEditing(false);
     }
@@ -236,7 +248,7 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
     if (activeEcho) {
       setEditingState({
         description: activeEcho.description,
-        reason: activeEcho.reason
+        reason: activeEcho.reason,
       });
       setIsEditing(false);
     }
@@ -304,13 +316,16 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
                 className="appearance-none bg-slate-800 border border-slate-700 text-slate-200 text-sm px-4 py-2 pr-10 rounded-lg focus:outline-none focus:border-muse-500 transition-colors"
               >
                 <option value="ALL">全部章节</option>
-                {chapters.map(chapter => (
+                {chapters.map((chapter) => (
                   <option key={chapter.id} value={chapter.id}>
                     {chapter.title}
                   </option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+              <ChevronDown
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                size={16}
+              />
             </div>
 
             {/* 角色筛选 */}
@@ -321,13 +336,16 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
                 className="appearance-none bg-slate-800 border border-slate-700 text-slate-200 text-sm px-4 py-2 pr-10 rounded-lg focus:outline-none focus:border-muse-500 transition-colors"
               >
                 <option value="ALL">全部角色</option>
-                {characters.map(char => (
+                {characters.map((char) => (
                   <option key={char.id} value={char.id}>
                     {char.name}
                   </option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+              <ChevronDown
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                size={16}
+              />
             </div>
 
             {/* 置信度筛选 */}
@@ -342,7 +360,10 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
                 <option value="MEDIUM">中置信度</option>
                 <option value="LOW">低置信度</option>
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+              <ChevronDown
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                size={16}
+              />
             </div>
 
             {/* 排序切换 */}
@@ -386,9 +407,7 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
                 <span className="text-lg">📊</span>
                 <span className="text-sm font-bold text-white">变更概览</span>
               </div>
-              <div className="text-xs text-slate-400 mb-3">
-                共 {filterStats.total} 个Echo
-              </div>
+              <div className="text-xs text-slate-400 mb-3">共 {filterStats.total} 个Echo</div>
               <div className="flex gap-4 text-xs">
                 <div className="flex items-center gap-1">
                   <span>🟢</span>
@@ -413,7 +432,7 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
                   <p className="text-xs">暂无符合条件的Echo</p>
                 </div>
               ) : (
-                filteredEchoes.map(echo => {
+                filteredEchoes.map((echo) => {
                   const confConfig = getConfidenceConfig(echo.confidence);
                   const isSelected = selectedIds.has(echo.id);
                   const isActive = activeEchoId === echo.id;
@@ -427,8 +446,8 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
                         isActive
                           ? 'bg-muse-900/30 border-muse-500/50 shadow-lg'
                           : isSelected
-                          ? `${confConfig.bg} ${confConfig.border}`
-                          : 'bg-slate-800/40 border-slate-700 hover:border-slate-600'
+                            ? `${confConfig.bg} ${confConfig.border}`
+                            : 'bg-slate-800/40 border-slate-700 hover:border-slate-600'
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -464,11 +483,13 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
 
                           {/* 类型标签 */}
                           <div className="flex items-center gap-2 mt-2">
-                            <span className={`text-[8px] uppercase font-bold px-1.5 py-0.5 rounded-sm ${
-                              echo.type === 'CHARACTER'
-                                ? 'bg-indigo-900/50 text-indigo-300'
-                                : 'bg-emerald-900/50 text-emerald-300'
-                            }`}>
+                            <span
+                              className={`text-[8px] uppercase font-bold px-1.5 py-0.5 rounded-sm ${
+                                echo.type === 'CHARACTER'
+                                  ? 'bg-indigo-900/50 text-indigo-300'
+                                  : 'bg-emerald-900/50 text-emerald-300'
+                              }`}
+                            >
                               {echo.type === 'CHARACTER' ? '人物' : '世界'}
                             </span>
                           </div>
@@ -514,11 +535,13 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <h3 className="text-lg font-bold text-white">{activeEcho.targetName}</h3>
-                      <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-sm ${
-                        activeEcho.type === 'CHARACTER'
-                          ? 'bg-indigo-900/50 text-indigo-300'
-                          : 'bg-emerald-900/50 text-emerald-300'
-                      }`}>
+                      <span
+                        className={`text-[10px] uppercase font-bold px-2 py-1 rounded-sm ${
+                          activeEcho.type === 'CHARACTER'
+                            ? 'bg-indigo-900/50 text-indigo-300'
+                            : 'bg-emerald-900/50 text-emerald-300'
+                        }`}
+                      >
                         {activeEcho.type === 'CHARACTER' ? '人物' : '世界'}
                       </span>
                     </div>
@@ -536,23 +559,27 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
                   <div className="flex items-center gap-4 mb-4">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-slate-400">类型:</span>
-                      <span className={`text-xs px-2 py-1 rounded border ${
-                        activeEcho.type === 'CHARACTER'
-                          ? 'bg-indigo-900/30 border-indigo-500/50 text-indigo-300'
-                          : 'bg-emerald-900/30 border-emerald-500/50 text-emerald-300'
-                      }`}>
+                      <span
+                        className={`text-xs px-2 py-1 rounded border ${
+                          activeEcho.type === 'CHARACTER'
+                            ? 'bg-indigo-900/30 border-indigo-500/50 text-indigo-300'
+                            : 'bg-emerald-900/30 border-emerald-500/50 text-emerald-300'
+                        }`}
+                      >
                         {activeEcho.type}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-slate-400">状态:</span>
-                      <span className={`text-xs px-2 py-1 rounded border ${
-                        activeEcho.status === 'ACCEPTED' || activeEcho.status === 'AUTO_ACCEPTED'
-                          ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-300'
-                          : activeEcho.status === 'PENDING'
-                          ? 'bg-amber-900/30 border-amber-500/50 text-amber-300'
-                          : 'bg-rose-900/30 border-rose-500/50 text-rose-300'
-                      }`}>
+                      <span
+                        className={`text-xs px-2 py-1 rounded border ${
+                          activeEcho.status === 'ACCEPTED' || activeEcho.status === 'AUTO_ACCEPTED'
+                            ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-300'
+                            : activeEcho.status === 'PENDING'
+                              ? 'bg-amber-900/30 border-amber-500/50 text-amber-300'
+                              : 'bg-rose-900/30 border-rose-500/50 text-rose-300'
+                        }`}
+                      >
                         {activeEcho.status}
                       </span>
                     </div>
@@ -577,13 +604,13 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
                 <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
                   {/* 描述 */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-2">
-                      描述
-                    </label>
+                    <label className="block text-xs font-bold text-slate-400 mb-2">描述</label>
                     {isEditing ? (
                       <textarea
                         value={editingState.description}
-                        onChange={(e) => setEditingState({ ...editingState, description: e.target.value })}
+                        onChange={(e) =>
+                          setEditingState({ ...editingState, description: e.target.value })
+                        }
                         className="w-full h-24 bg-slate-800 border border-slate-700 text-slate-200 text-sm p-3 rounded-lg focus:outline-none focus:border-muse-500 transition-colors resize-none"
                         placeholder="输入描述..."
                       />
@@ -596,13 +623,13 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
 
                   {/* 原因 */}
                   <div>
-                    <label className="block text-xs font-bold text-slate-400 mb-2">
-                      原因
-                    </label>
+                    <label className="block text-xs font-bold text-slate-400 mb-2">原因</label>
                     {isEditing ? (
                       <textarea
                         value={editingState.reason}
-                        onChange={(e) => setEditingState({ ...editingState, reason: e.target.value })}
+                        onChange={(e) =>
+                          setEditingState({ ...editingState, reason: e.target.value })
+                        }
                         className="w-full h-20 bg-slate-800 border border-slate-700 text-slate-200 text-sm p-3 rounded-lg focus:outline-none focus:border-muse-500 transition-colors resize-none"
                         placeholder="输入原因..."
                       />
@@ -633,7 +660,10 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
                       </label>
                       <div className="space-y-2">
                         {activeEcho.triples.map((triple, idx) => (
-                          <div key={idx} className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-xs">
+                          <div
+                            key={idx}
+                            className="bg-slate-800/50 border border-slate-700 rounded-lg p-3 text-xs"
+                          >
                             <div className="flex items-center gap-2 text-slate-300">
                               <span className="font-bold">{triple.subject}</span>
                               <span className="text-muse-400">→</span>
@@ -643,7 +673,8 @@ export const EchoDeepReview: React.FC<EchoDeepReviewProps> = ({
                             </div>
                             {triple.weight !== undefined && (
                               <div className="mt-1 text-slate-500">
-                                强度: {triple.weight}% {triple.trajectory && `(${triple.trajectory})`}
+                                强度: {triple.weight}%{' '}
+                                {triple.trajectory && `(${triple.trajectory})`}
                               </div>
                             )}
                           </div>

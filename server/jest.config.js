@@ -5,11 +5,7 @@ module.exports = {
   roots: ['<rootDir>/src'],
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
-  collectCoverageFrom: [
-    'src/services/**/*.ts',
-    '!src/**/*.d.ts',
-    '!src/index.ts'
-  ],
+  collectCoverageFrom: ['src/services/**/*.ts', '!src/**/*.d.ts', '!src/index.ts'],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   verbose: true,
@@ -17,14 +13,17 @@ module.exports = {
   restoreMocks: true,
   // Handle ES modules
   transform: {
-    '^.+\\.tsx?$': ['ts-jest', {
-      useESM: false,
-    }]
+    '^.+\\.tsx?$': [
+      'ts-jest',
+      {
+        useESM: false,
+      },
+    ],
   },
   // Module path mapping
   moduleNameMapper: {
-    '^(\\.{1,2}/.*)\\.js$': '$1'
+    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   // Setup files
-  setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts']
+  setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
 };

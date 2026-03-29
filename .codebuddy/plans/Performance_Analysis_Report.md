@@ -9,6 +9,7 @@
 ## 执行摘要
 
 ### 关键发现
+
 1. **前端包体积过大**: 主bundle达到1.58MB (gzip后444KB)，超出推荐值3倍
 2. **AI API调用缺乏限流**: 可能导致API配额耗尽和成本失控
 3. **图谱查询未优化**: Neo4j查询缺少索引和查询优化
@@ -16,6 +17,7 @@
 5. **同步策略可改进**: 增量同步机制存在改进空间
 
 ### 优化优先级排序
+
 1. 🔴 **前端包体积优化** (预期收益: 加载时间减少60%)
 2. 🔴 **AI API限流和批处理** (预期收益: API成本降低50%)
 3. 🟡 **图谱查询优化** (预期收益: 查询速度提升3-5倍)
@@ -29,12 +31,14 @@
 ### 1.1 包大小和加载时间 🔴 高影响
 
 **当前状态**:
+
 ```
 dist/assets/index-CYvq7R8_.js: 1,582.29 kB (gzip: 444.21 kB)
 总构建大小: 1.6MB
 ```
 
 **问题分析**:
+
 1. **主bundle过大**: 1.58MB远超Vite推荐的500KB限制
 2. **代码分割不足**: 多个警告提示动态导入未生效
 3. **第三方库未优化**: recharts、tiptap等大型库未拆分
@@ -61,11 +65,11 @@ export default defineConfig({
           'vendor-storage': ['localforage'],
           // UI组件
           'vendor-ui': ['lucide-react', 'react-window'],
-        }
-      }
+        },
+      },
     },
-    chunkSizeWarningLimit: 500
-  }
+    chunkSizeWarningLimit: 500,
+  },
 });
 ```
 
@@ -100,6 +104,7 @@ import Settings from 'lucide-react/dist/esm/icons/settings';
 ### 1.2 组件渲染性能 🟡 中等影响
 
 **当前状态**:
+
 - 使用Zustand进行状态管理 ✓
 - 组件选择性订阅状态 ✓
 - 虚拟滚动实现不完整 ⚠️
@@ -107,6 +112,7 @@ import Settings from 'lucide-react/dist/esm/icons/settings';
 **问题分析**:
 
 #### VirtualList.tsx 第36-51行
+
 ```typescript
 // 当前实现: 实际未使用虚拟滚动
 return (
@@ -166,6 +172,7 @@ function SimpleVirtualList<T>({ items, itemHeight, height, renderItem }: Virtual
 ### 1.3 状态更新效率 🟢 低影响
 
 **当前状态**: 良好
+
 - Zustand的切片架构避免不必要重渲染 ✓
 - 使用debounce减少高频更新 ✓
 - 增量patch机制减少同步数据量 ✓
@@ -194,7 +201,7 @@ updateProject: (data) => {
     store.saveToPersistentStorage();
     store.syncToBackend();
   }
-}
+};
 ```
 
 ---
@@ -204,6 +211,7 @@ updateProject: (data) => {
 ### 2.1 API响应时间 🟡 中等影响
 
 **当前状态**:
+
 - Express服务器配置基本合理 ✓
 - JSON body限制50MB过大 ⚠️
 - 缺少响应压缩中间件 ⚠️
@@ -219,19 +227,21 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 
 // 响应压缩 (预期收益: 传输数据减少70%)
-app.use(compression({
-  filter: (req, res) => {
-    if (req.headers['x-no-compression']) return false;
-    return compression.filter(req, res);
-  },
-  threshold: 1024 // 超过1KB才压缩
-}));
+app.use(
+  compression({
+    filter: (req, res) => {
+      if (req.headers['x-no-compression']) return false;
+      return compression.filter(req, res);
+    },
+    threshold: 1024, // 超过1KB才压缩
+  })
+);
 
 // API速率限制 (预期收益: 防止API滥用)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15分钟
   max: 100, // 每个IP最多100次请求
-  message: { error: '请求过于频繁，请稍后再试' }
+  message: { error: '请求过于频繁，请稍后再试' },
 });
 app.use('/api/', limiter);
 
@@ -250,18 +260,21 @@ app.use('/api/projects/*/chapters/*/expand', aiLimiter);
 app.use(express.json({ limit: '50mb' }));
 
 // 建议: 根据实际需求调整
-app.use(express.json({
-  limit: '10mb',
-  verify: (req, res, buf) => {
-    // 添加payload大小日志
-    console.log(`[API] ${req.method} ${req.path} - Payload: ${(buf.length / 1024).toFixed(2)}KB`);
-  }
-}));
+app.use(
+  express.json({
+    limit: '10mb',
+    verify: (req, res, buf) => {
+      // 添加payload大小日志
+      console.log(`[API] ${req.method} ${req.path} - Payload: ${(buf.length / 1024).toFixed(2)}KB`);
+    },
+  })
+);
 ```
 
 ### 2.2 数据库查询效率 🔴 高影响
 
 **当前状态**:
+
 - Prisma ORM ✓
 - 缺少复合索引 ⚠️
 - N+1查询问题 ⚠️
@@ -270,6 +283,7 @@ app.use(express.json({
 **问题分析**:
 
 #### Prisma Schema分析
+
 ```prisma
 // 当前索引
 model Chapter {
@@ -344,14 +358,14 @@ const project = await prisma.project.findUnique({
         summary: true,
         order: true,
         // 不包含content字段，减少数据传输
-      }
+      },
     },
     characters: true,
     worldSettings: true,
     plotNodes: {
-      orderBy: { order: 'asc' }
-    }
-  }
+      orderBy: { order: 'asc' },
+    },
+  },
 });
 ```
 
@@ -364,7 +378,7 @@ import NodeCache from 'node-cache';
 const queryCache = new NodeCache({
   stdTTL: 300, // 5分钟TTL
   checkperiod: 60,
-  maxKeys: 1000
+  maxKeys: 1000,
 });
 
 export const cacheMiddleware = (duration: number) => {
@@ -394,6 +408,7 @@ router.get('/:id', cacheMiddleware(300), getProject);
 ### 2.3 Neo4j图谱查询优化 🔴 高影响
 
 **当前状态**:
+
 - queries.ts文件100KB，包含大量复杂查询 ⚠️
 - 查询未优化 ⚠️
 - 缺少索引 ⚠️
@@ -401,6 +416,7 @@ router.get('/:id', cacheMiddleware(300), getProject);
 **问题分析**:
 
 #### 关键查询示例 (queries.ts 第15-48行)
+
 ```typescript
 export const getProjectGraph = async (projectId: string, includeTypes?: string[]) => {
   // 问题1: 全量节点查询
@@ -456,7 +472,7 @@ export const getProjectGraphOptimized = async (projectId: string, includeTypes?:
     const record = result.records[0];
     return {
       nodes: record.get('nodes'),
-      edges: record.get('edges').filter(e => e.source && e.target)
+      edges: record.get('edges').filter((e) => e.source && e.target),
     };
   } finally {
     await session.close();
@@ -497,6 +513,7 @@ export const getProjectGraphPaginated = async (
 ### 3.1 Gemini API调用频率 🔴 高影响
 
 **当前状态**:
+
 - 重试机制已实现 ✓ (core.ts 第92-113行)
 - 无请求频率限制 ⚠️
 - 无批处理机制 ⚠️
@@ -505,6 +522,7 @@ export const getProjectGraphPaginated = async (
 **问题分析**:
 
 #### 缓存策略 (core.ts 第130-212行)
+
 ```typescript
 export const executeModelTask = async (...) => {
   // 缓存命中
@@ -553,7 +571,7 @@ class AIRequestQueue {
         task,
         prompt,
         resolve,
-        reject
+        reject,
       });
 
       if (!this.processing) {
@@ -595,10 +613,10 @@ class AIRequestQueue {
   private extractBatch(): QueuedRequest[] {
     // 提取相同类型的请求进行批处理
     const firstTask = this.queue[0].task;
-    const batch = this.queue.filter(r => r.task === firstTask).slice(0, 5);
+    const batch = this.queue.filter((r) => r.task === firstTask).slice(0, 5);
 
     // 从队列中移除
-    batch.forEach(r => {
+    batch.forEach((r) => {
       const index = this.queue.indexOf(r);
       if (index >= 0) this.queue.splice(index, 1);
     });
@@ -609,9 +627,9 @@ class AIRequestQueue {
   private async processBatch(batch: QueuedRequest[]) {
     try {
       // 合并prompt
-      const combinedPrompt = batch.map((r, i) =>
-        `[Request ${i + 1}]\n${r.prompt}`
-      ).join('\n\n---\n\n');
+      const combinedPrompt = batch
+        .map((r, i) => `[Request ${i + 1}]\n${r.prompt}`)
+        .join('\n\n---\n\n');
 
       const result = await executeModelTask(
         batch[0].task,
@@ -625,7 +643,7 @@ class AIRequestQueue {
       const results = this.parseBatchResult(result, batch.length);
       batch.forEach((r, i) => r.resolve(results[i] || ''));
     } catch (error) {
-      batch.forEach(r => r.reject(error));
+      batch.forEach((r) => r.reject(error));
     }
   }
 }
@@ -677,7 +695,7 @@ class SmartCacheManager {
     const oneHourAgo = now - 3600000;
     this.accessPatterns.set(
       key,
-      accesses.filter(t => t > oneHourAgo)
+      accesses.filter((t) => t > oneHourAgo)
     );
   }
 
@@ -691,6 +709,7 @@ class SmartCacheManager {
 ### 3.2 提示词长度优化 🟡 中等影响
 
 **当前状态**:
+
 - 场景生成包含大量上下文 ⚠️
 - 滚动摘要可能过长 ⚠️
 
@@ -779,7 +798,7 @@ export const generateSceneStreaming = async (
       config: {
         systemInstruction: getInstructionWithSettings('scene_generation', params.settings),
         temperature: 0.8,
-      }
+      },
     });
 
     let fullText = '';
@@ -800,7 +819,7 @@ export const generateSceneStreaming = async (
 const generateWithProgress = async () => {
   const response = await fetch('/api/generate-scene-stream', {
     method: 'POST',
-    body: JSON.stringify(params)
+    body: JSON.stringify(params),
   });
 
   const reader = response.body.getReader();
@@ -811,7 +830,7 @@ const generateWithProgress = async () => {
     if (done) break;
 
     const chunk = decoder.decode(value);
-    setDraft(prev => prev + chunk); // 实时更新UI
+    setDraft((prev) => prev + chunk); // 实时更新UI
   }
 };
 ```
@@ -823,6 +842,7 @@ const generateWithProgress = async () => {
 ### 4.1 前后端同步策略 🟡 中等影响
 
 **当前状态**:
+
 - Debounce 2秒自动保存 ✓
 - 增量PATCH机制 ✓
 - 无冲突检测 ⚠️
@@ -849,7 +869,7 @@ class OfflineSyncQueue {
 
   constructor() {
     window.addEventListener('online', () => this.processQueue());
-    window.addEventListener('offline', () => this.isOnline = false);
+    window.addEventListener('offline', () => (this.isOnline = false));
   }
 
   async enqueue(operation: Omit<SyncOperation, 'id' | 'timestamp' | 'retries'>) {
@@ -857,7 +877,7 @@ class OfflineSyncQueue {
       ...operation,
       id: generateId(),
       timestamp: Date.now(),
-      retries: 0
+      retries: 0,
     };
 
     this.queue.push(op);
@@ -927,8 +947,10 @@ class ConflictResolver {
   detectConflict(localData: any, serverData: any): boolean {
     // 检测lastModified差异
     if (localData.lastModified && serverData.lastModified) {
-      return localData.lastModified < serverData.lastModified &&
-             localData.lastModified !== serverData.lastModified;
+      return (
+        localData.lastModified < serverData.lastModified &&
+        localData.lastModified !== serverData.lastModified
+      );
     }
     return false;
   }
@@ -948,7 +970,7 @@ class ConflictResolver {
 
     return {
       strategy: 'MERGE',
-      mergedData: merged
+      mergedData: merged,
     };
   }
 }
@@ -957,6 +979,7 @@ class ConflictResolver {
 ### 4.2 图谱同步频率 🟡 中等影响
 
 **当前状态**:
+
 - syncDebounce 2秒 ✓
 - 同步锁机制 ✓ (sync.ts 第4行)
 - 无批量同步 ⚠️
@@ -985,9 +1008,7 @@ class GraphSyncBatcher {
 
     // 批量处理
     const results = await Promise.allSettled(
-      syncs.map(([projectId, data]) =>
-        this.syncProjectGraph(projectId, data)
-      )
+      syncs.map(([projectId, data]) => this.syncProjectGraph(projectId, data))
     );
 
     results.forEach((result, i) => {
@@ -1039,6 +1060,7 @@ class GraphSyncBatcher {
 ### 4.3 增量更新机制 🟢 低影响
 
 **当前状态**: 良好
+
 - 已实现增量patch ✓
 - 待同步数据缓存 ✓
 
@@ -1067,7 +1089,7 @@ updateProject: (data) => {
   _pendingPatch = { ..._pendingPatch, ...actualChanges };
 
   // ... 触发保存
-}
+};
 
 // 辅助函数
 function isEqual(a: any, b: any): boolean {
@@ -1080,7 +1102,7 @@ function isEqual(a: any, b: any): boolean {
 
   if (keysA.length !== keysB.length) return false;
 
-  return keysA.every(key => isEqual(a[key], b[key]));
+  return keysA.every((key) => isEqual(a[key], b[key]));
 }
 ```
 
@@ -1091,6 +1113,7 @@ function isEqual(a: any, b: any): boolean {
 ### 5.1 内存使用 🟡 中等影响
 
 **当前状态**:
+
 - Zustand store内存管理良好 ✓
 - 缓存无上限 ⚠️
 - 大型对象未清理 ⚠️
@@ -1119,7 +1142,7 @@ class CacheManager {
     this.cache.set(key, {
       data,
       timestamp: Date.now(),
-      key
+      key,
     });
   }
 
@@ -1159,6 +1182,7 @@ class CacheManager {
 ### 5.2 网络请求量 🟡 中等影响
 
 **当前状态**:
+
 - 无请求去重 ⚠️
 - 无请求优先级 ⚠️
 
@@ -1207,6 +1231,7 @@ export const fetchProjectList = async (): Promise<ProjectSummary[]> => {
 ### 5.3 存储空间 🟢 低影响
 
 **当前状态**:
+
 - IndexedDB替代localStorage ✓
 - 无旧数据清理 ⚠️
 
@@ -1222,25 +1247,23 @@ class StorageCleaner {
 
     // 清理过期的Echo
     const { project } = useProjectStore.getState();
-    const cleanedEchoes = project.echoes.filter(e =>
-      e.status !== 'RESOLVED' || e.timestamp > cutoffDate
+    const cleanedEchoes = project.echoes.filter(
+      (e) => e.status !== 'RESOLVED' || e.timestamp > cutoffDate
     );
 
     if (cleanedEchoes.length !== project.echoes.length) {
       useProjectStore.getState().updateProject({
-        echoes: cleanedEchoes
+        echoes: cleanedEchoes,
       });
       console.log(`[Storage] Cleaned ${project.echoes.length - cleanedEchoes.length} old echoes`);
     }
 
     // 清理过期的PlotHistory
-    const cleanedHistory = project.plotHistory.filter(h =>
-      h.timestamp > cutoffDate
-    );
+    const cleanedHistory = project.plotHistory.filter((h) => h.timestamp > cutoffDate);
 
     if (cleanedHistory.length !== project.plotHistory.length) {
       useProjectStore.getState().updateProject({
-        plotHistory: cleanedHistory
+        plotHistory: cleanedHistory,
       });
     }
   }
@@ -1250,7 +1273,7 @@ class StorageCleaner {
       const estimate = await navigator.storage.estimate();
       return {
         used: estimate.usage || 0,
-        quota: estimate.quota || 0
+        quota: estimate.quota || 0,
       };
     }
     return { used: 0, quota: 0 };
@@ -1260,9 +1283,12 @@ class StorageCleaner {
 export const storageCleaner = new StorageCleaner();
 
 // 定期清理
-setInterval(() => {
-  storageCleaner.cleanOldData();
-}, 24 * 60 * 60 * 1000); // 每天清理一次
+setInterval(
+  () => {
+    storageCleaner.cleanOldData();
+  },
+  24 * 60 * 60 * 1000
+); // 每天清理一次
 ```
 
 ---
@@ -1309,7 +1335,7 @@ class PerformanceMonitor {
       report[name] = {
         avg: values.reduce((a, b) => a + b, 0) / values.length,
         min: Math.min(...values),
-        max: Math.max(...values)
+        max: Math.max(...values),
       };
     }
 
@@ -1370,6 +1396,7 @@ export const PerformanceDashboard: React.FC = () => {
 ## 7. 实施路线图
 
 ### 第一阶段: 快速见效 (1-2周)
+
 1. **前端代码分割** - 实施manualChunks配置
 2. **添加数据库索引** - 执行Prisma schema迁移
 3. **API响应压缩** - 添加compression中间件
@@ -1378,6 +1405,7 @@ export const PerformanceDashboard: React.FC = () => {
 **预期收益**: 加载时间减少40%，API响应速度提升30%
 
 ### 第二阶段: 深度优化 (2-4周)
+
 1. **AI请求队列** - 实现限流和批处理
 2. **Neo4j查询优化** - 添加索引和查询重构
 3. **离线同步队列** - 提升数据可靠性
@@ -1386,6 +1414,7 @@ export const PerformanceDashboard: React.FC = () => {
 **预期收益**: API成本降低40%，查询速度提升5倍，内存占用减少30%
 
 ### 第三阶段: 监控和持续优化 (持续)
+
 1. **性能监控仪表板** - 实时追踪关键指标
 2. **A/B测试** - 验证优化效果
 3. **用户反馈循环** - 根据实际使用情况调整
@@ -1396,18 +1425,19 @@ export const PerformanceDashboard: React.FC = () => {
 
 ## 8. 成本效益分析
 
-| 优化项 | 开发成本 | 预期收益 | ROI |
-|--------|---------|---------|-----|
-| 前端代码分割 | 2天 | 加载时间减少60% | 极高 |
-| 数据库索引 | 0.5天 | 查询速度提升3-10倍 | 极高 |
-| AI请求队列 | 3天 | API成本降低40% | 高 |
-| Neo4j优化 | 2天 | 图谱查询提速5倍 | 高 |
-| 缓存优化 | 1天 | 响应时间减少40% | 高 |
-| 离线队列 | 2天 | 数据可靠性提升90% | 中 |
-| 内存管理 | 1天 | 内存占用减少30% | 中 |
+| 优化项       | 开发成本 | 预期收益           | ROI  |
+| ------------ | -------- | ------------------ | ---- |
+| 前端代码分割 | 2天      | 加载时间减少60%    | 极高 |
+| 数据库索引   | 0.5天    | 查询速度提升3-10倍 | 极高 |
+| AI请求队列   | 3天      | API成本降低40%     | 高   |
+| Neo4j优化    | 2天      | 图谱查询提速5倍    | 高   |
+| 缓存优化     | 1天      | 响应时间减少40%    | 高   |
+| 离线队列     | 2天      | 数据可靠性提升90%  | 中   |
+| 内存管理     | 1天      | 内存占用减少30%    | 中   |
 
 **总计开发时间**: 约11.5天
 **总体预期收益**:
+
 - 前端加载时间: 减少60%
 - API响应速度: 提升50%
 - API成本: 降低40%
@@ -1420,18 +1450,22 @@ export const PerformanceDashboard: React.FC = () => {
 ## 9. 风险和注意事项
 
 ### 9.1 代码分割风险
+
 - **风险**: 过度分割导致HTTP请求增加
 - **缓解**: 使用HTTP/2多路复用，合理设置chunk大小
 
 ### 9.2 缓存策略风险
+
 - **风险**: 缓存过期导致数据不一致
 - **缓解**: 实现主动失效机制，在数据更新时清除相关缓存
 
 ### 9.3 批处理风险
+
 - **风险**: 批处理延迟影响用户体验
 - **缓解**: 对关键操作提供即时模式，非关键操作使用批处理
 
 ### 9.4 Neo4j索引风险
+
 - **风险**: 索引创建影响写入性能
 - **缓解**: 在低峰期创建索引，监控写入性能
 

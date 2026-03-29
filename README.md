@@ -35,17 +35,20 @@
 ### 安装与运行
 
 1. **进入项目目录**
+
    ```bash
    cd remix_-muse_-小说架构师_022302
    ```
 
 2. **安装依赖**
+
    ```bash
    npm install
    ```
 
 3. **配置环境变量**
    在项目根目录找到或创建 `.env.local` 文件，并将其中的 `GEMINI_API_KEY` 替换为您自己的 API 密钥：
+
    ```env
    GEMINI_API_KEY="your_api_key_here"
    ```

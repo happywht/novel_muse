@@ -10,8 +10,8 @@ export type PromptOverrideTier = 'DEFAULT' | 'PROJECT' | 'MODULE';
  */
 export interface ModulePromptConfig {
   moduleId: AppSection;
-  promptKeys: string[];        // 该模块相关的prompt keys
-  creativity?: number;       // 默认创意值
+  promptKeys: string[]; // 该模块相关的prompt keys
+  creativity?: number; // 默认创意值
   parameters?: PromptParameter[];
 }
 
@@ -35,7 +35,7 @@ export interface PromptParameter {
  */
 export interface PromptPanelProps {
   moduleId: AppSection;
-  compact?: boolean;           // 紧凑模式（仅显示徽章）
+  compact?: boolean; // 紧凑模式（仅显示徽章）
   defaultCollapsed?: boolean;
   onPromptChange?: (key: string, value: string) => void;
   onParameterChange?: (key: string, value: any) => void;

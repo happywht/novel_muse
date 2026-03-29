@@ -1,7 +1,5 @@
 {
   "permissions": {
-    "allow": [
-      "Skill(zcf:git-commit)"
-    ]
+    "allow": ["Skill(zcf:git-commit)"]
   }
 }

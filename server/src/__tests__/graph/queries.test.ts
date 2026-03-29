@@ -4,19 +4,15 @@
  */
 
 import { jest } from '@jest/globals';
-import {
-  getMockDriver,
-} from './__mocks__/client';
+import { getMockDriver } from './__mocks__/client';
 
 // 模拟 client 模块
 jest.mock('../../services/graph/client', () => ({
-  getDriver: () => getMockDriver()
+  getDriver: () => getMockDriver(),
 }));
 
 // 导入被测试的函数（需要在 mock 之后导入）
-import {
-  getCharacterTraits,
-} from '../../services/graph/queries';
+import { getCharacterTraits } from '../../services/graph/queries';
 
 describe('Graph Queries Service', () => {
   let mockSession: ReturnType<ReturnType<typeof getMockDriver>['getMockSession']>;
@@ -41,7 +37,7 @@ describe('Graph Queries Service', () => {
       forEach: (callback: (value: any, key: string) => void) => {
         Object.entries(data).forEach(([key, value]) => callback(value, key));
       },
-      toObject: () => data
+      toObject: () => data,
     };
   }
 
@@ -60,12 +56,10 @@ describe('Graph Queries Service', () => {
         fear: '害怕失败',
         weakness: '过于自信',
         signature: '冷静',
-        contrast: '与李四形成对比'
+        contrast: '与李四形成对比',
       };
 
-      mockSession.setMockResult('MATCH (c:Character', [
-        createMockRecord(mockTraits)
-      ]);
+      mockSession.setMockResult('MATCH (c:Character', [createMockRecord(mockTraits)]);
 
       const result = await getCharacterTraits(projectId, characterId);
 
@@ -92,12 +86,10 @@ describe('Graph Queries Service', () => {
         fear: null,
         weakness: null,
         signature: null,
-        contrast: null
+        contrast: null,
       };
 
-      mockSession.setMockResult('MATCH (c:Character', [
-        createMockRecord(mockTraits)
-      ]);
+      mockSession.setMockResult('MATCH (c:Character', [createMockRecord(mockTraits)]);
 
       const result = await getCharacterTraits(projectId, characterId);
 
@@ -109,8 +101,7 @@ describe('Graph Queries Service', () => {
     it('应该处理数据库错误', async () => {
       mockSession.setFailure(true, new Error('Database connection failed'));
 
-      await expect(getCharacterTraits(projectId, characterId))
-        .rejects.toThrow();
+      await expect(getCharacterTraits(projectId, characterId)).rejects.toThrow();
     });
   });
 });

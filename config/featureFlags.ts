@@ -4,11 +4,11 @@ export type UserTier = 'FREE' | 'PREMIUM';
 
 export interface FeatureFlags {
   // 高级功能开关
-  promptConfirmBeforeAI: boolean;  // AI调用前确认
-  promptEditor: boolean;            // Prompt编辑器
-  callHistory: boolean;             // 调用历史
-  promptEditing: boolean;           // Prompt编辑功能
-  customPromptLibrary: boolean;     // 自定义Prompt库
+  promptConfirmBeforeAI: boolean; // AI调用前确认
+  promptEditor: boolean; // Prompt编辑器
+  callHistory: boolean; // 调用历史
+  promptEditing: boolean; // Prompt编辑功能
+  customPromptLibrary: boolean; // 自定义Prompt库
 }
 
 // 默认配置

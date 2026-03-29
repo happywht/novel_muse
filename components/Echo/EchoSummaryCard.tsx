@@ -1,15 +1,22 @@
 import React, { useState, useMemo } from 'react';
 import { Echo } from '../../types';
 import {
-  ScanSearch, Sparkles, RefreshCw, ChevronDown, ChevronUp,
-  Check, X, Zap, Eye
+  ScanSearch,
+  Sparkles,
+  RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  X,
+  Zap,
+  Eye,
 } from 'lucide-react';
 import {
   categorizeEchoes,
   getConfidenceConfig,
   getConfidenceBarColor,
   formatConfidence,
-  CategorizedEchoes
+  CategorizedEchoes,
 } from './echoUtils';
 
 interface EchoSummaryCardProps {
@@ -29,7 +36,7 @@ export const EchoSummaryCard: React.FC<EchoSummaryCardProps> = ({
   onAccept,
   onReject,
   onSimulate,
-  onViewAll
+  onViewAll,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -55,7 +62,11 @@ export const EchoSummaryCard: React.FC<EchoSummaryCardProps> = ({
               disabled={isExtracting}
               className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded flex items-center gap-1 transition-colors disabled:opacity-50 border border-slate-700"
             >
-              {isExtracting ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} />}
+              {isExtracting ? (
+                <RefreshCw size={12} className="animate-spin" />
+              ) : (
+                <Sparkles size={12} />
+              )}
               提取状态变更
             </button>
           )}
@@ -81,7 +92,11 @@ export const EchoSummaryCard: React.FC<EchoSummaryCardProps> = ({
             disabled={isExtracting}
             className="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-300 px-2 py-1 rounded flex items-center gap-1 transition-colors disabled:opacity-50 border border-slate-700"
           >
-            {isExtracting ? <RefreshCw size={12} className="animate-spin" /> : <Sparkles size={12} />}
+            {isExtracting ? (
+              <RefreshCw size={12} className="animate-spin" />
+            ) : (
+              <Sparkles size={12} />
+            )}
             重新提取
           </button>
         )}
@@ -143,7 +158,7 @@ export const EchoSummaryCard: React.FC<EchoSummaryCardProps> = ({
       {/* 展开/折叠详情 */}
       {isExpanded && (
         <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar animate-fade-in">
-          {echoes.map(echo => {
+          {echoes.map((echo) => {
             const confConfig = getConfidenceConfig(echo.confidence);
 
             return (
@@ -155,11 +170,13 @@ export const EchoSummaryCard: React.FC<EchoSummaryCardProps> = ({
                   {/* 左侧：类型和名称 */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
-                      <span className={`text-[8px] uppercase font-bold px-1.5 py-0.5 rounded-sm ${
-                        echo.type === 'CHARACTER'
-                          ? 'bg-indigo-900/50 text-indigo-300'
-                          : 'bg-emerald-900/50 text-emerald-300'
-                      }`}>
+                      <span
+                        className={`text-[8px] uppercase font-bold px-1.5 py-0.5 rounded-sm ${
+                          echo.type === 'CHARACTER'
+                            ? 'bg-indigo-900/50 text-indigo-300'
+                            : 'bg-emerald-900/50 text-emerald-300'
+                        }`}
+                      >
                         {echo.type === 'CHARACTER' ? '人物' : '世界'}
                       </span>
                       <span className="font-bold text-slate-200 text-sm truncate">

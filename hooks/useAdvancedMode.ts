@@ -10,7 +10,7 @@ export function useAdvancedMode() {
   });
 
   const toggle = useCallback(() => {
-    setIsAdvanced(prev => {
+    setIsAdvanced((prev) => {
       const newValue = !prev;
       if (typeof window !== 'undefined') {
         localStorage.setItem(ADVANCED_MODE_KEY, String(newValue));

@@ -1,102 +1,114 @@
-import { Type } from "@google/genai";
+import { Type } from '@google/genai';
+import { Character, WorldSetting, CreativeSettings, Echo, PlotNode, Chapter } from '../../types';
 import {
-    Character, WorldSetting, CreativeSettings, Echo, PlotNode,
-    Chapter
-} from "../../types";
-import {
-    safeParseAiJson, AiPlotNodeArraySchema, AiPlotRhythmArraySchema as SchemaPlotRhythm,
-    AiChapterOutlineArraySchema
-} from "../schemas";
-import {
-    getAIClient, executeModelTask, getInstructionWithSettings, getModelName
-} from "./core";
-import { formatContext, filterRelevantSettings, formatEntityLookupTable } from "./helpers";
-import { getDisplayRelationships } from "../../utils/characterRelations";
-import { buildPromptContent } from "../../config/prompts";
-import { renderUserPromptBlocks } from "../../config/templates/defaults";
+  safeParseAiJson,
+  AiPlotNodeArraySchema,
+  AiPlotRhythmArraySchema as SchemaPlotRhythm,
+  AiChapterOutlineArraySchema,
+} from '../schemas';
+import { getAIClient, executeModelTask, getInstructionWithSettings, getModelName } from './core';
+import { formatContext, filterRelevantSettings, formatEntityLookupTable } from './helpers';
+import { getDisplayRelationships } from '../../utils/characterRelations';
+import { buildPromptContent, getPlotWeavingInstruction } from '../../config/prompts';
+import { renderUserPromptBlocks } from '../../config/templates/defaults';
 
 export interface PlotRhythmPoint {
-    beat: string;
-    tension: number;
-    description: string;
+  beat: string;
+  tension: number;
+  description: string;
 }
 
 /**
  * Graph context structure for plot generation
  */
 export interface GraphContext {
-    characterRelationships: Array<{
-        subject: string;
-        relation: string;
-        object: string;
-        weight?: number;
-    }>;
-    plotLineage?: {
-        predecessors: any[];
-        successors: any[];
-    };
+  characterRelationships: Array<{
+    subject: string;
+    relation: string;
+    object: string;
+    weight?: number;
+  }>;
+  plotLineage?: {
+    predecessors: any[];
+    successors: any[];
+  };
 }
 
 /**
  * Generate plot outline from context and premise
  */
 export const generatePlotFromContext = async (
-    premise: string,
-    genre: string,
-    characters: Character[],
-    worldSettings: WorldSetting[],
-    settings?: CreativeSettings,
-    template?: string,
-    echoes: Echo[] = [],
-    graphContext?: GraphContext
+  premise: string,
+  genre: string,
+  characters: Character[],
+  worldSettings: WorldSetting[],
+  settings?: CreativeSettings,
+  template?: string,
+  echoes: Echo[] = [],
+  graphContext?: GraphContext
 ): Promise<PlotNode[]> => {
-    const queryContext = `${premise} ${template || ''} ${characters.map(c => c.name).join(' ')}`;
-    const relevantSettings = filterRelevantSettings(worldSettings, queryContext, 15);
+  const queryContext = `${premise} ${template || ''} ${characters.map((c) => c.name).join(' ')}`;
+  const relevantSettings = filterRelevantSettings(worldSettings, queryContext, 15);
 
-    let contextStr = "【登场角色 (Cast)】\n";
-    if (characters.length > 0) {
-        characters.forEach(c => {
-            const charEchoes = echoes.filter(e => e.targetId === c.id && e.status === 'ACCEPTED').sort((a, b) => a.timestamp - b.timestamp);
-            const displayRels = getDisplayRelationships(c.structuredRelations) || c.relationships || '';
-            contextStr += `- ${c.name} (${c.role}): ${c.description}${displayRels ? ` (关系: ${displayRels})` : ''}\n`;
-            if (charEchoes.length > 0) {
-                contextStr += `  ⚡ [当前状态变更]: ${charEchoes.map(e => e.description).join('; ')}\n`;
-            }
-        });
-    } else {
-        contextStr += "尚未设定。\n";
-    }
+  let contextStr = '【登场角色 (Cast)】\n';
+  if (characters.length > 0) {
+    characters.forEach((c) => {
+      const charEchoes = echoes
+        .filter((e) => e.targetId === c.id && e.status === 'ACCEPTED')
+        .sort((a, b) => a.timestamp - b.timestamp);
+      const displayRels = getDisplayRelationships(c.structuredRelations) || c.relationships || '';
+      contextStr += `- ${c.name} (${c.role}): ${c.description}${displayRels ? ` (关系: ${displayRels})` : ''}\n`;
+      if (charEchoes.length > 0) {
+        contextStr += `  ⚡ [当前状态变更]: ${charEchoes.map((e) => e.description).join('; ')}\n`;
+      }
+    });
+  } else {
+    contextStr += '尚未设定。\n';
+  }
 
-    contextStr += "\n【高相关度世界观法则 (Deep Lore Context)】\n";
-    if (relevantSettings.length > 0) {
-        const categories = Array.from(new Set(relevantSettings.map(w => w.category)));
-        categories.forEach(cat => {
-            const items = relevantSettings.filter(w => w.category === cat);
-            if (items.length > 0) {
-                contextStr += `[${cat}]:\n`;
-                items.forEach(w => contextStr += `  - ${w.title}: ${w.content.slice(0, 500)}${w.content.length > 500 ? '...' : ''}\n`);
-            }
-        });
-    } else {
-        contextStr += "无特别约束设定。\n";
-    }
+  contextStr += '\n【高相关度世界观法则 (Deep Lore Context)】\n';
+  if (relevantSettings.length > 0) {
+    const categories = Array.from(new Set(relevantSettings.map((w) => w.category)));
+    categories.forEach((cat) => {
+      const items = relevantSettings.filter((w) => w.category === cat);
+      if (items.length > 0) {
+        contextStr += `[${cat}]:\n`;
+        items.forEach(
+          (w) =>
+            (contextStr += `  - ${w.title}: ${w.content.slice(0, 500)}${w.content.length > 500 ? '...' : ''}\n`)
+        );
+      }
+    });
+  } else {
+    contextStr += '无特别约束设定。\n';
+  }
 
-    // Build graph context section
-    let graphContextSection = '';
-    if (graphContext?.characterRelationships?.length) {
-        graphContextSection = `
+  // Build graph context section
+  let graphContextSection = '';
+  if (graphContext?.characterRelationships?.length) {
+    graphContextSection = `
 【角色关系图谱 (来自知识库)】:
-${graphContext.characterRelationships.map(r =>
-    `- ${r.subject} --[${r.relation}]--> ${r.object}${r.weight ? ` (强度: ${r.weight})` : ''}`
-).join('\n')}
+${graphContext.characterRelationships
+  .map(
+    (r) =>
+      `- ${r.subject} --[${r.relation}]--> ${r.object}${r.weight ? ` (强度: ${r.weight})` : ''}`
+  )
+  .join('\n')}
 `;
-        console.log('[Plot Generation] Using graph context with', graphContext.characterRelationships.length, 'relationships');
-    }
+    console.log(
+      '[Plot Generation] Using graph context with',
+      graphContext.characterRelationships.length,
+      'relationships'
+    );
+  }
 
-    const lookupTable = formatEntityLookupTable(characters, relevantSettings);
-    const instruction = getInstructionWithSettings('plot_weaving', settings);
+  const lookupTable = formatEntityLookupTable(characters, relevantSettings);
+  const instruction = getPlotWeavingInstruction(undefined, settings);
 
-    let taskRequirement = `
+  // 使用 buildPromptContent 构建用户提示内容,支持项目级自定义
+  const baseUserPrompt = buildPromptContent('plot_weaving_user', undefined, settings);
+
+  let taskRequirement = `
   任务要求：
   1. 结合人物的性格缺陷和目标，设计引发剧情的激励事件。
   2. 利用【高相关度世界观法则】制造专属设定的障碍、谜题和转折。
@@ -107,13 +119,14 @@ ${graphContext.characterRelationships.map(r =>
   6. **修罗场识别**：对于涉及2个或以上角色正面冲突、对峙或博弈的情节，自动识别为"冲突场景"，
      明确标注冲突类型（CONFRONTATION对峙/CLIMAX高潮/TWIST反转）、参与角色、冲突核心赌注和强度等级（1-10）。`;
 
-    if (template) {
-        taskRequirement += `\n\n【关键要求】请严格按照以下经典故事结构模版进行填充 and 创作：\n${template}`;
-    } else {
-        taskRequirement += `\n\n请生成一个包含 "起、承、转、合" 或 "分章/分幕" 结构的详细大纲。`;
-    }
+  if (template) {
+    taskRequirement += `\n\n【关键要求】请严格按照以下经典故事结构模版进行填充 and 创作：\n${template}`;
+  } else {
+    taskRequirement += `\n\n请生成一个包含 "起、承、转、合" 或 "分章/分幕" 结构的详细大纲。`;
+  }
 
-    const prompt = `
+  const prompt = `${baseUserPrompt}
+
   小说类型: ${genre}
   核心梗概: ${premise}
 
@@ -150,52 +163,60 @@ ${graphContext.characterRelationships.map(r =>
   禁止包含任何开场白或解释文字。
   `;
 
-    // Prepare template data
-    const templateData = { premise, genre, contextStr, relevantSettings, graphContext, lookupTable, template };
+  // Prepare template data
+  const templateData = {
+    premise,
+    genre,
+    contextStr,
+    relevantSettings,
+    graphContext,
+    lookupTable,
+    template,
+  };
 
-    try {
-        const responseText = await executeModelTask(
-            'generatePlot',
-            instruction,
-            prompt,
-            'gemini-3-pro-preview',
-            0.6,
-            AiPlotNodeArraySchema,
-            4096,
-            { templateId: 'generate_plot', templateData }
-        );
+  try {
+    const responseText = await executeModelTask(
+      'generatePlot',
+      instruction,
+      prompt,
+      'gemini-3-pro-preview',
+      0.6,
+      AiPlotNodeArraySchema,
+      4096,
+      { templateId: 'generate_plot', templateData }
+    );
 
-        const result = safeParseAiJson(responseText, AiPlotNodeArraySchema, "Plot Generation") || [];
-        return result.map((p: any, index: number) => ({
-            ...p,
-            id: Date.now().toString() + Math.random(),
-            order: index
-        })) as PlotNode[];
-    } catch (error) {
-        console.error("Gemini Plot Generation Error:", error);
-        throw error;
-    }
+    const result = safeParseAiJson(responseText, AiPlotNodeArraySchema, 'Plot Generation') || [];
+    return result.map((p: any, index: number) => ({
+      ...p,
+      id: Date.now().toString() + Math.random(),
+      order: index,
+    })) as PlotNode[];
+  } catch (error) {
+    console.error('Gemini Plot Generation Error:', error);
+    throw error;
+  }
 };
 
 /**
  * Rewrite plot based on feedback
  */
 export const rewritePlot = async (
-    currentPlot: string,
-    directive: string,
-    genre: string,
-    characters: Character[],
-    worldSettings: WorldSetting[],
-    settings?: CreativeSettings,
-    echoes: Echo[] = []
+  currentPlot: string,
+  directive: string,
+  genre: string,
+  characters: Character[],
+  worldSettings: WorldSetting[],
+  settings?: CreativeSettings,
+  echoes: Echo[] = []
 ): Promise<PlotNode[]> => {
-    const contextStr = formatContext(characters, worldSettings, echoes);
-    const lookupTable = formatEntityLookupTable(characters, worldSettings);
-    const instruction = getInstructionWithSettings('plot_weaving', settings);
+  const contextStr = formatContext(characters, worldSettings, echoes);
+  const lookupTable = formatEntityLookupTable(characters, worldSettings);
+  const instruction = getInstructionWithSettings('plot_rewrite', settings);
 
-    // 使用buildPromptContent构建prompt，支持项目级自定义
-    const basePrompt = buildPromptContent('plot_rewrite', undefined, settings);
-    const prompt = `${basePrompt}
+  // 使用buildPromptContent构建prompt，支持项目级自定义
+  const basePrompt = buildPromptContent('plot_rewrite_user', undefined, settings);
+  const prompt = `${basePrompt}
 
 小说类型: ${genre}
 ${contextStr}
@@ -224,51 +245,57 @@ ${contextStr}
 禁止包含任何开场白或解释文字。
 `;
 
-    // Prepare template data
-    const templateData = { genre, contextStr, lookupTable, currentPlot, directive };
+  // Prepare template data
+  const templateData = { genre, contextStr, lookupTable, currentPlot, directive };
 
-    try {
-        const responseText = await executeModelTask(
-            'rewritePlot',
-            instruction,
-            prompt,
-            'gemini-3-pro-preview',
-            0.3,
-            AiPlotNodeArraySchema,
-            4096,
-            { templateId: 'rewrite_plot', templateData }
-        );
+  try {
+    const responseText = await executeModelTask(
+      'rewritePlot',
+      instruction,
+      prompt,
+      'gemini-3-pro-preview',
+      0.3,
+      AiPlotNodeArraySchema,
+      4096,
+      { templateId: 'rewrite_plot', templateData }
+    );
 
-        const result = safeParseAiJson(responseText, AiPlotNodeArraySchema, "Plot Rewrite") || [];
-        return result.map((p: any, index: number) => ({
-            ...p,
-            id: Date.now().toString() + Math.random(),
-            order: index
-        })) as PlotNode[];
-    } catch (e) {
-        console.error("Gemini Plot Rewrite Error:", e);
-        throw e;
-    }
+    const result = safeParseAiJson(responseText, AiPlotNodeArraySchema, 'Plot Rewrite') || [];
+    return result.map((p: any, index: number) => ({
+      ...p,
+      id: Date.now().toString() + Math.random(),
+      order: index,
+    })) as PlotNode[];
+  } catch (e) {
+    console.error('Gemini Plot Rewrite Error:', e);
+    throw e;
+  }
 };
 
 /**
  * Analyze plot rhythm and tension
  */
 export const analyzePlotRhythm = async (plotOutline: string): Promise<PlotRhythmPoint[]> => {
-    const responseSchema = {
-        type: Type.ARRAY,
-        items: {
-            type: Type.OBJECT,
-            properties: {
-                beat: { type: Type.STRING, description: "章节名称或关键情节点 (e.g., '第一章', '激励事件')" },
-                tension: { type: Type.NUMBER, description: "该点的剧情张力值 (0-100)，0为平静，100为最高潮" },
-                description: { type: Type.STRING, description: "简短描述该点的剧情内容" }
-            },
-            required: ["beat", "tension", "description"]
-        }
-    };
+  const responseSchema = {
+    type: Type.ARRAY,
+    items: {
+      type: Type.OBJECT,
+      properties: {
+        beat: {
+          type: Type.STRING,
+          description: "章节名称或关键情节点 (e.g., '第一章', '激励事件')",
+        },
+        tension: {
+          type: Type.NUMBER,
+          description: '该点的剧情张力值 (0-100)，0为平静，100为最高潮',
+        },
+        description: { type: Type.STRING, description: '简短描述该点的剧情内容' },
+      },
+      required: ['beat', 'tension', 'description'],
+    },
+  };
 
-    const prompt = `
+  const prompt = `
     请分析以下小说大纲的剧情节奏和张力起伏。
     将大纲拆解为关键的剧情点（Beat），并评估每个点的张力值（Tension Level）。
     
@@ -285,47 +312,47 @@ export const analyzePlotRhythm = async (plotOutline: string): Promise<PlotRhythm
     请输出 JSON 格式的分析结果，包含至少 5-10 个关键点。
     `;
 
-    // Prepare template data
-    const templateData = { plotOutline };
+  // Prepare template data
+  const templateData = { plotOutline };
 
-    try {
-        const responseText = await executeModelTask(
-            'analyzePlotRhythm',
-            '',
-            prompt,
-            await getModelName('flash'),
-            0.2,
-            responseSchema,
-            undefined,
-            { templateId: 'analyze_plot_rhythm', templateData }
-        );
+  try {
+    const responseText = await executeModelTask(
+      'analyzePlotRhythm',
+      '',
+      prompt,
+      await getModelName('flash'),
+      0.2,
+      responseSchema,
+      undefined,
+      { templateId: 'analyze_plot_rhythm', templateData }
+    );
 
-        const parsed = safeParseAiJson(responseText, SchemaPlotRhythm, 'analyzePlotRhythm');
-        return parsed ?? [];
-    } catch (e) {
-        console.error("Rhythm Analysis Error", e);
-        return [];
-    }
+    const parsed = safeParseAiJson(responseText, SchemaPlotRhythm, 'analyzePlotRhythm');
+    return parsed ?? [];
+  } catch (e) {
+    console.error('Rhythm Analysis Error', e);
+    return [];
+  }
 };
 
 /**
  * Split large plot node into detailed chapter outlines (Chapter Fission)
  */
 export const splitPlotNodeIntoChapters = async (
-    genre: string,
-    fullPlotSummary: string,
-    targetNode: PlotNode,
-    characters: Character[],
-    worldSettings: WorldSetting[],
-    settings?: CreativeSettings,
-    echoes: Echo[] = [],
-    fissionCount: number | 'AUTO' = 'AUTO'
+  genre: string,
+  fullPlotSummary: string,
+  targetNode: PlotNode,
+  characters: Character[],
+  worldSettings: WorldSetting[],
+  settings?: CreativeSettings,
+  echoes: Echo[] = [],
+  fissionCount: number | 'AUTO' = 'AUTO'
 ): Promise<{ title: string; summary: string; expectedPOV: string; beats?: any[] }[]> => {
-    const contextStr = formatContext(characters, worldSettings, echoes);
-    const instruction = getInstructionWithSettings('plot_fission', settings);
-    const countInstruction = fissionCount === 'AUTO' ? '2-3 个' : `${fissionCount} 个`;
+  const contextStr = formatContext(characters, worldSettings, echoes);
+  const instruction = getInstructionWithSettings('plot_fission', settings);
+  const countInstruction = fissionCount === 'AUTO' ? '2-3 个' : `${fissionCount} 个`;
 
-    const prompt = `
+  const prompt = `
     小说类型: ${genre}
     项目全剧情概览: ${fullPlotSummary}
     
@@ -365,58 +392,66 @@ export const splitPlotNodeIntoChapters = async (
     禁止包含任何开场白或解释文字。
     `;
 
-    // Prepare template data
-    const templateData = { genre, fullPlotSummary, targetNode, characters, worldSettings, echoes, fissionCount };
+  // Prepare template data
+  const templateData = {
+    genre,
+    fullPlotSummary,
+    targetNode,
+    characters,
+    worldSettings,
+    echoes,
+    fissionCount,
+  };
 
-    try {
-        const responseText = await executeModelTask(
-            'splitPlotNodeIntoChapters',
-            instruction,
-            prompt,
-            await getModelName('pro'),
-            settings?.creativity || 0.85,
-            AiChapterOutlineArraySchema,
-            undefined,
-            { templateId: 'split_plot_node_into_chapters', templateData }
-        );
+  try {
+    const responseText = await executeModelTask(
+      'splitPlotNodeIntoChapters',
+      instruction,
+      prompt,
+      await getModelName('pro'),
+      settings?.creativity || 0.85,
+      AiChapterOutlineArraySchema,
+      undefined,
+      { templateId: 'split_plot_node_into_chapters', templateData }
+    );
 
-        const raw = safeParseAiJson(responseText, AiChapterOutlineArraySchema, "Chapter Fission");
-        if (!raw) return [];
+    const raw = safeParseAiJson(responseText, AiChapterOutlineArraySchema, 'Chapter Fission');
+    if (!raw) return [];
 
-        // Map to include IDs and initialized beat states
-        return raw.map(ch => ({
-            ...ch,
-            beats: ch.beats?.map(b => ({
-                ...b,
-                id: Math.random().toString(36).substr(2, 9),
-                isCompleted: false
-            }))
-        }));
-    } catch (e) {
-        console.error("Gemini Chapter Fission Error:", e);
-        throw e;
-    }
+    // Map to include IDs and initialized beat states
+    return raw.map((ch) => ({
+      ...ch,
+      beats: ch.beats?.map((b) => ({
+        ...b,
+        id: Math.random().toString(36).substr(2, 9),
+        isCompleted: false,
+      })),
+    }));
+  } catch (e) {
+    console.error('Gemini Chapter Fission Error:', e);
+    throw e;
+  }
 };
 
 /**
  * Regenerate a single chapter outline
  */
 export const regenerateChapterOutline = async (
-    genre: string,
-    fullPlotSummary: string,
-    targetNode: PlotNode,
-    chapterToRewrite: Chapter,
-    previousChapter: Chapter | null,
-    nextChapter: Chapter | null,
-    characters: Character[],
-    worldSettings: WorldSetting[],
-    settings?: CreativeSettings,
-    echoes: Echo[] = []
+  genre: string,
+  fullPlotSummary: string,
+  targetNode: PlotNode,
+  chapterToRewrite: Chapter,
+  previousChapter: Chapter | null,
+  nextChapter: Chapter | null,
+  characters: Character[],
+  worldSettings: WorldSetting[],
+  settings?: CreativeSettings,
+  echoes: Echo[] = []
 ): Promise<{ title: string; summary: string; expectedPOV: string; beats?: any[] } | null> => {
-    const contextStr = formatContext(characters, worldSettings, echoes);
-    const instruction = getInstructionWithSettings('plot_fission', settings);
+  const contextStr = formatContext(characters, worldSettings, echoes);
+  const instruction = getInstructionWithSettings('plot_fission', settings);
 
-    const prompt = `
+  const prompt = `
     小说类型: ${genre}
     项目全剧情概览: ${fullPlotSummary}
     
@@ -457,59 +492,56 @@ export const regenerateChapterOutline = async (
     禁止包含任何开场白或解释文字。
     `;
 
-    // Prepare template data
-    const templateData = {
-        genre,
-        fullPlotSummary,
-        targetNode,
-        chapterToRewrite,
-        previousChapter,
-        nextChapter,
-        characters,
-        worldSettings,
-        echoes
-    };
+  // Prepare template data
+  const templateData = {
+    genre,
+    fullPlotSummary,
+    targetNode,
+    chapterToRewrite,
+    previousChapter,
+    nextChapter,
+    characters,
+    worldSettings,
+    echoes,
+  };
 
-    try {
-        const responseText = await executeModelTask(
-            'regenerateChapterOutline',
-            instruction,
-            prompt,
-            await getModelName('pro'),
-            settings?.creativity || 0.85,
-            AiChapterOutlineArraySchema,
-            undefined,
-            { templateId: 'regenerate_chapter_outline', templateData }
-        );
+  try {
+    const responseText = await executeModelTask(
+      'regenerateChapterOutline',
+      instruction,
+      prompt,
+      await getModelName('pro'),
+      settings?.creativity || 0.85,
+      AiChapterOutlineArraySchema,
+      undefined,
+      { templateId: 'regenerate_chapter_outline', templateData }
+    );
 
-        const raw = safeParseAiJson(responseText, AiChapterOutlineArraySchema, "Chapter Regeneration");
-        const result = raw && raw.length > 0 ? raw[0] : null;
+    const raw = safeParseAiJson(responseText, AiChapterOutlineArraySchema, 'Chapter Regeneration');
+    const result = raw && raw.length > 0 ? raw[0] : null;
 
-        if (result) {
-            return {
-                ...result,
-                beats: result.beats?.map(b => ({
-                    ...b,
-                    id: Math.random().toString(36).substr(2, 9),
-                    isCompleted: false
-                }))
-            };
-        }
-        return null;
-    } catch (e) {
-        console.error("Gemini Chapter Regeneration Error:", e);
-        throw e;
+    if (result) {
+      return {
+        ...result,
+        beats: result.beats?.map((b) => ({
+          ...b,
+          id: Math.random().toString(36).substr(2, 9),
+          isCompleted: false,
+        })),
+      };
     }
+    return null;
+  } catch (e) {
+    console.error('Gemini Chapter Regeneration Error:', e);
+    throw e;
+  }
 };
 
 /**
  * Twist Agent - Inspiration Jumps
  */
-export const generateTwistHooks = async (
-    context: string,
-    plotBeat: string
-): Promise<string[]> => {
-    const prompt = `
+export const generateTwistHooks = async (context: string, plotBeat: string): Promise<string[]> => {
+  const prompt = `
 你是一位顶级的小说策划大师。基于当前的【故事背景/记忆】和即将发生的【情节目标】，请提供 3 个极具张力的“情节勾子”或“反转灵感”。
 
 【灵感要求】：
@@ -526,24 +558,27 @@ ${plotBeat}
 请直接返回 3 条灵感，每条占一行，以数字开头（如 1. ...）。不要包含多余的废话。
     `;
 
-    // Prepare template data
-    const templateData = { context, plotBeat };
+  // Prepare template data
+  const templateData = { context, plotBeat };
 
-    try {
-        const responseText = await executeModelTask(
-            'generateTwistHooks',
-            '',
-            prompt,
-            await getModelName('pro'),
-            0.9,
-            undefined,
-            undefined,
-            { templateId: 'generate_twist_hooks', templateData }
-        );
+  try {
+    const responseText = await executeModelTask(
+      'generateTwistHooks',
+      '',
+      prompt,
+      await getModelName('pro'),
+      0.9,
+      undefined,
+      undefined,
+      { templateId: 'generate_twist_hooks', templateData }
+    );
 
-        return responseText.split('\n').filter(line => /^\d\./.test(line.trim())).map(line => line.replace(/^\d\.\s*/, '').trim());
-    } catch (error) {
-        console.error("Failed to generate twist hooks:", error);
-        return [];
-    }
+    return responseText
+      .split('\n')
+      .filter((line) => /^\d\./.test(line.trim()))
+      .map((line) => line.replace(/^\d\.\s*/, '').trim());
+  } catch (error) {
+    console.error('Failed to generate twist hooks:', error);
+    return [];
+  }
 };

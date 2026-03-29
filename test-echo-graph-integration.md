@@ -3,6 +3,7 @@
 ## 已实现功能
 
 ### 1. 关系时间线 (Relationship Timeline)
+
 - **位置**: 图谱查询面板 → "关系时间线" 区域
 - **使用方法**:
   1. 点击"图谱查询"按钮展开面板
@@ -17,6 +18,7 @@
   - 描述 (description)
 
 ### 2. 未回收伏笔面板 (Foreshadowing Panel)
+
 - **位置**: 图谱查询面板 → "未回收伏笔" 区域
 - **自动加载**: 打开图谱查询面板时自动加载
 - **手动刷新**: 点击"刷新"按钮
@@ -28,6 +30,7 @@
   - 伏笔总数统计
 
 ### 3. 矛盾检测 (Contradiction Detection)
+
 - **位置**: 图谱查询面板 → "矛盾检测" 区域
 - **使用方法**: 点击"检测矛盾"按钮
 - **API调用**: `detectContradictions(projectId)`
@@ -38,6 +41,7 @@
   - 涉及实体 (entities)
 
 ### 4. Echo采纳时同步到图谱
+
 - **位置**: Echo列表中每个Echo的"采纳"按钮
 - **使用方法**: 悬停在待处理的Echo上，点击"✓"按钮
 - **API调用**: `POST /api/graph/:projectId/echoes/:echoId/accept`
@@ -46,12 +50,14 @@
 ## UI设计
 
 ### 新增图标
+
 - `Network`: 图谱查询按钮
 - `Users`: 关系时间线区域
 - `GitBranch`: 未回收伏笔区域
 - `AlertTriangle`: 矛盾检测区域
 
 ### 样式特点
+
 - 保持与现有UI风格一致
 - 使用slate、muse、amber、rose配色方案
 - 支持暗色主题
@@ -60,6 +66,7 @@
 ## 技术实现
 
 ### 状态管理
+
 ```typescript
 // Graph Query States
 const [selectedChar1Id, setSelectedChar1Id] = useState<string | null>(null);
@@ -74,35 +81,37 @@ const [showGraphPanel, setShowGraphPanel] = useState(false);
 ```
 
 ### 类型定义
+
 ```typescript
 interface RelationshipTimelineItem {
-    timestamp: number;
-    echoId: string;
-    relation: string;
-    trajectory: string;
-    weight: number;
-    description: string;
+  timestamp: number;
+  echoId: string;
+  relation: string;
+  trajectory: string;
+  weight: number;
+  description: string;
 }
 
 interface ForeshadowingItem {
-    subject: string;
-    relation: string;
-    object: string;
-    echoId: string;
-    createdAt: number;
-    relatedChapter?: string;
+  subject: string;
+  relation: string;
+  object: string;
+  echoId: string;
+  createdAt: number;
+  relatedChapter?: string;
 }
 
 interface ContradictionItem {
-    type: 'RELATIONSHIP_CONFLICT' | 'STATE_MISMATCH' | 'TEMPORAL_ERROR';
-    description: string;
-    entities: string[];
-    conflictingEchoes: string[];
-    severity: 'HIGH' | 'MEDIUM' | 'LOW';
+  type: 'RELATIONSHIP_CONFLICT' | 'STATE_MISMATCH' | 'TEMPORAL_ERROR';
+  description: string;
+  entities: string[];
+  conflictingEchoes: string[];
+  severity: 'HIGH' | 'MEDIUM' | 'LOW';
 }
 ```
 
 ### API集成
+
 - 所有API调用都通过 `services/apiService.ts` 中的函数
 - 支持错误处理和加载状态
 - 使用 async/await 模式
@@ -110,6 +119,7 @@ interface ContradictionItem {
 ## 测试步骤
 
 ### 1. 测试关系时间线
+
 ```bash
 # 确保后端服务器运行
 cd server
@@ -126,17 +136,20 @@ npm run dev
 5. 验证时间线数据显示正确
 
 ### 2. 测试伏笔追踪
+
 1. 打开图谱查询面板
 2. 验证"未回收伏笔"区域自动加载
 3. 点击"刷新"按钮测试手动刷新
 4. 检查伏笔列表显示格式
 
 ### 3. 测试矛盾检测
+
 1. 在图谱查询面板中点击"检测矛盾"按钮
 2. 验证矛盾列表显示
 3. 检查严重程度颜色编码
 
 ### 4. 测试Echo采纳同步
+
 1. 找到一个待处理的Echo
 2. 悬停并点击"✓"采纳按钮
 3. 验证提示消息"Echo已采纳并同步到图谱"
@@ -145,6 +158,7 @@ npm run dev
 ## 文件修改
 
 ### 修改的文件
+
 - `components/EchoChamber.tsx`
   - 新增图谱查询状态管理
   - 新增图谱查询面板UI
@@ -152,6 +166,7 @@ npm run dev
   - 修改Echo采纳逻辑以支持图谱同步
 
 ### 依赖的文件（未修改）
+
 - `services/apiService.ts` - 提供图谱查询API
 - `types.ts` - 类型定义
 

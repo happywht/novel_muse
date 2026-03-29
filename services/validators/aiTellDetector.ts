@@ -21,16 +21,28 @@ export interface AITellResult {
 }
 
 const HEDGE_WORDS: ReadonlyArray<string> = [
-  '似乎', '可能', '或许', '大概', '某种程度上', '一定程度上', '在某种意义上',
+  '似乎',
+  '可能',
+  '或许',
+  '大概',
+  '某种程度上',
+  '一定程度上',
+  '在某种意义上',
 ];
 
 const TRANSITION_WORDS: ReadonlyArray<string> = [
-  '然而', '不过', '与此同时', '另一方面', '尽管如此', '话虽如此', '但值得注意的是',
+  '然而',
+  '不过',
+  '与此同时',
+  '另一方面',
+  '尽管如此',
+  '话虽如此',
+  '但值得注意的是',
 ];
 
 function countOccurrences(
   text: string,
-  words: ReadonlyArray<string>,
+  words: ReadonlyArray<string>
 ): ReadonlyArray<{ word: string; count: number }> {
   return words
     .map((word) => {
@@ -134,10 +146,10 @@ function checkListStructure(content: string): AITellIssue | null {
 
 function computeScore(issues: ReadonlyArray<AITellIssue>): number {
   const WEIGHTS: Record<string, number> = {
-    '段落等长': 30,
-    '套话密度': 25,
-    '公式化转折': 25,
-    '列表式结构': 20,
+    段落等长: 30,
+    套话密度: 25,
+    公式化转折: 25,
+    列表式结构: 20,
   };
 
   let score = 0;

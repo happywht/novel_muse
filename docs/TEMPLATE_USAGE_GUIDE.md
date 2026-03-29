@@ -7,6 +7,7 @@
 模板系统允许你将 Prompt 定义为结构化的模板,而不是手动拼接字符串。
 
 **旧方式 (手动拼接)**:
+
 ```typescript
 const prompt = `
 小说类型: ${genre}
@@ -16,11 +17,12 @@ const prompt = `
 ```
 
 **新方式 (模板系统)**:
+
 ```typescript
 const templateData = {
   genre,
   plotBeat,
-  context
+  context,
 };
 
 const userPrompt = renderUserPromptBlocks('scene_generation', templateData);
@@ -33,7 +35,7 @@ return await executeModelTask(
   temperature,
   undefined,
   2048,
-  { templateId: 'scene_generation', templateData }  // 传递模板选项
+  { templateId: 'scene_generation', templateData } // 传递模板选项
 );
 ```
 
@@ -69,7 +71,7 @@ const SCENE_GENERATION_TEMPLATE: PromptTemplate = {
     {
       name: 'genre',
       type: 'string',
-      tier: 'critical',  // critical | important | optional
+      tier: 'critical', // critical | important | optional
       source: 'project_state',
       required: true,
       description: '小说类型',
@@ -83,26 +85,29 @@ const SCENE_GENERATION_TEMPLATE: PromptTemplate = {
 ### 3. 模板语法
 
 #### 简单变量
+
 ```typescript
-template: `小说类型: {{genre}}`
+template: `小说类型: {{genre}}`;
 // 数据: { genre: '玄幻' }
 // 输出: 小说类型: 玄幻
 ```
 
 #### 条件渲染
+
 ```typescript
 template: `{{#if povName}}
 - **视角锁定**: 必须严格以【{{povName}}】的视角叙事。
-{{/if}}`
+{{/if}}`;
 // 数据: { povName: '林远' }
 // 输出: - **视角锁定**: 必须严格以【林远】的视角叙事。
 ```
 
 #### 循环渲染
+
 ```typescript
 template: `{{#each physicalStatus}}
 - [{{this.name}}]: 位于 [{{this.location}}], 状态: [{{this.state}}]
-{{/each}}`
+{{/each}}`;
 // 数据: {
 //   physicalStatus: [
 //     { name: '林远', location: '修炼室', state: '健康' },
@@ -115,13 +120,14 @@ template: `{{#each physicalStatus}}
 ```
 
 #### 嵌套循环
+
 ```typescript
 template: `{{#each relevantSettingsByCategory}}
 [{{this.category}}]:
 {{#each this.items}}
   - {{this.title}}: {{this.content}}
 {{/each}}
-{{/each}}`
+{{/each}}`;
 // 数据: {
 //   relevantSettingsByCategory: [
 //     {
@@ -140,10 +146,11 @@ template: `{{#each relevantSettingsByCategory}}
 ```
 
 #### 循环内条件
+
 ```typescript
 template: `{{#each physicalStatus}}
 - [{{this.name}}]: 状态: [{{this.state}}]{{#if this.isDead}} (已死亡){{/if}}
-{{/each}}`
+{{/each}}`;
 // 数据: {
 //   physicalStatus: [
 //     { name: '林远', state: '健康', isDead: false },
@@ -177,14 +184,14 @@ const userPrompt = renderUserPromptBlocks('scene_generation', templateData);
 
 ```typescript
 return await executeModelTask(
-  'scene_generation',  // 任务类型
-  instruction,         // 系统指令
-  userPrompt,          // 渲染后的用户 Prompt
+  'scene_generation', // 任务类型
+  instruction, // 系统指令
+  userPrompt, // 渲染后的用户 Prompt
   'gemini-3-flash-preview',
   0.9,
   undefined,
   2048,
-  { templateId: 'scene_generation', templateData }  // 模板选项
+  { templateId: 'scene_generation', templateData } // 模板选项
 );
 ```
 
@@ -350,18 +357,20 @@ export const expandScene = async (
   const renderedPrompt = renderUserPromptBlocks('scene_expansion', templateData);
 
   try {
-    return await executeModelTask(
-      'expandScene',
-      instruction,
-      renderedPrompt,
-      'gemini-3-flash-preview',
-      settings?.creativity || 0.9,
-      undefined,
-      undefined,
-      { templateId: 'scene_expansion', templateData }
-    ) || "生成失败。";
+    return (
+      (await executeModelTask(
+        'expandScene',
+        instruction,
+        renderedPrompt,
+        'gemini-3-flash-preview',
+        settings?.creativity || 0.9,
+        undefined,
+        undefined,
+        { templateId: 'scene_expansion', templateData }
+      )) || '生成失败。'
+    );
   } catch (error) {
-    console.error("Gemini Scene Expansion Error:", error);
+    console.error('Gemini Scene Expansion Error:', error);
     throw error;
   }
 };

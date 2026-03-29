@@ -126,7 +126,7 @@ class SSEConnectionManager {
       return [];
     }
     return Array.from(ids)
-      .map(id => this.connections.get(id))
+      .map((id) => this.connections.get(id))
       .filter((c): c is SSEConnection => c !== undefined);
   }
 }
@@ -194,11 +194,7 @@ export const sseHandler = (req: Request, res: Response, _next: NextFunction): vo
 /**
  * Helper function to send SSE event
  */
-export function sendSSEEvent(
-  projectId: string,
-  event: string,
-  data: unknown
-): number {
+export function sendSSEEvent(projectId: string, event: string, data: unknown): number {
   return sseManager.sendToProject(projectId, event, {
     ...(typeof data === 'object' && data !== null ? data : {}),
     timestamp: new Date().toISOString(),

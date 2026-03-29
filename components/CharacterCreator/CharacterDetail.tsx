@@ -80,8 +80,14 @@ function EchoProposals() {
  * 角色画像区域
  */
 function CharacterPortrait() {
-  const { activeChar, isGeneratingImage, imageStyle, setImageStyle, handleGenerateImage, openChat } =
-    useCharacterCreator();
+  const {
+    activeChar,
+    isGeneratingImage,
+    imageStyle,
+    setImageStyle,
+    handleGenerateImage,
+    openChat,
+  } = useCharacterCreator();
 
   if (!activeChar) return null;
 
@@ -89,7 +95,11 @@ function CharacterPortrait() {
     <div className="flex-shrink-0">
       <div className="w-48 h-64 rounded-2xl bg-slate-800 border border-slate-700 overflow-hidden relative group shadow-2xl">
         {activeChar.imageUrl ? (
-          <img src={activeChar.imageUrl} alt={activeChar.name} className="w-full h-full object-cover" />
+          <img
+            src={activeChar.imageUrl}
+            alt={activeChar.name}
+            className="w-full h-full object-cover"
+          />
         ) : (
           <div className="flex flex-col items-center justify-center w-full h-full text-slate-600 space-y-2">
             <User size={48} />
@@ -200,31 +210,41 @@ function TraitsSection() {
       <div className="mt-2 space-y-2 bg-slate-800/20 border border-indigo-500/10 rounded-xl p-4">
         {traits.desire && (
           <div className="bg-emerald-950/20 border border-emerald-500/20 rounded-lg p-3">
-            <h5 className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">核心欲望</h5>
+            <h5 className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
+              核心欲望
+            </h5>
             <p className="text-xs text-slate-300">{traits.desire}</p>
           </div>
         )}
         {traits.fear && (
           <div className="bg-red-950/20 border border-red-500/20 rounded-lg p-3">
-            <h5 className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">核心恐惧</h5>
+            <h5 className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-1">
+              核心恐惧
+            </h5>
             <p className="text-xs text-slate-300">{traits.fear}</p>
           </div>
         )}
         {traits.weakness && (
           <div className="bg-amber-950/20 border border-amber-500/20 rounded-lg p-3">
-            <h5 className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">致命弱点</h5>
+            <h5 className="text-[10px] font-bold text-amber-400 uppercase tracking-wider mb-1">
+              致命弱点
+            </h5>
             <p className="text-xs text-slate-300">{traits.weakness}</p>
           </div>
         )}
         {traits.signature && (
           <div className="bg-cyan-950/20 border border-cyan-500/20 rounded-lg p-3">
-            <h5 className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">标志特征</h5>
+            <h5 className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider mb-1">
+              标志特征
+            </h5>
             <p className="text-xs text-slate-300">{traits.signature}</p>
           </div>
         )}
         {traits.contrast && (
           <div className="bg-purple-950/20 border border-purple-500/20 rounded-lg p-3">
-            <h5 className="text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-1">反差萌点</h5>
+            <h5 className="text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-1">
+              反差萌点
+            </h5>
             <p className="text-xs text-slate-300">{traits.contrast}</p>
           </div>
         )}
@@ -322,8 +342,8 @@ function ForeshadowingSection() {
               foreshadow.status === 'OPEN'
                 ? 'bg-amber-950/20 border-amber-500/30'
                 : foreshadow.status === 'RESOLVED'
-                ? 'bg-emerald-950/20 border-emerald-500/30'
-                : 'bg-slate-700/20 border-slate-600/30'
+                  ? 'bg-emerald-950/20 border-emerald-500/30'
+                  : 'bg-slate-700/20 border-slate-600/30'
             }`}
           >
             <div className="flex items-start justify-between mb-2">
@@ -335,11 +355,15 @@ function ForeshadowingSection() {
                   foreshadow.status === 'OPEN'
                     ? 'bg-amber-500/20 text-amber-400'
                     : foreshadow.status === 'RESOLVED'
-                    ? 'bg-emerald-500/20 text-emerald-400'
-                    : 'bg-slate-500/20 text-slate-400'
+                      ? 'bg-emerald-500/20 text-emerald-400'
+                      : 'bg-slate-500/20 text-slate-400'
                 }`}
               >
-                {foreshadow.status === 'OPEN' ? '待回收' : foreshadow.status === 'RESOLVED' ? '已回收' : '已废弃'}
+                {foreshadow.status === 'OPEN'
+                  ? '待回收'
+                  : foreshadow.status === 'RESOLVED'
+                    ? '已回收'
+                    : '已废弃'}
               </span>
             </div>
             {foreshadow.weight !== undefined && (
@@ -376,7 +400,11 @@ function RelationshipsSection() {
       MENTORS: { bg: 'bg-purple-950/30', border: 'border-purple-500/30', text: 'text-purple-400' },
       RIVAL_OF: { bg: 'bg-orange-950/30', border: 'border-orange-500/30', text: 'text-orange-400' },
       SERVES: { bg: 'bg-slate-700/30', border: 'border-slate-500/30', text: 'text-slate-400' },
-      FRIEND_OF: { bg: 'bg-emerald-950/30', border: 'border-emerald-500/30', text: 'text-emerald-400' },
+      FRIEND_OF: {
+        bg: 'bg-emerald-950/30',
+        border: 'border-emerald-500/30',
+        text: 'text-emerald-400',
+      },
       RELATED_TO: { bg: 'bg-slate-700/30', border: 'border-slate-500/30', text: 'text-slate-400' },
     };
     return colorMap[relationType] || colorMap['RELATED_TO'];
@@ -407,7 +435,9 @@ function RelationshipsSection() {
                   className={`flex items-center gap-3 p-3 rounded-lg ${colors.bg} border ${colors.border} transition-all hover:scale-[1.01]`}
                 >
                   <div className="flex-1 flex items-center gap-2">
-                    <span className={`text-xs font-bold ${colors.text} uppercase tracking-wider`}>{typeLabel}</span>
+                    <span className={`text-xs font-bold ${colors.text} uppercase tracking-wider`}>
+                      {typeLabel}
+                    </span>
                     <span className="text-slate-400">-&gt;</span>
                     <span className="text-sm text-white font-medium">{targetName}</span>
                   </div>
@@ -417,7 +447,11 @@ function RelationshipsSection() {
                       <div className="w-12 h-1.5 bg-slate-700 rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full ${
-                            rel.weight > 70 ? 'bg-rose-500' : rel.weight > 40 ? 'bg-amber-500' : 'bg-slate-500'
+                            rel.weight > 70
+                              ? 'bg-rose-500'
+                              : rel.weight > 40
+                                ? 'bg-amber-500'
+                                : 'bg-slate-500'
                           }`}
                           style={{ width: `${rel.weight}%` }}
                         />
@@ -428,7 +462,9 @@ function RelationshipsSection() {
                   {rel.trajectory && rel.trajectory !== 'stable' && (
                     <span
                       className={`text-[10px] px-1.5 py-0.5 rounded ${
-                        rel.trajectory === 'rising' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'
+                        rel.trajectory === 'rising'
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'bg-red-500/20 text-red-400'
                       }`}
                     >
                       {rel.trajectory === 'rising' ? '升温中' : '降温中'}
@@ -445,7 +481,9 @@ function RelationshipsSection() {
       <div className="space-y-2">
         {!isStructuredFormat(activeChar.structuredRelations) && !isEditing && (
           <>
-            <label className="text-[10px] text-slate-500 uppercase tracking-wider">自由文本描述</label>
+            <label className="text-[10px] text-slate-500 uppercase tracking-wider">
+              自由文本描述
+            </label>
             <textarea
               value={activeChar.relationships || ''}
               onChange={(e) => updateRelationship(e.target.value)}
@@ -537,7 +575,9 @@ export function CharacterDetail() {
                     </span>
                   )}
                 </div>
-                <h1 className="text-4xl font-serif font-bold text-white tracking-tight">{activeChar.name}</h1>
+                <h1 className="text-4xl font-serif font-bold text-white tracking-tight">
+                  {activeChar.name}
+                </h1>
               </div>
               <div className="flex gap-2">
                 {isEditing ? (
@@ -617,7 +657,9 @@ export function CharacterDetail() {
               <div className="space-y-3">
                 {activeChar.signature && (
                   <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-                    <h4 className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest mb-2">标志特征</h4>
+                    <h4 className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest mb-2">
+                      标志特征
+                    </h4>
                     <p className="text-xs text-slate-400 leading-relaxed whitespace-pre-line">
                       {activeChar.signature}
                     </p>
@@ -625,13 +667,17 @@ export function CharacterDetail() {
                 )}
                 {activeChar.contrast && (
                   <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-                    <h4 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-2">反差萌点</h4>
+                    <h4 className="text-[10px] font-bold text-purple-400 uppercase tracking-widest mb-2">
+                      反差萌点
+                    </h4>
                     <p className="text-xs text-slate-400 leading-relaxed">{activeChar.contrast}</p>
                   </div>
                 )}
                 {activeChar.weakness && (
                   <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4">
-                    <h4 className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-2">致命弱点</h4>
+                    <h4 className="text-[10px] font-bold text-amber-400 uppercase tracking-widest mb-2">
+                      致命弱点
+                    </h4>
                     <p className="text-xs text-slate-400 leading-relaxed">{activeChar.weakness}</p>
                   </div>
                 )}
@@ -644,7 +690,9 @@ export function CharacterDetail() {
                 currentArc={activeChar.arc}
                 onArcChange={(arc) => {
                   updateProject({
-                    characters: project.characters.map((c) => (c.id === activeChar.id ? { ...c, arc } : c)),
+                    characters: project.characters.map((c) =>
+                      c.id === activeChar.id ? { ...c, arc } : c
+                    ),
                   });
                 }}
               />

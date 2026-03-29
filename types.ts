@@ -1,20 +1,26 @@
-
-
-export type BeatTag = 'INCITING_INCIDENT' | 'PLOT_POINT_1' | 'MIDPOINT' | 'PLOT_POINT_2' | 'CLIMAX' | 'RESOLUTION' | 'OTHER' | null;
+export type BeatTag =
+  | 'INCITING_INCIDENT'
+  | 'PLOT_POINT_1'
+  | 'MIDPOINT'
+  | 'PLOT_POINT_2'
+  | 'CLIMAX'
+  | 'RESOLUTION'
+  | 'OTHER'
+  | null;
 
 /**
  * 角色关系类型枚举 - 与图谱关系类型对应
  */
 export type CharacterRelationType =
-  | 'ENEMY_OF'      // 敌对
-  | 'ALLY_OF'       // 盟友
-  | 'LOVES'         // 爱慕
-  | 'KIN_OF'        // 亲属
-  | 'MENTORS'       // 师徒
-  | 'RIVAL_OF'      // 竞争对手
-  | 'SERVES'        // 效忠
-  | 'FRIEND_OF'     // 朋友
-  | 'RELATED_TO';   // 通用关系（兜底）
+  | 'ENEMY_OF' // 敌对
+  | 'ALLY_OF' // 盟友
+  | 'LOVES' // 爱慕
+  | 'KIN_OF' // 亲属
+  | 'MENTORS' // 师徒
+  | 'RIVAL_OF' // 竞争对手
+  | 'SERVES' // 效忠
+  | 'FRIEND_OF' // 朋友
+  | 'RELATED_TO'; // 通用关系（兜底）
 
 /**
  * 结构化角色关系 - 用于图谱存储和查询
@@ -23,22 +29,22 @@ export type CharacterRelationType =
  * 2. 完整格式: { id, targetCharacterId, targetCharacterName, ... }
  */
 export interface CharacterRelation {
-  id?: string;                   // 关系唯一ID（可选，AI生成时可能没有）
-  targetCharacterId?: string;    // 目标角色ID（可选，AI生成时可能只有名称）
-  targetCharacterName?: string;  // 目标角色名称（旧字段名，保持向后兼容）
-  targetName?: string;           // 目标角色名称（推荐使用，与AI返回字段一致）
-  type?: CharacterRelationType;  // 关系类型（可选，AI生成时可能不返回，默认值为 'RELATED_TO'）
-  description?: string;          // 关系描述（如 "青梅竹马"）
-  weight?: number;               // 关系强度 0-100
+  id?: string; // 关系唯一ID（可选，AI生成时可能没有）
+  targetCharacterId?: string; // 目标角色ID（可选，AI生成时可能只有名称）
+  targetCharacterName?: string; // 目标角色名称（旧字段名，保持向后兼容）
+  targetName?: string; // 目标角色名称（推荐使用，与AI返回字段一致）
+  type?: CharacterRelationType; // 关系类型（可选，AI生成时可能不返回，默认值为 'RELATED_TO'）
+  description?: string; // 关系描述（如 "青梅竹马"）
+  weight?: number; // 关系强度 0-100
   trajectory?: 'rising' | 'falling' | 'stable'; // 关系走向
-  isBidirectional?: boolean;     // 是否双向关系
-  createdAt?: number;            // 创建时间
-  updatedAt?: number;            // 更新时间
+  isBidirectional?: boolean; // 是否双向关系
+  createdAt?: number; // 创建时间
+  updatedAt?: number; // 更新时间
 }
 
- /**
-  * 关系类型中文显示名称映射
-  */
+/**
+ * 关系类型中文显示名称映射
+ */
 export const RELATION_TYPE_LABELS: Record<CharacterRelationType, string> = {
   ENEMY_OF: '敌对',
   ALLY_OF: '盟友',
@@ -51,14 +57,12 @@ export const RELATION_TYPE_LABELS: Record<CharacterRelationType, string> = {
   RELATED_TO: '关联',
 };
 
-
-
 /**
  * 旧格式关系解析结果
  * 解析 "朋友: 张三；敌人: 李四" 格式
  */
 export interface ParsedLegacyRelation {
-  type: string;      // 原始类型名（如 "朋友"）
+  type: string; // 原始类型名（如 "朋友"）
   targetName: string; // 目标角色名
 }
 
@@ -98,27 +102,31 @@ export type ArcType = 'redemption' | 'corruption' | 'steadfast' | 'awakening';
 
 export type ArcPhase = 'setup' | 'rising-action' | 'crisis' | 'climax' | 'resolution';
 
-export type ArcMilestone = 'EXPOSITION' | 'RISING_STAKES' | 'POINT_OF_NO_RETURN' | 'DARK_NIGHT_OF_SOUL';
+export type ArcMilestone =
+  | 'EXPOSITION'
+  | 'RISING_STAKES'
+  | 'POINT_OF_NO_RETURN'
+  | 'DARK_NIGHT_OF_SOUL';
 
 /**
  * 弧线类型中文标签
  */
 export const ARC_TYPE_LABELS: Record<ArcType, string> = {
-    redemption: '救赎弧线',
-    corruption: '堕落弧线',
-    steadfast: '坚守弧线',
-    awakening: '觉醒弧线',
+  redemption: '救赎弧线',
+  corruption: '堕落弧线',
+  steadfast: '坚守弧线',
+  awakening: '觉醒弧线',
 };
 
 /**
  * 弧线阶段中文标签
  */
 export const ARC_PHASE_LABELS: Record<ArcPhase, string> = {
-    setup: '铺垫期',
-    'rising-action': '上升行动',
-    crisis: '危机点',
-    climax: '高潮',
-    resolution: '结局',
+  setup: '铺垫期',
+  'rising-action': '上升行动',
+  crisis: '危机点',
+  climax: '高潮',
+  resolution: '结局',
 };
 
 export interface CharacterArcTemplate {
@@ -163,10 +171,10 @@ export interface Character {
   imageUrl?: string;
 
   // 世界设定关联
-  originLocation?: string;    // 起源/出生地（WorldSetting ID）
-  residence?: string;         // 居住地（WorldSetting ID）
+  originLocation?: string; // 起源/出生地（WorldSetting ID）
+  residence?: string; // 居住地（WorldSetting ID）
   controlledTerritories?: string[]; // 控制的领地（WorldSetting ID数组）
-  exiledFrom?: string[];      // 被流放的地点（WorldSetting ID数组）
+  exiledFrom?: string[]; // 被流放的地点（WorldSetting ID数组）
 
   // 系统字段
   physicalStatus?: string; // 身体状态
@@ -181,9 +189,9 @@ export interface WorldSetting {
   content: string;
 
   // 层级关系
-  parentId?: string;          // 父级设定ID（如：王国下的城市）
-  importance?: number;        // 重要性等级 1-10
-  tags?: string[];            // 设定标签
+  parentId?: string; // 父级设定ID（如：王国下的城市）
+  importance?: number; // 重要性等级 1-10
+  tags?: string[]; // 设定标签
 }
 
 export interface PlotVersion {
@@ -213,21 +221,21 @@ export interface Chapter {
   id: string;
   title: string;
   content: string;
-  summary?: string;     // NEW: For chapter-level outlining
+  summary?: string; // NEW: For chapter-level outlining
   expectedPOV?: string; // NEW: Track perspective
-  plotNodeId?: string;  // NEW: Link back to a PlotNode
+  plotNodeId?: string; // NEW: Link back to a PlotNode
   order: number;
   lastModified: number;
   beats?: ChapterBeat[]; // NEW: For granular scene planning
-  metadata?: Array<{key: string, value: string}>; // Chapter metadata like POV
+  metadata?: Array<{ key: string; value: string }>; // Chapter metadata like POV
   targetWordCount?: number; // 目标字数（帮助追踪写作进度）
 }
 
 export type PromptProfile = 'LITERARY' | 'WEB_NOVEL';
 
 export interface CreativeSettings {
-  tone: string;      // e.g., "Dark", "Humorous", "Epic"
-  style: string;     // e.g., "Descriptive", "Concise", "Poetic"
+  tone: string; // e.g., "Dark", "Humorous", "Epic"
+  style: string; // e.g., "Descriptive", "Concise", "Poetic"
   creativity: number; // 0.0 to 1.0 (Temperature)
   targetAudience: string;
   promptProfile?: PromptProfile; // Choice of prompt pack
@@ -250,7 +258,7 @@ export enum AppSection {
   OUTLINER = 'OUTLINER',
   DRAFTING = 'DRAFTING',
   ECHOES = 'ECHOES',
-  GRAPH = 'GRAPH'
+  GRAPH = 'GRAPH',
 }
 
 /**
@@ -260,8 +268,8 @@ export interface KnowledgeTriple {
   subject: string;
   relation: string;
   object: string;
-  weight?: number;      // 0-100: Intensity of relationship
-  trajectory?: string;  // rising, falling, stable
+  weight?: number; // 0-100: Intensity of relationship
+  trajectory?: string; // rising, falling, stable
   isForeshadowing?: boolean; // NEW Task 2.1: Whether this is a narrative hook
   status?: 'OPEN' | 'RESOLVED' | 'ABANDONED'; // Status of the hook
   branchId?: string; // NEW Task 2.2: Context isolation
@@ -279,8 +287,8 @@ export interface Echo {
   triples?: KnowledgeTriple[]; // NEW: Structural changes associated with this echo
   branchId?: string; // NEW Task 2.2
   // MVP: 准确性提升字段
-  confidence?: number;           // 0-1: AI置信度，用于自动处理判断
-  extractionEvidence?: string;   // 原文中支持此提取的具体句子
+  confidence?: number; // 0-1: AI置信度，用于自动处理判断
+  extractionEvidence?: string; // 原文中支持此提取的具体句子
 }
 
 export interface StateChangeRecommendation {
@@ -290,8 +298,8 @@ export interface StateChangeRecommendation {
   suggestedUpdate: string;
   reason: string;
   // MVP: 准确性提升字段
-  confidence?: number;           // 0-1: AI置信度
-  extractionEvidence?: string;   // 原文依据
+  confidence?: number; // 0-1: AI置信度
+  extractionEvidence?: string; // 原文依据
 }
 
 export interface TimelineEvent {
@@ -354,7 +362,13 @@ export interface NarrativeInsight {
   logic: string;
 }
 
-export type PolishMode = 'SENSORY' | 'CINEMATIC' | 'PSYCHOLOGICAL' | 'MINIMALIST' | 'WEB_MEME' | 'ANTI_DETECT';
+export type PolishMode =
+  | 'SENSORY'
+  | 'CINEMATIC'
+  | 'PSYCHOLOGICAL'
+  | 'MINIMALIST'
+  | 'WEB_MEME'
+  | 'ANTI_DETECT';
 
 export type ViewMode = 'FORGE' | 'MANUSCRIPT';
 

@@ -2,7 +2,21 @@ import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from 
 import { AppSection, ProjectState, WorldGenConfig } from './types';
 // 懒加载主要业务模块以优化首屏性能
 import { Sidebar } from './components/Sidebar';
-import { FolderOpen, Plus, Trash2, Save, X, Check, Download, Upload, Database, HardDrive, RefreshCw, BookOpen, AlertCircle } from 'lucide-react';
+import {
+  FolderOpen,
+  Plus,
+  Trash2,
+  Save,
+  X,
+  Check,
+  Download,
+  Upload,
+  Database,
+  HardDrive,
+  RefreshCw,
+  BookOpen,
+  AlertCircle,
+} from 'lucide-react';
 import { useProjectStore, INITIAL_PROJECT } from './store/useProjectStore';
 import { storageService, STORAGE_KEYS } from './services/storageService';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -14,19 +28,47 @@ import { Loader } from './components/Loader';
 
 // ==================== 懒加载组件 ====================
 // 主要业务模块 - 按需加载，减少首屏 bundle 大小
-const Dashboard = lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
-const WorldBuilder = lazy(() => import('./components/WorldBuilder').then(m => ({ default: m.WorldBuilder })));
-const CharacterCreator = lazy(() => import('./components/CharacterCreator').then(m => ({ default: m.CharacterCreator })));
-const PlotWeaver = lazy(() => import('./components/PlotWeaver').then(m => ({ default: m.PlotWeaver })));
-const ChapterOutliner = lazy(() => import('./components/ChapterOutliner/ChapterOutliner').then(m => ({ default: m.ChapterOutliner })));
-const DraftingRoom = lazy(() => import('./components/DraftingRoom').then(m => ({ default: m.DraftingRoom })));
-const EchoChamber = lazy(() => import('./components/EchoChamber').then(m => ({ default: m.EchoChamber })));
-const UserGuide = lazy(() => import('./components/UserGuide').then(m => ({ default: m.UserGuide })));
-const SettingsPanel = lazy(() => import('./components/SettingsPanel/index').then(m => ({ default: m.SettingsPanel })));
-const KnowledgeGraph = lazy(() => import('./components/KnowledgeGraph').then(m => ({ default: m.KnowledgeGraph })));
-const PromptTuner = lazy(() => import('./components/PromptTuner').then(m => ({ default: m.PromptTuner })));
-const CreativeCompassView = lazy(() => import('./components/CreativeCompassView').then(m => ({ default: m.CreativeCompassView })));
-const ProjectLobby = lazy(() => import('./components/ProjectLobby').then(m => ({ default: m.ProjectLobby })));
+const Dashboard = lazy(() =>
+  import('./components/Dashboard').then((m) => ({ default: m.Dashboard }))
+);
+const WorldBuilder = lazy(() =>
+  import('./components/WorldBuilder').then((m) => ({ default: m.WorldBuilder }))
+);
+const CharacterCreator = lazy(() =>
+  import('./components/CharacterCreator').then((m) => ({ default: m.CharacterCreator }))
+);
+const PlotWeaver = lazy(() =>
+  import('./components/PlotWeaver').then((m) => ({ default: m.PlotWeaver }))
+);
+const ChapterOutliner = lazy(() =>
+  import('./components/ChapterOutliner/ChapterOutliner').then((m) => ({
+    default: m.ChapterOutliner,
+  }))
+);
+const DraftingRoom = lazy(() =>
+  import('./components/DraftingRoom').then((m) => ({ default: m.DraftingRoom }))
+);
+const EchoChamber = lazy(() =>
+  import('./components/EchoChamber').then((m) => ({ default: m.EchoChamber }))
+);
+const UserGuide = lazy(() =>
+  import('./components/UserGuide').then((m) => ({ default: m.UserGuide }))
+);
+const SettingsPanel = lazy(() =>
+  import('./components/SettingsPanel/index').then((m) => ({ default: m.SettingsPanel }))
+);
+const KnowledgeGraph = lazy(() =>
+  import('./components/KnowledgeGraph').then((m) => ({ default: m.KnowledgeGraph }))
+);
+const PromptTuner = lazy(() =>
+  import('./components/PromptTuner').then((m) => ({ default: m.PromptTuner }))
+);
+const CreativeCompassView = lazy(() =>
+  import('./components/CreativeCompassView').then((m) => ({ default: m.CreativeCompassView }))
+);
+const ProjectLobby = lazy(() =>
+  import('./components/ProjectLobby').then((m) => ({ default: m.ProjectLobby }))
+);
 
 // 加载状态组件
 const LoadingFallback = () => (
@@ -39,27 +81,27 @@ const MUSE_FILE_VERSION = '1.0';
 
 const App: React.FC = () => {
   // 切片化订阅 - 只订阅需要的部分，避免重渲染
-  const project = useProjectStore(state => state.project);
-  const activeSection = useProjectStore(state => state.activeSection);
-  const savedProjects = useProjectStore(state => state.savedProjects);
-  const useBackend = useProjectStore(state => state.useBackend);
-  const isSaving = useProjectStore(state => state.isSaving);
-  const isLoading = useProjectStore(state => state.isLoading);
-  const showGuide = useProjectStore(state => state.showGuide);
-  const showSettings = useProjectStore(state => state.showSettings);
-  const showPromptTuner = useProjectStore(state => state.showPromptTuner);
-  
-  const setActiveSection = useProjectStore(state => state.setActiveSection);
-  const setShowGuide = useProjectStore(state => state.setShowGuide);
-  const setShowSettings = useProjectStore(state => state.setShowSettings);
-  const setShowPromptTuner = useProjectStore(state => state.setShowPromptTuner);
-  const updateProject = useProjectStore(state => state.updateProject);
-  const initialize = useProjectStore(state => state.initialize);
-  const createProject = useProjectStore(state => state.createProject);
-  const switchProject = useProjectStore(state => state.switchProject);
-  const deleteProject = useProjectStore(state => state.deleteProject);
-  const forceSync = useProjectStore(state => state.forceSync);
-  const lastError = useProjectStore(state => state.lastError);
+  const project = useProjectStore((state) => state.project);
+  const activeSection = useProjectStore((state) => state.activeSection);
+  const savedProjects = useProjectStore((state) => state.savedProjects);
+  const useBackend = useProjectStore((state) => state.useBackend);
+  const isSaving = useProjectStore((state) => state.isSaving);
+  const isLoading = useProjectStore((state) => state.isLoading);
+  const showGuide = useProjectStore((state) => state.showGuide);
+  const showSettings = useProjectStore((state) => state.showSettings);
+  const showPromptTuner = useProjectStore((state) => state.showPromptTuner);
+
+  const setActiveSection = useProjectStore((state) => state.setActiveSection);
+  const setShowGuide = useProjectStore((state) => state.setShowGuide);
+  const setShowSettings = useProjectStore((state) => state.setShowSettings);
+  const setShowPromptTuner = useProjectStore((state) => state.setShowPromptTuner);
+  const updateProject = useProjectStore((state) => state.updateProject);
+  const initialize = useProjectStore((state) => state.initialize);
+  const createProject = useProjectStore((state) => state.createProject);
+  const switchProject = useProjectStore((state) => state.switchProject);
+  const deleteProject = useProjectStore((state) => state.deleteProject);
+  const forceSync = useProjectStore((state) => state.forceSync);
+  const lastError = useProjectStore((state) => state.lastError);
 
   // Feature flags from global config
   const enableEchoSystem = useFeature('enableEchoSystem');
@@ -132,7 +174,8 @@ const App: React.FC = () => {
           lastModified: Date.now(),
         };
 
-        const { setSavedProjects, setProject, setActiveSection, savedProjects } = useProjectStore.getState();
+        const { setSavedProjects, setProject, setActiveSection, savedProjects } =
+          useProjectStore.getState();
         const newList = [...savedProjects, importedProject];
 
         await storageService.setItem(STORAGE_KEYS.PROJECTS, newList);
@@ -174,155 +217,180 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary>
-    <FeatureFlagProvider>
-      <ConfirmDialogProvider>
-    <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans selection:bg-muse-500/30 selection:text-muse-100 flex">
-      {/* Hidden file input for import */}
-      <input
-        ref={importFileRef}
-        type="file"
-        accept=".muse,.json"
-        onChange={handleImportProject}
-        className="hidden"
-      />
+      <FeatureFlagProvider>
+        <ConfirmDialogProvider>
+          <div className="min-h-screen bg-[#0f172a] text-slate-200 font-sans selection:bg-muse-500/30 selection:text-muse-100 flex">
+            {/* Hidden file input for import */}
+            <input
+              ref={importFileRef}
+              type="file"
+              accept=".muse,.json"
+              onChange={handleImportProject}
+              className="hidden"
+            />
 
-      {/* Sidebar Navigation */}
-      <Sidebar
-        activeSection={activeSection}
-        setActiveSection={setActiveSection}
-        onOpenSettings={() => setShowSettings(true)}
-        onOpenPromptTuner={() => setShowPromptTuner(true)}
-        onOpenGuide={() => setShowGuide(true)}
-        hasCharEchoes={project.echoes?.some(e => e.type === 'CHARACTER' && e.status === 'PENDING')}
-        hasWorldEchoes={project.echoes?.some(e => e.type === 'WORLD' && e.status === 'PENDING')}
-      />
+            {/* Sidebar Navigation */}
+            <Sidebar
+              activeSection={activeSection}
+              setActiveSection={setActiveSection}
+              onOpenSettings={() => setShowSettings(true)}
+              onOpenPromptTuner={() => setShowPromptTuner(true)}
+              onOpenGuide={() => setShowGuide(true)}
+              hasCharEchoes={project.echoes?.some(
+                (e) => e.type === 'CHARACTER' && e.status === 'PENDING'
+              )}
+              hasWorldEchoes={project.echoes?.some(
+                (e) => e.type === 'WORLD' && e.status === 'PENDING'
+              )}
+            />
 
-      {/* Main wrapper (offset by sidebar) */}
-      <div className="flex-1 flex flex-col ml-[68px] min-h-screen">
-        {/* New Enhanced Topbar */}
-        <header className="h-14 border-b border-slate-800/60 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-30 flex items-center justify-between px-6">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-slate-400">
-              <BookOpen size={16} className="text-muse-400" />
-              <span className="text-xs font-bold uppercase tracking-widest opacity-50">Project</span>
-            </div>
-            <h1 className="font-serif font-bold text-base text-white tracking-tight">{project.title || "未命名宇宙"}</h1>
-          </div>
-
-          <div className="flex items-center gap-4">
-            {/* Sync Hub */}
-            <div className="flex items-center bg-slate-950/50 rounded-2xl border border-slate-800/50 p-1 pr-3 gap-3">
-              <div className={`flex items-center gap-1.5 text-[10px] uppercase font-bold px-3 py-1.5 rounded-xl border ${useBackend ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5' : 'text-amber-400 border-amber-500/20 bg-amber-500/5'}`}>
-                {useBackend ? <Database size={10} /> : <HardDrive size={10} />}
-                <span>{useBackend ? 'MySQL Sync' : 'IndexedDB'}</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {isSaving ? (
-                  <div className="flex items-center gap-2 px-1">
-                    <RefreshCw size={14} className="text-muse-400 animate-spin" />
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Syncing...</span>
+            {/* Main wrapper (offset by sidebar) */}
+            <div className="flex-1 flex flex-col ml-[68px] min-h-screen">
+              {/* New Enhanced Topbar */}
+              <header className="h-14 border-b border-slate-800/60 bg-slate-900/80 backdrop-blur-xl sticky top-0 z-30 flex items-center justify-between px-6">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <BookOpen size={16} className="text-muse-400" />
+                    <span className="text-xs font-bold uppercase tracking-widest opacity-50">
+                      Project
+                    </span>
                   </div>
-                ) : (
+                  <h1 className="font-serif font-bold text-base text-white tracking-tight">
+                    {project.title || '未命名宇宙'}
+                  </h1>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  {/* Sync Hub */}
+                  <div className="flex items-center bg-slate-950/50 rounded-2xl border border-slate-800/50 p-1 pr-3 gap-3">
+                    <div
+                      className={`flex items-center gap-1.5 text-[10px] uppercase font-bold px-3 py-1.5 rounded-xl border ${useBackend ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5' : 'text-amber-400 border-amber-500/20 bg-amber-500/5'}`}
+                    >
+                      {useBackend ? <Database size={10} /> : <HardDrive size={10} />}
+                      <span>{useBackend ? 'MySQL Sync' : 'IndexedDB'}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {isSaving ? (
+                        <div className="flex items-center gap-2 px-1">
+                          <RefreshCw size={14} className="text-muse-400 animate-spin" />
+                          <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                            Syncing...
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={forceSync}
+                          className="flex items-center gap-2 px-1 group text-slate-500 hover:text-emerald-400 transition-colors"
+                        >
+                          <Check size={14} className="group-hover:scale-110 transition-transform" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider">
+                            Saved
+                          </span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   <button
-                    onClick={forceSync}
-                    className="flex items-center gap-2 px-1 group text-slate-500 hover:text-emerald-400 transition-colors"
+                    onClick={() => handleExportProject(project)}
+                    className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all"
+                    title="导出当前宇宙"
                   >
-                    <Check size={14} className="group-hover:scale-110 transition-transform" />
-                    <span className="text-[10px] font-bold uppercase tracking-wider">Saved</span>
+                    <Download size={18} />
                   </button>
-                )}
-              </div>
+                </div>
+              </header>
+
+              {/* Main Content Area */}
+              <main className="flex-1 p-6 overflow-auto">
+                <Suspense fallback={<LoadingFallback />}>
+                  {activeSection === AppSection.DASHBOARD && (
+                    <Dashboard
+                      project={project}
+                      updateProject={updateProject}
+                      onImportProject={() => importFileRef.current?.click()}
+                    />
+                  )}
+                  {activeSection === AppSection.WORLD && (
+                    <WorldBuilder project={project} updateProject={updateProject} />
+                  )}
+                  {activeSection === AppSection.CHARACTERS && (
+                    <CharacterCreator project={project} updateProject={updateProject} />
+                  )}
+                  {activeSection === AppSection.PLOT && (
+                    <PlotWeaver project={project} updateProject={updateProject} />
+                  )}
+                  {activeSection === AppSection.OUTLINER && (
+                    <ChapterOutliner project={project} updateProject={updateProject} />
+                  )}
+                  {activeSection === AppSection.DRAFTING && (
+                    <DraftingRoom project={project} updateProject={updateProject} />
+                  )}
+                  {activeSection === AppSection.ECHOES &&
+                    (enableEchoSystem ? (
+                      <EchoChamber project={project} updateProject={updateProject} />
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center min-h-0 bg-[#0b1222] animate-fade-in p-6">
+                        <AlertCircle size={48} className="text-slate-600 mb-4" />
+                        <h3 className="text-lg font-bold text-slate-400 mb-2">Echo系统已禁用</h3>
+                        <p className="text-sm text-slate-500">
+                          请在「设置 → 高级 → 功能开关」中启用Echo系统
+                        </p>
+                      </div>
+                    ))}
+                  {activeSection === AppSection.GRAPH &&
+                    (enableKnowledgeGraph ? (
+                      <div className="flex-1 flex flex-col min-h-0 bg-[#0b1222] animate-fade-in relative z-10 p-6">
+                        <KnowledgeGraph
+                          projectId={project.id}
+                          useBackend={useBackend}
+                          projectData={project}
+                          updateProject={updateProject}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center min-h-0 bg-[#0b1222] animate-fade-in p-6">
+                        <AlertCircle size={48} className="text-slate-600 mb-4" />
+                        <h3 className="text-lg font-bold text-slate-400 mb-2">知识图谱已禁用</h3>
+                        <p className="text-sm text-slate-500">
+                          请在「设置 → 高级 → 功能开关」中启用知识图谱
+                        </p>
+                      </div>
+                    ))}
+                  {activeSection === AppSection.CREATIVE_COMPASS && (
+                    <CreativeCompassView project={project} updateProject={updateProject} />
+                  )}
+                </Suspense>
+              </main>
             </div>
 
-            <button
-              onClick={() => handleExportProject(project)}
-              className="p-2.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all"
-              title="导出当前宇宙"
-            >
-              <Download size={18} />
-            </button>
+            {/* User Guide Modal */}
+            {showGuide && (
+              <Suspense fallback={<LoadingFallback />}>
+                <UserGuide onClose={() => setShowGuide(false)} />
+              </Suspense>
+            )}
+
+            {/* Settings Panel Modal */}
+            {showSettings && (
+              <Suspense fallback={<LoadingFallback />}>
+                <SettingsPanel onClose={() => setShowSettings(false)} />
+              </Suspense>
+            )}
+
+            {/* Prompt Tuner Modal */}
+            {showPromptTuner && (
+              <Suspense fallback={<LoadingFallback />}>
+                <PromptTuner onClose={() => setShowPromptTuner(false)} />
+              </Suspense>
+            )}
+
+            {/* AI Call Confirmation Dialog (Global) */}
+            <PromptConfirmDialog />
           </div>
-        </header>
-
-        {/* Main Content Area */}
-        <main className="flex-1 p-6 overflow-auto">
-          <Suspense fallback={<LoadingFallback />}>
-            {activeSection === AppSection.DASHBOARD && (
-              <Dashboard project={project} updateProject={updateProject} onImportProject={() => importFileRef.current?.click()} />
-            )}
-            {activeSection === AppSection.WORLD && (
-              <WorldBuilder project={project} updateProject={updateProject} />
-            )}
-            {activeSection === AppSection.CHARACTERS && (
-              <CharacterCreator project={project} updateProject={updateProject} />
-            )}
-            {activeSection === AppSection.PLOT && (
-              <PlotWeaver project={project} updateProject={updateProject} />
-            )}
-            {activeSection === AppSection.OUTLINER && (
-              <ChapterOutliner project={project} updateProject={updateProject} />
-            )}
-            {activeSection === AppSection.DRAFTING && (
-              <DraftingRoom project={project} updateProject={updateProject} />
-            )}
-            {activeSection === AppSection.ECHOES && (
-              enableEchoSystem ? (
-                <EchoChamber project={project} updateProject={updateProject} />
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center min-h-0 bg-[#0b1222] animate-fade-in p-6">
-                  <AlertCircle size={48} className="text-slate-600 mb-4" />
-                  <h3 className="text-lg font-bold text-slate-400 mb-2">Echo系统已禁用</h3>
-                  <p className="text-sm text-slate-500">请在「设置 → 高级 → 功能开关」中启用Echo系统</p>
-                </div>
-              )
-            )}
-            {activeSection === AppSection.GRAPH && (
-              enableKnowledgeGraph ? (
-                <div className="flex-1 flex flex-col min-h-0 bg-[#0b1222] animate-fade-in relative z-10 p-6">
-                  <KnowledgeGraph projectId={project.id} useBackend={useBackend} projectData={project} updateProject={updateProject} />
-                </div>
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center min-h-0 bg-[#0b1222] animate-fade-in p-6">
-                  <AlertCircle size={48} className="text-slate-600 mb-4" />
-                  <h3 className="text-lg font-bold text-slate-400 mb-2">知识图谱已禁用</h3>
-                  <p className="text-sm text-slate-500">请在「设置 → 高级 → 功能开关」中启用知识图谱</p>
-                </div>
-              )
-            )}
-            {activeSection === AppSection.CREATIVE_COMPASS && (
-              <CreativeCompassView project={project} updateProject={updateProject} />
-            )}
-          </Suspense>
-        </main>
-      </div>
-
-      {/* User Guide Modal */}
-      {showGuide && (
-        <Suspense fallback={<LoadingFallback />}>
-          <UserGuide onClose={() => setShowGuide(false)} />
-        </Suspense>
-      )}
-
-      {/* Settings Panel Modal */}
-      {showSettings && (
-        <Suspense fallback={<LoadingFallback />}>
-          <SettingsPanel onClose={() => setShowSettings(false)} />
-        </Suspense>
-      )}
-
-      {/* Prompt Tuner Modal */}
-      {showPromptTuner && (
-        <Suspense fallback={<LoadingFallback />}>
-          <PromptTuner onClose={() => setShowPromptTuner(false)} />
-        </Suspense>
-      )}
-
-      {/* AI Call Confirmation Dialog (Global) */}
-      <PromptConfirmDialog />
-    </div>
-    </ConfirmDialogProvider>
-    </FeatureFlagProvider>
+        </ConfirmDialogProvider>
+      </FeatureFlagProvider>
     </ErrorBoundary>
   );
 };

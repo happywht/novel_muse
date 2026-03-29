@@ -37,6 +37,7 @@ components/Echo/
 ### 2. 证据展示
 
 每个Echo都会显示：
+
 - **extractionEvidence**: 原文中支持此提取的具体句子
 - **置信度进度条**: 可视化显示AI的确信程度
 - **置信度百分比**: 精确到百分比
@@ -53,10 +54,10 @@ import { EchoSummaryCard } from '../Echo';
   isExtracting={isExtracting}
   onExtract={handleExtractEchoes}
   onAccept={handleAddEcho}
-  onReject={(echo) => setExtractedEchoes(prev => prev.filter(e => e.id !== echo.id))}
+  onReject={(echo) => setExtractedEchoes((prev) => prev.filter((e) => e.id !== echo.id))}
   onSimulate={handleSimulatePropagation}
   onViewAll={() => navigateToEchoChamber()}
-/>
+/>;
 ```
 
 ### EchoReviewPanel（用于侧边栏审核）
@@ -76,7 +77,7 @@ import { EchoReviewPanel } from '../Echo';
   onSimulate={handleSimulate}
   onClose={() => setShowPanel(false)}
   onOpenDeepReview={() => setShowDeepReview(true)}
-/>
+/>;
 ```
 
 ### EchoDeepReview（Phase 3: 全屏深度审核模式）
@@ -98,7 +99,7 @@ const [showDeepReview, setShowDeepReview] = useState(false);
   onBatchReject={handleBatchReject}
   onUpdate={handleUpdateEcho}
   onSimulate={handleSimulate}
-/>
+/>;
 ```
 
 #### EchoDeepReview 功能特性
@@ -141,14 +142,14 @@ import { categorizeEchoes, getConfidenceConfig, autoAcceptHighConfidence } from 
 
 // 按置信度分类
 const categorized = categorizeEchoes(echoes);
-console.log(categorized.high);    // 高置信度Echoes
-console.log(categorized.medium);  // 中置信度Echoes
-console.log(categorized.low);     // 低置信度Echoes
+console.log(categorized.high); // 高置信度Echoes
+console.log(categorized.medium); // 中置信度Echoes
+console.log(categorized.low); // 低置信度Echoes
 
 // 获取置信度配置
 const config = getConfidenceConfig(0.9);
-console.log(config.bg);      // 'bg-emerald-900/20'
-console.log(config.icon);    // '✅'
+console.log(config.bg); // 'bg-emerald-900/20'
+console.log(config.icon); // '✅'
 
 // 自动采纳高置信度
 const { accepted, remaining } = autoAcceptHighConfidence(echoes);
@@ -167,14 +168,14 @@ interface Echo {
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'PREDICTION' | 'ARCHIVED' | 'AUTO_ACCEPTED';
   timestamp: number;
   // MVP: 准确性提升字段
-  confidence?: number;           // 0-1: AI置信度
-  extractionEvidence?: string;   // 原文依据
+  confidence?: number; // 0-1: AI置信度
+  extractionEvidence?: string; // 原文依据
 }
 
 interface CategorizedEchoes {
-  high: Echo[];      // 高置信度 (≥0.85)
-  medium: Echo[];    // 中置信度 (0.5-0.85)
-  low: Echo[];       // 低置信度 (<0.5)
+  high: Echo[]; // 高置信度 (≥0.85)
+  medium: Echo[]; // 中置信度 (0.5-0.85)
+  low: Echo[]; // 低置信度 (<0.5)
   total: number;
 }
 ```
@@ -219,6 +220,7 @@ const lowConfidence = {
 ## 键盘快捷键
 
 ### EchoDeepReview
+
 - `ESC`: 关闭深度审核模式
 - `Ctrl+A` / `Cmd+A`: 全选/取消全选当前筛选结果
 
@@ -260,12 +262,14 @@ const lowConfidence = {
 ### 2. useDraftingActions更新（已完成）
 
 在 `components/DraftingRoom/useDraftingActions.ts` 中已更新：
+
 - `handleExtractEchoes`: 支持confidence和extractionEvidence
 - `triggerStateAnalysis`: 支持confidence和extractionEvidence
 
 ### 3. 类型定义（已完成）
 
 在 `types.ts` 中已添加：
+
 - `Echo.confidence`: number
 - `Echo.extractionEvidence`: string
 - `StateChangeRecommendation.confidence`: number
@@ -274,6 +278,7 @@ const lowConfidence = {
 ### 4. Gemini服务（已完成）
 
 在 `services/gemini/world.ts` 中已更新：
+
 - `analyzeStateChanges`: 返回confidence和extractionEvidence
 - Schema定义已包含这两个字段
 
@@ -288,6 +293,7 @@ const lowConfidence = {
 ## 贡献指南
 
 如果需要扩展功能：
+
 1. 在 `echoUtils.ts` 中添加辅助函数
 2. 保持现有的颜色和动画规范
 3. 确保TypeScript类型安全

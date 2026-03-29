@@ -14,25 +14,25 @@
 interface Echo {
   id: string;
   type: 'CHARACTER' | 'WORLD';
-  targetId: string;           // 目标实体ID
-  targetName: string;         // 目标实体名称
-  description: string;        // 变更描述
-  reason: string;             // 变更原因
+  targetId: string; // 目标实体ID
+  targetName: string; // 目标实体名称
+  description: string; // 变更描述
+  reason: string; // 变更原因
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'PREDICTION' | 'ARCHIVED' | 'AUTO_ACCEPTED';
   timestamp: number;
   triples?: KnowledgeTriple[]; // 知识三元组（关系变更）
-  branchId?: string;          // 分支ID
-  confidence?: number;        // AI置信度 0-1
+  branchId?: string; // 分支ID
+  confidence?: number; // AI置信度 0-1
   extractionEvidence?: string; // 原文依据
 }
 
 interface KnowledgeTriple {
-  subject: string;            // 主体
-  relation: string;           // 关系类型
-  object: string;             // 客体
-  weight?: number;            // 关系强度 0-100
-  trajectory?: string;        // 关系走向: rising, falling, stable
-  isForeshadowing?: boolean;  // 是否为伏笔
+  subject: string; // 主体
+  relation: string; // 关系类型
+  object: string; // 客体
+  weight?: number; // 关系强度 0-100
+  trajectory?: string; // 关系走向: rising, falling, stable
+  isForeshadowing?: boolean; // 是否为伏笔
   status?: 'OPEN' | 'RESOLVED' | 'ABANDONED';
   branchId?: string;
 }
@@ -40,13 +40,13 @@ interface KnowledgeTriple {
 
 ### 1.2 关系复杂度评估
 
-| 维度 | 评分 | 说明 |
-|------|------|------|
-| **实体关联** | ★★★★★ | 直接关联Character和WorldSetting实体 |
-| **关系三元组** | ★★★★★ | 已包含KnowledgeTriple结构，天然支持图谱化 |
-| **时序性** | ★★★★☆ | 有timestamp，支持时间线分析 |
-| **状态追踪** | ★★★★★ | 多种状态（PENDING/ACCEPTED/REJECTED等），支持关系演变 |
-| **置信度** | ★★★★☆ | 有confidence字段，支持关系强度评估 |
+| 维度           | 评分  | 说明                                                  |
+| -------------- | ----- | ----------------------------------------------------- |
+| **实体关联**   | ★★★★★ | 直接关联Character和WorldSetting实体                   |
+| **关系三元组** | ★★★★★ | 已包含KnowledgeTriple结构，天然支持图谱化             |
+| **时序性**     | ★★★★☆ | 有timestamp，支持时间线分析                           |
+| **状态追踪**   | ★★★★★ | 多种状态（PENDING/ACCEPTED/REJECTED等），支持关系演变 |
+| **置信度**     | ★★★★☆ | 有confidence字段，支持关系强度评估                    |
 
 ### 1.3 已有图谱功能
 
@@ -68,17 +68,20 @@ interface KnowledgeTriple {
 **优先级**: ★★★★★（最高）
 
 Echoes模块是整个系统中最适合图谱化的模块，原因：
+
 - 数据结构已包含三元组格式
 - 与Character/WorldSetting有直接关联
 - 已有完整性检查和矛盾检测逻辑
 - 支持时序分析和状态演变
 
 **图谱节点类型**:
+
 - `Echo` - 变更事件节点
 - `Character` - 角色节点
 - `WorldSetting` - 世界设定节点
 
 **图谱关系类型**:
+
 - `AFFECTS` - Echo影响实体
 - `CHANGES_RELATION` - 变更关系
 - `CAUSES` - 因果关系（推演）
@@ -95,13 +98,13 @@ interface Chapter {
   id: string;
   title: string;
   content: string;
-  summary?: string;           // 章节细纲
-  expectedPOV?: string;       // 视角人物
-  plotNodeId?: string;        // 关联PlotNode
+  summary?: string; // 章节细纲
+  expectedPOV?: string; // 视角人物
+  plotNodeId?: string; // 关联PlotNode
   order: number;
   lastModified: number;
-  beats?: ChapterBeat[];      // 场景节拍链
-  metadata?: Array<{key: string, value: string}>;
+  beats?: ChapterBeat[]; // 场景节拍链
+  metadata?: Array<{ key: string; value: string }>;
 }
 
 interface ChapterBeat {
@@ -131,13 +134,13 @@ interface PlotNode {
 
 ### 2.2 关系复杂度评估
 
-| 维度 | 评分 | 说明 |
-|------|------|------|
+| 维度         | 评分  | 说明                                                |
+| ------------ | ----- | --------------------------------------------------- |
 | **实体关联** | ★★★★☆ | Chapter关联PlotNode，PlotNode关联Character/Location |
-| **层级关系** | ★★★★★ | PlotNode → Chapter → ChapterBeat 三级结构 |
-| **时序性** | ★★★★★ | 有order字段，严格时序 |
-| **冲突分析** | ★★★★☆ | 有conflictScenario结构 |
-| **内容关联** | ★★★☆☆ | content为文本，需要NLP提取关系 |
+| **层级关系** | ★★★★★ | PlotNode → Chapter → ChapterBeat 三级结构           |
+| **时序性**   | ★★★★★ | 有order字段，严格时序                               |
+| **冲突分析** | ★★★★☆ | 有conflictScenario结构                              |
+| **内容关联** | ★★★☆☆ | content为文本，需要NLP提取关系                      |
 
 ### 2.3 已有分析功能
 
@@ -162,17 +165,20 @@ interface PlotNode {
 **优先级**: ★★★★☆（高）
 
 Outliner模块适合图谱化，但复杂度略低于Echoes：
+
 - 层级结构清晰（PlotNode → Chapter → Beat）
 - 已有冲突分析基础设施
 - 与Character/Location有关联
 
 **图谱节点类型**:
+
 - `PlotNode` - 情节节点
 - `Chapter` - 章节
 - `ChapterBeat` - 场景节拍
 - `Conflict` - 冲突场景
 
 **图谱关系类型**:
+
 - `EXPANDS_TO` - PlotNode展开为Chapter
 - `CONTAINS` - Chapter包含Beat
 - `INVOLVES` - 章节涉及角色/地点
@@ -186,6 +192,7 @@ Outliner模块适合图谱化，但复杂度略低于Echoes：
 ### 3.1 模块定位
 
 Forge模块是**创作工坊**（DraftingRoom的一部分），主要功能：
+
 - 场景正文生成
 - 文学润色（五感增强、镜头语言、心理侧写等）
 - 局部重写
@@ -201,27 +208,30 @@ DraftEditor（编辑）→ 提取Echo → EchoSummaryCard（确认）
 
 ### 3.3 关系复杂度评估
 
-| 维度 | 评分 | 说明 |
-|------|------|------|
-| **实体关联** | ★★★☆☆ | 使用Character/WorldSetting作为输入，不存储关系 |
-| **关系产生** | ★★★★★ | 生成内容产生新的Echo和关系三元组 |
-| **时序性** | ★★☆☆☆ | 无独立时序，依赖Chapter |
-| **数据持久化** | ★★☆☆☆ | 主要为临时状态，结果存入Draft/Chapter/Echo |
+| 维度           | 评分  | 说明                                           |
+| -------------- | ----- | ---------------------------------------------- |
+| **实体关联**   | ★★★☆☆ | 使用Character/WorldSetting作为输入，不存储关系 |
+| **关系产生**   | ★★★★★ | 生成内容产生新的Echo和关系三元组               |
+| **时序性**     | ★★☆☆☆ | 无独立时序，依赖Chapter                        |
+| **数据持久化** | ★★☆☆☆ | 主要为临时状态，结果存入Draft/Chapter/Echo     |
 
 ### 3.4 图谱化建议
 
 **优先级**: ★★☆☆☆（低）
 
 Forge模块本身**不适合**作为独立图谱模块，原因：
+
 - 它是创作工具，不是数据存储模块
 - 产生的关系已通过Echo机制处理
 - 无独立持久化数据结构
 
 **但Forge与图谱的集成点**:
+
 1. **输入端**: 从图谱获取角色状态、位置、关系上下文
 2. **输出端**: 将生成内容的关系变更写入图谱（通过Echo）
 
 **推荐集成方式**:
+
 - 在生成场景时，从图谱查询`PhysicalStatus`和`unresolvedForeshadowing`
 - 生成后自动提取Echo并写入图谱
 
@@ -263,17 +273,17 @@ Forge模块本身**不适合**作为独立图谱模块，原因：
 
 ### 4.2 交叉关系矩阵
 
-| 模块A | 模块B | 关系类型 | 数据依赖 |
-|-------|-------|----------|----------|
-| Echoes | Character | 状态变更 | Echo.targetId → Character.id |
-| Echoes | WorldSetting | 设定变更 | Echo.targetId → WorldSetting.id |
-| Echoes | Outliner | 章节来源 | Echo可从Chapter内容提取 |
-| Outliner | PlotNode | 层级展开 | Chapter.plotNodeId → PlotNode.id |
-| Outliner | Character | 角色出场 | PlotNode.relatedCharacters |
-| Outliner | WorldSetting | 场景设定 | PlotNode.relatedLocations |
-| Forge | Echoes | 产生回响 | 生成内容 → 提取Echo |
-| Forge | Character | 使用角色 | 生成时引用角色设定 |
-| Forge | WorldSetting | 使用设定 | 生成时引用世界设定 |
+| 模块A    | 模块B        | 关系类型 | 数据依赖                         |
+| -------- | ------------ | -------- | -------------------------------- |
+| Echoes   | Character    | 状态变更 | Echo.targetId → Character.id     |
+| Echoes   | WorldSetting | 设定变更 | Echo.targetId → WorldSetting.id  |
+| Echoes   | Outliner     | 章节来源 | Echo可从Chapter内容提取          |
+| Outliner | PlotNode     | 层级展开 | Chapter.plotNodeId → PlotNode.id |
+| Outliner | Character    | 角色出场 | PlotNode.relatedCharacters       |
+| Outliner | WorldSetting | 场景设定 | PlotNode.relatedLocations        |
+| Forge    | Echoes       | 产生回响 | 生成内容 → 提取Echo              |
+| Forge    | Character    | 使用角色 | 生成时引用角色设定               |
+| Forge    | WorldSetting | 使用设定 | 生成时引用世界设定               |
 
 ### 4.3 图谱化后的数据流
 
@@ -302,25 +312,28 @@ Forge模块本身**不适合**作为独立图谱模块，原因：
 
 ### 5.1 优先级评估表
 
-| 模块 | 优先级 | 理由 | 实现复杂度 |
-|------|--------|------|-----------|
-| **Echoes** | P0（最高） | 已有三元组结构，直接映射到图谱 | ★★☆☆☆ |
-| **Outliner** | P1（高） | 层级结构清晰，冲突分析有价值 | ★★★☆☆ |
-| **Forge** | P2（低） | 作为工具集成，不需要独立图谱化 | ★☆☆☆☆ |
+| 模块         | 优先级     | 理由                           | 实现复杂度 |
+| ------------ | ---------- | ------------------------------ | ---------- |
+| **Echoes**   | P0（最高） | 已有三元组结构，直接映射到图谱 | ★★☆☆☆      |
+| **Outliner** | P1（高）   | 层级结构清晰，冲突分析有价值   | ★★★☆☆      |
+| **Forge**    | P2（低）   | 作为工具集成，不需要独立图谱化 | ★☆☆☆☆      |
 
 ### 5.2 实施路线图
 
 #### Phase 1: Echoes图谱化（1-2周）
+
 - [ ] 将Echo中的KnowledgeTriple同步到图谱
 - [ ] 实现Echo节点与Character/WorldSetting的关联
 - [ ] 添加关系演变时序查询
 
 #### Phase 2: Outliner图谱化（2-3周）
+
 - [ ] 创建Chapter和PlotNode节点
 - [ ] 建立层级关系（EXPANDS_TO, CONTAINS）
 - [ ] 集成冲突可视化到图谱查询
 
 #### Phase 3: Forge集成（1周）
+
 - [ ] 生成前从图谱查询PhysicalStatus
 - [ ] 生成后自动将Echo写入图谱
 - [ ] 实现伏笔追踪（Chekhov's Gun）

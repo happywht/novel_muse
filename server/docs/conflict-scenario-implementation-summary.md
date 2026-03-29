@@ -7,54 +7,64 @@
 ## 修改文件清单
 
 ### 1. `server/src/services/graph/sync.ts`
+
 **修改内容**: 在 PlotNode 同步逻辑中添加冲突场景关系创建
 
 **关键代码** (第 365-397 行):
+
 ```typescript
 // 2.5.5. Create ConflictScenario relationships
 for (const node of projectData.plotNodes) {
-    if (node.conflictScenario && node.conflictScenario.participants?.length > 0) {
-        const conflict = node.conflictScenario;
+  if (node.conflictScenario && node.conflictScenario.participants?.length > 0) {
+    const conflict = node.conflictScenario;
 
-        // 为每个参与者创建冲突关系
-        for (const participantId of conflict.participants) {
-            try {
-                await session.run(
-                    `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})
+    // 为每个参与者创建冲突关系
+    for (const participantId of conflict.participants) {
+      try {
+        await session.run(
+          `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})
                      MATCH (c:Character {id: $participantId, projectId: $projectId})
                      MERGE (pn)-[r:HAS_CONFLICT_PARTICIPANT]->(c)
                      SET r.conflictType = $conflictType,
                          r.stakes = $stakes,
                          r.intensity = $intensity`,
-                    {
-                        plotNodeId: node.id,
-                        projectId,
-                        participantId,
-                        conflictType: conflict.type || 'CONFRONTATION',
-                        stakes: conflict.stakes || '',
-                        intensity: conflict.intensity || 5
-                    }
-                );
-            } catch (conflictErr) {
-                console.warn(`Failed to create conflict relationship for PlotNode ${node.id} -> Character ${participantId}:`, conflictErr);
-            }
-        }
-
-        console.log(`  └─ Conflict scenario: ${conflict.participants.length} participants, intensity ${conflict.intensity}`);
+          {
+            plotNodeId: node.id,
+            projectId,
+            participantId,
+            conflictType: conflict.type || 'CONFRONTATION',
+            stakes: conflict.stakes || '',
+            intensity: conflict.intensity || 5,
+          }
+        );
+      } catch (conflictErr) {
+        console.warn(
+          `Failed to create conflict relationship for PlotNode ${node.id} -> Character ${participantId}:`,
+          conflictErr
+        );
+      }
     }
+
+    console.log(
+      `  └─ Conflict scenario: ${conflict.participants.length} participants, intensity ${conflict.intensity}`
+    );
+  }
 }
 ```
 
 **特性**:
+
 - 为每个参与者创建独立的 `HAS_CONFLICT_PARTICIPANT` 关系
 - 在关系上存储 `conflictType`、`stakes`、`intensity` 属性
 - 完善的错误处理，确保单个失败不影响整体同步
 - 控制台日志输出同步进度
 
 ### 2. `server/src/services/graph/queries.ts`
+
 **修改内容**: 添加两个新的查询函数
 
 **函数 1: getCharacterConflicts** (第 343-379 行)
+
 ```typescript
 export const getCharacterConflicts = async (
     projectId: string,
@@ -71,6 +81,7 @@ export const getCharacterConflicts = async (
 **功能**: 查询指定角色参与的所有冲突场景，包含其他参与者信息
 
 **函数 2: getHighIntensityConflicts** (第 381-416 行)
+
 ```typescript
 export const getHighIntensityConflicts = async (
     projectId: string
@@ -86,13 +97,16 @@ export const getHighIntensityConflicts = async (
 **功能**: 查询项目中所有高强度冲突场景（intensity >= 7）
 
 ### 3. `server/src/routes/graph.ts`
+
 **修改内容**: 添加两个新的 API 端点
 
 **端点 1**: `GET /api/graph/:projectId/conflicts/character/:characterId`
+
 - 查询角色的所有冲突场景
 - 返回按强度降序排列的结果
 
 **端点 2**: `GET /api/graph/:projectId/conflicts/high-intensity`
+
 - 查询所有高强度冲突
 - 返回按强度降序排列的结果
 
@@ -101,10 +115,12 @@ export const getHighIntensityConflicts = async (
 ### 图数据库设计
 
 **节点类型**:
+
 - PlotNode: 情节节点
 - Character: 角色节点
 
 **关系类型**: `HAS_CONFLICT_PARTICIPANT`
+
 - 方向: `(PlotNode)-[:HAS_CONFLICT_PARTICIPANT]->(Character)`
 - 属性:
   - `conflictType`: 冲突类型（CONFRONTATION | CLIMAX | TWIST）
@@ -126,9 +142,11 @@ export const getHighIntensityConflicts = async (
 ## 测试
 
 ### 测试文件
+
 - `server/test-conflict-scenario.ts`: 完整的功能测试脚本
 
 ### 测试覆盖
+
 1. 同步包含冲突场景的项目数据
 2. 查询角色的所有冲突场景
 3. 查询高强度冲突场景
@@ -136,6 +154,7 @@ export const getHighIntensityConflicts = async (
 5. 验证参与者信息完整性
 
 ### 运行测试
+
 ```bash
 cd server
 npx ts-node test-conflict-scenario.ts
@@ -147,14 +166,14 @@ npx ts-node test-conflict-scenario.ts
 
 ```typescript
 // 获取角色的冲突场景
-const conflicts = await fetch(
-  `/api/graph/${projectId}/conflicts/character/${characterId}`
-).then(r => r.json());
+const conflicts = await fetch(`/api/graph/${projectId}/conflicts/character/${characterId}`).then(
+  (r) => r.json()
+);
 
 // 获取高强度冲突
-const highIntensityConflicts = await fetch(
-  `/api/graph/${projectId}/conflicts/high-intensity`
-).then(r => r.json());
+const highIntensityConflicts = await fetch(`/api/graph/${projectId}/conflicts/high-intensity`).then(
+  (r) => r.json()
+);
 ```
 
 ### Neo4j Cypher 查询示例

@@ -126,7 +126,9 @@ export class PromptService {
   /**
    * 获取所有Prompts（包括默认和自定义）
    */
-  async getAllPrompts(profile: 'LITERARY' | 'WEB_NOVEL' = 'WEB_NOVEL'): Promise<Record<string, any>> {
+  async getAllPrompts(
+    profile: 'LITERARY' | 'WEB_NOVEL' = 'WEB_NOVEL'
+  ): Promise<Record<string, any>> {
     const registry = profile === 'LITERARY' ? PROMPT_REGISTRY_LITERARY : PROMPT_REGISTRY_WEB_NOVEL;
     const result: Record<string, any> = { ...registry };
 
@@ -166,7 +168,7 @@ export class PromptService {
       throw new Error('未找到版本历史');
     }
 
-    const version = versions.find(v => v.id === versionId);
+    const version = versions.find((v) => v.id === versionId);
     if (!version) {
       throw new Error('未找到指定版本');
     }
@@ -185,7 +187,7 @@ export class PromptService {
     try {
       const saved = await storageService.getItem<CustomPrompt[]>(STORAGE_KEYS.CUSTOM_PROMPTS);
       if (saved && Array.isArray(saved)) {
-        saved.forEach(p => this.customPrompts.set(p.key, p));
+        saved.forEach((p) => this.customPrompts.set(p.key, p));
       }
     } catch (error) {
       console.error('Failed to load custom prompts:', error);

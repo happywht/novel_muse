@@ -26,10 +26,12 @@
 ### 1.1 背景与目标
 
 P0-P1阶段已完成：
+
 - P0: Character节点和关系图谱化（CharacterRelation）
 - P1: PlotNode节点和关系图谱化（PlotNode-Character, PlotNode-Location关联）
 
 P2阶段目标：
+
 1. **增强WorldSetting节点**：添加aliases等新属性
 2. **完善层级关系**：CONTAINS, BORDERS, PART_OF
 3. **角色-设定关联**：ORIGINATED_FROM, RESIDES_IN, CONTROLS_TERRITORY, EXILED_FROM
@@ -37,12 +39,12 @@ P2阶段目标：
 
 ### 1.2 设计原则
 
-| 原则 | 说明 |
-|------|------|
+| 原则           | 说明                         |
+| -------------- | ---------------------------- |
 | **增量式增强** | 基于现有实现，不破坏已有功能 |
-| **数据完整性** | 确保关系双向一致性 |
-| **查询性能** | 优化图遍历查询性能 |
-| **可扩展性** | 支持未来新增关系类型 |
+| **数据完整性** | 确保关系双向一致性           |
+| **查询性能**   | 优化图遍历查询性能           |
+| **可扩展性**   | 支持未来新增关系类型         |
 
 ---
 
@@ -51,6 +53,7 @@ P2阶段目标：
 ### 2.1 已有实现（sync.ts）
 
 ✅ **已实现的WorldSetting功能**：
+
 ```typescript
 // 1. WorldSetting节点创建（带category标签）
 MERGE (w:WorldSetting:${categoryLabel} {id: $id, projectId: $projectId})
@@ -69,12 +72,14 @@ MERGE (parent)-[:CONTAINS]->(child)
 ```
 
 ✅ **已有的查询功能（queries.ts）**：
+
 - `getProjectGraph()` - 获取完整图谱（包含WorldSetting）
 - `getPhysicalStatus()` - 获取角色物理状态（包含location）
 
 ### 2.2 缺失功能
 
 ❌ **待实现**：
+
 1. WorldSetting节点缺少`aliases`属性
 2. 缺少`BORDERS`关系（地理相邻）
 3. 缺少`PART_OF`关系（CONTAINS的逆关系，便于查询）
@@ -100,13 +105,13 @@ export interface WorldSetting {
   content: string;
 
   // 层级关系
-  parentId?: string;          // 父级设定ID（如：王国下的城市）
-  importance?: number;        // 重要性等级 1-10
-  tags?: string[];            // 设定标签
+  parentId?: string; // 父级设定ID（如：王国下的城市）
+  importance?: number; // 重要性等级 1-10
+  tags?: string[]; // 设定标签
 
   // ===== P2 新增 =====
-  aliases?: string[];         // 别名数组（如：["帝都", "皇城", "王都"]）
-  borders?: string[];         // 相邻设定ID数组（用于地理相邻关系）
+  aliases?: string[]; // 别名数组（如：["帝都", "皇城", "王都"]）
+  borders?: string[]; // 相邻设定ID数组（用于地理相邻关系）
 }
 ```
 
@@ -114,16 +119,16 @@ export interface WorldSetting {
 
 ```typescript
 export const AiWorldSettingSchema = z.object({
-    title: z.string().min(1, '设定标题不能为空'),
-    category: z.enum(['Geography', 'Magic/Tech', 'Society', 'History', 'Other']).default('Other'),
-    content: z.string().default(''),
+  title: z.string().min(1, '设定标题不能为空'),
+  category: z.enum(['Geography', 'Magic/Tech', 'Society', 'History', 'Other']).default('Other'),
+  content: z.string().default(''),
 
-    // P2 新增
-    aliases: z.array(z.string()).optional().describe('设定别名'),
-    borders: z.array(z.string()).optional().describe('相邻地点ID（仅Geography类别）'),
-    parentId: z.string().optional().describe('父级设定ID'),
-    importance: z.number().min(1).max(10).optional(),
-    tags: z.array(z.string()).optional(),
+  // P2 新增
+  aliases: z.array(z.string()).optional().describe('设定别名'),
+  borders: z.array(z.string()).optional().describe('相邻地点ID（仅Geography类别）'),
+  parentId: z.string().optional().describe('父级设定ID'),
+  importance: z.number().min(1).max(10).optional(),
+  tags: z.array(z.string()).optional(),
 });
 ```
 
@@ -166,6 +171,7 @@ REQUIRE r.id IS UNIQUE;
 **语义**：父设定包含子设定
 
 **示例**：
+
 ```
 (王国)-[:CONTAINS]->(省份A)
 (王国)-[:CONTAINS]->(省份B)
@@ -174,14 +180,16 @@ REQUIRE r.id IS UNIQUE;
 ```
 
 **关系属性**：
+
 ```typescript
 interface CONTAINSProperties {
-  createdAt: number;      // 创建时间
+  createdAt: number; // 创建时间
   source: 'STRUCTURED_DATA' | 'MANUAL'; // 数据来源
 }
 ```
 
 **Cypher创建语句**：
+
 ```cypher
 MATCH (parent:WorldSetting {id: $parentId, projectId: $projectId})
 MATCH (child:WorldSetting {id: $childId, projectId: $projectId})
@@ -196,16 +204,19 @@ SET r.createdAt = timestamp(),
 **语义**：子设定属于父设定（CONTAINS的逆关系）
 
 **设计理由**：
+
 - 便于从子节点向上查询祖先链
 - 优化"查询某地点所属的所有上级地区"场景
 - 减少图遍历的方向判断
 
 **示例**：
+
 ```
 (城市1)-[:PART_OF]->(省份A)-[:PART_OF]->(王国)
 ```
 
 **实现策略**：
+
 - 创建CONTAINS时，同时创建PART_OF（双向关系）
 - 确保关系一致性
 
@@ -225,11 +236,13 @@ MERGE (child)-[:PART_OF {createdAt: timestamp()}]->(parent)
 **语义**：两个地理位置相邻
 
 **约束**：
+
 - 仅适用于`category: 'Geography'`的节点
 - 必须在同一层级（即parentId相同）
 - 双向对称关系（A与B相邻 ⟺ B与A相邻）
 
 **关系属性**：
+
 ```typescript
 interface BORDERSProperties {
   borderType?: 'LAND' | 'SEA' | 'MOUNTAIN' | 'RIVER'; // 边界类型
@@ -239,12 +252,14 @@ interface BORDERSProperties {
 ```
 
 **示例**：
+
 ```
 (城市1)-[:BORDERS {borderType: 'RIVER', description: '以黑河为界'}]-(城市2)
 (国家A)-[:BORDERS {borderType: 'LAND'}]-(国家B)
 ```
 
 **Cypher创建语句**：
+
 ```cypher
 MATCH (a:WorldSetting {id: $idA, projectId: $projectId, category: 'Geography'})
 MATCH (b:WorldSetting {id: $idB, projectId: $projectId, category: 'Geography'})
@@ -265,15 +280,17 @@ SET r1 += {borderType: $borderType, description: $description, createdAt: timest
 **语义**：角色出生于/起源于该地点
 
 **关系属性**：
+
 ```typescript
 interface ORIGINATED_FROMProperties {
-  year?: string;         // 出生年份（如"龙历205年"）
-  description?: string;  // 描述（如"出生于王家村"）
+  year?: string; // 出生年份（如"龙历205年"）
+  description?: string; // 描述（如"出生于王家村"）
   createdAt: number;
 }
 ```
 
 **示例**：
+
 ```
 (张三:Character)-[:ORIGINATED_FROM {year: "龙历205年"}]->(王家村:WorldSetting)
 ```
@@ -284,16 +301,18 @@ interface ORIGINATED_FROMProperties {
 **语义**：角色当前居住地
 
 **关系属性**：
+
 ```typescript
 interface RESIDES_INProperties {
-  since?: string;        // 居住起始时间
-  isCurrent: boolean;    // 是否当前居住地
-  description?: string;  // 描述
+  since?: string; // 居住起始时间
+  isCurrent: boolean; // 是否当前居住地
+  description?: string; // 描述
   createdAt: number;
 }
 ```
 
 **示例**：
+
 ```
 (张三:Character)-[:RESIDES_IN {since: "龙历230年", isCurrent: true}]->(帝都:WorldSetting)
 ```
@@ -304,17 +323,19 @@ interface RESIDES_INProperties {
 **语义**：角色控制/统治该领地
 
 **关系属性**：
+
 ```typescript
 interface CONTROLS_TERRITORYProperties {
   controlType?: 'SOVEREIGN' | 'GOVERNOR' | 'MILITARY'; // 统治类型
-  since?: string;        // 控制起始时间
-  legitimacy?: number;   // 合法性 0-100
+  since?: string; // 控制起始时间
+  legitimacy?: number; // 合法性 0-100
   description?: string;
   createdAt: number;
 }
 ```
 
 **示例**：
+
 ```
 (国王:Character)-[:CONTROLS_TERRITORY {controlType: 'SOVEREIGN', legitimacy: 95}]->(王国:WorldSetting)
 (将军:Character)-[:CONTROLS_TERRITORY {controlType: 'MILITARY', legitimacy: 60}]->(边疆省:WorldSetting)
@@ -326,17 +347,19 @@ interface CONTROLS_TERRITORYProperties {
 **语义**：角色被流放自该地点
 
 **关系属性**：
+
 ```typescript
 interface EXILED_FROMProperties {
-  year?: string;         // 流放年份
-  reason?: string;       // 流放原因
-  isReturned?: boolean;  // 是否已返回
+  year?: string; // 流放年份
+  reason?: string; // 流放原因
+  isReturned?: boolean; // 是否已返回
   description?: string;
   createdAt: number;
 }
 ```
 
 **示例**：
+
 ```
 (贵族:Character)-[:EXILED_FROM {year: "龙历240年", reason: "政治斗争失败"}]->(帝都:WorldSetting)
 ```
@@ -356,8 +379,8 @@ interface EXILED_FROMProperties {
 ```typescript
 // 3. Create WorldSetting nodes with category as label
 const worldSettingLabel = Neo4jErrorHelper.withTimeout(
-    session.run(
-        `MERGE (w:WorldSetting:${categoryLabel} {id: $id, projectId: $projectId})
+  session.run(
+    `MERGE (w:WorldSetting:${categoryLabel} {id: $id, projectId: $projectId})
          SET w += {
             title: $title,
             content: $content,
@@ -368,20 +391,20 @@ const worldSettingLabel = Neo4jErrorHelper.withTimeout(
             createdAt: $createdAt,
             updatedAt: $updatedAt
          }`,
-        {
-            id: ws.id,
-            projectId,
-            title: ws.title,
-            content: ws.content,
-            importance: ws.importance || 5,
-            tags: ws.tags || [],
-            aliases: ws.aliases || [],      // P2 新增
-            borders: ws.borders || [],      // P2 新增
-            createdAt: ws.createdAt || Date.now(),
-            updatedAt: ws.updatedAt || Date.now(),
-        }
-    ),
-    'create world setting node'
+    {
+      id: ws.id,
+      projectId,
+      title: ws.title,
+      content: ws.content,
+      importance: ws.importance || 5,
+      tags: ws.tags || [],
+      aliases: ws.aliases || [], // P2 新增
+      borders: ws.borders || [], // P2 新增
+      createdAt: ws.createdAt || Date.now(),
+      updatedAt: ws.updatedAt || Date.now(),
+    }
+  ),
+  'create world setting node'
 );
 ```
 
@@ -394,27 +417,27 @@ const worldSettingLabel = Neo4jErrorHelper.withTimeout(
 ```typescript
 // 3.5.1. Create CONTAINS and PART_OF relationships (层级包含)
 if (ws.parentId) {
-    try {
-        await Neo4jErrorHelper.withTimeout(
-            session.run(
-                `MATCH (parent:WorldSetting {id: $parentId, projectId: $projectId})
+  try {
+    await Neo4jErrorHelper.withTimeout(
+      session.run(
+        `MATCH (parent:WorldSetting {id: $parentId, projectId: $projectId})
                  MATCH (child:WorldSetting {id: $childId, projectId: $projectId})
                  // 创建双向关系
                  MERGE (parent)-[r1:CONTAINS]->(child)
                  MERGE (child)-[r2:PART_OF]->(parent)
                  SET r1 += {createdAt: timestamp(), source: 'STRUCTURED_DATA'},
                      r2 += {createdAt: timestamp(), source: 'STRUCTURED_DATA'}`,
-                {
-                    parentId: ws.parentId,
-                    childId: ws.id,
-                    projectId
-                }
-            ),
-            'create contains relationship'
-        );
-    } catch (err) {
-        console.warn(`Failed to create CONTAINS/PART_OF relationship for ${ws.title}:`, err);
-    }
+        {
+          parentId: ws.parentId,
+          childId: ws.id,
+          projectId,
+        }
+      ),
+      'create contains relationship'
+    );
+  } catch (err) {
+    console.warn(`Failed to create CONTAINS/PART_OF relationship for ${ws.title}:`, err);
+  }
 }
 ```
 
@@ -425,34 +448,34 @@ if (ws.parentId) {
 ```typescript
 // 3.5.0. Create BORDERS relationships (地理相邻关系)
 for (const ws of worldSettings) {
-    // 仅处理 Geography 类型的设定
-    if (ws.category !== 'Geography' || !ws.borders || ws.borders.length === 0) {
-        continue;
-    }
+  // 仅处理 Geography 类型的设定
+  if (ws.category !== 'Geography' || !ws.borders || ws.borders.length === 0) {
+    continue;
+  }
 
-    for (const borderId of ws.borders) {
-        try {
-            await Neo4jErrorHelper.withTimeout(
-                session.run(
-                    `MATCH (a:WorldSetting {id: $idA, projectId: $projectId, category: 'Geography'})
+  for (const borderId of ws.borders) {
+    try {
+      await Neo4jErrorHelper.withTimeout(
+        session.run(
+          `MATCH (a:WorldSetting {id: $idA, projectId: $projectId, category: 'Geography'})
                      MATCH (b:WorldSetting {id: $idB, projectId: $projectId, category: 'Geography'})
                      // 创建双向关系
                      MERGE (a)-[r1:BORDERS]->(b)
                      MERGE (b)-[r2:BORDERS]->(a)
                      SET r1 += {createdAt: timestamp(), source: 'STRUCTURED_DATA'},
                          r2 += {createdAt: timestamp(), source: 'STRUCTURED_DATA'}`,
-                    {
-                        idA: ws.id,
-                        idB: borderId,
-                        projectId
-                    }
-                ),
-                'create borders relationship'
-            );
-        } catch (err) {
-            console.warn(`Failed to create BORDERS relationship for ${ws.title} <-> ${borderId}:`, err);
-        }
+          {
+            idA: ws.id,
+            idB: borderId,
+            projectId,
+          }
+        ),
+        'create borders relationship'
+      );
+    } catch (err) {
+      console.warn(`Failed to create BORDERS relationship for ${ws.title} <-> ${borderId}:`, err);
     }
+  }
 }
 console.log(`✅ Synced WorldSetting BORDERS relationships for project ${projectId}`);
 ```
@@ -464,81 +487,81 @@ console.log(`✅ Synced WorldSetting BORDERS relationships for project ${project
 ```typescript
 // 3.5.2. Create Character-WorldSetting relationships (角色与设定关联)
 for (const char of characters) {
-    // 如果角色有 originLocation 字段，创建 ORIGINATED_FROM 关系
-    if (char.originLocation) {
-        try {
-            await Neo4jErrorHelper.withTimeout(
-                session.run(
-                    `MATCH (c:Character {id: $charId, projectId: $projectId})
+  // 如果角色有 originLocation 字段，创建 ORIGINATED_FROM 关系
+  if (char.originLocation) {
+    try {
+      await Neo4jErrorHelper.withTimeout(
+        session.run(
+          `MATCH (c:Character {id: $charId, projectId: $projectId})
                      MATCH (w:WorldSetting {id: $locId, projectId: $projectId})
                      MERGE (c)-[r:ORIGINATED_FROM]->(w)
                      SET r += {createdAt: timestamp(), source: 'STRUCTURED_DATA'}`,
-                    { charId: char.id, locId: char.originLocation, projectId }
-                ),
-                'create originated_from relationship'
-            );
-        } catch (err) {
-            console.warn(`Failed to create ORIGINATED_FROM for ${char.name}:`, err);
-        }
+          { charId: char.id, locId: char.originLocation, projectId }
+        ),
+        'create originated_from relationship'
+      );
+    } catch (err) {
+      console.warn(`Failed to create ORIGINATED_FROM for ${char.name}:`, err);
     }
+  }
 
-    // 如果角色有 residence 字段，创建 RESIDES_IN 关系
-    if (char.residence) {
-        try {
-            await Neo4jErrorHelper.withTimeout(
-                session.run(
-                    `MATCH (c:Character {id: $charId, projectId: $projectId})
+  // 如果角色有 residence 字段，创建 RESIDES_IN 关系
+  if (char.residence) {
+    try {
+      await Neo4jErrorHelper.withTimeout(
+        session.run(
+          `MATCH (c:Character {id: $charId, projectId: $projectId})
                      MATCH (w:WorldSetting {id: $resId, projectId: $projectId})
                      MERGE (c)-[r:RESIDES_IN]->(w)
                      SET r += {isCurrent: true, createdAt: timestamp(), source: 'STRUCTURED_DATA'}`,
-                    { charId: char.id, resId: char.residence, projectId }
-                ),
-                'create resides_in relationship'
-            );
-        } catch (err) {
-            console.warn(`Failed to create RESIDES_IN for ${char.name}:`, err);
-        }
+          { charId: char.id, resId: char.residence, projectId }
+        ),
+        'create resides_in relationship'
+      );
+    } catch (err) {
+      console.warn(`Failed to create RESIDES_IN for ${char.name}:`, err);
     }
+  }
 
-    // 如果角色有 controlledTerritories 字段，创建 CONTROLS_TERRITORY 关系
-    if (char.controlledTerritories && char.controlledTerritories.length > 0) {
-        for (const territoryId of char.controlledTerritories) {
-            try {
-                await Neo4jErrorHelper.withTimeout(
-                    session.run(
-                        `MATCH (c:Character {id: $charId, projectId: $projectId})
+  // 如果角色有 controlledTerritories 字段，创建 CONTROLS_TERRITORY 关系
+  if (char.controlledTerritories && char.controlledTerritories.length > 0) {
+    for (const territoryId of char.controlledTerritories) {
+      try {
+        await Neo4jErrorHelper.withTimeout(
+          session.run(
+            `MATCH (c:Character {id: $charId, projectId: $projectId})
                          MATCH (w:WorldSetting {id: $territoryId, projectId: $projectId})
                          MERGE (c)-[r:CONTROLS_TERRITORY]->(w)
                          SET r += {createdAt: timestamp(), source: 'STRUCTURED_DATA'}`,
-                        { charId: char.id, territoryId, projectId }
-                    ),
-                    'create controls_territory relationship'
-                );
-            } catch (err) {
-                console.warn(`Failed to create CONTROLS_TERRITORY for ${char.name}:`, err);
-            }
-        }
+            { charId: char.id, territoryId, projectId }
+          ),
+          'create controls_territory relationship'
+        );
+      } catch (err) {
+        console.warn(`Failed to create CONTROLS_TERRITORY for ${char.name}:`, err);
+      }
     }
+  }
 
-    // 如果角色有 exiledFrom 字段，创建 EXILED_FROM 关系
-    if (char.exiledFrom && char.exiledFrom.length > 0) {
-        for (const exiledLocationId of char.exiledFrom) {
-            try {
-                await Neo4jErrorHelper.withTimeout(
-                    session.run(
-                        `MATCH (c:Character {id: $charId, projectId: $projectId})
+  // 如果角色有 exiledFrom 字段，创建 EXILED_FROM 关系
+  if (char.exiledFrom && char.exiledFrom.length > 0) {
+    for (const exiledLocationId of char.exiledFrom) {
+      try {
+        await Neo4jErrorHelper.withTimeout(
+          session.run(
+            `MATCH (c:Character {id: $charId, projectId: $projectId})
                          MATCH (w:WorldSetting {id: $exiledLocationId, projectId: $projectId})
                          MERGE (c)-[r:EXILED_FROM]->(w)
                          SET r += {createdAt: timestamp(), source: 'STRUCTURED_DATA'}`,
-                        { charId: char.id, exiledLocationId, projectId }
-                    ),
-                    'create exiled_from relationship'
-                );
-            } catch (err) {
-                console.warn(`Failed to create EXILED_FROM for ${char.name}:`, err);
-            }
-        }
+            { charId: char.id, exiledLocationId, projectId }
+          ),
+          'create exiled_from relationship'
+        );
+      } catch (err) {
+        console.warn(`Failed to create EXILED_FROM for ${char.name}:`, err);
+      }
     }
+  }
 }
 console.log(`✅ Synced Character-WorldSetting relationships for project ${projectId}`);
 ```
@@ -552,16 +575,18 @@ console.log(`✅ Synced Character-WorldSetting relationships for project ${proje
 **功能**：获取WorldSetting的完整层级树
 
 **输入参数**：
+
 ```typescript
 interface GetWorldSettingHierarchyParams {
   projectId: string;
-  rootId?: string;        // 可选：指定根节点，不指定则返回所有根节点
-  maxDepth?: number;      // 最大深度，默认不限制
+  rootId?: string; // 可选：指定根节点，不指定则返回所有根节点
+  maxDepth?: number; // 最大深度，默认不限制
   includeProperties?: boolean; // 是否包含节点属性，默认true
 }
 ```
 
 **返回结构**：
+
 ```typescript
 interface WorldSettingTreeNode {
   id: string;
@@ -574,6 +599,7 @@ interface WorldSettingTreeNode {
 ```
 
 **Cypher查询**：
+
 ```cypher
 // 方案1: 使用递归CTE（Neo4j 4.4+）
 MATCH (root:WorldSetting {projectId: $projectId})
@@ -588,6 +614,7 @@ RETURN nodes(p) as nodes, relationships(p) as rels
 ```
 
 **TypeScript实现**：
+
 ```typescript
 /**
  * 获取WorldSetting的完整层级树
@@ -597,88 +624,88 @@ RETURN nodes(p) as nodes, relationships(p) as rels
  * @returns 层级树结构
  */
 export const getWorldSettingHierarchy = async (
-    projectId: string,
-    rootId?: string,
-    maxDepth: number = 10
+  projectId: string,
+  rootId?: string,
+  maxDepth: number = 10
 ): Promise<WorldSettingTreeNode[]> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 1. 查询所有CONTAINS关系
-        const result = await session.run(
-            `MATCH (parent:WorldSetting {projectId: $projectId})-[r:CONTAINS]->(child:WorldSetting)
+  try {
+    // 1. 查询所有CONTAINS关系
+    const result = await session.run(
+      `MATCH (parent:WorldSetting {projectId: $projectId})-[r:CONTAINS]->(child:WorldSetting)
              RETURN parent.id as parentId, parent.title as parentTitle,
                     child.id as childId, child.title as childTitle,
                     child.category as category, child.importance as importance
              ORDER BY parent.importance DESC, child.importance DESC`,
-            { projectId, maxDepth }
-        );
+      { projectId, maxDepth }
+    );
 
-        // 2. 构建树形结构
-        const nodeMap = new Map<string, WorldSettingTreeNode>();
-        const rootNodes: WorldSettingTreeNode[] = [];
+    // 2. 构建树形结构
+    const nodeMap = new Map<string, WorldSettingTreeNode>();
+    const rootNodes: WorldSettingTreeNode[] = [];
 
-        // 第一遍：创建所有节点
-        result.records.forEach(record => {
-            const parentId = record.get('parentId');
-            const childId = record.get('childId');
+    // 第一遍：创建所有节点
+    result.records.forEach((record) => {
+      const parentId = record.get('parentId');
+      const childId = record.get('childId');
 
-            if (!nodeMap.has(parentId)) {
-                nodeMap.set(parentId, {
-                    id: parentId,
-                    title: record.get('parentTitle'),
-                    category: 'Unknown',
-                    children: []
-                });
-            }
-
-            if (!nodeMap.has(childId)) {
-                nodeMap.set(childId, {
-                    id: childId,
-                    title: record.get('childTitle'),
-                    category: record.get('category'),
-                    importance: record.get('importance'),
-                    children: []
-                });
-            }
+      if (!nodeMap.has(parentId)) {
+        nodeMap.set(parentId, {
+          id: parentId,
+          title: record.get('parentTitle'),
+          category: 'Unknown',
+          children: [],
         });
+      }
 
-        // 第二遍：建立父子关系
-        result.records.forEach(record => {
-            const parentId = record.get('parentId');
-            const childId = record.get('childId');
-            const parent = nodeMap.get(parentId);
-            const child = nodeMap.get(childId);
-
-            if (parent && child) {
-                parent.children!.push(child);
-            }
+      if (!nodeMap.has(childId)) {
+        nodeMap.set(childId, {
+          id: childId,
+          title: record.get('childTitle'),
+          category: record.get('category'),
+          importance: record.get('importance'),
+          children: [],
         });
+      }
+    });
 
-        // 3. 找出根节点（没有PART_OF关系的节点）
-        const allNodes = Array.from(nodeMap.values());
-        const childIds = new Set(result.records.map(r => r.get('childId')));
+    // 第二遍：建立父子关系
+    result.records.forEach((record) => {
+      const parentId = record.get('parentId');
+      const childId = record.get('childId');
+      const parent = nodeMap.get(parentId);
+      const child = nodeMap.get(childId);
 
-        allNodes.forEach(node => {
-            if (!childIds.has(node.id)) {
-                rootNodes.push(node);
-            }
-        });
+      if (parent && child) {
+        parent.children!.push(child);
+      }
+    });
 
-        // 4. 如果指定了rootId，只返回该根节点
-        if (rootId) {
-            const specificRoot = rootNodes.find(n => n.id === rootId);
-            return specificRoot ? [specificRoot] : [];
-        }
+    // 3. 找出根节点（没有PART_OF关系的节点）
+    const allNodes = Array.from(nodeMap.values());
+    const childIds = new Set(result.records.map((r) => r.get('childId')));
 
-        return rootNodes;
-    } catch (error) {
-        console.error('Failed to get WorldSetting hierarchy:', error);
-        throw error;
-    } finally {
-        await session.close();
+    allNodes.forEach((node) => {
+      if (!childIds.has(node.id)) {
+        rootNodes.push(node);
+      }
+    });
+
+    // 4. 如果指定了rootId，只返回该根节点
+    if (rootId) {
+      const specificRoot = rootNodes.find((n) => n.id === rootId);
+      return specificRoot ? [specificRoot] : [];
     }
+
+    return rootNodes;
+  } catch (error) {
+    console.error('Failed to get WorldSetting hierarchy:', error);
+    throw error;
+  } finally {
+    await session.close();
+  }
 };
 ```
 
@@ -687,6 +714,7 @@ export const getWorldSettingHierarchy = async (
 **功能**：获取角色的完整地理位置上下文（包含层级链）
 
 **输入参数**：
+
 ```typescript
 interface GetCharacterLocationContextParams {
   projectId: string;
@@ -695,6 +723,7 @@ interface GetCharacterLocationContextParams {
 ```
 
 **返回结构**：
+
 ```typescript
 interface CharacterLocationContext {
   characterId: string;
@@ -729,18 +758,19 @@ interface WorldSettingBasic {
 ```
 
 **Cypher查询**：
+
 ```typescript
 export const getCharacterLocationContext = async (
-    projectId: string,
-    characterId: string
+  projectId: string,
+  characterId: string
 ): Promise<CharacterLocationContext | null> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 查询角色的所有位置关系
-        const result = await session.run(
-            `MATCH (c:Character {id: $characterId, projectId: $projectId})
+  try {
+    // 查询角色的所有位置关系
+    const result = await session.run(
+      `MATCH (c:Character {id: $characterId, projectId: $projectId})
              OPTIONAL MATCH (c)-[origin:ORIGINATED_FROM]->(originLoc:WorldSetting)
              OPTIONAL MATCH (c)-[res:RESIDES_IN]->(resLoc:WorldSetting)
              OPTIONAL MATCH (c)-[control:CONTROLS_TERRITORY]->(controlLoc:WorldSetting)
@@ -757,81 +787,81 @@ export const getCharacterLocationContext = async (
                     resLoc, collect(distinct resAncestor) as resAncestors, res.isCurrent,
                     controlLoc, collect(distinct controlAncestor) as controlAncestors, control.controlType,
                     exileLoc, collect(distinct exileAncestor) as exileAncestors, exile.reason`,
-            { characterId, projectId }
-        );
+      { characterId, projectId }
+    );
 
-        if (result.records.length === 0) {
-            return null;
-        }
-
-        const record = result.records[0];
-        const context: CharacterLocationContext = {
-            characterId,
-            characterName: record.get('characterName')
-        };
-
-        // 处理起源地
-        const originLoc = record.get('originLoc');
-        if (originLoc) {
-            context.origin = {
-                location: nodeToBasic(originLoc),
-                hierarchy: record.get('originAncestors').map(nodeToBasic)
-            };
-        }
-
-        // 处理居住地
-        const resLoc = record.get('resLoc');
-        if (resLoc) {
-            context.residence = {
-                location: nodeToBasic(resLoc),
-                hierarchy: record.get('resAncestors').map(nodeToBasic),
-                isCurrent: record.get('res.isCurrent') || false
-            };
-        }
-
-        // 处理控制领地（可能有多个）
-        const controlLocs = result.records
-            .filter(r => r.get('controlLoc'))
-            .map(r => ({
-                location: nodeToBasic(r.get('controlLoc')),
-                hierarchy: r.get('controlAncestors').map(nodeToBasic),
-                controlType: r.get('control.controlType')
-            }));
-
-        if (controlLocs.length > 0) {
-            context.controlledTerritories = controlLocs;
-        }
-
-        // 处理流放地（可能有多个）
-        const exileLocs = result.records
-            .filter(r => r.get('exileLoc'))
-            .map(r => ({
-                location: nodeToBasic(r.get('exileLoc')),
-                hierarchy: r.get('exileAncestors').map(nodeToBasic),
-                reason: r.get('exile.reason')
-            }));
-
-        if (exileLocs.length > 0) {
-            context.exiledFrom = exileLocs;
-        }
-
-        return context;
-    } catch (error) {
-        console.error('Failed to get character location context:', error);
-        throw error;
-    } finally {
-        await session.close();
+    if (result.records.length === 0) {
+      return null;
     }
+
+    const record = result.records[0];
+    const context: CharacterLocationContext = {
+      characterId,
+      characterName: record.get('characterName'),
+    };
+
+    // 处理起源地
+    const originLoc = record.get('originLoc');
+    if (originLoc) {
+      context.origin = {
+        location: nodeToBasic(originLoc),
+        hierarchy: record.get('originAncestors').map(nodeToBasic),
+      };
+    }
+
+    // 处理居住地
+    const resLoc = record.get('resLoc');
+    if (resLoc) {
+      context.residence = {
+        location: nodeToBasic(resLoc),
+        hierarchy: record.get('resAncestors').map(nodeToBasic),
+        isCurrent: record.get('res.isCurrent') || false,
+      };
+    }
+
+    // 处理控制领地（可能有多个）
+    const controlLocs = result.records
+      .filter((r) => r.get('controlLoc'))
+      .map((r) => ({
+        location: nodeToBasic(r.get('controlLoc')),
+        hierarchy: r.get('controlAncestors').map(nodeToBasic),
+        controlType: r.get('control.controlType'),
+      }));
+
+    if (controlLocs.length > 0) {
+      context.controlledTerritories = controlLocs;
+    }
+
+    // 处理流放地（可能有多个）
+    const exileLocs = result.records
+      .filter((r) => r.get('exileLoc'))
+      .map((r) => ({
+        location: nodeToBasic(r.get('exileLoc')),
+        hierarchy: r.get('exileAncestors').map(nodeToBasic),
+        reason: r.get('exile.reason'),
+      }));
+
+    if (exileLocs.length > 0) {
+      context.exiledFrom = exileLocs;
+    }
+
+    return context;
+  } catch (error) {
+    console.error('Failed to get character location context:', error);
+    throw error;
+  } finally {
+    await session.close();
+  }
 };
 
 // 辅助函数：Neo4j节点转基本结构
 function nodeToBasic(node: any): WorldSettingBasic {
-    return {
-        id: node.properties.id,
-        title: node.properties.title,
-        category: node.properties.category,
-        importance: node.properties.importance
-    };
+  return {
+    id: node.properties.id,
+    title: node.properties.title,
+    category: node.properties.category,
+    importance: node.properties.importance,
+  };
 }
 ```
 
@@ -840,6 +870,7 @@ function nodeToBasic(node: any): WorldSettingBasic {
 **功能**：获取某地点的所有关联角色
 
 **输入参数**：
+
 ```typescript
 interface GetLocationCharactersParams {
   projectId: string;
@@ -849,6 +880,7 @@ interface GetLocationCharactersParams {
 ```
 
 **返回结构**：
+
 ```typescript
 interface LocationCharacterInfo {
   characterId: string;
@@ -871,19 +903,20 @@ interface LocationCharactersResult {
 ```
 
 **TypeScript实现**：
+
 ```typescript
 export const getLocationCharacters = async (
-    projectId: string,
-    locationId: string,
-    includeDescendants: boolean = false
+  projectId: string,
+  locationId: string,
+  includeDescendants: boolean = false
 ): Promise<LocationCharactersResult> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 1. 查询当前地点的角色
-        const currentResult = await session.run(
-            `MATCH (loc:WorldSetting {id: $locationId, projectId: $projectId})
+  try {
+    // 1. 查询当前地点的角色
+    const currentResult = await session.run(
+      `MATCH (loc:WorldSetting {id: $locationId, projectId: $projectId})
              OPTIONAL MATCH (c:Character)-[r:ORIGINATED_FROM|RESIDES_IN|CONTROLS_TERRITORY|EXILED_FROM]->(loc)
              RETURN loc.title as locationTitle,
                     collect(DISTINCT {
@@ -893,24 +926,24 @@ export const getLocationCharacters = async (
                         relationType: type(r),
                         relationProperties: properties(r)
                     }) as characters`,
-            { locationId, projectId }
-        );
+      { locationId, projectId }
+    );
 
-        if (currentResult.records.length === 0) {
-            throw new Error(`Location ${locationId} not found`);
-        }
+    if (currentResult.records.length === 0) {
+      throw new Error(`Location ${locationId} not found`);
+    }
 
-        const record = currentResult.records[0];
-        const result: LocationCharactersResult = {
-            locationId,
-            locationTitle: record.get('locationTitle'),
-            characters: record.get('characters').filter((c: any) => c.characterId)
-        };
+    const record = currentResult.records[0];
+    const result: LocationCharactersResult = {
+      locationId,
+      locationTitle: record.get('locationTitle'),
+      characters: record.get('characters').filter((c: any) => c.characterId),
+    };
 
-        // 2. 如果需要，查询子地点的角色
-        if (includeDescendants) {
-            const descendantsResult = await session.run(
-                `MATCH (parent:WorldSetting {id: $locationId, projectId: $projectId})
+    // 2. 如果需要，查询子地点的角色
+    if (includeDescendants) {
+      const descendantsResult = await session.run(
+        `MATCH (parent:WorldSetting {id: $locationId, projectId: $projectId})
                  MATCH (parent)-[:CONTAINS*1..10]->(child:WorldSetting)
                  OPTIONAL MATCH (c:Character)-[r:ORIGINATED_FROM|RESIDES_IN|CONTROLS_TERRITORY|EXILED_FROM]->(child)
                  RETURN child.id as locationId, child.title as locationTitle,
@@ -921,23 +954,23 @@ export const getLocationCharacters = async (
                             relationType: type(r),
                             relationProperties: properties(r)
                         }) as characters`,
-                { locationId, projectId }
-            );
+        { locationId, projectId }
+      );
 
-            result.descendantLocations = descendantsResult.records.map(r => ({
-                locationId: r.get('locationId'),
-                locationTitle: r.get('locationTitle'),
-                characters: r.get('characters').filter((c: any) => c.characterId)
-            }));
-        }
-
-        return result;
-    } catch (error) {
-        console.error('Failed to get location characters:', error);
-        throw error;
-    } finally {
-        await session.close();
+      result.descendantLocations = descendantsResult.records.map((r) => ({
+        locationId: r.get('locationId'),
+        locationTitle: r.get('locationTitle'),
+        characters: r.get('characters').filter((c: any) => c.characterId),
+      }));
     }
+
+    return result;
+  } catch (error) {
+    console.error('Failed to get location characters:', error);
+    throw error;
+  } finally {
+    await session.close();
+  }
 };
 ```
 
@@ -946,15 +979,17 @@ export const getLocationCharacters = async (
 **功能**：获取领土控制关系网络
 
 **输入参数**：
+
 ```typescript
 interface GetTerritoryControlParams {
   projectId: string;
-  locationId?: string;     // 可选：指定地点，不指定则返回所有
-  characterId?: string;    // 可选：指定角色，不指定则返回所有
+  locationId?: string; // 可选：指定地点，不指定则返回所有
+  characterId?: string; // 可选：指定角色，不指定则返回所有
 }
 ```
 
 **返回结构**：
+
 ```typescript
 interface TerritoryControlNode {
   type: 'Character' | 'WorldSetting';
@@ -981,101 +1016,102 @@ interface TerritoryControlResult {
 ```
 
 **TypeScript实现**：
+
 ```typescript
 export const getTerritoryControl = async (
-    projectId: string,
-    locationId?: string,
-    characterId?: string
+  projectId: string,
+  locationId?: string,
+  characterId?: string
 ): Promise<TerritoryControlResult> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        let query: string;
-        let params: any = { projectId };
+  try {
+    let query: string;
+    let params: any = { projectId };
 
-        if (characterId) {
-            // 查询特定角色的控制领地
-            query = `
+    if (characterId) {
+      // 查询特定角色的控制领地
+      query = `
                 MATCH (c:Character {id: $characterId, projectId: $projectId})
                 MATCH (c)-[r:CONTROLS_TERRITORY]->(w:WorldSetting)
                 RETURN c, r, w
             `;
-            params.characterId = characterId;
-        } else if (locationId) {
-            // 查询特定地点的控制者
-            query = `
+      params.characterId = characterId;
+    } else if (locationId) {
+      // 查询特定地点的控制者
+      query = `
                 MATCH (c:Character)-[r:CONTROLS_TERRITORY]->(w:WorldSetting {id: $locationId, projectId: $projectId})
                 RETURN c, r, w
             `;
-            params.locationId = locationId;
-        } else {
-            // 查询所有控制关系
-            query = `
+      params.locationId = locationId;
+    } else {
+      // 查询所有控制关系
+      query = `
                 MATCH (c:Character)-[r:CONTROLS_TERRITORY]->(w:WorldSetting {projectId: $projectId})
                 RETURN c, r, w
             `;
-        }
-
-        const result = await session.run(query, params);
-
-        const nodes: TerritoryControlNode[] = [];
-        const edges: TerritoryControlEdge[] = [];
-        const nodeIds = new Set<string>();
-
-        result.records.forEach(record => {
-            const char = record.get('c');
-            const world = record.get('w');
-            const rel = record.get('r');
-
-            // 添加角色节点（避免重复）
-            if (!nodeIds.has(char.properties.id)) {
-                nodes.push({
-                    type: 'Character',
-                    id: char.properties.id,
-                    name: char.properties.name,
-                    properties: {
-                        role: char.properties.role,
-                        archetype: char.properties.archetype
-                    }
-                });
-                nodeIds.add(char.properties.id);
-            }
-
-            // 添加地点节点（避免重复）
-            if (!nodeIds.has(world.properties.id)) {
-                nodes.push({
-                    type: 'WorldSetting',
-                    id: world.properties.id,
-                    name: world.properties.title,
-                    properties: {
-                        category: world.properties.category,
-                        importance: world.properties.importance
-                    }
-                });
-                nodeIds.add(world.properties.id);
-            }
-
-            // 添加边
-            edges.push({
-                source: char.properties.id,
-                target: world.properties.id,
-                relationType: 'CONTROLS_TERRITORY',
-                properties: {
-                    controlType: rel.properties.controlType,
-                    legitimacy: rel.properties.legitimacy,
-                    since: rel.properties.since
-                }
-            });
-        });
-
-        return { nodes, edges };
-    } catch (error) {
-        console.error('Failed to get territory control:', error);
-        throw error;
-    } finally {
-        await session.close();
     }
+
+    const result = await session.run(query, params);
+
+    const nodes: TerritoryControlNode[] = [];
+    const edges: TerritoryControlEdge[] = [];
+    const nodeIds = new Set<string>();
+
+    result.records.forEach((record) => {
+      const char = record.get('c');
+      const world = record.get('w');
+      const rel = record.get('r');
+
+      // 添加角色节点（避免重复）
+      if (!nodeIds.has(char.properties.id)) {
+        nodes.push({
+          type: 'Character',
+          id: char.properties.id,
+          name: char.properties.name,
+          properties: {
+            role: char.properties.role,
+            archetype: char.properties.archetype,
+          },
+        });
+        nodeIds.add(char.properties.id);
+      }
+
+      // 添加地点节点（避免重复）
+      if (!nodeIds.has(world.properties.id)) {
+        nodes.push({
+          type: 'WorldSetting',
+          id: world.properties.id,
+          name: world.properties.title,
+          properties: {
+            category: world.properties.category,
+            importance: world.properties.importance,
+          },
+        });
+        nodeIds.add(world.properties.id);
+      }
+
+      // 添加边
+      edges.push({
+        source: char.properties.id,
+        target: world.properties.id,
+        relationType: 'CONTROLS_TERRITORY',
+        properties: {
+          controlType: rel.properties.controlType,
+          legitimacy: rel.properties.legitimacy,
+          since: rel.properties.since,
+        },
+      });
+    });
+
+    return { nodes, edges };
+  } catch (error) {
+    console.error('Failed to get territory control:', error);
+    throw error;
+  } finally {
+    await session.close();
+  }
 };
 ```
 
@@ -1157,87 +1193,93 @@ REMOVE w.aliases, w.borders
 
 ```typescript
 describe('WorldSetting Graph Sync', () => {
-    test('should create WorldSetting node with aliases', async () => {
-        const ws: WorldSetting = {
-            id: 'ws-1',
-            title: '帝都',
-            category: 'Geography',
-            content: '帝国的首都',
-            aliases: ['皇城', '王都'],
-            borders: ['ws-2', 'ws-3']
-        };
+  test('should create WorldSetting node with aliases', async () => {
+    const ws: WorldSetting = {
+      id: 'ws-1',
+      title: '帝都',
+      category: 'Geography',
+      content: '帝国的首都',
+      aliases: ['皇城', '王都'],
+      borders: ['ws-2', 'ws-3'],
+    };
 
-        await syncProjectToGraph(projectId, { worldSettings: [ws] });
+    await syncProjectToGraph(projectId, { worldSettings: [ws] });
 
-        const node = await getNode('ws-1');
-        expect(node.properties.aliases).toEqual(['皇城', '王都']);
-    });
+    const node = await getNode('ws-1');
+    expect(node.properties.aliases).toEqual(['皇城', '王都']);
+  });
 
-    test('should create CONTAINS and PART_OF relationships', async () => {
-        const parent: WorldSetting = { id: 'ws-1', title: '王国', category: 'Geography', content: '' };
-        const child: WorldSetting = { id: 'ws-2', title: '省份', category: 'Geography', content: '', parentId: 'ws-1' };
+  test('should create CONTAINS and PART_OF relationships', async () => {
+    const parent: WorldSetting = { id: 'ws-1', title: '王国', category: 'Geography', content: '' };
+    const child: WorldSetting = {
+      id: 'ws-2',
+      title: '省份',
+      category: 'Geography',
+      content: '',
+      parentId: 'ws-1',
+    };
 
-        await syncProjectToGraph(projectId, { worldSettings: [parent, child] });
+    await syncProjectToGraph(projectId, { worldSettings: [parent, child] });
 
-        const contains = await getRelationship('ws-1', 'ws-2', 'CONTAINS');
-        const partOf = await getRelationship('ws-2', 'ws-1', 'PART_OF');
+    const contains = await getRelationship('ws-1', 'ws-2', 'CONTAINS');
+    const partOf = await getRelationship('ws-2', 'ws-1', 'PART_OF');
 
-        expect(contains).toBeDefined();
-        expect(partOf).toBeDefined();
-    });
+    expect(contains).toBeDefined();
+    expect(partOf).toBeDefined();
+  });
 
-    test('should create BORDERS relationships', async () => {
-        const ws1: WorldSetting = {
-            id: 'ws-1',
-            title: '城市A',
-            category: 'Geography',
-            content: '',
-            borders: ['ws-2']
-        };
-        const ws2: WorldSetting = {
-            id: 'ws-2',
-            title: '城市B',
-            category: 'Geography',
-            content: '',
-            borders: ['ws-1']
-        };
+  test('should create BORDERS relationships', async () => {
+    const ws1: WorldSetting = {
+      id: 'ws-1',
+      title: '城市A',
+      category: 'Geography',
+      content: '',
+      borders: ['ws-2'],
+    };
+    const ws2: WorldSetting = {
+      id: 'ws-2',
+      title: '城市B',
+      category: 'Geography',
+      content: '',
+      borders: ['ws-1'],
+    };
 
-        await syncProjectToGraph(projectId, { worldSettings: [ws1, ws2] });
+    await syncProjectToGraph(projectId, { worldSettings: [ws1, ws2] });
 
-        const border1 = await getRelationship('ws-1', 'ws-2', 'BORDERS');
-        const border2 = await getRelationship('ws-2', 'ws-1', 'BORDERS');
+    const border1 = await getRelationship('ws-1', 'ws-2', 'BORDERS');
+    const border2 = await getRelationship('ws-2', 'ws-1', 'BORDERS');
 
-        expect(border1).toBeDefined();
-        expect(border2).toBeDefined();
-    });
+    expect(border1).toBeDefined();
+    expect(border2).toBeDefined();
+  });
 
-    test('should create Character-WorldSetting relationships', async () => {
-        const char: Character = {
-            id: 'char-1',
-            name: '张三',
-            role: '主角',
-            archetype: '英雄',
-            description: '',
-            originLocation: 'ws-1',
-            residence: 'ws-2',
-            controlledTerritories: ['ws-3'],
-            exiledFrom: ['ws-4']
-        };
+  test('should create Character-WorldSetting relationships', async () => {
+    const char: Character = {
+      id: 'char-1',
+      name: '张三',
+      role: '主角',
+      archetype: '英雄',
+      description: '',
+      originLocation: 'ws-1',
+      residence: 'ws-2',
+      controlledTerritories: ['ws-3'],
+      exiledFrom: ['ws-4'],
+    };
 
-        const locations = ['ws-1', 'ws-2', 'ws-3', 'ws-4'].map(id => ({
-            id,
-            title: `地点${id}`,
-            category: 'Geography',
-            content: ''
-        }));
+    const locations = ['ws-1', 'ws-2', 'ws-3', 'ws-4'].map((id) => ({
+      id,
+      title: `地点${id}`,
+      category: 'Geography',
+      content: '',
+    }));
 
-        await syncProjectToGraph(projectId, { characters: [char], worldSettings: locations });
+    await syncProjectToGraph(projectId, { characters: [char], worldSettings: locations });
 
-        expect(await getRelationship('char-1', 'ws-1', 'ORIGINATED_FROM')).toBeDefined();
-        expect(await getRelationship('char-1', 'ws-2', 'RESIDES_IN')).toBeDefined();
-        expect(await getRelationship('char-1', 'ws-3', 'CONTROLS_TERRITORY')).toBeDefined();
-        expect(await getRelationship('char-1', 'ws-4', 'EXILED_FROM')).toBeDefined();
-    });
+    expect(await getRelationship('char-1', 'ws-1', 'ORIGINATED_FROM')).toBeDefined();
+    expect(await getRelationship('char-1', 'ws-2', 'RESIDES_IN')).toBeDefined();
+    expect(await getRelationship('char-1', 'ws-3', 'CONTROLS_TERRITORY')).toBeDefined();
+    expect(await getRelationship('char-1', 'ws-4', 'EXILED_FROM')).toBeDefined();
+  });
 });
 ```
 
@@ -1245,41 +1287,41 @@ describe('WorldSetting Graph Sync', () => {
 
 ```typescript
 describe('WorldSetting Graph Queries', () => {
-    beforeEach(async () => {
-        // 准备测试数据
-        await seedTestData();
-    });
+  beforeEach(async () => {
+    // 准备测试数据
+    await seedTestData();
+  });
 
-    test('getWorldSettingHierarchy should return correct tree', async () => {
-        const hierarchy = await getWorldSettingHierarchy(projectId);
+  test('getWorldSettingHierarchy should return correct tree', async () => {
+    const hierarchy = await getWorldSettingHierarchy(projectId);
 
-        expect(hierarchy).toHaveLength(1); // 1个根节点
-        expect(hierarchy[0].title).toBe('王国');
-        expect(hierarchy[0].children).toHaveLength(2); // 2个省份
-    });
+    expect(hierarchy).toHaveLength(1); // 1个根节点
+    expect(hierarchy[0].title).toBe('王国');
+    expect(hierarchy[0].children).toHaveLength(2); // 2个省份
+  });
 
-    test('getCharacterLocationContext should return full hierarchy', async () => {
-        const context = await getCharacterLocationContext(projectId, 'char-1');
+  test('getCharacterLocationContext should return full hierarchy', async () => {
+    const context = await getCharacterLocationContext(projectId, 'char-1');
 
-        expect(context?.origin?.hierarchy).toHaveLength(3); // 城市 -> 省份 -> 王国
-        expect(context?.residence?.location.title).toBe('帝都');
-    });
+    expect(context?.origin?.hierarchy).toHaveLength(3); // 城市 -> 省份 -> 王国
+    expect(context?.residence?.location.title).toBe('帝都');
+  });
 
-    test('getLocationCharacters should return all related characters', async () => {
-        const result = await getLocationCharacters(projectId, 'ws-1', true);
+  test('getLocationCharacters should return all related characters', async () => {
+    const result = await getLocationCharacters(projectId, 'ws-1', true);
 
-        expect(result.characters).toContainEqual(
-            expect.objectContaining({ characterName: '张三', relationType: 'ORIGINATED_FROM' })
-        );
-        expect(result.descendantLocations).toBeDefined();
-    });
+    expect(result.characters).toContainEqual(
+      expect.objectContaining({ characterName: '张三', relationType: 'ORIGINATED_FROM' })
+    );
+    expect(result.descendantLocations).toBeDefined();
+  });
 
-    test('getTerritoryControl should return control network', async () => {
-        const network = await getTerritoryControl(projectId);
+  test('getTerritoryControl should return control network', async () => {
+    const network = await getTerritoryControl(projectId);
 
-        expect(network.nodes).toHaveLength(5); // 2 characters + 3 locations
-        expect(network.edges).toHaveLength(3); // 3 control relationships
-    });
+    expect(network.nodes).toHaveLength(5); // 2 characters + 3 locations
+    expect(network.edges).toHaveLength(3); // 3 control relationships
+  });
 });
 ```
 
@@ -1315,21 +1357,21 @@ describe('WorldSetting UI Integration', () => {
 
 ```typescript
 describe('WorldSetting Performance', () => {
-    test('getWorldSettingHierarchy should complete within 500ms', async () => {
-        const start = Date.now();
-        await getWorldSettingHierarchy(projectId);
-        const duration = Date.now() - start;
+  test('getWorldSettingHierarchy should complete within 500ms', async () => {
+    const start = Date.now();
+    await getWorldSettingHierarchy(projectId);
+    const duration = Date.now() - start;
 
-        expect(duration).toBeLessThan(500);
-    });
+    expect(duration).toBeLessThan(500);
+  });
 
-    test('getCharacterLocationContext should complete within 200ms', async () => {
-        const start = Date.now();
-        await getCharacterLocationContext(projectId, 'char-1');
-        const duration = Date.now() - start;
+  test('getCharacterLocationContext should complete within 200ms', async () => {
+    const start = Date.now();
+    await getCharacterLocationContext(projectId, 'char-1');
+    const duration = Date.now() - start;
 
-        expect(duration).toBeLessThan(200);
-    });
+    expect(duration).toBeLessThan(200);
+  });
 });
 ```
 
@@ -1339,20 +1381,20 @@ describe('WorldSetting Performance', () => {
 
 ### 9.1 技术风险
 
-| 风险 | 影响 | 概率 | 缓解措施 |
-|------|------|------|----------|
-| **数据迁移失败** | 高 | 低 | 实施分阶段迁移，提供回滚脚本 |
-| **查询性能下降** | 中 | 中 | 添加索引，优化Cypher查询，使用查询计划分析 |
-| **关系不一致** | 中 | 低 | 实现双向关系验证，定期数据一致性检查 |
-| **前端兼容性问题** | 低 | 中 | 保持旧API兼容，渐进式前端更新 |
+| 风险               | 影响 | 概率 | 缓解措施                                   |
+| ------------------ | ---- | ---- | ------------------------------------------ |
+| **数据迁移失败**   | 高   | 低   | 实施分阶段迁移，提供回滚脚本               |
+| **查询性能下降**   | 中   | 中   | 添加索引，优化Cypher查询，使用查询计划分析 |
+| **关系不一致**     | 中   | 低   | 实现双向关系验证，定期数据一致性检查       |
+| **前端兼容性问题** | 低   | 中   | 保持旧API兼容，渐进式前端更新              |
 
 ### 9.2 业务风险
 
-| 风险 | 影响 | 概率 | 缓解措施 |
-|------|------|------|----------|
-| **用户体验中断** | 高 | 低 | 分阶段部署，保持向后兼容 |
-| **数据丢失** | 极高 | 极低 | 数据备份，事务性操作 |
-| **性能退化** | 中 | 中 | 性能监控，优化查询 |
+| 风险             | 影响 | 概率 | 缓解措施                 |
+| ---------------- | ---- | ---- | ------------------------ |
+| **用户体验中断** | 高   | 低   | 分阶段部署，保持向后兼容 |
+| **数据丢失**     | 极高 | 极低 | 数据备份，事务性操作     |
+| **性能退化**     | 中   | 中   | 性能监控，优化查询       |
 
 ### 9.3 应急预案
 
@@ -1361,6 +1403,7 @@ describe('WorldSetting Performance', () => {
 **症状**：数据库连接断开，迁移脚本执行中断
 
 **应急措施**：
+
 1. 检查数据库连接状态
 2. 执行数据一致性检查
 3. 如果不一致，执行回滚脚本
@@ -1371,6 +1414,7 @@ describe('WorldSetting Performance', () => {
 **症状**：查询响应时间超过2秒
 
 **应急措施**：
+
 1. 检查索引是否创建成功
 2. 使用`EXPLAIN`分析慢查询
 3. 临时禁用复杂查询功能
@@ -1381,6 +1425,7 @@ describe('WorldSetting Performance', () => {
 **症状**：CONTAINS存在但PART_OF缺失
 
 **应急措施**：
+
 1. 执行一致性修复脚本
 2. 记录不一致数据用于分析
 3. 修复sync.ts中的关系创建逻辑
@@ -1391,31 +1436,31 @@ describe('WorldSetting Performance', () => {
 
 ### 10.1 开发阶段（预计2周）
 
-| 任务 | 工作量 | 负责人 | 开始日期 | 结束日期 |
-|------|--------|--------|----------|----------|
-| Schema设计与评审 | 2天 | Backend Lead | Day 1 | Day 2 |
-| types.ts和schemas.ts更新 | 1天 | Backend Dev | Day 3 | Day 3 |
-| sync.ts增强实现 | 3天 | Backend Dev | Day 4 | Day 6 |
-| queries.ts查询函数实现 | 4天 | Backend Dev | Day 7 | Day 10 |
-| 单元测试编写 | 2天 | Backend Dev | Day 11 | Day 12 |
-| 集成测试与调试 | 2天 | Full Team | Day 13 | Day 14 |
+| 任务                     | 工作量 | 负责人       | 开始日期 | 结束日期 |
+| ------------------------ | ------ | ------------ | -------- | -------- |
+| Schema设计与评审         | 2天    | Backend Lead | Day 1    | Day 2    |
+| types.ts和schemas.ts更新 | 1天    | Backend Dev  | Day 3    | Day 3    |
+| sync.ts增强实现          | 3天    | Backend Dev  | Day 4    | Day 6    |
+| queries.ts查询函数实现   | 4天    | Backend Dev  | Day 7    | Day 10   |
+| 单元测试编写             | 2天    | Backend Dev  | Day 11   | Day 12   |
+| 集成测试与调试           | 2天    | Full Team    | Day 13   | Day 14   |
 
 ### 10.2 测试阶段（预计1周）
 
-| 任务 | 工作量 | 负责人 | 开始日期 | 结束日期 |
-|------|--------|--------|----------|----------|
-| 数据迁移测试 | 2天 | Backend Dev | Day 15 | Day 16 |
-| 性能测试与优化 | 2天 | Backend Dev | Day 17 | Day 18 |
-| 前端集成测试 | 1天 | Frontend Dev | Day 19 | Day 19 |
-| UAT用户验收测试 | 2天 | Product Owner | Day 20 | Day 21 |
+| 任务            | 工作量 | 负责人        | 开始日期 | 结束日期 |
+| --------------- | ------ | ------------- | -------- | -------- |
+| 数据迁移测试    | 2天    | Backend Dev   | Day 15   | Day 16   |
+| 性能测试与优化  | 2天    | Backend Dev   | Day 17   | Day 18   |
+| 前端集成测试    | 1天    | Frontend Dev  | Day 19   | Day 19   |
+| UAT用户验收测试 | 2天    | Product Owner | Day 20   | Day 21   |
 
 ### 10.3 部署阶段（预计2天）
 
-| 任务 | 工作量 | 负责人 | 开始日期 | 结束日期 |
-|------|--------|--------|----------|----------|
-| 生产环境Schema迁移 | 1天 | DevOps | Day 22 | Day 22 |
-| 生产环境数据迁移 | 1天 | Backend Lead | Day 23 | Day 23 |
-| 监控与验证 | 1天 | Full Team | Day 24 | Day 24 |
+| 任务               | 工作量 | 负责人       | 开始日期 | 结束日期 |
+| ------------------ | ------ | ------------ | -------- | -------- |
+| 生产环境Schema迁移 | 1天    | DevOps       | Day 22   | Day 22   |
+| 生产环境数据迁移   | 1天    | Backend Lead | Day 23   | Day 23   |
+| 监控与验证         | 1天    | Full Team    | Day 24   | Day 24   |
 
 ---
 
@@ -1424,26 +1469,31 @@ describe('WorldSetting Performance', () => {
 ### 11.1 功能验收标准
 
 ✅ **WorldSetting节点增强**：
+
 - [ ] 支持aliases属性存储和查询
 - [ ] 支持borders属性存储
 - [ ] 全文索引支持别名搜索
 
 ✅ **层级关系**：
+
 - [ ] CONTAINS关系正确创建
 - [ ] PART_OF逆关系正确创建
 - [ ] 层级树查询返回正确结构
 
 ✅ **地理关系**：
+
 - [ ] BORDERS关系正确创建（双向）
 - [ ] 仅Geography类型节点支持
 
 ✅ **角色-设定关联**：
+
 - [ ] ORIGINATED_FROM关系正确创建
 - [ ] RESIDES_IN关系正确创建
 - [ ] CONTROLS_TERRITORY关系正确创建
 - [ ] EXILED_FROM关系正确创建
 
 ✅ **查询功能**：
+
 - [ ] getWorldSettingHierarchy返回完整层级树
 - [ ] getCharacterLocationContext返回完整位置上下文
 - [ ] getLocationCharacters返回所有关联角色
@@ -1548,33 +1598,33 @@ RETURN b, c, type(r) as relationType
 
 ### B.1 常见错误及处理
 
-| 错误代码 | 错误信息 | 原因 | 解决方案 |
-|---------|---------|------|----------|
-| `WS001` | WorldSetting not found | 节点不存在 | 检查ID是否正确，确保节点已同步 |
-| `WS002` | Invalid parentId | 父节点不存在 | 验证parentId，确保父节点已创建 |
-| `WS003` | Circular dependency detected | 循环依赖 | 检查层级关系，避免A→B→A |
-| `WS004` | Geography constraint violated | 非地理节点使用BORDERS | 仅Geography类型支持BORDERS |
-| `WS005` | Relationship already exists | 关系已存在 | 使用MERGE而非CREATE |
+| 错误代码 | 错误信息                      | 原因                  | 解决方案                       |
+| -------- | ----------------------------- | --------------------- | ------------------------------ |
+| `WS001`  | WorldSetting not found        | 节点不存在            | 检查ID是否正确，确保节点已同步 |
+| `WS002`  | Invalid parentId              | 父节点不存在          | 验证parentId，确保父节点已创建 |
+| `WS003`  | Circular dependency detected  | 循环依赖              | 检查层级关系，避免A→B→A        |
+| `WS004`  | Geography constraint violated | 非地理节点使用BORDERS | 仅Geography类型支持BORDERS     |
+| `WS005`  | Relationship already exists   | 关系已存在            | 使用MERGE而非CREATE            |
 
 ### B.2 错误处理代码示例
 
 ```typescript
 try {
-    await getWorldSettingHierarchy(projectId);
+  await getWorldSettingHierarchy(projectId);
 } catch (error) {
-    if (error.code === 'WS001') {
-        // 节点不存在，触发同步
-        await syncProjectToGraph(projectId, projectData);
-        // 重试查询
-        return await getWorldSettingHierarchy(projectId);
-    } else if (error.code === 'WS003') {
-        // 循环依赖，记录并通知用户
-        logger.error('Circular dependency in WorldSetting hierarchy', { projectId });
-        throw new UserFacingError('世界设定存在循环依赖，请检查层级关系');
-    } else {
-        // 未知错误，向上抛出
-        throw error;
-    }
+  if (error.code === 'WS001') {
+    // 节点不存在，触发同步
+    await syncProjectToGraph(projectId, projectData);
+    // 重试查询
+    return await getWorldSettingHierarchy(projectId);
+  } else if (error.code === 'WS003') {
+    // 循环依赖，记录并通知用户
+    logger.error('Circular dependency in WorldSetting hierarchy', { projectId });
+    throw new UserFacingError('世界设定存在循环依赖，请检查层级关系');
+  } else {
+    // 未知错误，向上抛出
+    throw error;
+  }
 }
 ```
 
@@ -1583,6 +1633,7 @@ try {
 **文档结束**
 
 **下一步行动**：
+
 1. 团队评审本设计文档
 2. 确认实施时间表
 3. 开始Schema设计与评审

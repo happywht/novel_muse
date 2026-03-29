@@ -197,24 +197,18 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <div className="p-6">
           {/* 图标与标题 */}
           <div className="flex items-start gap-4 mb-4">
-            <div className={`flex-shrink-0 w-12 h-12 rounded-xl ${styles.iconBg} flex items-center justify-center`}>
-              <span className={styles.iconColor}>
-                {icon || styles.icon}
-              </span>
+            <div
+              className={`flex-shrink-0 w-12 h-12 rounded-xl ${styles.iconBg} flex items-center justify-center`}
+            >
+              <span className={styles.iconColor}>{icon || styles.icon}</span>
             </div>
             <div className="flex-1 min-w-0 pt-1">
               {title && (
-                <h3
-                  id="confirm-dialog-title"
-                  className="text-lg font-semibold text-white mb-2"
-                >
+                <h3 id="confirm-dialog-title" className="text-lg font-semibold text-white mb-2">
                   {title}
                 </h3>
               )}
-              <p
-                id="confirm-dialog-message"
-                className="text-sm text-slate-400 leading-relaxed"
-              >
+              <p id="confirm-dialog-message" className="text-sm text-slate-400 leading-relaxed">
                 {message}
               </p>
             </div>
@@ -253,9 +247,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 focus:${styles.ringColor}
               `}
             >
-              {isLoading && (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              )}
+              {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
               {confirmText}
             </button>
           </div>

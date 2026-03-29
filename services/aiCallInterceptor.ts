@@ -16,9 +16,10 @@ export interface AICallContext {
   thinkingBudget?: number;
 
   // 新增模板相关字段
-  templateId?: string;                    // 模板ID
-  templateData?: Record<string, any>;     // 结构化变量数据
-  templateMeta?: {                        // 模板元信息（用于UI展示）
+  templateId?: string; // 模板ID
+  templateData?: Record<string, any>; // 结构化变量数据
+  templateMeta?: {
+    // 模板元信息（用于UI展示）
     label: string;
     description: string;
     variables: Array<{
@@ -68,10 +69,7 @@ export async function interceptAICall(context: AICallContext): Promise<AICallRes
 
       // 渲染用户提示
       if (context.userPrompt) {
-        context.userPrompt = templateEngine.render(
-          context.userPrompt,
-          context.templateData
-        );
+        context.userPrompt = templateEngine.render(context.userPrompt, context.templateData);
       }
     } catch (error) {
       console.error('Template rendering error:', error);
@@ -83,9 +81,11 @@ export async function interceptAICall(context: AICallContext): Promise<AICallRes
     pendingConfirmation = { context, resolve, reject };
 
     // 触发全局事件，通知UI显示确认对话框
-    window.dispatchEvent(new CustomEvent(AI_CONFIRMATION_EVENT, {
-      detail: context
-    }));
+    window.dispatchEvent(
+      new CustomEvent(AI_CONFIRMATION_EVENT, {
+        detail: context,
+      })
+    );
   });
 }
 

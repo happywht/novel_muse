@@ -16,7 +16,7 @@
 
 3. **API 端点验证**。
    - ✅ 健康检查: `GET /api/inkos/health` - 正常返回
-200 OK
+     200 OK
    - ✅ 类型列表: `GET /api/inkos/genres` - 返回 12 种小说类型
    - ✅ 审计维度列表: `GET /api/inkos/dimensions` - 返回 32 个审计维度
    - ✅ SSE 连接测试通过
@@ -27,11 +27,13 @@
 ## 待修复的问题
 
 目前 inkos CLI 集成还需要进一步调整。主要问题是:
+
 1. inkos CLI 术语不概念不匹配（使用 "book" 而非 "project"
 2. 命令行参数可能不完全兼容
 3. 需要实际测试 inkos CLI 的真实功能
 
 接下来的步骤应该是:
+
 1. 研究 inkos CLI 的实际命令格式
 2. 蟚改服务层代码以匹配实际 CLI
 3. 进行端到端测试
@@ -50,6 +52,7 @@
 ## 文件清单
 
 **核心集成文件**:
+
 - `D:\家庭\副业探索\小说项目\小说开题\remix_-muse_-小说架构师_022302\server\src\types\inkos.ts`
 - `D:\家庭\副业探索\小说项目\小说开题\remix_-muse_-小说架构师_022302\server\src\middleware\sse.ts`
 - `D:\家庭\副业探索\小说项目\小说开题\remix_-muse_-小说架构师_022302\server\src\services\inkosService.ts`

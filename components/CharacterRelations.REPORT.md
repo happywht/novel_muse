@@ -42,6 +42,7 @@
 ## 功能特性
 
 ### 核心功能
+
 - ✅ 双格式支持（新格式 `structuredRelations`，旧格式 `relationships`）
 - ✅ 9 种关系类型（敌对、盟友、爱慕、亲属、师徒、竞争、效忠、朋友、关联）
 - ✅ 颜色编码（每种类型独特配色）
@@ -54,6 +55,7 @@
 - ✅ 分组展示关系
 
 ### 技术实现
+
 - ✅ TypeScript 类型安全
 - ✅ React Hooks 性能优化
 - ✅ Tailwind CSS 样式
@@ -62,17 +64,17 @@
 
 ## 关系类型配色
 
-| 类型 | 中文 | 颜色 | 图标 |
-|------|------|------|------|
-| ENEMY_OF | 敌对 | 红色 | Swords |
-| ALLY_OF | 盟友 | 绿色 | Handshake |
-| LOVES | 爱慕 | 粉色 | Heart |
-| KIN_OF | 亲属 | 蓝色 | Users |
-| MENTORS | 师徒 | 紫色 | Sparkles |
-| RIVAL_OF | 竞争 | 橙色 | Target |
-| SERVES | 效忠 | 灰色 | Crown |
-| FRIEND_OF | 朋友 | 青色 | UserCircle |
-| RELATED_TO | 关联 | 默认 | Link |
+| 类型       | 中文 | 颜色 | 图标       |
+| ---------- | ---- | ---- | ---------- |
+| ENEMY_OF   | 敌对 | 红色 | Swords     |
+| ALLY_OF    | 盟友 | 绿色 | Handshake  |
+| LOVES      | 爱慕 | 粉色 | Heart      |
+| KIN_OF     | 亲属 | 蓝色 | Users      |
+| MENTORS    | 师徒 | 紫色 | Sparkles   |
+| RIVAL_OF   | 竞争 | 橙色 | Target     |
+| SERVES     | 效忠 | 灰色 | Crown      |
+| FRIEND_OF  | 朋友 | 青色 | UserCircle |
+| RELATED_TO | 关联 | 默认 | Link       |
 
 ## 快速开始
 
@@ -116,16 +118,15 @@ import { CharacterRelations } from './components/CharacterRelations';
 ## 集成步骤
 
 1. **导入组件**
+
    ```tsx
    import { CharacterRelations } from './components/CharacterRelations';
    ```
 
 2. **在角色详情中使用**
+
    ```tsx
-   <CharacterRelations
-     character={character}
-     allCharacters={project.characters}
-   />
+   <CharacterRelations character={character} allCharacters={project.characters} />
    ```
 
 3. **添加交互功能（可选）**

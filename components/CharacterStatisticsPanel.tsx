@@ -87,7 +87,8 @@ export const CharacterStatisticsPanel: React.FC<CharacterStatisticsPanelProps> =
           <div className="text-left">
             <h3 className="font-semibold text-white">角色出场统计</h3>
             <p className="text-xs text-slate-400">
-              {report.totalChapters} 章 · {characters.length} 角色 · 平均出场率 {summary.averageAppearanceRate}%
+              {report.totalChapters} 章 · {characters.length} 角色 · 平均出场率{' '}
+              {summary.averageAppearanceRate}%
             </p>
           </div>
         </div>
@@ -154,9 +155,7 @@ export const CharacterStatisticsPanel: React.FC<CharacterStatisticsPanelProps> =
                   <div className="text-[10px] text-slate-400 uppercase">上升趋势</div>
                 </div>
                 <div className="bg-slate-900/50 rounded-lg p-3 text-center">
-                  <div className="text-lg font-bold text-red-400">
-                    {summary.fadingStars.length}
-                  </div>
+                  <div className="text-lg font-bold text-red-400">{summary.fadingStars.length}</div>
                   <div className="text-[10px] text-slate-400 uppercase">下降趋势</div>
                 </div>
                 <div className="bg-slate-900/50 rounded-lg p-3 text-center">
@@ -265,10 +264,10 @@ export const CharacterStatisticsPanel: React.FC<CharacterStatisticsPanelProps> =
                         index === 0
                           ? 'bg-yellow-500/20 text-yellow-400'
                           : index === 1
-                          ? 'bg-slate-400/20 text-slate-300'
-                          : index === 2
-                          ? 'bg-orange-500/20 text-orange-400'
-                          : 'bg-slate-700 text-slate-500'
+                            ? 'bg-slate-400/20 text-slate-300'
+                            : index === 2
+                              ? 'bg-orange-500/20 text-orange-400'
+                              : 'bg-slate-700 text-slate-500'
                       }`}
                     >
                       {index + 1}
@@ -297,10 +296,10 @@ export const CharacterStatisticsPanel: React.FC<CharacterStatisticsPanelProps> =
                             rating.level === 'excellent'
                               ? 'bg-emerald-400'
                               : rating.level === 'good'
-                              ? 'bg-green-400'
-                              : rating.level === 'fair'
-                              ? 'bg-yellow-400'
-                              : 'bg-red-400'
+                                ? 'bg-green-400'
+                                : rating.level === 'fair'
+                                  ? 'bg-yellow-400'
+                                  : 'bg-red-400'
                           }`}
                           style={{ width: `${char.percentage}%` }}
                         />

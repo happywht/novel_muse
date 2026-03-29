@@ -26,13 +26,13 @@
 
 ### 1.1 核心原则
 
-| 原则 | 说明 |
-|------|------|
+| 原则                       | 说明                               |
+| -------------------------- | ---------------------------------- |
 | **属性存实体，关系存图谱** | 节点存储实体属性，边存储关系元数据 |
-| **双写保持兼容** | 图谱与 MySQL 保持同步，支持回退 |
-| **渐进式迁移** | 新功能优先使用图谱，旧数据逐步迁移 |
-| **分支隔离** | 支持沙盒分支，便于实验性创作 |
-| **创作者主权** | AI 提取的关系需人工确认后生效 |
+| **双写保持兼容**           | 图谱与 MySQL 保持同步，支持回退    |
+| **渐进式迁移**             | 新功能优先使用图谱，旧数据逐步迁移 |
+| **分支隔离**               | 支持沙盒分支，便于实验性创作       |
+| **创作者主权**             | AI 提取的关系需人工确认后生效      |
 
 ### 1.2 命名规范
 
@@ -46,14 +46,14 @@
 
 所有节点必须包含以下全局属性：
 
-| 属性名 | 类型 | 必需 | 说明 |
-|--------|------|------|------|
-| `id` | String | ✓ | 全局唯一标识符（UUID 或时间戳） |
-| `projectId` | String | ✓ | 所属项目 ID，用于多租户隔离 |
-| `branchId` | String | | 分支 ID，默认 'main' |
-| `createdAt` | Long | ✓ | 创建时间戳 |
-| `updatedAt` | Long | | 最后更新时间戳 |
-| `source` | String | | 数据来源：'STRUCTURED_DATA' / 'AI_EXTRACTED' / 'MANUAL' |
+| 属性名      | 类型   | 必需 | 说明                                                    |
+| ----------- | ------ | ---- | ------------------------------------------------------- |
+| `id`        | String | ✓    | 全局唯一标识符（UUID 或时间戳）                         |
+| `projectId` | String | ✓    | 所属项目 ID，用于多租户隔离                             |
+| `branchId`  | String |      | 分支 ID，默认 'main'                                    |
+| `createdAt` | Long   | ✓    | 创建时间戳                                              |
+| `updatedAt` | Long   |      | 最后更新时间戳                                          |
+| `source`    | String |      | 数据来源：'STRUCTURED_DATA' / 'AI_EXTRACTED' / 'MANUAL' |
 
 ---
 
@@ -63,28 +63,29 @@
 
 **标签**: `:Character`
 
-| 属性名 | 类型 | 必需 | 索引 | 说明 |
-|--------|------|------|------|------|
-| `id` | String | ✓ | ✓ | 唯一标识符 |
-| `projectId` | String | ✓ | ✓ | 项目 ID |
-| `name` | String | ✓ | ✓ | 角色名称 |
-| `role` | String | ✓ | | 角色定位（主角/反派/导师等） |
-| `archetype` | String | | | 角色原型 |
-| `description` | String | | | 详细描述（限 500 字符） |
-| `alignment` | String | | | 道德阵营 |
-| `tags` | List[String] | | | 角色标签数组 |
-| `desire` | String | | | 核心欲望 |
-| `fear` | String | | | 核心恐惧 |
-| `signature` | String | | | 标志性特征 |
-| `contrast` | String | | | 反差萌点 |
-| `weakness` | String | | | 弱点/缺陷 |
-| `state` | String | | | 当前状态（正常/受伤/死亡） |
-| `isDead` | Boolean | | | 是否死亡 |
-| `branchId` | String | | | 分支 ID |
-| `createdAt` | Long | ✓ | | 创建时间 |
-| `updatedAt` | Long | | | 更新时间 |
+| 属性名        | 类型         | 必需 | 索引 | 说明                         |
+| ------------- | ------------ | ---- | ---- | ---------------------------- |
+| `id`          | String       | ✓    | ✓    | 唯一标识符                   |
+| `projectId`   | String       | ✓    | ✓    | 项目 ID                      |
+| `name`        | String       | ✓    | ✓    | 角色名称                     |
+| `role`        | String       | ✓    |      | 角色定位（主角/反派/导师等） |
+| `archetype`   | String       |      |      | 角色原型                     |
+| `description` | String       |      |      | 详细描述（限 500 字符）      |
+| `alignment`   | String       |      |      | 道德阵营                     |
+| `tags`        | List[String] |      |      | 角色标签数组                 |
+| `desire`      | String       |      |      | 核心欲望                     |
+| `fear`        | String       |      |      | 核心恐惧                     |
+| `signature`   | String       |      |      | 标志性特征                   |
+| `contrast`    | String       |      |      | 反差萌点                     |
+| `weakness`    | String       |      |      | 弱点/缺陷                    |
+| `state`       | String       |      |      | 当前状态（正常/受伤/死亡）   |
+| `isDead`      | Boolean      |      |      | 是否死亡                     |
+| `branchId`    | String       |      |      | 分支 ID                      |
+| `createdAt`   | Long         | ✓    |      | 创建时间                     |
+| `updatedAt`   | Long         |      |      | 更新时间                     |
 
 **Cypher 示例**:
+
 ```cypher
 CREATE (c:Character {
   id: 'char_001',
@@ -114,21 +115,22 @@ CREATE (c:Character {
 
 **标签**: `:WorldSetting` + 动态分类标签（`:Geography`, `:Magic_Tech`, `:Society`, `:History`, `:Other`）
 
-| 属性名 | 类型 | 必需 | 索引 | 说明 |
-|--------|------|------|------|------|
-| `id` | String | ✓ | ✓ | 唯一标识符 |
-| `projectId` | String | ✓ | ✓ | 项目 ID |
-| `title` | String | ✓ | ✓ | 设定标题 |
-| `category` | String | ✓ | | 分类 |
-| `content` | String | | | 详细内容（限 1000 字符） |
-| `parentId` | String | | | 父级设定 ID |
-| `importance` | Integer | | | 重要性等级 1-10 |
-| `tags` | List[String] | | | 设定标签 |
-| `branchId` | String | | | 分支 ID |
-| `createdAt` | Long | ✓ | | 创建时间 |
-| `updatedAt` | Long | | | 更新时间 |
+| 属性名       | 类型         | 必需 | 索引 | 说明                     |
+| ------------ | ------------ | ---- | ---- | ------------------------ |
+| `id`         | String       | ✓    | ✓    | 唯一标识符               |
+| `projectId`  | String       | ✓    | ✓    | 项目 ID                  |
+| `title`      | String       | ✓    | ✓    | 设定标题                 |
+| `category`   | String       | ✓    |      | 分类                     |
+| `content`    | String       |      |      | 详细内容（限 1000 字符） |
+| `parentId`   | String       |      |      | 父级设定 ID              |
+| `importance` | Integer      |      |      | 重要性等级 1-10          |
+| `tags`       | List[String] |      |      | 设定标签                 |
+| `branchId`   | String       |      |      | 分支 ID                  |
+| `createdAt`  | Long         | ✓    |      | 创建时间                 |
+| `updatedAt`  | Long         |      |      | 更新时间                 |
 
 **Cypher 示例**:
+
 ```cypher
 CREATE (w:WorldSetting:Geography {
   id: 'world_001',
@@ -150,22 +152,23 @@ CREATE (w:WorldSetting:Geography {
 
 **标签**: `:PlotNode`
 
-| 属性名 | 类型 | 必需 | 索引 | 说明 |
-|--------|------|------|------|------|
-| `id` | String | ✓ | ✓ | 唯一标识符 |
-| `projectId` | String | ✓ | ✓ | 项目 ID |
-| `title` | String | ✓ | ✓ | 情节标题 |
-| `content` | String | | | 情节内容/节拍描述 |
-| `order` | Integer | ✓ | ✓ | 排序序号 |
-| `beatTag` | String | | | 叙事里程碑标签 |
-| `conflictType` | String | | | 冲突类型（CONFRONTATION/CLIMAX/TWIST） |
-| `conflictStakes` | String | | | 冲突赌注/核心 |
-| `conflictIntensity` | Integer | | | 冲突强度 1-10 |
-| `branchId` | String | | | 分支 ID |
-| `createdAt` | Long | ✓ | | 创建时间 |
-| `updatedAt` | Long | | | 更新时间 |
+| 属性名              | 类型    | 必需 | 索引 | 说明                                   |
+| ------------------- | ------- | ---- | ---- | -------------------------------------- |
+| `id`                | String  | ✓    | ✓    | 唯一标识符                             |
+| `projectId`         | String  | ✓    | ✓    | 项目 ID                                |
+| `title`             | String  | ✓    | ✓    | 情节标题                               |
+| `content`           | String  |      |      | 情节内容/节拍描述                      |
+| `order`             | Integer | ✓    | ✓    | 排序序号                               |
+| `beatTag`           | String  |      |      | 叙事里程碑标签                         |
+| `conflictType`      | String  |      |      | 冲突类型（CONFRONTATION/CLIMAX/TWIST） |
+| `conflictStakes`    | String  |      |      | 冲突赌注/核心                          |
+| `conflictIntensity` | Integer |      |      | 冲突强度 1-10                          |
+| `branchId`          | String  |      |      | 分支 ID                                |
+| `createdAt`         | Long    | ✓    |      | 创建时间                               |
+| `updatedAt`         | Long    |      |      | 更新时间                               |
 
 **BeatTag 枚举值**:
+
 - `INCITING_INCIDENT` - 激励事件
 - `PLOT_POINT_1` - 第一幕转折点
 - `MIDPOINT` - 中点
@@ -175,6 +178,7 @@ CREATE (w:WorldSetting:Geography {
 - `OTHER` - 其他
 
 **Cypher 示例**:
+
 ```cypher
 CREATE (pn:PlotNode {
   id: 'plot_001',
@@ -197,22 +201,23 @@ CREATE (pn:PlotNode {
 
 **标签**: `:Chapter`
 
-| 属性名 | 类型 | 必需 | 索引 | 说明 |
-|--------|------|------|------|------|
-| `id` | String | ✓ | ✓ | 唯一标识符 |
-| `projectId` | String | ✓ | ✓ | 项目 ID |
-| `title` | String | ✓ | ✓ | 章节标题 |
-| `content` | String | | | 章节正文 |
-| `summary` | String | | | 章节摘要 |
-| `order` | Integer | ✓ | ✓ | 章节序号 |
-| `pov` | String | | | 视角人物名称 |
-| `plotNodeId` | String | | | 关联的情节节点 ID |
-| `wordCount` | Integer | | | 字数统计 |
-| `branchId` | String | | | 分支 ID |
-| `createdAt` | Long | ✓ | | 创建时间 |
-| `updatedAt` | Long | | | 更新时间 |
+| 属性名       | 类型    | 必需 | 索引 | 说明              |
+| ------------ | ------- | ---- | ---- | ----------------- |
+| `id`         | String  | ✓    | ✓    | 唯一标识符        |
+| `projectId`  | String  | ✓    | ✓    | 项目 ID           |
+| `title`      | String  | ✓    | ✓    | 章节标题          |
+| `content`    | String  |      |      | 章节正文          |
+| `summary`    | String  |      |      | 章节摘要          |
+| `order`      | Integer | ✓    | ✓    | 章节序号          |
+| `pov`        | String  |      |      | 视角人物名称      |
+| `plotNodeId` | String  |      |      | 关联的情节节点 ID |
+| `wordCount`  | Integer |      |      | 字数统计          |
+| `branchId`   | String  |      |      | 分支 ID           |
+| `createdAt`  | Long    | ✓    |      | 创建时间          |
+| `updatedAt`  | Long    |      |      | 更新时间          |
 
 **Cypher 示例**:
+
 ```cypher
 CREATE (ch:Chapter {
   id: 'ch_001',
@@ -235,18 +240,19 @@ CREATE (ch:Chapter {
 
 **标签**: `:Event`
 
-| 属性名 | 类型 | 必需 | 索引 | 说明 |
-|--------|------|------|------|------|
-| `id` | String | ✓ | ✓ | 唯一标识符 |
-| `projectId` | String | ✓ | ✓ | 项目 ID |
-| `title` | String | ✓ | ✓ | 事件标题 |
-| `description` | String | | | 事件描述 |
-| `worldDate` | String | | | 世界观内日期 |
-| `type` | String | ✓ | | 事件类型（SCENE/BACKGROUND/ECHO） |
-| `branchId` | String | | | 分支 ID |
-| `createdAt` | Long | ✓ | | 创建时间 |
+| 属性名        | 类型   | 必需 | 索引 | 说明                              |
+| ------------- | ------ | ---- | ---- | --------------------------------- |
+| `id`          | String | ✓    | ✓    | 唯一标识符                        |
+| `projectId`   | String | ✓    | ✓    | 项目 ID                           |
+| `title`       | String | ✓    | ✓    | 事件标题                          |
+| `description` | String |      |      | 事件描述                          |
+| `worldDate`   | String |      |      | 世界观内日期                      |
+| `type`        | String | ✓    |      | 事件类型（SCENE/BACKGROUND/ECHO） |
+| `branchId`    | String |      |      | 分支 ID                           |
+| `createdAt`   | Long   | ✓    |      | 创建时间                          |
 
 **Cypher 示例**:
+
 ```cypher
 CREATE (e:Event {
   id: 'evt_001',
@@ -266,22 +272,23 @@ CREATE (e:Event {
 
 **标签**: `:Echo`
 
-| 属性名 | 类型 | 必需 | 索引 | 说明 |
-|--------|------|------|------|------|
-| `id` | String | ✓ | ✓ | 唯一标识符 |
-| `projectId` | String | ✓ | ✓ | 项目 ID |
-| `targetId` | String | ✓ | | 目标实体 ID |
-| `targetType` | String | ✓ | | 目标类型（CHARACTER/WORLD） |
-| `targetName` | String | ✓ | | 目标名称 |
-| `description` | String | ✓ | | 变更描述 |
-| `reason` | String | | | 变更原因 |
-| `status` | String | ✓ | | 状态（PENDING/ACCEPTED/REJECTED/AUTO_ACCEPTED/PREDICTION/ARCHIVED） |
-| `confidence` | Float | | | AI 置信度 0-1 |
-| `extractionEvidence` | String | | | 提取依据原文 |
-| `branchId` | String | | | 分支 ID |
-| `createdAt` | Long | ✓ | | 创建时间 |
+| 属性名               | 类型   | 必需 | 索引 | 说明                                                                |
+| -------------------- | ------ | ---- | ---- | ------------------------------------------------------------------- |
+| `id`                 | String | ✓    | ✓    | 唯一标识符                                                          |
+| `projectId`          | String | ✓    | ✓    | 项目 ID                                                             |
+| `targetId`           | String | ✓    |      | 目标实体 ID                                                         |
+| `targetType`         | String | ✓    |      | 目标类型（CHARACTER/WORLD）                                         |
+| `targetName`         | String | ✓    |      | 目标名称                                                            |
+| `description`        | String | ✓    |      | 变更描述                                                            |
+| `reason`             | String |      |      | 变更原因                                                            |
+| `status`             | String | ✓    |      | 状态（PENDING/ACCEPTED/REJECTED/AUTO_ACCEPTED/PREDICTION/ARCHIVED） |
+| `confidence`         | Float  |      |      | AI 置信度 0-1                                                       |
+| `extractionEvidence` | String |      |      | 提取依据原文                                                        |
+| `branchId`           | String |      |      | 分支 ID                                                             |
+| `createdAt`          | Long   | ✓    |      | 创建时间                                                            |
 
 **状态流转**:
+
 ```
 PENDING ──(confidence >= 0.85)──> AUTO_ACCEPTED ──> ACCEPTED
     │
@@ -291,6 +298,7 @@ PENDING ──(confidence >= 0.85)──> AUTO_ACCEPTED ──> ACCEPTED
 ```
 
 **Cypher 示例**:
+
 ```cypher
 CREATE (e:Echo {
   id: 'echo_001',
@@ -314,17 +322,17 @@ CREATE (e:Echo {
 
 **标签**: `:Draft`
 
-| 属性名 | 类型 | 必需 | 索引 | 说明 |
-|--------|------|------|------|------|
-| `id` | String | ✓ | ✓ | 唯一标识符 |
-| `projectId` | String | ✓ | ✓ | 项目 ID |
-| `title` | String | ✓ | | 草稿标题 |
-| `content` | String | | | 草稿内容 |
-| `relatedPlotPoint` | String | | | 关联情节 ID |
-| `version` | Integer | | | 版本号 |
-| `branchId` | String | | | 分支 ID |
-| `createdAt` | Long | ✓ | | 创建时间 |
-| `updatedAt` | Long | | | 更新时间 |
+| 属性名             | 类型    | 必需 | 索引 | 说明        |
+| ------------------ | ------- | ---- | ---- | ----------- |
+| `id`               | String  | ✓    | ✓    | 唯一标识符  |
+| `projectId`        | String  | ✓    | ✓    | 项目 ID     |
+| `title`            | String  | ✓    |      | 草稿标题    |
+| `content`          | String  |      |      | 草稿内容    |
+| `relatedPlotPoint` | String  |      |      | 关联情节 ID |
+| `version`          | Integer |      |      | 版本号      |
+| `branchId`         | String  |      |      | 分支 ID     |
+| `createdAt`        | Long    | ✓    |      | 创建时间    |
+| `updatedAt`        | Long    |      |      | 更新时间    |
 
 ---
 
@@ -332,18 +340,18 @@ CREATE (e:Echo {
 
 **标签**: `:Foreshadowing`
 
-| 属性名 | 类型 | 必需 | 索引 | 说明 |
-|--------|------|------|------|------|
-| `id` | String | ✓ | ✓ | 唯一标识符 |
-| `projectId` | String | ✓ | ✓ | 项目 ID |
-| `title` | String | ✓ | | 伏笔标题 |
-| `description` | String | | | 伏笔描述 |
-| `status` | String | ✓ | | 状态（OPEN/RESOLVED/ABANDONED） |
-| `plantedChapterId` | String | | | 埋设章节 ID |
-| `resolvedChapterId` | String | | | 回收章节 ID |
-| `branchId` | String | | | 分支 ID |
-| `createdAt` | Long | ✓ | | 创建时间 |
-| `resolvedAt` | Long | | | 回收时间 |
+| 属性名              | 类型   | 必需 | 索引 | 说明                            |
+| ------------------- | ------ | ---- | ---- | ------------------------------- |
+| `id`                | String | ✓    | ✓    | 唯一标识符                      |
+| `projectId`         | String | ✓    | ✓    | 项目 ID                         |
+| `title`             | String | ✓    |      | 伏笔标题                        |
+| `description`       | String |      |      | 伏笔描述                        |
+| `status`            | String | ✓    |      | 状态（OPEN/RESOLVED/ABANDONED） |
+| `plantedChapterId`  | String |      |      | 埋设章节 ID                     |
+| `resolvedChapterId` | String |      |      | 回收章节 ID                     |
+| `branchId`          | String |      |      | 分支 ID                         |
+| `createdAt`         | Long   | ✓    |      | 创建时间                        |
+| `resolvedAt`        | Long   |      |      | 回收时间                        |
 
 ---
 
@@ -351,31 +359,32 @@ CREATE (e:Echo {
 
 ### 3.1 角色间关系（Character ↔ Character）
 
-| 关系类型 | 方向性 | 属性 | 说明 |
-|----------|--------|------|------|
-| `ENEMY_OF` | 有向 | weight, reason, source | 敌对关系 |
-| `ALLY_OF` | 有向 | weight, reason, source | 盟友关系 |
-| `LOVES` | 有向 | weight, reason, source, trajectory | 爱慕关系 |
-| `KIN_OF` | 双向 | weight, reason, source | 亲属关系 |
-| `MENTORS` | 有向 | weight, reason, source | 师徒关系 |
-| `RIVAL_OF` | 双向 | weight, reason, source | 竞争关系 |
-| `SERVES` | 有向 | weight, reason, source | 效忠关系 |
-| `FRIEND_OF` | 双向 | weight, reason, source | 朋友关系 |
-| `RELATED_TO` | 有向/双向 | weight, reason, source | 通用关系（兜底） |
+| 关系类型     | 方向性    | 属性                               | 说明             |
+| ------------ | --------- | ---------------------------------- | ---------------- |
+| `ENEMY_OF`   | 有向      | weight, reason, source             | 敌对关系         |
+| `ALLY_OF`    | 有向      | weight, reason, source             | 盟友关系         |
+| `LOVES`      | 有向      | weight, reason, source, trajectory | 爱慕关系         |
+| `KIN_OF`     | 双向      | weight, reason, source             | 亲属关系         |
+| `MENTORS`    | 有向      | weight, reason, source             | 师徒关系         |
+| `RIVAL_OF`   | 双向      | weight, reason, source             | 竞争关系         |
+| `SERVES`     | 有向      | weight, reason, source             | 效忠关系         |
+| `FRIEND_OF`  | 双向      | weight, reason, source             | 朋友关系         |
+| `RELATED_TO` | 有向/双向 | weight, reason, source             | 通用关系（兜底） |
 
 **关系属性详解**:
 
-| 属性名 | 类型 | 必需 | 说明 |
-|--------|------|------|------|
-| `weight` | Integer | | 关系强度 0-100，默认 50 |
-| `reason` | String | | 关系原因/描述 |
-| `source` | String | | 来源（STRUCTURED_DATA/AI_EXTRACTED/MANUAL） |
-| `trajectory` | String | | 关系走向（rising/falling/stable） |
-| `branchId` | String | | 分支 ID |
-| `createdAt` | Long | | 创建时间 |
-| `updatedAt` | Long | | 更新时间 |
+| 属性名       | 类型    | 必需 | 说明                                        |
+| ------------ | ------- | ---- | ------------------------------------------- |
+| `weight`     | Integer |      | 关系强度 0-100，默认 50                     |
+| `reason`     | String  |      | 关系原因/描述                               |
+| `source`     | String  |      | 来源（STRUCTURED_DATA/AI_EXTRACTED/MANUAL） |
+| `trajectory` | String  |      | 关系走向（rising/falling/stable）           |
+| `branchId`   | String  |      | 分支 ID                                     |
+| `createdAt`  | Long    |      | 创建时间                                    |
+| `updatedAt`  | Long    |      | 更新时间                                    |
 
 **Cypher 示例**:
+
 ```cypher
 MATCH (a:Character {id: 'char_001', projectId: 'proj_123'})
 MATCH (b:Character {id: 'char_002', projectId: 'proj_123'})
@@ -392,91 +401,91 @@ SET r.weight = 85,
 
 ### 3.2 情节关联关系（PlotNode 相关）
 
-| 关系类型 | 源 → 目标 | 属性 | 说明 |
-|----------|-----------|------|------|
-| `INVOLVES` | PlotNode → Character | | 情节涉及的角色 |
-| `LOCATED_AT` | PlotNode → WorldSetting | | 情节发生地点 |
-| `HAS_CONFLICT_PARTICIPANT` | PlotNode → Character | conflictType, stakes, intensity | 冲突参与者 |
-| `PRECEDES` | PlotNode → PlotNode | | 情节时序关系 |
-| `CAUSES` | PlotNode → PlotNode | weight | 因果关系 |
+| 关系类型                   | 源 → 目标               | 属性                            | 说明           |
+| -------------------------- | ----------------------- | ------------------------------- | -------------- |
+| `INVOLVES`                 | PlotNode → Character    |                                 | 情节涉及的角色 |
+| `LOCATED_AT`               | PlotNode → WorldSetting |                                 | 情节发生地点   |
+| `HAS_CONFLICT_PARTICIPANT` | PlotNode → Character    | conflictType, stakes, intensity | 冲突参与者     |
+| `PRECEDES`                 | PlotNode → PlotNode     |                                 | 情节时序关系   |
+| `CAUSES`                   | PlotNode → PlotNode     | weight                          | 因果关系       |
 
 **HAS_CONFLICT_PARTICIPANT 属性**:
 
-| 属性名 | 类型 | 说明 |
-|--------|------|------|
-| `conflictType` | String | CONFRONTATION/CLIMAX/TWIST |
-| `stakes` | String | 冲突赌注/核心 |
-| `intensity` | Integer | 冲突强度 1-10 |
-| `branchId` | String | 分支 ID |
+| 属性名         | 类型    | 说明                       |
+| -------------- | ------- | -------------------------- |
+| `conflictType` | String  | CONFRONTATION/CLIMAX/TWIST |
+| `stakes`       | String  | 冲突赌注/核心              |
+| `intensity`    | Integer | 冲突强度 1-10              |
+| `branchId`     | String  | 分支 ID                    |
 
 ---
 
 ### 3.3 章节关联关系（Chapter 相关）
 
-| 关系类型 | 源 → 目标 | 属性 | 说明 |
-|----------|-----------|------|------|
-| `IMPLEMENTS` | Chapter → PlotNode | | 章节实现情节 |
-| `INVOLVES` | Chapter → Character | | 章节涉及角色 |
-| `LOCATED_IN` | Chapter → WorldSetting | | 章节发生地点 |
-| `POV_IS` | Chapter → Character | | 视角人物 |
-| `PRECEDES` | Chapter → Chapter | | 章节顺序 |
-| `PLANTS` | Chapter → Foreshadowing | | 埋设伏笔 |
-| `RESOLVES` | Chapter → Foreshadowing | | 回收伏笔 |
+| 关系类型     | 源 → 目标               | 属性 | 说明         |
+| ------------ | ----------------------- | ---- | ------------ |
+| `IMPLEMENTS` | Chapter → PlotNode      |      | 章节实现情节 |
+| `INVOLVES`   | Chapter → Character     |      | 章节涉及角色 |
+| `LOCATED_IN` | Chapter → WorldSetting  |      | 章节发生地点 |
+| `POV_IS`     | Chapter → Character     |      | 视角人物     |
+| `PRECEDES`   | Chapter → Chapter       |      | 章节顺序     |
+| `PLANTS`     | Chapter → Foreshadowing |      | 埋设伏笔     |
+| `RESOLVES`   | Chapter → Foreshadowing |      | 回收伏笔     |
 
 ---
 
 ### 3.4 角色与世界设定关系（Character ↔ WorldSetting）
 
-| 关系类型 | 源 → 目标 | 属性 | 说明 |
-|----------|-----------|------|------|
-| `ORIGINATED_FROM` | Character → WorldSetting | | 起源/出生地 |
-| `RESIDES_IN` | Character → WorldSetting | | 居住地 |
-| `CONTROLS_TERRITORY` | Character → WorldSetting | | 控制领地 |
-| `EXILED_FROM` | Character → WorldSetting | | 被流放地 |
-| `LOCATED_IN` | Character → WorldSetting | timestamp | 当前位置（带时间戳） |
+| 关系类型             | 源 → 目标                | 属性      | 说明                 |
+| -------------------- | ------------------------ | --------- | -------------------- |
+| `ORIGINATED_FROM`    | Character → WorldSetting |           | 起源/出生地          |
+| `RESIDES_IN`         | Character → WorldSetting |           | 居住地               |
+| `CONTROLS_TERRITORY` | Character → WorldSetting |           | 控制领地             |
+| `EXILED_FROM`        | Character → WorldSetting |           | 被流放地             |
+| `LOCATED_IN`         | Character → WorldSetting | timestamp | 当前位置（带时间戳） |
 
 ---
 
 ### 3.5 世界设定层级关系（WorldSetting 相关）
 
-| 关系类型 | 源 → 目标 | 属性 | 说明 |
-|----------|-----------|------|------|
-| `CONTAINS` | WorldSetting → WorldSetting | | 层级包含（王国→城市） |
-| `ADJACENT_TO` | WorldSetting → WorldSetting | | 地理相邻 |
-| `DEPENDS_ON` | WorldSetting → WorldSetting | | 依赖关系 |
-| `CONFLICTS_WITH` | WorldSetting → WorldSetting | | 冲突关系 |
+| 关系类型         | 源 → 目标                   | 属性 | 说明                  |
+| ---------------- | --------------------------- | ---- | --------------------- |
+| `CONTAINS`       | WorldSetting → WorldSetting |      | 层级包含（王国→城市） |
+| `ADJACENT_TO`    | WorldSetting → WorldSetting |      | 地理相邻              |
+| `DEPENDS_ON`     | WorldSetting → WorldSetting |      | 依赖关系              |
+| `CONFLICTS_WITH` | WorldSetting → WorldSetting |      | 冲突关系              |
 
 ---
 
 ### 3.6 事件关联关系（Event 相关）
 
-| 关系类型 | 源 → 目标 | 属性 | 说明 |
-|----------|-----------|------|------|
-| `INVOLVED_IN` | Character → Event | | 角色参与事件 |
-| `OCCURRED_AT` | Event → WorldSetting | | 事件发生地点 |
-| `PRECEDES` | Event → Event | | 事件时序 |
-| `TRIGGERS` | Event → Event | | 事件触发 |
+| 关系类型      | 源 → 目标            | 属性 | 说明         |
+| ------------- | -------------------- | ---- | ------------ |
+| `INVOLVED_IN` | Character → Event    |      | 角色参与事件 |
+| `OCCURRED_AT` | Event → WorldSetting |      | 事件发生地点 |
+| `PRECEDES`    | Event → Event        |      | 事件时序     |
+| `TRIGGERS`    | Event → Event        |      | 事件触发     |
 
 ---
 
 ### 3.7 Echo 关联关系
 
-| 关系类型 | 源 → 目标 | 属性 | 说明 |
-|----------|-----------|------|------|
-| `HAS_ECHO` | Character/WorldSetting → Echo | | 实体关联的 Echo |
-| `SUGGESTS_CHANGE` | Echo → Character/WorldSetting | field, oldValue, newValue | 建议的变更 |
-| `DERIVED_FROM` | Echo → Chapter | | 从哪个章节提取 |
+| 关系类型          | 源 → 目标                     | 属性                      | 说明            |
+| ----------------- | ----------------------------- | ------------------------- | --------------- |
+| `HAS_ECHO`        | Character/WorldSetting → Echo |                           | 实体关联的 Echo |
+| `SUGGESTS_CHANGE` | Echo → Character/WorldSetting | field, oldValue, newValue | 建议的变更      |
+| `DERIVED_FROM`    | Echo → Chapter                |                           | 从哪个章节提取  |
 
 ---
 
 ### 3.8 伏笔关系（Foreshadowing 相关）
 
-| 关系类型 | 源 → 目标 | 属性 | 说明 |
-|----------|-----------|------|------|
-| `INVOLVES` | Foreshadowing → Character | | 涉及角色 |
-| `RELATES_TO` | Foreshadowing → WorldSetting | | 涉及设定 |
-| `PLANTED_IN` | Foreshadowing → Chapter | | 埋设章节 |
-| `RESOLVED_IN` | Foreshadowing → Chapter | | 回收章节 |
+| 关系类型      | 源 → 目标                    | 属性 | 说明     |
+| ------------- | ---------------------------- | ---- | -------- |
+| `INVOLVES`    | Foreshadowing → Character    |      | 涉及角色 |
+| `RELATES_TO`  | Foreshadowing → WorldSetting |      | 涉及设定 |
+| `PLANTED_IN`  | Foreshadowing → Chapter      |      | 埋设章节 |
+| `RESOLVED_IN` | Foreshadowing → Chapter      |      | 回收章节 |
 
 ---
 
@@ -656,13 +665,13 @@ RETURN f.id as id,
 
 **同步触发时机**:
 
-| 操作 | 触发方式 | 延迟 | 一致性级别 |
-|------|----------|------|-----------|
-| 创建实体 | 同步双写 | 0ms | 强一致 |
-| 更新实体 | 异步同步 | 2000ms | 最终一致 |
-| 删除实体 | 同步级联 | 0ms | 强一致 |
-| 创建关系 | 图谱优先 | 0ms | 强一致（图谱） |
-| AI 提取关系 | 异步同步 | N/A | 最终一致 |
+| 操作        | 触发方式 | 延迟   | 一致性级别     |
+| ----------- | -------- | ------ | -------------- |
+| 创建实体    | 同步双写 | 0ms    | 强一致         |
+| 更新实体    | 异步同步 | 2000ms | 最终一致       |
+| 删除实体    | 同步级联 | 0ms    | 强一致         |
+| 创建关系    | 图谱优先 | 0ms    | 强一致（图谱） |
+| AI 提取关系 | 异步同步 | N/A    | 最终一致       |
 
 ---
 
@@ -671,7 +680,11 @@ RETURN f.id as id,
 ```typescript
 // 冲突类型定义
 interface LogicConflict {
-  type: 'LOCATION_MISMATCH' | 'RELATIONSHIP_CONFLICT' | 'FACTUAL_INCONSISTENCY' | 'TEMPORAL_VIOLATION';
+  type:
+    | 'LOCATION_MISMATCH'
+    | 'RELATIONSHIP_CONFLICT'
+    | 'FACTUAL_INCONSISTENCY'
+    | 'TEMPORAL_VIOLATION';
   description: string;
   truthInGraph: string;
   extractedFact: string;
@@ -689,7 +702,7 @@ const CONFLICT_DETECTION_RULES = [
       WHERE c.name = $characterName AND current.title <> $extractedLocation
       RETURN current.title as truthInGraph
     `,
-    severity: 'HIGH'
+    severity: 'HIGH',
   },
   {
     type: 'RELATIONSHIP_CONFLICT',
@@ -701,7 +714,7 @@ const CONFLICT_DETECTION_RULES = [
       AND type(r) <> $extractedRelation
       RETURN type(r) as truthInGraph
     `,
-    severity: 'MEDIUM'
+    severity: 'MEDIUM',
   },
   {
     type: 'TEMPORAL_VIOLATION',
@@ -711,8 +724,8 @@ const CONFLICT_DETECTION_RULES = [
       WHERE e1.worldDate > e2.worldDate
       RETURN e1.title + ' should come after ' + e2.title as violation
     `,
-    severity: 'HIGH'
-  }
+    severity: 'HIGH',
+  },
 ];
 ```
 
@@ -722,14 +735,14 @@ const CONFLICT_DETECTION_RULES = [
 
 **校验规则**:
 
-| 规则 | 类型 | 说明 |
-|------|------|------|
-| `FK_CHARACTER_EXISTS` | 外键 | PlotNode.relatedCharacters 必须存在 |
-| `FK_WORLDSETTING_EXISTS` | 外键 | PlotNode.relatedLocations 必须存在 |
-| `FK_PLOTNODE_EXISTS` | 外键 | Chapter.plotNodeId 必须存在 |
-| `UNIQUE_ORDER` | 唯一 | Chapter.order 在项目内唯一 |
-| `VALID_BEAT_TAG` | 枚举 | PlotNode.beatTag 必须在枚举值内 |
-| `VALID_RELATION_TYPE` | 枚举 | 关系类型必须在白名单内 |
+| 规则                     | 类型 | 说明                                |
+| ------------------------ | ---- | ----------------------------------- |
+| `FK_CHARACTER_EXISTS`    | 外键 | PlotNode.relatedCharacters 必须存在 |
+| `FK_WORLDSETTING_EXISTS` | 外键 | PlotNode.relatedLocations 必须存在  |
+| `FK_PLOTNODE_EXISTS`     | 外键 | Chapter.plotNodeId 必须存在         |
+| `UNIQUE_ORDER`           | 唯一 | Chapter.order 在项目内唯一          |
+| `VALID_BEAT_TAG`         | 枚举 | PlotNode.beatTag 必须在枚举值内     |
+| `VALID_RELATION_TYPE`    | 枚举 | 关系类型必须在白名单内              |
 
 **完整性校验 Cypher**:
 
@@ -772,14 +785,14 @@ SET r.customType = '前世仇人',
 interface CustomRelationType {
   id: string;
   projectId: string;
-  name: string;           // 显示名称
-  description: string;    // 描述
+  name: string; // 显示名称
+  description: string; // 描述
   direction: 'DIRECTED' | 'UNDIRECTED' | 'BIDIRECTIONAL';
-  allowedSourceTypes: string[];  // 允许的源节点类型
-  allowedTargetTypes: string[];  // 允许的目标节点类型
-  color: string;          // 可视化颜色
-  icon: string;           // 图标
-  createdBy: string;      // 创建者
+  allowedSourceTypes: string[]; // 允许的源节点类型
+  allowedTargetTypes: string[]; // 允许的目标节点类型
+  color: string; // 可视化颜色
+  icon: string; // 图标
+  createdBy: string; // 创建者
   createdAt: number;
 }
 ```
@@ -844,8 +857,8 @@ interface MigrationScript {
   fromVersion: string;
   toVersion: string;
   description: string;
-  up: string;    // 升级 Cypher
-  down: string;  // 降级 Cypher
+  up: string; // 升级 Cypher
+  down: string; // 降级 Cypher
 }
 
 const migrations: MigrationScript[] = [
@@ -861,8 +874,8 @@ const migrations: MigrationScript[] = [
     down: `
       MATCH ()-[r:HAS_CONFLICT_PARTICIPANT]->()
       REMOVE r.intensity
-    `
-  }
+    `,
+  },
 ];
 ```
 
@@ -1086,6 +1099,7 @@ SET r.weight = 85,
 ### 8.2 常用操作 Cypher
 
 **创建角色**:
+
 ```cypher
 CREATE (c:Character {
   id: $id,
@@ -1111,6 +1125,7 @@ RETURN c
 ```
 
 **创建角色关系**:
+
 ```cypher
 MATCH (a:Character {id: $sourceId, projectId: $projectId})
 MATCH (b:Character {id: $targetId, projectId: $projectId})
@@ -1130,6 +1145,7 @@ RETURN r
 ```
 
 **创建情节节点**:
+
 ```cypher
 CREATE (pn:PlotNode {
   id: $id,
@@ -1156,6 +1172,7 @@ RETURN pn
 ```
 
 **创建冲突参与者关系**:
+
 ```cypher
 MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})
 UNWIND $participantIds AS participantId
@@ -1168,6 +1185,7 @@ SET r.conflictType = $conflictType,
 ```
 
 **查询项目图谱**:
+
 ```cypher
 MATCH (n {projectId: $projectId})
 OPTIONAL MATCH (n)-[r]-(m {projectId: $projectId})
@@ -1179,6 +1197,7 @@ RETURN n, r, m,
 ```
 
 **删除项目所有数据**:
+
 ```cypher
 MATCH (n {projectId: $projectId})
 DETACH DELETE n
@@ -1356,10 +1375,10 @@ Schema 版本号: MAJOR.MINOR.PATCH
 ### 10.2 版本迁移矩阵
 
 | 当前版本 | 目标版本 | 迁移类型 | 风险等级 |
-|----------|----------|----------|----------|
-| 1.0.0 | 1.1.0 | MINOR | 低 |
-| 1.1.0 | 1.2.0 | MINOR | 低 |
-| 1.2.0 | 2.0.0 | MAJOR | 高 |
+| -------- | -------- | -------- | -------- |
+| 1.0.0    | 1.1.0    | MINOR    | 低       |
+| 1.1.0    | 1.2.0    | MINOR    | 低       |
+| 1.2.0    | 2.0.0    | MAJOR    | 高       |
 
 ### 10.3 迁移执行流程
 
@@ -1453,7 +1472,7 @@ export const VALID_RELATION_TYPES = new Set([
 
   // Echo 相关
   'SUGGESTS_CHANGE',
-  'DERIVED_FROM'
+  'DERIVED_FROM',
 ]);
 ```
 
@@ -1464,54 +1483,54 @@ export const VALID_RELATION_TYPES = new Set([
 ```typescript
 export const CHINESE_TO_RELATION_TYPE: Record<string, string> = {
   // 敌对关系
-  '敌人': 'ENEMY_OF',
-  '敌对': 'ENEMY_OF',
-  '仇人': 'ENEMY_OF',
-  '仇敌': 'ENEMY_OF',
-  '死敌': 'ENEMY_OF',
-  '宿敌': 'ENEMY_OF',
+  敌人: 'ENEMY_OF',
+  敌对: 'ENEMY_OF',
+  仇人: 'ENEMY_OF',
+  仇敌: 'ENEMY_OF',
+  死敌: 'ENEMY_OF',
+  宿敌: 'ENEMY_OF',
 
   // 盟友关系
-  '盟友': 'ALLY_OF',
-  '同盟': 'ALLY_OF',
-  '伙伴': 'ALLY_OF',
-  '同伴': 'ALLY_OF',
+  盟友: 'ALLY_OF',
+  同盟: 'ALLY_OF',
+  伙伴: 'ALLY_OF',
+  同伴: 'ALLY_OF',
 
   // 爱情关系
-  '爱': 'LOVES',
-  '爱慕': 'LOVES',
-  '恋人': 'LOVES',
-  '情人': 'LOVES',
-  '暗恋': 'LOVES',
-  '喜欢': 'LOVES',
+  爱: 'LOVES',
+  爱慕: 'LOVES',
+  恋人: 'LOVES',
+  情人: 'LOVES',
+  暗恋: 'LOVES',
+  喜欢: 'LOVES',
 
   // 亲情关系
-  '亲人': 'KIN_OF',
-  '亲属': 'KIN_OF',
-  '家人': 'KIN_OF',
-  '亲戚': 'KIN_OF',
+  亲人: 'KIN_OF',
+  亲属: 'KIN_OF',
+  家人: 'KIN_OF',
+  亲戚: 'KIN_OF',
 
   // 师徒关系
-  '师父': 'MENTORS',
-  '师傅': 'MENTORS',
-  '徒弟': 'MENTORS',
-  '师徒': 'MENTORS',
-  '导师': 'MENTORS',
+  师父: 'MENTORS',
+  师傅: 'MENTORS',
+  徒弟: 'MENTORS',
+  师徒: 'MENTORS',
+  导师: 'MENTORS',
 
   // 竞争关系
-  '竞争': 'RIVAL_OF',
-  '对手': 'RIVAL_OF',
-  '敌手': 'RIVAL_OF',
+  竞争: 'RIVAL_OF',
+  对手: 'RIVAL_OF',
+  敌手: 'RIVAL_OF',
 
   // 效忠关系
-  '效忠': 'SERVES',
-  '下属': 'SERVES',
-  '仆人': 'SERVES',
+  效忠: 'SERVES',
+  下属: 'SERVES',
+  仆人: 'SERVES',
 
   // 友谊关系
-  '朋友': 'FRIEND_OF',
-  '好友': 'FRIEND_OF',
-  '友情': 'FRIEND_OF'
+  朋友: 'FRIEND_OF',
+  好友: 'FRIEND_OF',
+  友情: 'FRIEND_OF',
 };
 ```
 
@@ -1617,8 +1636,8 @@ ORDER BY weight DESC
 
 ## 文档变更历史
 
-| 版本 | 日期 | 变更内容 | 作者 |
-|------|------|----------|------|
+| 版本  | 日期       | 变更内容 | 作者           |
+| ----- | ---------- | -------- | -------------- |
 | 1.0.0 | 2026-03-21 | 初始版本 | 数据库专家团队 |
 
 ---

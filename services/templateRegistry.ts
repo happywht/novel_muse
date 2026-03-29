@@ -149,9 +149,7 @@ export class TemplateRegistry {
   /**
    * 映射变量来源
    */
-  private mapVariableSource(
-    source: string
-  ): 'user' | 'project' | 'computed' | 'system' {
+  private mapVariableSource(source: string): 'user' | 'project' | 'computed' | 'system' {
     const sourceMap: Record<string, 'user' | 'project' | 'computed' | 'system'> = {
       user_input: 'user',
       project_state: 'project',
@@ -188,8 +186,8 @@ export class TemplateRegistry {
       level === 'user'
         ? this.userTemplates
         : level === 'project'
-        ? this.projectTemplates
-        : this.defaultTemplates;
+          ? this.projectTemplates
+          : this.defaultTemplates;
 
     targetMap.set(template.id, template);
   }
@@ -271,10 +269,7 @@ export class TemplateRegistry {
   /**
    * 验证变量完整性
    */
-  validateVariables(
-    templateId: string,
-    values: Record<string, any>
-  ): ValidationResult {
+  validateVariables(templateId: string, values: Record<string, any>): ValidationResult {
     const template = this.getTemplate(templateId);
 
     if (!template) {
@@ -297,9 +292,7 @@ export class TemplateRegistry {
       if (variable.required) {
         if (value === undefined || value === null || value === '') {
           missing.push(variable.name);
-          errors.push(
-            `Missing required variable: ${variable.name} (${variable.description})`
-          );
+          errors.push(`Missing required variable: ${variable.name} (${variable.description})`);
         }
       } else {
         // 可选变量缺失时给出警告
@@ -332,10 +325,7 @@ export class TemplateRegistry {
   /**
    * 验证变量类型
    */
-  private validateVariableType(
-    variable: PromptVariable,
-    value: any
-  ): string | null {
+  private validateVariableType(variable: PromptVariable, value: any): string | null {
     const actualType = Array.isArray(value) ? 'array' : typeof value;
 
     switch (variable.type) {
@@ -454,10 +444,7 @@ export function getTemplateVariables(templateId: string): PromptVariable[] {
 /**
  * 按重要性获取变量
  */
-export function getVariablesByTier(
-  templateId: string,
-  tier: VariableTier
-): PromptVariable[] {
+export function getVariablesByTier(templateId: string, tier: VariableTier): PromptVariable[] {
   return templateRegistry.getVariablesByTier(templateId, tier);
 }
 
@@ -474,9 +461,7 @@ export function validateTemplateVariables(
 /**
  * 按分类获取模板
  */
-export function getTemplatesByCategory(
-  category: TemplateCategory
-): PromptTemplateDefinition[] {
+export function getTemplatesByCategory(category: TemplateCategory): PromptTemplateDefinition[] {
   return templateRegistry.getTemplatesByCategory(category);
 }
 

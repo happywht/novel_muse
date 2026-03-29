@@ -18,14 +18,14 @@ function VirtualListInner<T>({
   itemHeight,
   height,
   renderItem,
-  className = ''
+  className = '',
 }: VirtualListProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [enableVirtualScroll, setEnableVirtualScroll] = useState(true);
 
   useEffect(() => {
     // 从全局配置读取虚拟滚动开关
-    getGlobalConfig().then(config => {
+    getGlobalConfig().then((config) => {
       setEnableVirtualScroll(config.features.enableVirtualScrolling);
     });
   }, []);
@@ -33,15 +33,11 @@ function VirtualListInner<T>({
   // 根据 enableVirtualScroll 开关决定是否使用虚拟滚动
   // 当前实现：当 enableVirtualScroll 为 false 时，使用简单滚动
   // 未来可以在此处集成真正的虚拟滚动库
-  
+
   // 简单的滚动列表实现（不使用虚拟滚动）
   // 如果需要真正的虚拟滚动，可以考虑降级到 react-window 1.x 或使用 react-virtualized
   return (
-    <div
-      ref={containerRef}
-      className={className}
-      style={{ height, overflow: 'auto' }}
-    >
+    <div ref={containerRef} className={className} style={{ height, overflow: 'auto' }}>
       {items.map((item, index) => (
         <div key={index} style={{ minHeight: itemHeight }}>
           {renderItem(item, index)}

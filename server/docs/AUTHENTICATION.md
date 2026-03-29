@@ -7,6 +7,7 @@
 ## 认证方式
 
 ### 请求头认证
+
 在所有需要认证的 API 请求中，必须包含 `x-api-key` 请求头：
 
 ```http
@@ -16,7 +17,9 @@ x-api-key: your-api-key-here
 ```
 
 ### 公开路由
+
 以下路由不需要认证：
+
 - `GET /api/health` - 健康检查端点
 
 ## 环境变量配置
@@ -37,12 +40,14 @@ API_KEYS=key1,key2,key3
 ## 开发环境配置
 
 ### 方式 1：跳过认证（仅限开发）
+
 ```bash
 NODE_ENV=development
 SKIP_AUTH=true
 ```
 
 ### 方式 2：配置开发用 API Key
+
 ```bash
 NODE_ENV=development
 SKIP_AUTH=false
@@ -73,6 +78,7 @@ openssl rand -hex 32
 ## 客户端使用示例
 
 ### JavaScript/TypeScript
+
 ```typescript
 const API_BASE = 'http://localhost:3001/api';
 const API_KEY = 'your-api-key';
@@ -85,6 +91,7 @@ const response = await fetch(`${API_BASE}/projects`, {
 ```
 
 ### Axios
+
 ```typescript
 import axios from 'axios';
 
@@ -100,6 +107,7 @@ const projects = await api.get('/projects');
 ```
 
 ### cURL
+
 ```bash
 curl -H "x-api-key: your-api-key" http://localhost:3001/api/projects
 ```
@@ -107,6 +115,7 @@ curl -H "x-api-key: your-api-key" http://localhost:3001/api/projects
 ## 错误响应
 
 ### 401 Unauthorized - 缺少 API Key
+
 ```json
 {
   "error": "Unauthorized: Missing API key",
@@ -115,6 +124,7 @@ curl -H "x-api-key: your-api-key" http://localhost:3001/api/projects
 ```
 
 ### 401 Unauthorized - 无效的 API Key
+
 ```json
 {
   "error": "Unauthorized: Invalid API key",
@@ -123,6 +133,7 @@ curl -H "x-api-key: your-api-key" http://localhost:3001/api/projects
 ```
 
 ### 429 Too Many Requests - 速率限制
+
 ```json
 {
   "error": "Too many authentication attempts. Please try again later.",
@@ -143,6 +154,7 @@ curl -H "x-api-key: your-api-key" http://localhost:3001/api/projects
 ## 安全审计日志
 
 系统会自动记录以下安全事件：
+
 - 失败的认证尝试（包含 IP 地址和请求路径）
 - 生产环境未配置 API Keys 的警告
 - 开发环境未配置 API Keys 的警告
@@ -150,15 +162,18 @@ curl -H "x-api-key: your-api-key" http://localhost:3001/api/projects
 ## 故障排查
 
 ### 问题：所有请求返回 401
+
 - 检查 `x-api-key` 请求头是否正确设置
 - 确认 `.env` 文件中的 `API_KEYS` 包含你使用的密钥
 - 重启服务器以加载新的环境变量
 
 ### 问题：开发环境也需要认证
+
 - 设置 `SKIP_AUTH=true` 或配置 `API_KEYS`
 - 确保 `NODE_ENV=development`
 
 ### 问题：生产环境无法启动
+
 - 确保配置了 `API_KEYS` 环境变量
 - 检查日志中的 "SECURITY WARNING" 消息
 

@@ -1,8 +1,13 @@
 import React, { useMemo, useCallback, useEffect } from 'react';
 import { Echo, Character, WorldSetting, Chapter } from '../../types';
 import {
-  X, Download, Share2, CheckCircle2, AlertTriangle,
-  FileText, ChevronRight
+  X,
+  Download,
+  Share2,
+  CheckCircle2,
+  AlertTriangle,
+  FileText,
+  ChevronRight,
 } from 'lucide-react';
 import {
   checkIntegrity,
@@ -12,7 +17,7 @@ import {
   exportReportAsJSON,
   exportReportAsMarkdown,
   IntegrityReport,
-  IntegrityIssue
+  IntegrityIssue,
 } from './echoUtils';
 import { useToast } from '../../hooks/useToast';
 
@@ -81,7 +86,9 @@ const IssueCard: React.FC<{ issue: IntegrityIssue }> = ({ issue }) => {
   const severityConfig = getSeverityConfig(issue.severity);
 
   return (
-    <div className={`p-3 rounded-lg border ${severityConfig.bgClass} ${severityConfig.borderClass}`}>
+    <div
+      className={`p-3 rounded-lg border ${severityConfig.bgClass} ${severityConfig.borderClass}`}
+    >
       <div className="flex items-start gap-2">
         <span className="text-sm shrink-0">{severityConfig.icon}</span>
         <div className="flex-1 min-w-0">
@@ -98,9 +105,7 @@ const IssueCard: React.FC<{ issue: IntegrityIssue }> = ({ issue }) => {
             </p>
           )}
           {issue.chapterInfo && (
-            <p className="text-slate-600 text-xs mt-1">
-              章节: {issue.chapterInfo}
-            </p>
+            <p className="text-slate-600 text-xs mt-1">章节: {issue.chapterInfo}</p>
           )}
         </div>
       </div>
@@ -145,7 +150,7 @@ export const EchoIntegrityReport: React.FC<EchoIntegrityReportProps> = ({
   echoes,
   characters,
   worldSettings,
-  chapters = []
+  chapters = [],
 }) => {
   const { toast } = useToast();
   // 执行完整性检查
@@ -163,10 +168,10 @@ export const EchoIntegrityReport: React.FC<EchoIntegrityReportProps> = ({
     const groups: Record<IntegrityIssue['type'], IntegrityIssue[]> = {
       ORPHAN_NODE: [],
       CONTRADICTION: [],
-      PENDING_ECHO: []
+      PENDING_ECHO: [],
     };
 
-    report.issues.forEach(issue => {
+    report.issues.forEach((issue) => {
       groups[issue.type].push(issue);
     });
 
@@ -237,7 +242,7 @@ export const EchoIntegrityReport: React.FC<EchoIntegrityReportProps> = ({
   }, [report, groupedIssues]);
 
   // 判断是否可以发布
-  const canPublish = report.issues.filter(i => i.severity === 'HIGH').length === 0;
+  const canPublish = report.issues.filter((i) => i.severity === 'HIGH').length === 0;
 
   if (!isOpen) return null;
 
@@ -305,8 +310,7 @@ export const EchoIntegrityReport: React.FC<EchoIntegrityReportProps> = ({
               <span className="text-sm font-bold text-white">
                 {report.issues.length > 0
                   ? `发现 ${report.issues.length} 个潜在问题`
-                  : '所有检查通过'
-                }
+                  : '所有检查通过'}
               </span>
             </div>
 
@@ -383,7 +387,9 @@ export const EchoIntegrityReport: React.FC<EchoIntegrityReportProps> = ({
                     <span className="text-slate-300 text-sm">待处理</span>
                   </div>
                   <div className="text-right">
-                    <span className={`${report.stats.pending === 0 ? 'text-emerald-400' : 'text-amber-400'} font-bold`}>
+                    <span
+                      className={`${report.stats.pending === 0 ? 'text-emerald-400' : 'text-amber-400'} font-bold`}
+                    >
                       {report.stats.pending}
                     </span>
                     {report.stats.pending === 0 && (
@@ -413,9 +419,7 @@ export const EchoIntegrityReport: React.FC<EchoIntegrityReportProps> = ({
                     <span className={`text-lg font-bold ${healthConfig.textClass}`}>
                       {healthConfig.label}
                     </span>
-                    <p className="text-slate-500 text-xs mt-1">
-                      {report.healthScore}/100
-                    </p>
+                    <p className="text-slate-500 text-xs mt-1">{report.healthScore}/100</p>
                   </div>
                 </div>
               </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 
-export const Loader: React.FC<{ text?: string }> = ({ text = "思考中..." }) => {
+export const Loader: React.FC<{ text?: string }> = ({ text = '思考中...' }) => {
   return (
     <div className="flex flex-col items-center justify-center p-8 space-y-4">
       <div className="relative w-12 h-12">

@@ -29,9 +29,18 @@ const META_NARRATION_PATTERNS = [
 
 /** 分析报告式术语（禁止出现在正文中） */
 const REPORT_TERMS = [
-  '核心动机', '信息边界', '信息落差', '核心风险', '利益最大化',
-  '当前处境', '行为约束', '性格过滤', '情绪外化', '锚定效应',
-  '沉没成本', '认知共鸣',
+  '核心动机',
+  '信息边界',
+  '信息落差',
+  '核心风险',
+  '利益最大化',
+  '当前处境',
+  '行为约束',
+  '性格过滤',
+  '情绪外化',
+  '锚定效应',
+  '沉没成本',
+  '认知共鸣',
 ];
 
 /** 作者说教词 */
@@ -56,7 +65,7 @@ export interface PostWriteOptions {
  */
 export function validatePostWrite(
   content: string,
-  options?: PostWriteOptions,
+  options?: PostWriteOptions
 ): ReadonlyArray<PostWriteViolation> {
   const violations: PostWriteViolation[] = [];
   const fatigueWords = options?.fatigueWords ?? [];
@@ -146,7 +155,7 @@ export function validatePostWrite(
     violations.push({
       rule: '报告术语',
       severity: 'error',
-      description: `正文中出现分析报告术语：${foundTerms.map(t => `"${t}"`).join('、')}`,
+      description: `正文中出现分析报告术语：${foundTerms.map((t) => `"${t}"`).join('、')}`,
       suggestion: '这些术语只能用于内部推理，正文中用口语化表达替代',
     });
   }
@@ -162,7 +171,7 @@ export function validatePostWrite(
     violations.push({
       rule: '作者说教',
       severity: 'warning',
-      description: `出现说教词：${foundSermons.map(w => `"${w}"`).join('、')}`,
+      description: `出现说教词：${foundSermons.map((w) => `"${w}"`).join('、')}`,
       suggestion: '删除说教词，让读者自己从情节中判断',
     });
   }
@@ -184,8 +193,8 @@ export function validatePostWrite(
   // 9. 连续"了"字检查（≥6句连续含"了"）
   const sentences = content
     .split(/[。！？]/)
-    .map(s => s.trim())
-    .filter(s => s.length > 2);
+    .map((s) => s.trim())
+    .filter((s) => s.length > 2);
 
   let consecutiveLe = 0;
   let maxConsecutiveLe = 0;
@@ -209,10 +218,10 @@ export function validatePostWrite(
   // 10. 段落长度检查（手机阅读：≥2段超300字）
   const paragraphs = content
     .split(/\n\s*\n/)
-    .map(p => p.trim())
-    .filter(p => p.length > 0);
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
 
-  const longParagraphs = paragraphs.filter(p => p.length > 300);
+  const longParagraphs = paragraphs.filter((p) => p.length > 300);
   if (longParagraphs.length >= 2) {
     violations.push({
       rule: '段落过长',
@@ -241,17 +250,17 @@ export function validatePostWrite(
 export function formatViolations(violations: ReadonlyArray<PostWriteViolation>): string {
   if (violations.length === 0) return '全部通过，无违规';
 
-  const errors = violations.filter(v => v.severity === 'error');
-  const warnings = violations.filter(v => v.severity === 'warning');
+  const errors = violations.filter((v) => v.severity === 'error');
+  const warnings = violations.filter((v) => v.severity === 'warning');
 
   const parts: string[] = [];
   if (errors.length > 0) {
     parts.push(`🔴 ${errors.length} 项错误:`);
-    errors.forEach(e => parts.push(`  [${e.rule}] ${e.description}\n    → ${e.suggestion}`));
+    errors.forEach((e) => parts.push(`  [${e.rule}] ${e.description}\n    → ${e.suggestion}`));
   }
   if (warnings.length > 0) {
     parts.push(`🟡 ${warnings.length} 项警告:`);
-    warnings.forEach(w => parts.push(`  [${w.rule}] ${w.description}\n    → ${w.suggestion}`));
+    warnings.forEach((w) => parts.push(`  [${w.rule}] ${w.description}\n    → ${w.suggestion}`));
   }
 
   return parts.join('\n');

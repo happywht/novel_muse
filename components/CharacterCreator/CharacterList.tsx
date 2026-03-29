@@ -42,7 +42,7 @@ export function CharacterList() {
   };
 
   // 渲染单个角色项
-  const renderCharacterItem = (char: typeof project.characters[0]) => {
+  const renderCharacterItem = (char: (typeof project.characters)[0]) => {
     const hasEcho = hasPendingEcho(char.id);
 
     return (
@@ -181,7 +181,11 @@ export function CharacterList() {
           <VirtualList
             items={filteredCharacters}
             itemHeight={80}
-                       height={typeof window !== 'undefined' ? window.innerHeight - UI_CONFIG.VIRTUAL_LIST_BOTTOM_OFFSET : UI_CONFIG.DEFAULT_LIST_HEIGHT}
+            height={
+              typeof window !== 'undefined'
+                ? window.innerHeight - UI_CONFIG.VIRTUAL_LIST_BOTTOM_OFFSET
+                : UI_CONFIG.DEFAULT_LIST_HEIGHT
+            }
             className="space-y-2"
             renderItem={renderCharacterItem}
           />

@@ -23,7 +23,7 @@ const MyComponent = () => {
   const handleAccept = (echo: Echo) => {
     // 采纳逻辑
     updateProject({ echoes: [...project.echoes, { ...echo, status: 'ACCEPTED' }] });
-    setEchoes(prev => prev.filter(e => e.id !== echo.id));
+    setEchoes((prev) => prev.filter((e) => e.id !== echo.id));
   };
 
   return (
@@ -32,7 +32,7 @@ const MyComponent = () => {
       isExtracting={isExtracting}
       onExtract={handleExtract}
       onAccept={handleAccept}
-      onReject={(echo) => setEchoes(prev => prev.filter(e => e.id !== echo.id))}
+      onReject={(echo) => setEchoes((prev) => prev.filter((e) => e.id !== echo.id))}
     />
   );
 };
@@ -49,18 +49,24 @@ const ReviewPage = () => {
   const handleBatchAccept = (selected: Echo[]) => {
     // 批量采纳
     updateProject({
-      echoes: [...project.echoes, ...selected.map(e => ({ ...e, status: 'ACCEPTED' }))]
+      echoes: [...project.echoes, ...selected.map((e) => ({ ...e, status: 'ACCEPTED' }))],
     });
-    setPendingEchoes(prev => prev.filter(e => !selected.find(s => s.id === e.id)));
+    setPendingEchoes((prev) => prev.filter((e) => !selected.find((s) => s.id === e.id)));
   };
 
   return (
     <EchoReviewPanel
       echoes={pendingEchoes}
-      onAccept={(echo) => {/* 单个采纳 */}}
-      onReject={(echo) => {/* 单个拒绝 */}}
+      onAccept={(echo) => {
+        /* 单个采纳 */
+      }}
+      onReject={(echo) => {
+        /* 单个拒绝 */
+      }}
       onBatchAccept={handleBatchAccept}
-      onBatchReject={(selected) => {/* 批量拒绝 */}}
+      onBatchReject={(selected) => {
+        /* 批量拒绝 */
+      }}
     />
   );
 };
@@ -108,9 +114,7 @@ const DraftingPage = () => {
   return (
     <div>
       {/* 你的内容 */}
-      <div className="editor-content">
-        {/* 编辑器内容 */}
-      </div>
+      <div className="editor-content">{/* 编辑器内容 */}</div>
 
       {/* 添加EchoSummaryCard */}
       {generatedContent && (
@@ -119,7 +123,7 @@ const DraftingPage = () => {
           isExtracting={isExtracting}
           onExtract={handleExtractEchoes}
           onAccept={handleAddEcho}
-          onReject={(echo) => setExtractedEchoes(prev => prev.filter(e => e.id !== echo.id))}
+          onReject={(echo) => setExtractedEchoes((prev) => prev.filter((e) => e.id !== echo.id))}
         />
       )}
     </div>
@@ -138,35 +142,31 @@ const EchoReviewPage = () => {
 
   useEffect(() => {
     // 加载待审核的Echoes
-    const pending = project.echoes.filter(e => e.status === 'PENDING');
+    const pending = project.echoes.filter((e) => e.status === 'PENDING');
     setEchoes(pending);
   }, []);
 
   const handleAccept = (echo: Echo) => {
     updateProject({
-      echoes: project.echoes.map(e =>
-        e.id === echo.id ? { ...e, status: 'ACCEPTED' } : e
-      )
+      echoes: project.echoes.map((e) => (e.id === echo.id ? { ...e, status: 'ACCEPTED' } : e)),
     });
-    setEchoes(prev => prev.filter(e => e.id !== echo.id));
+    setEchoes((prev) => prev.filter((e) => e.id !== echo.id));
   };
 
   return (
     <div className="flex h-screen">
-      <div className="flex-1">
-        {/* 主内容区 */}
-      </div>
+      <div className="flex-1">{/* 主内容区 */}</div>
       <div className="w-1/3">
         <EchoReviewPanel
           echoes={echoes}
           onAccept={handleAccept}
           onReject={(echo) => {
             updateProject({
-              echoes: project.echoes.map(e =>
+              echoes: project.echoes.map((e) =>
                 e.id === echo.id ? { ...e, status: 'REJECTED' } : e
-              )
+              ),
             });
-            setEchoes(prev => prev.filter(e => e.id !== echo.id));
+            setEchoes((prev) => prev.filter((e) => e.id !== echo.id));
           }}
         />
       </div>
@@ -224,8 +224,8 @@ interface Echo {
   branchId?: string;
 
   // MVP: 准确性提升字段（重要！）
-  confidence?: number;           // 0-1: AI置信度
-  extractionEvidence?: string;   // 原文依据
+  confidence?: number; // 0-1: AI置信度
+  extractionEvidence?: string; // 原文依据
 }
 ```
 
@@ -242,7 +242,7 @@ const exampleEcho: Echo = {
   status: 'PENDING',
   timestamp: Date.now(),
   confidence: 0.92,
-  extractionEvidence: '李明感到一阵剧痛，反派的剑已经刺穿了他的左臂，鲜血喷涌而出。'
+  extractionEvidence: '李明感到一阵剧痛，反派的剑已经刺穿了他的左臂，鲜血喷涌而出。',
 };
 ```
 
@@ -270,11 +270,7 @@ const CustomEchoCard = ({ echo }) => {
   const confidence = echo.confidence || 0.7;
   const customBg = confidence >= 0.9 ? 'bg-green-900/30' : 'bg-yellow-900/30';
 
-  return (
-    <div className={`p-4 rounded-lg ${customBg}`}>
-      {echo.description}
-    </div>
-  );
+  return <div className={`p-4 rounded-lg ${customBg}`}>{echo.description}</div>;
 };
 ```
 
@@ -312,12 +308,7 @@ const VirtualizedEchoList = ({ echoes }) => {
   );
 
   return (
-    <FixedSizeList
-      height={600}
-      itemCount={echoes.length}
-      itemSize={100}
-      width="100%"
-    >
+    <FixedSizeList height={600} itemCount={echoes.length} itemSize={100} width="100%">
       {Row}
     </FixedSizeList>
   );
@@ -334,7 +325,7 @@ const DebugEcho = ({ echo }) => {
     id: echo.id,
     name: echo.targetName,
     confidence: echo.confidence,
-    evidence: echo.extractionEvidence
+    evidence: echo.extractionEvidence,
   });
 
   return <EchoSummaryCard echoes={[echo]} />;
@@ -360,50 +351,53 @@ const SafeEchoCard = ({ echo }) => {
 ## 常见问题
 
 ### Q1: Echo没有显示置信度进度条？
+
 **A**: 检查echo.confidence是否存在。如果AI未返回confidence，默认为0.7。
 
 ```tsx
 // 确保Echo包含confidence字段
 const echo = {
   // ...其他字段
-  confidence: 0.85  // 确保这个字段存在
+  confidence: 0.85, // 确保这个字段存在
 };
 ```
 
 ### Q2: 如何修改置信度阈值？
+
 **A**: 使用categorizeEchoes后手动分类：
 
 ```tsx
 const customCategorize = (echoes: Echo[]) => {
-  const HIGH_THRESHOLD = 0.9;  // 自定义阈值
+  const HIGH_THRESHOLD = 0.9; // 自定义阈值
   const MEDIUM_THRESHOLD = 0.6;
 
   return {
-    high: echoes.filter(e => (e.confidence || 0.7) >= HIGH_THRESHOLD),
-    medium: echoes.filter(e => {
+    high: echoes.filter((e) => (e.confidence || 0.7) >= HIGH_THRESHOLD),
+    medium: echoes.filter((e) => {
       const conf = e.confidence || 0.7;
       return conf >= MEDIUM_THRESHOLD && conf < HIGH_THRESHOLD;
     }),
-    low: echoes.filter(e => (e.confidence || 0.7) < MEDIUM_THRESHOLD),
-    total: echoes.length
+    low: echoes.filter((e) => (e.confidence || 0.7) < MEDIUM_THRESHOLD),
+    total: echoes.length,
   };
 };
 ```
 
 ### Q3: 批量操作后如何更新UI？
+
 **A**: 从state中移除已处理的Echo：
 
 ```tsx
 const handleBatchAccept = (selected: Echo[]) => {
-  const selectedIds = new Set(selected.map(e => e.id));
+  const selectedIds = new Set(selected.map((e) => e.id));
 
   // 更新项目
   updateProject({
-    echoes: [...project.echoes, ...selected.map(e => ({ ...e, status: 'ACCEPTED' }))]
+    echoes: [...project.echoes, ...selected.map((e) => ({ ...e, status: 'ACCEPTED' }))],
   });
 
   // 从本地state移除
-  setLocalEchoes(prev => prev.filter(e => !selectedIds.has(e.id)));
+  setLocalEchoes((prev) => prev.filter((e) => !selectedIds.has(e.id)));
 };
 ```
 

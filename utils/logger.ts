@@ -39,12 +39,12 @@ const CACHE_TTL = 5000; // 缓存5秒，避免频繁读取配置
  */
 async function getConfig(): Promise<CachedConfig> {
   const now = Date.now();
-  
+
   // 如果缓存有效，直接返回
-  if (configCache && (now - configCache.timestamp) < CACHE_TTL) {
+  if (configCache && now - configCache.timestamp < CACHE_TTL) {
     return configCache;
   }
-  
+
   // 从存储中读取配置
   const config = await getGlobalConfig();
   configCache = {
@@ -52,7 +52,7 @@ async function getConfig(): Promise<CachedConfig> {
     logLevel: config.features.logLevel,
     timestamp: now,
   };
-  
+
   return configCache;
 }
 
@@ -64,10 +64,10 @@ function shouldLog(methodLevel: keyof typeof LOG_METHOD_PRIORITY, config: Cached
   if (config.logLevel === 'none') {
     return false;
   }
-  
+
   const configuredPriority = LOG_LEVEL_PRIORITY[config.logLevel];
   const methodPriority = LOG_METHOD_PRIORITY[methodLevel];
-  
+
   return methodPriority <= configuredPriority;
 }
 
@@ -76,7 +76,9 @@ function shouldLog(methodLevel: keyof typeof LOG_METHOD_PRIORITY, config: Cached
  */
 function formatMessage(level: string, message: string): string {
   const timestamp = new Date().toISOString();
-  const prefix = configCache?.debugMode ? `[${timestamp}] [${level.toUpperCase()}]` : `[${level.toUpperCase()}]`;
+  const prefix = configCache?.debugMode
+    ? `[${timestamp}] [${level.toUpperCase()}]`
+    : `[${level.toUpperCase()}]`;
   return `${prefix} ${message}`;
 }
 

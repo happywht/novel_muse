@@ -1,25 +1,36 @@
 import {
-    Character, WorldSetting, CreativeSettings, Echo, PlotNode,
-    Chapter, KnowledgeTriple, LogicConflict
-} from "../../types";
-import {
-    executeModelTask, getInstructionWithSettings, getModelName
-} from "./core";
-import { formatContext } from "./helpers";
-import { API_BASE } from "../apiService";
-import { buildPromptContent } from "../../config/prompts";
-import { buildGenreContext } from "../../config/genreRules";
+  Character,
+  WorldSetting,
+  CreativeSettings,
+  Echo,
+  PlotNode,
+  Chapter,
+  KnowledgeTriple,
+  LogicConflict,
+} from '../../types';
+import { executeModelTask, getInstructionWithSettings, getModelName } from './core';
+import { formatContext } from './helpers';
+import { API_BASE } from '../apiService';
+import { buildPromptContent } from '../../config/prompts';
+import { buildGenreContext } from '../../config/genreRules';
 
 /**
  * Deep plot auditing for logic and pacing
  */
-export const analyzePlot = async (premise: string, currentPlot: string, characters: Character[], worldSettings: WorldSetting[], settings?: CreativeSettings, echoes: Echo[] = []): Promise<string> => {
-    const instruction = getInstructionWithSettings('plot_analysis', settings);
-    const contextStr = formatContext(characters, worldSettings, echoes);
+export const analyzePlot = async (
+  premise: string,
+  currentPlot: string,
+  characters: Character[],
+  worldSettings: WorldSetting[],
+  settings?: CreativeSettings,
+  echoes: Echo[] = []
+): Promise<string> => {
+  const instruction = getInstructionWithSettings('plot_analysis', settings);
+  const contextStr = formatContext(characters, worldSettings, echoes);
 
-    // 使用buildPromptContent构建prompt，支持项目级自定义
-    const basePrompt = buildPromptContent('audit_plot', undefined, settings);
-    const prompt = `${basePrompt}
+  // 使用buildPromptContent构建prompt，支持项目级自定义
+  const basePrompt = buildPromptContent('audit_plot', undefined, settings);
+  const prompt = `${basePrompt}
 
 【核心梗概】: ${premise}
 
@@ -30,43 +41,50 @@ ${currentPlot}
 
 请使用 Markdown 格式输出。请确保报告包含一个明确的“可操作建议列表”，以便后续自动修复程序调用。`;
 
-    const templateData = { premise, currentPlot, characters, worldSettings, settings, echoes };
+  const templateData = { premise, currentPlot, characters, worldSettings, settings, echoes };
 
-    try {
-        return await executeModelTask(
-            'analyzePlot',
-            instruction,
-            prompt,
-            'gemini-3-pro-preview',
-            0.1,
-            undefined,
-            2048,
-            { templateId: 'audit_plot', templateData }
-        ) || "无法分析剧情。";
-    } catch (error) {
-        console.error("Gemini Plot Analysis Error:", error);
-        throw error;
-    }
+  try {
+    return (
+      (await executeModelTask(
+        'analyzePlot',
+        instruction,
+        prompt,
+        'gemini-3-pro-preview',
+        0.1,
+        undefined,
+        2048,
+        { templateId: 'audit_plot', templateData }
+      )) || '无法分析剧情。'
+    );
+  } catch (error) {
+    console.error('Gemini Plot Analysis Error:', error);
+    throw error;
+  }
 };
 
 /**
  * Audit chapter plan against node goals
  */
 export const auditChapterPlan = async (
-    genre: string,
-    targetNode: PlotNode,
-    chapters: Chapter[],
-    characters: Character[],
-    worldSettings: WorldSetting[],
-    settings?: CreativeSettings
+  genre: string,
+  targetNode: PlotNode,
+  chapters: Chapter[],
+  characters: Character[],
+  worldSettings: WorldSetting[],
+  settings?: CreativeSettings
 ): Promise<{
-    isAligned: boolean;
-    issues: { type: 'GAP' | 'DRIFT' | 'CONTRADICTION'; description: string; suggestion: string }[]
+  isAligned: boolean;
+  issues: { type: 'GAP' | 'DRIFT' | 'CONTRADICTION'; description: string; suggestion: string }[];
 }> => {
-    const contextStr = formatContext(characters, worldSettings);
-    const chaptersText = chapters.map((c, i) => `[第 ${i + 1} 章: ${c.title}]\n概要: ${c.summary}\n节拍: ${c.beats?.map(b => `- [${b.type}] ${b.description}`).join('\n')}`).join('\n\n');
+  const contextStr = formatContext(characters, worldSettings);
+  const chaptersText = chapters
+    .map(
+      (c, i) =>
+        `[第 ${i + 1} 章: ${c.title}]\n概要: ${c.summary}\n节拍: ${c.beats?.map((b) => `- [${b.type}] ${b.description}`).join('\n')}`
+    )
+    .join('\n\n');
 
-    const prompt = `
+  const prompt = `
     你是一个严谨的剧情质量审计员。
     你的任务是核对【章节规划】是否忠实地落实了所属的【情节节点】要求，并指出是否存在“离题（Drift）”或“过度偏离”的情况。
     
@@ -98,38 +116,36 @@ export const auditChapterPlan = async (
     禁止包含任何开场白或解释文字。
     `;
 
-    const templateData = { genre, targetNode, chapters, characters, worldSettings, settings };
+  const templateData = { genre, targetNode, chapters, characters, worldSettings, settings };
 
-    try {
-        const responseText = await executeModelTask(
-            'auditChapterPlan',
-            '',
-            prompt,
-            await getModelName('pro'),
-            0.1,
-            undefined,
-            2048,
-            { templateId: 'audit_chapter_plan', templateData }
-        );
+  try {
+    const responseText = await executeModelTask(
+      'auditChapterPlan',
+      '',
+      prompt,
+      await getModelName('pro'),
+      0.1,
+      undefined,
+      2048,
+      { templateId: 'audit_chapter_plan', templateData }
+    );
 
-        const parsed = JSON.parse(responseText || '{}');
-        return {
-            isAligned: parsed.isAligned ?? true,
-            issues: parsed.issues ?? []
-        };
-    } catch (e) {
-        console.error("Chapter Audit Error:", e);
-        return { isAligned: true, issues: [] };
-    }
+    const parsed = JSON.parse(responseText || '{}');
+    return {
+      isAligned: parsed.isAligned ?? true,
+      issues: parsed.issues ?? [],
+    };
+  } catch (e) {
+    console.error('Chapter Audit Error:', e);
+    return { isAligned: true, issues: [] };
+  }
 };
 
 /**
  * Extract knowledge triples from content
  */
-export const extractKnowledgeTriples = async (
-    content: string
-): Promise<KnowledgeTriple[]> => {
-    const prompt = `
+export const extractKnowledgeTriples = async (content: string): Promise<KnowledgeTriple[]> => {
+  const prompt = `
 你是一位精通逻辑分析的小说编辑。你的任务是从给定的【正文内容】中提取核心的人物位置、人物关系和重大事实三元组，并评估关系的强度与趋势。
 
 【提取要求】：
@@ -153,53 +169,53 @@ export const extractKnowledgeTriples = async (
 ${content.slice(0, 5000)}
     `;
 
-    const templateData = { content };
+  const templateData = { content };
 
-    try {
-        const responseText = await executeModelTask(
-            'extractKnowledgeTriples',
-            '',
-            prompt,
-            await getModelName('flash'),
-            0.1,
-            undefined,
-            undefined,
-            { templateId: 'extract_knowledge_triples', templateData }
-        );
+  try {
+    const responseText = await executeModelTask(
+      'extractKnowledgeTriples',
+      '',
+      prompt,
+      await getModelName('flash'),
+      0.1,
+      undefined,
+      undefined,
+      { templateId: 'extract_knowledge_triples', templateData }
+    );
 
-        const match = responseText.match(/\[[\s\S]*\]/);
-        if (match) {
-            return JSON.parse(match[0]);
-        }
-        return [];
-    } catch (error) {
-        console.error("Failed to extract triples:", error);
-        return [];
+    const match = responseText.match(/\[[\s\S]*\]/);
+    if (match) {
+      return JSON.parse(match[0]);
     }
+    return [];
+  } catch (error) {
+    console.error('Failed to extract triples:', error);
+    return [];
+  }
 };
 
 /**
  * Verify logic conflicts via backend API
  */
 export const verifyLogicConflicts = async (
-    projectId: string,
-    triples: KnowledgeTriple[]
+  projectId: string,
+  triples: KnowledgeTriple[]
 ): Promise<LogicConflict[]> => {
-    if (triples.length === 0) return [];
+  if (triples.length === 0) return [];
 
-    try {
-        const response = await fetch(`${API_BASE}/graph/verify-logic`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ projectId, triples })
-        });
+  try {
+    const response = await fetch(`${API_BASE}/graph/verify-logic`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, triples }),
+    });
 
-        if (!response.ok) return [];
-        return await response.json();
-    } catch (error) {
-        console.error("Failed to verify logic conflicts:", error);
-        return [];
-    }
+    if (!response.ok) return [];
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to verify logic conflicts:', error);
+    return [];
+  }
 };
 
 /**
@@ -207,31 +223,42 @@ export const verifyLogicConflicts = async (
  * Returns structured JSON with severity levels across 10 core dimensions.
  */
 export const auditChapterContent = async (
-    genre: string,
-    chapterContent: string,
-    chapterTitle: string,
-    chapterNumber: number,
-    characters: Character[],
-    worldSettings: WorldSetting[],
-    previousChapters: Chapter[],
-    settings?: CreativeSettings
+  genre: string,
+  chapterContent: string,
+  chapterTitle: string,
+  chapterNumber: number,
+  characters: Character[],
+  worldSettings: WorldSetting[],
+  previousChapters: Chapter[],
+  settings?: CreativeSettings
 ): Promise<{
-    passed: boolean;
-    issues: Array<{ severity: 'critical' | 'warning' | 'info'; category: string; description: string; suggestion: string }>;
-    summary: string;
+  passed: boolean;
+  issues: Array<{
+    severity: 'critical' | 'warning' | 'info';
+    category: string;
+    description: string;
+    suggestion: string;
+  }>;
+  summary: string;
 }> => {
-    const contextStr = formatContext(characters, worldSettings);
-    const genreContext = buildGenreContext(genre);
+  const contextStr = formatContext(characters, worldSettings);
+  const genreContext = buildGenreContext(genre);
 
-    const recentChapters = previousChapters
-        .filter(c => c.order < chapterNumber)
-        .sort((a, b) => b.order - a.order)
-        .slice(0, 3);
-    const prevContext = recentChapters.length > 0
-        ? recentChapters.map(c => `[第${c.order}章: ${c.title}]\n${c.summary || c.content?.slice(0, 500) || '(无摘要)'}`).join('\n\n')
-        : '(无前文)';
+  const recentChapters = previousChapters
+    .filter((c) => c.order < chapterNumber)
+    .sort((a, b) => b.order - a.order)
+    .slice(0, 3);
+  const prevContext =
+    recentChapters.length > 0
+      ? recentChapters
+          .map(
+            (c) =>
+              `[第${c.order}章: ${c.title}]\n${c.summary || c.content?.slice(0, 500) || '(无摘要)'}`
+          )
+          .join('\n\n')
+      : '(无前文)';
 
-    const prompt = `你是一位严格的${genre || ''}小说审稿编辑。请审查以下章节内容。
+  const prompt = `你是一位严格的${genre || ''}小说审稿编辑。请审查以下章节内容。
 
 审查维度（共10个核心维度）：
 1. OOC检查 - 角色行为是否符合设定性格和动机
@@ -265,36 +292,36 @@ ${chapterContent}
 
 只有当存在 critical 级别问题时，passed 才为 false。禁止包含任何其他文字。`;
 
-    const templateData = {
-        genre,
-        chapterContent,
-        chapterTitle,
-        chapterNumber,
-        characters,
-        worldSettings,
-        previousChapters,
-        settings
-    };
+  const templateData = {
+    genre,
+    chapterContent,
+    chapterTitle,
+    chapterNumber,
+    characters,
+    worldSettings,
+    previousChapters,
+    settings,
+  };
 
-    try {
-        const responseText = await executeModelTask(
-            'auditChapterContent',
-            '',
-            prompt,
-            await getModelName('pro'),
-            0.2,
-            undefined,
-            4096,
-            { templateId: 'audit_chapter_content', templateData }
-        );
+  try {
+    const responseText = await executeModelTask(
+      'auditChapterContent',
+      '',
+      prompt,
+      await getModelName('pro'),
+      0.2,
+      undefined,
+      4096,
+      { templateId: 'audit_chapter_content', templateData }
+    );
 
-        const match = responseText.match(/\{[\s\S]*\}/);
-        if (match) {
-            return JSON.parse(match[0]);
-        }
-        return { passed: true, issues: [], summary: '审稿输出解析失败' };
-    } catch (e) {
-        console.error("Chapter Content Audit Error:", e);
-        return { passed: true, issues: [], summary: '审稿失败' };
+    const match = responseText.match(/\{[\s\S]*\}/);
+    if (match) {
+      return JSON.parse(match[0]);
     }
+    return { passed: true, issues: [], summary: '审稿输出解析失败' };
+  } catch (e) {
+    console.error('Chapter Content Audit Error:', e);
+    return { passed: true, issues: [], summary: '审稿失败' };
+  }
 };

@@ -46,7 +46,9 @@ export const CharacterStatistics: React.FC<CharacterStatisticsProps> = ({
   );
 
   // UI 状态
-  const [selectedTab, setSelectedTab] = useState<'overview' | 'ranking' | 'trends' | 'chapters'>('overview');
+  const [selectedTab, setSelectedTab] = useState<'overview' | 'ranking' | 'trends' | 'chapters'>(
+    'overview'
+  );
   const [expandedCharacter, setExpandedCharacter] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'appearances' | 'percentage' | 'trend'>('appearances');
 
@@ -145,9 +147,7 @@ export const CharacterStatistics: React.FC<CharacterStatisticsProps> = ({
       {/* Content */}
       <div className="min-h-[400px]">
         {/* Overview Tab */}
-        {selectedTab === 'overview' && (
-          <OverviewTab report={report} TrendIcon={TrendIcon} />
-        )}
+        {selectedTab === 'overview' && <OverviewTab report={report} TrendIcon={TrendIcon} />}
 
         {/* Ranking Tab */}
         {selectedTab === 'ranking' && (
@@ -160,9 +160,7 @@ export const CharacterStatistics: React.FC<CharacterStatisticsProps> = ({
         )}
 
         {/* Trends Tab */}
-        {selectedTab === 'trends' && (
-          <TrendsTab report={report} TrendIcon={TrendIcon} />
-        )}
+        {selectedTab === 'trends' && <TrendsTab report={report} TrendIcon={TrendIcon} />}
 
         {/* Chapters Tab */}
         {selectedTab === 'chapters' && (
@@ -200,27 +198,19 @@ const OverviewTab: React.FC<TabProps> = ({ report, TrendIcon }) => {
       {/* 核心指标 */}
       <div className="grid grid-cols-4 gap-4">
         <div className="bg-slate-800/50 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-white">
-            {summary.averageAppearanceRate}%
-          </div>
+          <div className="text-2xl font-bold text-white">{summary.averageAppearanceRate}%</div>
           <div className="text-xs text-slate-400 uppercase tracking-wider">平均出场率</div>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-emerald-400">
-            {balancedCharacters.length}
-          </div>
+          <div className="text-2xl font-bold text-emerald-400">{balancedCharacters.length}</div>
           <div className="text-xs text-slate-400 uppercase tracking-wider">均衡角色</div>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-orange-400">
-            {summary.risingStars.length}
-          </div>
+          <div className="text-2xl font-bold text-orange-400">{summary.risingStars.length}</div>
           <div className="text-xs text-slate-400 uppercase tracking-wider">上升趋势</div>
         </div>
         <div className="bg-slate-800/50 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-blue-400">
-            {summary.fadingStars.length}
-          </div>
+          <div className="text-2xl font-bold text-blue-400">{summary.fadingStars.length}</div>
           <div className="text-xs text-slate-400 uppercase tracking-wider">下降趋势</div>
         </div>
       </div>
@@ -239,7 +229,8 @@ const OverviewTab: React.FC<TabProps> = ({ report, TrendIcon }) => {
                   {summary.mostActive.characterName}
                 </div>
                 <div className="text-sm text-slate-400">
-                  出场 {summary.mostActive.totalAppearances} 次 · {summary.mostActive.percentage}% 章节覆盖
+                  出场 {summary.mostActive.totalAppearances} 次 · {summary.mostActive.percentage}%
+                  章节覆盖
                 </div>
               </div>
               <TrendIcon trend={summary.mostActive.trend} />
@@ -261,7 +252,8 @@ const OverviewTab: React.FC<TabProps> = ({ report, TrendIcon }) => {
                   {summary.leastActive.characterName}
                 </div>
                 <div className="text-sm text-slate-400">
-                  出场 {summary.leastActive.totalAppearances} 次 · {summary.leastActive.percentage}% 章节覆盖
+                  出场 {summary.leastActive.totalAppearances} 次 · {summary.leastActive.percentage}%
+                  章节覆盖
                 </div>
               </div>
               <TrendIcon trend={summary.leastActive.trend} />
@@ -326,12 +318,7 @@ interface RankingTabProps {
   TrendIcon: React.FC<{ trend: CharacterStats['trend'] }>;
 }
 
-const RankingTab: React.FC<RankingTabProps> = ({
-  characters,
-  sortBy,
-  setSortBy,
-  TrendIcon,
-}) => {
+const RankingTab: React.FC<RankingTabProps> = ({ characters, sortBy, setSortBy, TrendIcon }) => {
   return (
     <div className="space-y-4">
       {/* 排序控制 */}
@@ -371,10 +358,10 @@ const RankingTab: React.FC<RankingTabProps> = ({
                   index === 0
                     ? 'bg-yellow-500/20 text-yellow-400'
                     : index === 1
-                    ? 'bg-slate-400/20 text-slate-300'
-                    : index === 2
-                    ? 'bg-orange-500/20 text-orange-400'
-                    : 'bg-slate-700 text-slate-400'
+                      ? 'bg-slate-400/20 text-slate-300'
+                      : index === 2
+                        ? 'bg-orange-500/20 text-orange-400'
+                        : 'bg-slate-700 text-slate-400'
                 }`}
               >
                 {index + 1}
@@ -403,10 +390,10 @@ const RankingTab: React.FC<RankingTabProps> = ({
                       rating.level === 'excellent'
                         ? 'bg-emerald-400'
                         : rating.level === 'good'
-                        ? 'bg-green-400'
-                        : rating.level === 'fair'
-                        ? 'bg-yellow-400'
-                        : 'bg-red-400'
+                          ? 'bg-green-400'
+                          : rating.level === 'fair'
+                            ? 'bg-yellow-400'
+                            : 'bg-red-400'
                     }`}
                     style={{ width: `${char.percentage}%` }}
                   />
@@ -414,9 +401,7 @@ const RankingTab: React.FC<RankingTabProps> = ({
               </div>
 
               {/* 评级标签 */}
-              <div
-                className={`px-2 py-1 rounded text-xs font-medium ${rating.color} bg-slate-800`}
-              >
+              <div className={`px-2 py-1 rounded text-xs font-medium ${rating.color} bg-slate-800`}>
                 {rating.label}
               </div>
             </div>
@@ -451,9 +436,7 @@ const TrendsTab: React.FC<TabProps> = ({ report, TrendIcon }) => {
               >
                 <div>
                   <div className="font-medium text-white">{char.characterName}</div>
-                  <div className="text-sm text-slate-400">
-                    出场 {char.totalAppearances} 次
-                  </div>
+                  <div className="text-sm text-slate-400">出场 {char.totalAppearances} 次</div>
                 </div>
                 <div className="text-right">
                   <div className="text-emerald-400 font-bold">{char.percentage}%</div>
@@ -482,9 +465,7 @@ const TrendsTab: React.FC<TabProps> = ({ report, TrendIcon }) => {
               >
                 <div>
                   <div className="font-medium text-white">{char.characterName}</div>
-                  <div className="text-sm text-slate-400">
-                    出场 {char.totalAppearances} 次
-                  </div>
+                  <div className="text-sm text-slate-400">出场 {char.totalAppearances} 次</div>
                 </div>
                 <div className="text-right">
                   <div className="text-red-400 font-bold">{char.percentage}%</div>
@@ -503,8 +484,7 @@ const TrendsTab: React.FC<TabProps> = ({ report, TrendIcon }) => {
         <h4 className="font-semibold text-white mb-2">趋势判断说明</h4>
         <p className="text-sm text-slate-400">
           系统通过比较角色在前后半部分章节的出场密度来判断趋势。
-          如果后半部分密度比前半部分高出15%以上，则判定为上升趋势；
-          反之则判定为下降趋势。
+          如果后半部分密度比前半部分高出15%以上，则判定为上升趋势； 反之则判定为下降趋势。
         </p>
       </div>
     </div>
@@ -532,18 +512,13 @@ const ChaptersTab: React.FC<ChaptersTabProps> = ({
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-slate-400">
-        点击角色查看在各章节的详细出场情况
-      </p>
+      <p className="text-sm text-slate-400">点击角色查看在各章节的详细出场情况</p>
 
       {characters.map((char) => {
         const isExpanded = expandedCharacter === char.characterId;
 
         return (
-          <div
-            key={char.characterId}
-            className="bg-slate-800/30 rounded-lg overflow-hidden"
-          >
+          <div key={char.characterId} className="bg-slate-800/30 rounded-lg overflow-hidden">
             {/* 角色头部 */}
             <button
               onClick={() => setExpandedCharacter(isExpanded ? null : char.characterId)}
@@ -584,9 +559,7 @@ const ChaptersTab: React.FC<ChaptersTabProps> = ({
                         className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="text-xs text-slate-500 w-6">
-                            #{chapter.chapterOrder}
-                          </div>
+                          <div className="text-xs text-slate-500 w-6">#{chapter.chapterOrder}</div>
                           <div>
                             <div className="font-medium text-white text-sm">
                               {chapter.chapterTitle}
@@ -602,18 +575,14 @@ const ChaptersTab: React.FC<ChaptersTabProps> = ({
                             <div className="text-xs text-slate-400">出场</div>
                           </div>
                           <div className="text-center">
-                            <div className="font-bold text-muse-400">
-                              {chapter.density}
-                            </div>
+                            <div className="font-bold text-muse-400">{chapter.density}</div>
                             <div className="text-xs text-slate-400">密度</div>
                           </div>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <p className="text-slate-500 text-sm text-center py-4">
-                      该角色暂无出场记录
-                    </p>
+                    <p className="text-slate-500 text-sm text-center py-4">该角色暂无出场记录</p>
                   )}
                 </div>
 

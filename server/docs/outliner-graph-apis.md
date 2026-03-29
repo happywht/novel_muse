@@ -13,6 +13,7 @@
 获取章节的依赖关系，包括关联的情节节点、涉及的角色、场景地点、节拍列表以及前后章节。
 
 **函数签名：**
+
 ```typescript
 export const getChapterDependencies = async (
     projectId: string,
@@ -29,10 +30,12 @@ export const getChapterDependencies = async (
 ```
 
 **参数：**
+
 - `projectId`: 项目ID
 - `chapterId`: 章节ID
 
 **返回值：**
+
 - `chapter`: 章节基本信息（id, title, order, summary, pov等）
 - `plotNode`: 关联的情节节点（通过 IMPLEMENTS 关系）
 - `involvedCharacters`: 涉及的角色列表（通过 INVOLVES 关系）
@@ -42,6 +45,7 @@ export const getChapterDependencies = async (
 - `successor`: 后继章节（通过 PRECEDES 关系）
 
 **Cypher 查询示例：**
+
 ```cypher
 // 获取章节基本信息
 MATCH (ch:Chapter {id: $chapterId, projectId: $projectId}) RETURN ch
@@ -63,6 +67,7 @@ MATCH (ch:Chapter {id: $chapterId})-[:PRECEDES]->(next:Chapter {projectId: $proj
 ```
 
 **使用场景：**
+
 - 章节详情面板显示
 - 章节依赖关系可视化
 - 章节编辑时的上下文参考
@@ -74,6 +79,7 @@ MATCH (ch:Chapter {id: $chapterId})-[:PRECEDES]->(next:Chapter {projectId: $proj
 获取章节涉及的角色网络，包括角色列表和角色之间的关系。
 
 **函数签名：**
+
 ```typescript
 export const getChapterCharacterNetwork = async (
     projectId: string,
@@ -90,10 +96,12 @@ export const getChapterCharacterNetwork = async (
 ```
 
 **参数：**
+
 - `projectId`: 项目ID
 - `chapterId`: 章节ID
 
 **返回值：**
+
 - `characters`: 章节涉及的角色列表
 - `relationships`: 角色之间的关系数组
   - `subject`: 关系主体（角色名称）
@@ -102,10 +110,12 @@ export const getChapterCharacterNetwork = async (
   - `weight`: 关系强度（0-100）
 
 **数据来源：**
+
 1. 角色之间的关系边（Character 节点之间的关系）
 2. KnowledgeTriple 中的关系数据（可能包含更多细节）
 
 **Cypher 查询示例：**
+
 ```cypher
 // 获取章节涉及的角色
 MATCH (ch:Chapter {id: $chapterId, projectId: $projectId})-[:INVOLVES]->(c:Character)
@@ -124,6 +134,7 @@ RETURN t.subject as subject, t.relation as relation, t.object as object, t.weigh
 ```
 
 **使用场景：**
+
 - 章节角色关系网络可视化
 - 角色交互分析
 - 冲突预测和建议
@@ -135,6 +146,7 @@ RETURN t.subject as subject, t.relation as relation, t.object as object, t.weigh
 获取伏笔链追踪，显示伏笔在不同章节中的出现和解决情况。
 
 **函数签名：**
+
 ```typescript
 export const getForeshadowingChain = async (
     projectId: string,
@@ -149,10 +161,12 @@ export const getForeshadowingChain = async (
 ```
 
 **参数：**
+
 - `projectId`: 项目ID
 - `foreshadowingId`: 伏笔ID（KnowledgeTriple 的 ID）
 
 **返回值：**
+
 - `source`: 伏笔源信息（KnowledgeTriple 节点）
   - `subject`: 伏笔主体
   - `relation`: 伏笔关系
@@ -167,11 +181,13 @@ export const getForeshadowingChain = async (
     - `RESOLVED`: 伏笔回收
 
 **状态映射逻辑：**
+
 - KnowledgeTriple.status = 'OPEN' → 'PLANTED'
 - KnowledgeTriple.status = 'RESOLVED' → 'RESOLVED'
 - 其他情况 → 'HINTED'
 
 **Cypher 查询示例：**
+
 ```cypher
 // 获取伏笔源信息
 MATCH (t:KnowledgeTriple {id: $foreshadowingId, projectId: $projectId, isForeshadowing: true})
@@ -195,6 +211,7 @@ ORDER BY chapter.order
 ```
 
 **使用场景：**
+
 - 伏笔追踪面板
 - 伏笔完整性检查
 - 伏笔回收提醒
@@ -206,6 +223,7 @@ ORDER BY chapter.order
 获取冲突热力图数据，显示所有章节的冲突强度和类型。
 
 **函数签名：**
+
 ```typescript
 export const getConflictHeatmapData = async (
     projectId: string
@@ -219,10 +237,12 @@ export const getConflictHeatmapData = async (
 ```
 
 **参数：**
+
 - `projectId`: 项目ID
 
 **返回值：**
 返回一个数组，每个元素包含：
+
 - `chapterId`: 章节ID
 - `chapterTitle`: 章节标题
 - `intensity`: 冲突强度（0-10）
@@ -230,6 +250,7 @@ export const getConflictHeatmapData = async (
 - `participants`: 参与角色名称列表
 
 **冲突数据来源：**
+
 1. PlotNode 的 `conflictScenario` 属性（主要来源）
    - `type`: 冲突类型
    - `intensity`: 冲突强度（1-10）
@@ -239,6 +260,7 @@ export const getConflictHeatmapData = async (
    - 如果有2个及以上角色但没有冲突场景，推断为基础冲突（intensity=3）
 
 **Cypher 查询示例：**
+
 ```cypher
 MATCH (ch:Chapter {projectId: $projectId})
 OPTIONAL MATCH (ch)-[:IMPLEMENTS]->(pn:PlotNode)
@@ -253,19 +275,20 @@ ORDER BY chapterOrder
 ```
 
 **冲突场景数据解析：**
+
 ```typescript
 // conflictScenario 可能是字符串或对象
-const scenario = typeof conflictScenario === 'string'
-    ? JSON.parse(conflictScenario)
-    : conflictScenario;
+const scenario =
+  typeof conflictScenario === 'string' ? JSON.parse(conflictScenario) : conflictScenario;
 
 if (scenario) {
-    intensity = scenario.intensity || 0;
-    conflictType = scenario.type || 'NONE';
+  intensity = scenario.intensity || 0;
+  conflictType = scenario.type || 'NONE';
 }
 ```
 
 **使用场景：**
+
 - 冲突热力图可视化
 - 节奏分析
 - 冲突分布概览
@@ -342,16 +365,16 @@ Character
 ```typescript
 // 测试 getChapterDependencies
 describe('getChapterDependencies', () => {
-    it('should return chapter dependencies', async () => {
-        const result = await getChapterDependencies('project-1', 'chapter-1');
-        expect(result.chapter).toBeDefined();
-        expect(result.involvedCharacters).toBeInstanceOf(Array);
-    });
+  it('should return chapter dependencies', async () => {
+    const result = await getChapterDependencies('project-1', 'chapter-1');
+    expect(result.chapter).toBeDefined();
+    expect(result.involvedCharacters).toBeInstanceOf(Array);
+  });
 
-    it('should return null for non-existent chapter', async () => {
-        const result = await getChapterDependencies('project-1', 'non-existent');
-        expect(result.chapter).toBeNull();
-    });
+  it('should return null for non-existent chapter', async () => {
+    const result = await getChapterDependencies('project-1', 'non-existent');
+    expect(result.chapter).toBeNull();
+  });
 });
 ```
 
@@ -405,6 +428,7 @@ describe('getChapterDependencies', () => {
 ## 更新日志
 
 ### v1.0.0 (2025-03-21)
+
 - 实现四个 Outliner 图谱查询 API
 - 支持章节依赖关系查询
 - 支持角色网络分析

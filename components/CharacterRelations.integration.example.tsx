@@ -37,10 +37,7 @@ export const CharacterDetailPanel: React.FC<CharacterDetailPanelProps> = ({
             <h2 className="text-2xl font-bold">{character.name}</h2>
             <span className="text-sm text-slate-400">({character.role})</span>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -71,9 +68,7 @@ export const CharacterDetailPanel: React.FC<CharacterDetailPanelProps> = ({
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-60">
           <div className="bg-slate-800 rounded-xl p-6 max-w-md">
             <h3 className="text-lg font-semibold mb-4">编辑角色关系</h3>
-            <p className="text-slate-400 text-sm mb-4">
-              这里可以集成关系编辑表单...
-            </p>
+            <p className="text-slate-400 text-sm mb-4">这里可以集成关系编辑表单...</p>
             <button
               onClick={() => setIsEditingRelations(false)}
               className="w-full px-4 py-2 bg-muse-600 hover:bg-muse-700 rounded-lg"

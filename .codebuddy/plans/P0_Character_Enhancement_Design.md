@@ -12,6 +12,7 @@
 ### 1.1 目标
 
 Character 模块是整个系统的核心实体，当前存在以下痛点：
+
 - `relationships` 字段为 string 类型，无法直接用于图谱查询
 - 新字段（`alignment`, `tags`, `desire`, `fear`, `signature`, `contrast`, `weakness`）已定义但未使用
 - 角色-世界设定关联字段（`originLocation`, `residence`）未充分利用
@@ -26,16 +27,16 @@ Character 模块是整个系统的核心实体，当前存在以下痛点：
 
 ### 1.3 影响范围
 
-| 文件 | 影响等级 | 改动类型 |
-|------|---------|---------|
-| `server/src/services/graph/sync.ts` | 🔴 高 | 新增同步函数 |
-| `server/src/services/graph/queries.ts` | 🔴 高 | 新增查询 API |
-| `types.ts` | 🟡 中 | 扩展字段定义 |
-| `services/schemas.ts` | 🟡 中 | 解析逻辑调整 |
-| `components/CharacterCreator.tsx` | 🟡 中 | UI 展示增强 |
-| `components/CharacterRelations.tsx` | 🟢 低 | 已支持新格式 |
-| `utils/characterRelations.ts` | 🟢 低 | 已实现转换逻辑 |
-| `store/useProjectStore.ts` | 🟡 中 | 新增图谱查询方法 |
+| 文件                                   | 影响等级 | 改动类型         |
+| -------------------------------------- | -------- | ---------------- |
+| `server/src/services/graph/sync.ts`    | 🔴 高    | 新增同步函数     |
+| `server/src/services/graph/queries.ts` | 🔴 高    | 新增查询 API     |
+| `types.ts`                             | 🟡 中    | 扩展字段定义     |
+| `services/schemas.ts`                  | 🟡 中    | 解析逻辑调整     |
+| `components/CharacterCreator.tsx`      | 🟡 中    | UI 展示增强      |
+| `components/CharacterRelations.tsx`    | 🟢 低    | 已支持新格式     |
+| `utils/characterRelations.ts`          | 🟢 低    | 已实现转换逻辑   |
+| `store/useProjectStore.ts`             | 🟡 中    | 新增图谱查询方法 |
 
 ---
 
@@ -45,26 +46,26 @@ Character 模块是整个系统的核心实体，当前存在以下痛点：
 
 **当前字段分类**:
 
-| 字段 | 类型 | 图谱化需求 | 优先级 |
-|------|------|----------|-------|
-| `id` | string | 图谱节点主键 | P0 |
-| `name` | string | 节点标签 | P0 |
-| `role` | string | 节点属性 | P0 |
-| `archetype` | string | 节点属性 | P0 |
-| `description` | string | 节点属性 | P0 |
-| `alignment` | string | **新增图谱属性** | P1 |
-| `tags` | string[] | **新增图谱标签** | P1 |
-| `desire` | string | **新增图谱属性** | P1 |
-| `fear` | string | **新增图谱属性** | P1 |
-| `signature` | string | **新增图谱属性** | P1 |
-| `contrast` | string | **新增图谱属性** | P2 |
-| `weakness` | string | **新增图谱属性** | P2 |
-| `relationships` | string | **保留（兼容）** | P0 |
-| `structuredRelations` | CharacterRelation[] | **图谱关系边** | P0 |
-| `originLocation` | string | **图谱关系边** | P1 |
-| `residence` | string | **图谱关系边** | P1 |
-| `controlledTerritories` | string[] | **图谱关系边** | P2 |
-| `exiledFrom` | string[] | **图谱关系边** | P2 |
+| 字段                    | 类型                | 图谱化需求       | 优先级 |
+| ----------------------- | ------------------- | ---------------- | ------ |
+| `id`                    | string              | 图谱节点主键     | P0     |
+| `name`                  | string              | 节点标签         | P0     |
+| `role`                  | string              | 节点属性         | P0     |
+| `archetype`             | string              | 节点属性         | P0     |
+| `description`           | string              | 节点属性         | P0     |
+| `alignment`             | string              | **新增图谱属性** | P1     |
+| `tags`                  | string[]            | **新增图谱标签** | P1     |
+| `desire`                | string              | **新增图谱属性** | P1     |
+| `fear`                  | string              | **新增图谱属性** | P1     |
+| `signature`             | string              | **新增图谱属性** | P1     |
+| `contrast`              | string              | **新增图谱属性** | P2     |
+| `weakness`              | string              | **新增图谱属性** | P2     |
+| `relationships`         | string              | **保留（兼容）** | P0     |
+| `structuredRelations`   | CharacterRelation[] | **图谱关系边**   | P0     |
+| `originLocation`        | string              | **图谱关系边**   | P1     |
+| `residence`             | string              | **图谱关系边**   | P1     |
+| `controlledTerritories` | string[]            | **图谱关系边**   | P2     |
+| `exiledFrom`            | string[]            | **图谱关系边**   | P2     |
 
 ### 2.2 节点属性扩展方案
 
@@ -117,20 +118,20 @@ Character 模块是整个系统的核心实体，当前存在以下痛点：
 
 **角色-世界设定关系**:
 
-| 关系类型 | 源 → 目标 | 含义 | 属性 |
-|----------|----------|------|------|
-| `ORIGINATED_FROM` | Character → WorldSetting | 起源/出生地 | `{since: date}` |
-| `RESIDES_IN` | Character → WorldSetting | 当前居住地 | `{since: date, branchId: string}` |
-| `CONTROLS_TERRITORY` | Character → WorldSetting | 控制的领地 | `{since: date, authority: string}` |
-| `EXILED_FROM` | Character → WorldSetting | 被流放地 | `{since: date, reason: string}` |
+| 关系类型             | 源 → 目标                | 含义        | 属性                               |
+| -------------------- | ------------------------ | ----------- | ---------------------------------- |
+| `ORIGINATED_FROM`    | Character → WorldSetting | 起源/出生地 | `{since: date}`                    |
+| `RESIDES_IN`         | Character → WorldSetting | 当前居住地  | `{since: date, branchId: string}`  |
+| `CONTROLS_TERRITORY` | Character → WorldSetting | 控制的领地  | `{since: date, authority: string}` |
+| `EXILED_FROM`        | Character → WorldSetting | 被流放地    | `{since: date, reason: string}`    |
 
 **角色深度属性关系（可选，用于复杂场景）**:
 
-| 关系类型 | 源 → 目标 | 含义 | 用途 |
-|----------|----------|------|------|
+| 关系类型     | 源 → 目标          | 含义     | 用途       |
+| ------------ | ------------------ | -------- | ---------- |
 | `HAS_DESIRE` | Character → Desire | 拥有欲望 | 多欲望支持 |
-| `HAS_FEAR` | Character → Fear | 拥有恐惧 | 多恐惧支持 |
-| `HAS_TRAIT` | Character → Trait | 拥有特质 | 标签扩展 |
+| `HAS_FEAR`   | Character → Fear   | 拥有恐惧 | 多恐惧支持 |
+| `HAS_TRAIT`  | Character → Trait  | 拥有特质 | 标签扩展   |
 
 > **设计决策**: 初期采用属性存储，仅在需要复杂关系时扩展为节点
 
@@ -143,13 +144,13 @@ Character 模块是整个系统的核心实体，当前存在以下痛点：
  * 角色深度属性（用于图谱查询）
  */
 export interface CharacterDepthAttributes {
-  alignment?: string;      // 道德阵营
-  tags?: string[];         // 角色标签
-  desire?: string;         // 核心欲望
-  fear?: string;           // 核心恐惧
-  signature?: string;      // 标志性特征
-  contrast?: string;       // 反差萌点
-  weakness?: string;       // 弱点/缺陷
+  alignment?: string; // 道德阵营
+  tags?: string[]; // 角色标签
+  desire?: string; // 核心欲望
+  fear?: string; // 核心恐惧
+  signature?: string; // 标志性特征
+  contrast?: string; // 反差萌点
+  weakness?: string; // 弱点/缺陷
 }
 
 /**
@@ -474,14 +475,14 @@ if (projectData.characters?.length > 0) {
 
 ### 3.3 同步触发时机
 
-| 触发点 | 同步类型 | 调用函数 |
-|--------|---------|---------|
-| 项目加载 | 全量同步 | `syncProjectToGraph` |
-| 角色创建 | 增量同步 | `syncSingleCharacter` |
-| 角色更新 | 增量同步 | `syncSingleCharacter` |
-| 角色删除 | 增量删除 | `deleteCharacterFromGraph` |
-| 批量生成 | 全量同步 | `syncProjectToGraph` |
-| Echo 接受 | 增量同步 | `syncSingleCharacter` |
+| 触发点    | 同步类型 | 调用函数                   |
+| --------- | -------- | -------------------------- |
+| 项目加载  | 全量同步 | `syncProjectToGraph`       |
+| 角色创建  | 增量同步 | `syncSingleCharacter`      |
+| 角色更新  | 增量同步 | `syncSingleCharacter`      |
+| 角色删除  | 增量删除 | `deleteCharacterFromGraph` |
+| 批量生成  | 全量同步 | `syncProjectToGraph`       |
+| Echo 接受 | 增量同步 | `syncSingleCharacter`      |
 
 ### 3.4 增量同步 vs 全量同步
 
@@ -588,7 +589,7 @@ export const getCharacterWithDepth = async (
       { charId: characterId, projectId }
     );
 
-    const relationships = relsResult.records.map(r => ({
+    const relationships = relsResult.records.map((r) => ({
       targetId: r.get('targetId'),
       targetName: r.get('targetName'),
       relationType: r.get('relationType'),
@@ -605,7 +606,7 @@ export const getCharacterWithDepth = async (
       { charId: characterId, projectId }
     );
 
-    const worldRelations = worldRelsResult.records.map(r => ({
+    const worldRelations = worldRelsResult.records.map((r) => ({
       settingId: r.get('settingId'),
       settingName: r.get('settingName'),
       relationType: r.get('relationType'),
@@ -621,7 +622,7 @@ export const getCharacterWithDepth = async (
       { charId: characterId, projectId }
     );
 
-    const conflicts = conflictsResult.records.map(r => ({
+    const conflicts = conflictsResult.records.map((r) => ({
       plotNodeId: r.get('plotNodeId'),
       plotNodeTitle: r.get('plotNodeTitle'),
       conflictType: r.get('conflictType'),
@@ -665,7 +666,7 @@ export const searchCharactersByTags = async (
          RETURN c`;
 
     const result = await session.run(query, { projectId, tags });
-    return result.records.map(r => r.get('c').properties);
+    return result.records.map((r) => r.get('c').properties);
   } finally {
     await session.close();
   }
@@ -697,7 +698,7 @@ export const getCharactersByAlignment = async (
        ORDER BY c.name`,
       { projectId, pattern: alignmentPattern }
     );
-    return result.records.map(r => r.get('c').properties);
+    return result.records.map((r) => r.get('c').properties);
   } finally {
     await session.close();
   }
@@ -731,15 +732,15 @@ export const getCharacterMotivationNetwork = async (
       { projectId }
     );
 
-    const characters = result.records.map(r => ({
+    const characters = result.records.map((r) => ({
       id: r.get('id'),
       name: r.get('name'),
       desire: r.get('desire'),
       fear: r.get('fear'),
     }));
 
-    const desires = [...new Set(characters.filter(c => c.desire).map(c => c.desire))];
-    const fears = [...new Set(characters.filter(c => c.fear).map(c => c.fear))];
+    const desires = [...new Set(characters.filter((c) => c.desire).map((c) => c.desire))];
+    const fears = [...new Set(characters.filter((c) => c.fear).map((c) => c.fear))];
 
     return { characters, desires, fears };
   } finally {
@@ -778,7 +779,7 @@ export const getCharactersAtLocation = async (
       { projectId, locationId }
     );
 
-    return result.records.map(r => ({
+    return result.records.map((r) => ({
       character: r.get('c').properties,
       relationType: r.get('relationType'),
       since: r.get('since'),
@@ -802,10 +803,7 @@ import {
   getCharacterMotivationNetwork,
   getCharactersAtLocation,
 } from '../services/graph/queries';
-import {
-  syncSingleCharacter,
-  syncCharacterDepthAttributes,
-} from '../services/graph/sync';
+import { syncSingleCharacter, syncCharacterDepthAttributes } from '../services/graph/sync';
 
 const router = Router();
 
@@ -984,7 +982,7 @@ const CharacterDepthPanel: React.FC<{
             <input
               type="text"
               value={(character.tags || []).join(', ')}
-              onChange={(e) => onUpdate({ tags: e.target.value.split(',').map(t => t.trim()) })}
+              onChange={(e) => onUpdate({ tags: e.target.value.split(',').map((t) => t.trim()) })}
               placeholder="高智商低情商, 洁癖晚期, 腹黑（用逗号分隔）"
               className="w-full bg-slate-900 border border-slate-700 rounded p-2 text-sm text-white"
             />
@@ -1072,7 +1070,7 @@ export const CharacterWorldRelationSelector: React.FC<Props> = ({
 }) => {
   const getLocationLabel = (id: string | undefined) => {
     if (!id) return '未设定';
-    const setting = worldSettings.find(w => w.id === id);
+    const setting = worldSettings.find((w) => w.id === id);
     return setting?.title || '未知地点';
   };
 
@@ -1097,8 +1095,8 @@ export const CharacterWorldRelationSelector: React.FC<Props> = ({
           >
             <option value="">未设定</option>
             {worldSettings
-              .filter(w => w.category === 'Geography')
-              .map(w => (
+              .filter((w) => w.category === 'Geography')
+              .map((w) => (
                 <option key={w.id} value={w.id}>
                   {w.title}
                 </option>
@@ -1119,8 +1117,8 @@ export const CharacterWorldRelationSelector: React.FC<Props> = ({
           >
             <option value="">未设定</option>
             {worldSettings
-              .filter(w => w.category === 'Geography')
-              .map(w => (
+              .filter((w) => w.category === 'Geography')
+              .map((w) => (
                 <option key={w.id} value={w.id}>
                   {w.title}
                 </option>
@@ -1136,15 +1134,17 @@ export const CharacterWorldRelationSelector: React.FC<Props> = ({
           </label>
           <div className="flex flex-wrap gap-2">
             {worldSettings
-              .filter(w => w.category === 'Geography')
-              .map(w => (
+              .filter((w) => w.category === 'Geography')
+              .map((w) => (
                 <label
                   key={w.id}
                   className={`
                     px-3 py-1 rounded-full text-xs cursor-pointer transition-all
-                    ${(character.controlledTerritories || []).includes(w.id)
-                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50'
-                      : 'bg-slate-900 text-slate-500 border border-slate-700 hover:border-slate-600'}
+                    ${
+                      (character.controlledTerritories || []).includes(w.id)
+                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50'
+                        : 'bg-slate-900 text-slate-500 border border-slate-700 hover:border-slate-600'
+                    }
                   `}
                 >
                   <input
@@ -1155,7 +1155,9 @@ export const CharacterWorldRelationSelector: React.FC<Props> = ({
                       if (e.target.checked) {
                         onUpdate({ controlledTerritories: [...territories, w.id] });
                       } else {
-                        onUpdate({ controlledTerritories: territories.filter(id => id !== w.id) });
+                        onUpdate({
+                          controlledTerritories: territories.filter((id) => id !== w.id),
+                        });
                       }
                     }}
                     className="hidden"
@@ -1195,17 +1197,17 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     if (!useBackend) return;
 
     try {
-      const response = await fetch(`/api/graph/character/${characterId}/depth?projectId=${project.id}`);
+      const response = await fetch(
+        `/api/graph/character/${characterId}/depth?projectId=${project.id}`
+      );
       const data = await response.json();
 
       // 更新本地角色数据（合并深度属性）
       set((state) => ({
         project: {
           ...state.project,
-          characters: state.project.characters.map(c =>
-            c.id === characterId
-              ? { ...c, ...data.character }
-              : c
+          characters: state.project.characters.map((c) =>
+            c.id === characterId ? { ...c, ...data.character } : c
           ),
         },
       }));
@@ -1238,7 +1240,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     if (!useBackend) return;
 
     try {
-      const response = await fetch(`/api/graph/characters/motivation-network?projectId=${project.id}`);
+      const response = await fetch(
+        `/api/graph/characters/motivation-network?projectId=${project.id}`
+      );
       const data = await response.json();
       // 可以存储到单独的状态中用于可视化
       return data;
@@ -1276,7 +1280,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 const NODE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
   // ... 现有配置 ...
   CharacterDesire: { bg: '#f97316', border: '#fb923c', text: '#fff7ed' }, // 橙色表示欲望
-  CharacterFear: { bg: '#7c3aed', border: '#8b5cf6', text: '#f5f3ff' },   // 紫色表示恐惧
+  CharacterFear: { bg: '#7c3aed', border: '#8b5cf6', text: '#f5f3ff' }, // 紫色表示恐惧
 };
 
 // 新增图层切换
@@ -1287,13 +1291,15 @@ const MOTIVATION_LAYERS = ['Character', 'CharacterDesire', 'CharacterFear'];
   onClick={() => setActiveLayers(MOTIVATION_LAYERS)}
   className={`
     px-3 py-1 rounded text-xs font-medium transition-colors
-    ${JSON.stringify(activeLayers) === JSON.stringify(MOTIVATION_LAYERS)
-      ? 'bg-muse-600 text-white'
-      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}
+    ${
+      JSON.stringify(activeLayers) === JSON.stringify(MOTIVATION_LAYERS)
+        ? 'bg-muse-600 text-white'
+        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+    }
   `}
 >
   动机网络
-</button>
+</button>;
 ```
 
 #### 5.3.2 角色深度属性标签云
@@ -1311,12 +1317,15 @@ interface Props {
 
 export const CharacterTagCloud: React.FC<Props> = ({ characters, onSelectCharacter }) => {
   // 收集所有标签及其出现次数
-  const tagCounts = characters.reduce((acc, char) => {
-    (char.tags || []).forEach(tag => {
-      acc[tag] = (acc[tag] || 0) + 1;
-    });
-    return acc;
-  }, {} as Record<string, number>);
+  const tagCounts = characters.reduce(
+    (acc, char) => {
+      (char.tags || []).forEach((tag) => {
+        acc[tag] = (acc[tag] || 0) + 1;
+      });
+      return acc;
+    },
+    {} as Record<string, number>
+  );
 
   const sortedTags = Object.entries(tagCounts)
     .sort((a, b) => b[1] - a[1])
@@ -1330,7 +1339,7 @@ export const CharacterTagCloud: React.FC<Props> = ({ characters, onSelectCharact
           key={tag}
           onClick={() => {
             // 点击标签筛选角色
-            const chars = characters.filter(c => c.tags?.includes(tag));
+            const chars = characters.filter((c) => c.tags?.includes(tag));
             if (chars.length === 1) onSelectCharacter(chars[0].id);
           }}
           className="px-3 py-1 bg-muse-600/20 text-muse-400 rounded-full text-xs hover:bg-muse-600/30 transition-colors"
@@ -1351,6 +1360,7 @@ export const CharacterTagCloud: React.FC<Props> = ({ characters, onSelectCharact
 ### 6.1 旧数据兼容方案
 
 **原则**:
+
 1. 运行时自动转换旧格式关系
 2. 保留 `relationships` 字段向后兼容
 3. 提供可选的数据库迁移脚本
@@ -1434,12 +1444,11 @@ async function migrateProject(projectId: string) {
     console.log(`Migrating project ${projectId}...`);
 
     // 1. 获取所有角色节点
-    const charsResult = await session.run(
-      `MATCH (c:Character {projectId: $projectId}) RETURN c`,
-      { projectId }
-    );
+    const charsResult = await session.run(`MATCH (c:Character {projectId: $projectId}) RETURN c`, {
+      projectId,
+    });
 
-    const characters = charsResult.records.map(r => r.get('c').properties);
+    const characters = charsResult.records.map((r) => r.get('c').properties);
 
     // 2. 为每个角色处理关系
     for (const char of characters) {
@@ -1452,7 +1461,9 @@ async function migrateProject(projectId: string) {
       );
 
       if (existingRels.records.length > 0) {
-        console.log(`  Character ${char.name} already has ${existingRels.records.length} relations, skipping`);
+        console.log(
+          `  Character ${char.name} already has ${existingRels.records.length} relations, skipping`
+        );
         continue;
       }
 
@@ -1467,7 +1478,6 @@ async function migrateProject(projectId: string) {
     // 3. 同步深度属性（从 MySQL 读取并更新到 Neo4j）
     // 这一步需要从 MySQL 获取完整角色数据
     console.log(`  Syncing depth attributes...`);
-
   } finally {
     await session.close();
   }
@@ -1503,7 +1513,7 @@ export const ensureCharacterStructuredRelations = async (
     );
 
     if (existingRels.records.length > 0) {
-      return existingRels.records.map(r => ({
+      return existingRels.records.map((r) => ({
         targetCharacterId: r.get('targetId'),
         targetCharacterName: r.get('targetName'),
         type: r.get('type') as CharacterRelationType,
@@ -1622,13 +1632,13 @@ export const ensureCharacterStructuredRelations = async (
 
 ## 八、风险与缓解措施
 
-| 风险 | 等级 | 缓解措施 |
-|------|------|---------|
+| 风险                 | 等级  | 缓解措施                     |
+| -------------------- | ----- | ---------------------------- |
 | Neo4j 数组类型兼容性 | 🟡 中 | 使用字符串数组，避免复杂类型 |
-| 旧数据转换精度 | 🟡 中 | 保留原始字符串，运行时转换 |
-| 同步性能瓶颈 | 🟡 中 | 实现增量同步，减少全量同步 |
-| 前端状态管理复杂度 | 🟢 低 | 使用 Zustand 切片订阅 |
-| API 版本兼容 | 🟢 低 | 保持旧 API 可用 |
+| 旧数据转换精度       | 🟡 中 | 保留原始字符串，运行时转换   |
+| 同步性能瓶颈         | 🟡 中 | 实现增量同步，减少全量同步   |
+| 前端状态管理复杂度   | 🟢 低 | 使用 Zustand 切片订阅        |
+| API 版本兼容         | 🟢 低 | 保持旧 API 可用              |
 
 ---
 

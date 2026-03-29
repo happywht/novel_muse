@@ -18,14 +18,16 @@ const originalLog = console.log;
 console.warn = (...args: any[]) => {
   // 忽略特定警告
   const message = args[0];
-  if (typeof message === 'string' &&
-      (message.includes('Failed to parse') ||
-       message.includes('not found') ||
-       message.includes('Failed to sync') ||
-       message.includes('Failed to create') ||
-       message.includes('syncEchoToGraph') ||
-       message.includes('syncChapterToGraph') ||
-       message.includes('syncForgeResult'))) {
+  if (
+    typeof message === 'string' &&
+    (message.includes('Failed to parse') ||
+      message.includes('not found') ||
+      message.includes('Failed to sync') ||
+      message.includes('Failed to create') ||
+      message.includes('syncEchoToGraph') ||
+      message.includes('syncChapterToGraph') ||
+      message.includes('syncForgeResult'))
+  ) {
     return;
   }
   originalWarn.apply(console, args);
@@ -34,11 +36,13 @@ console.warn = (...args: any[]) => {
 console.log = (...args: any[]) => {
   // 忽略特定日志
   const message = args[0];
-  if (typeof message === 'string' &&
-      (message.includes('syncEchoToGraph') ||
-       message.includes('syncChapterToGraph') ||
-       message.includes('syncForgeResult') ||
-       message.includes('syncChaptersToGraph'))) {
+  if (
+    typeof message === 'string' &&
+    (message.includes('syncEchoToGraph') ||
+      message.includes('syncChapterToGraph') ||
+      message.includes('syncForgeResult') ||
+      message.includes('syncChaptersToGraph'))
+  ) {
     return;
   }
   originalLog.apply(console, args);

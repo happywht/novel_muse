@@ -65,11 +65,7 @@ async function testValidApiKeyAccepted(): Promise<boolean> {
 async function testErrorResponseFormat(): Promise<boolean> {
   const response = await fetch(`${API_BASE}/projects`);
   const data = await response.json();
-  return (
-    response.status === 401 &&
-    data.error !== undefined &&
-    data.code !== undefined
-  );
+  return response.status === 401 && data.error !== undefined && data.code !== undefined;
 }
 
 async function runTests() {

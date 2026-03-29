@@ -28,7 +28,11 @@ export function CharacterChat() {
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-slate-700 overflow-hidden border border-slate-500">
               {activeChar.imageUrl ? (
-                <img src={activeChar.imageUrl} alt={activeChar.name} className="w-full h-full object-cover" />
+                <img
+                  src={activeChar.imageUrl}
+                  alt={activeChar.name}
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <div className="flex items-center justify-center w-full h-full">
                   <User size={20} />
@@ -53,7 +57,10 @@ export function CharacterChat() {
             </div>
           )}
           {chatHistory.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div
+              key={idx}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+            >
               <div
                 className={`max-w-[80%] px-4 py-2 rounded-2xl text-sm leading-relaxed ${
                   msg.role === 'user'

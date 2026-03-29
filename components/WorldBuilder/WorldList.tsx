@@ -1,5 +1,16 @@
 import React, { useState } from 'react';
-import { Search, Plus, BookPlus, Trash2, Settings2, Map, Eye, Cpu, BookOpen, Scroll } from 'lucide-react';
+import {
+  Search,
+  Plus,
+  BookPlus,
+  Trash2,
+  Settings2,
+  Map,
+  Eye,
+  Cpu,
+  BookOpen,
+  Scroll,
+} from 'lucide-react';
 import { VirtualList } from '../VirtualList';
 import { ConfirmDialog } from '../common';
 import { useWorldBuilder, SparklesIcon } from './WorldBuilderContext';
@@ -87,7 +98,9 @@ export const WorldList: React.FC = () => {
         {showConfig && (
           <div className="bg-slate-950/50 rounded-lg p-3 border border-slate-700 space-y-3 animate-fade-in text-sm">
             <div>
-              <label className="text-xs text-slate-500 font-bold uppercase mb-1 block">详略程度</label>
+              <label className="text-xs text-slate-500 font-bold uppercase mb-1 block">
+                详略程度
+              </label>
               <div className="flex gap-1">
                 {['Brief', 'Standard', 'Detailed'].map((level) => (
                   <button
@@ -101,13 +114,15 @@ export const WorldList: React.FC = () => {
               </div>
             </div>
             <div>
-              <label className="text-xs text-slate-500 font-bold uppercase mb-1 block">侧重方向</label>
+              <label className="text-xs text-slate-500 font-bold uppercase mb-1 block">
+                侧重方向
+              </label>
               <div className="grid grid-cols-2 gap-1">
                 {[
                   { k: 'Balanced', l: '平衡', i: BookOpen },
                   { k: 'Sensory', l: '感官描写', i: Eye },
                   { k: 'Logic', l: '逻辑原理', i: Cpu },
-                  { k: 'History', l: '历史渊源', i: Scroll }
+                  { k: 'History', l: '历史渊源', i: Scroll },
                 ].map((opt) => (
                   <button
                     key={opt.k}
@@ -124,7 +139,7 @@ export const WorldList: React.FC = () => {
 
         {/* 分类标签 */}
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide pt-2">
-          {categories.map(cat => (
+          {categories.map((cat) => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
@@ -143,7 +158,7 @@ export const WorldList: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={`搜索${categories.find(c => c.id === selectedCategory)?.label}...`}
+            placeholder={`搜索${categories.find((c) => c.id === selectedCategory)?.label}...`}
             className="w-full bg-slate-900 border border-slate-700 rounded-md pl-9 pr-3 py-1.5 text-xs text-white focus:border-muse-500 outline-none"
           />
         </div>
@@ -176,7 +191,11 @@ export const WorldList: React.FC = () => {
                 title="AI 灵感生成"
                 className="bg-muse-600 hover:bg-muse-500 text-white p-2 rounded-md disabled:opacity-50"
               >
-                {isGenerating ? <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div> : <Plus size={18} />}
+                {isGenerating ? (
+                  <div className="animate-spin w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div>
+                ) : (
+                  <Plus size={18} />
+                )}
               </button>
             </div>
           </div>
@@ -187,14 +206,23 @@ export const WorldList: React.FC = () => {
           <VirtualList
             items={filteredSettings}
             itemHeight={UI_CONFIG.WORLD_LIST_ITEM_HEIGHT}
-            height={typeof window !== 'undefined' ? window.innerHeight - UI_CONFIG.WORLD_LIST_HEIGHT_OFFSET : UI_CONFIG.DEFAULT_LIST_HEIGHT}
+            height={
+              typeof window !== 'undefined'
+                ? window.innerHeight - UI_CONFIG.WORLD_LIST_HEIGHT_OFFSET
+                : UI_CONFIG.DEFAULT_LIST_HEIGHT
+            }
             className="space-y-2"
             renderItem={(lore, idx) => {
-              const hasEcho = (project.echoes || []).some(e => e.targetId === lore.id && e.status === 'PENDING');
+              const hasEcho = (project.echoes || []).some(
+                (e) => e.targetId === lore.id && e.status === 'PENDING'
+              );
               return (
                 <div
                   key={lore.id}
-                  onClick={() => { setActiveItemId(lore.id); setDraftLore(null); }}
+                  onClick={() => {
+                    setActiveItemId(lore.id);
+                    setDraftLore(null);
+                  }}
                   className={`p-3 rounded-lg cursor-pointer flex justify-between items-center group relative overflow-hidden ${
                     activeItemId === lore.id
                       ? 'bg-muse-900/50 border border-muse-500/50'
@@ -207,7 +235,9 @@ export const WorldList: React.FC = () => {
                   )}
 
                   {/* 标题 */}
-                  <span className={`font-medium truncate ${hasEcho ? 'text-cyan-100' : 'text-slate-200'}`}>
+                  <span
+                    className={`font-medium truncate ${hasEcho ? 'text-cyan-100' : 'text-slate-200'}`}
+                  >
                     {lore.title}
                   </span>
 
@@ -227,7 +257,7 @@ export const WorldList: React.FC = () => {
         {/* 空状态 */}
         {filteredSettings.length === 0 && (
           <div className="text-center text-slate-500 text-sm mt-8 italic">
-            {searchQuery ? "未找到匹配条目" : "暂无条目"}
+            {searchQuery ? '未找到匹配条目' : '暂无条目'}
           </div>
         )}
       </div>

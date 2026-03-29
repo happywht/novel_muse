@@ -14,29 +14,29 @@ import { Chapter, Character, PlotNode } from '../types';
  * 单个角色的统计数据
  */
 export interface CharacterStats {
-  characterId: string;          // 角色ID
-  characterName: string;        // 角色名称
-  totalAppearances: number;     // 总出场次数
+  characterId: string; // 角色ID
+  characterName: string; // 角色名称
+  totalAppearances: number; // 总出场次数
   chapterBreakdown: ChapterBreakdown[]; // 各章节出场明细
-  percentage: number;           // 出场时间占比 (0-100)
+  percentage: number; // 出场时间占比 (0-100)
   trend: 'rising' | 'falling' | 'stable'; // 出场趋势
-  firstAppearance?: number;     // 首次出场章节序号
-  lastAppearance?: number;      // 最后出场章节序号
-  averagePerChapter: number;    // 平均每章出场次数
-  peakChapter?: string;         // 出场最多的章节ID
-  peakChapterTitle?: string;    // 出场最多的章节标题
+  firstAppearance?: number; // 首次出场章节序号
+  lastAppearance?: number; // 最后出场章节序号
+  averagePerChapter: number; // 平均每章出场次数
+  peakChapter?: string; // 出场最多的章节ID
+  peakChapterTitle?: string; // 出场最多的章节标题
 }
 
 /**
  * 章节出场明细
  */
 export interface ChapterBreakdown {
-  chapterId: string;            // 章节ID
-  chapterTitle: string;         // 章节标题
-  chapterOrder: number;         // 章节顺序
-  count: number;                // 出场次数
-  wordCount: number;            // 章节字数
-  density: number;              // 出场密度 (每千字出场次数)
+  chapterId: string; // 章节ID
+  chapterTitle: string; // 章节标题
+  chapterOrder: number; // 章节顺序
+  count: number; // 出场次数
+  wordCount: number; // 章节字数
+  density: number; // 出场密度 (每千字出场次数)
 }
 
 /**
@@ -44,24 +44,24 @@ export interface ChapterBreakdown {
  */
 export interface StatisticsReport {
   characters: CharacterStats[]; // 所有角色统计
-  totalChapters: number;        // 总章节数
-  totalWordCount: number;       // 总字数
-  summary: ReportSummary;       // 报告摘要
-  generatedAt: number;          // 生成时间戳
+  totalChapters: number; // 总章节数
+  totalWordCount: number; // 总字数
+  summary: ReportSummary; // 报告摘要
+  generatedAt: number; // 生成时间戳
 }
 
 /**
  * 报告摘要
  */
 export interface ReportSummary {
-  mostActive: CharacterStats | null;     // 最活跃角色
-  leastActive: CharacterStats | null;    // 最不活跃角色
-  risingStars: CharacterStats[];         // 出场趋势上升的角色
-  fadingStars: CharacterStats[];         // 出场趋势下降的角色
-  balancedCharacters: CharacterStats[];  // 出场均衡的角色
+  mostActive: CharacterStats | null; // 最活跃角色
+  leastActive: CharacterStats | null; // 最不活跃角色
+  risingStars: CharacterStats[]; // 出场趋势上升的角色
+  fadingStars: CharacterStats[]; // 出场趋势下降的角色
+  balancedCharacters: CharacterStats[]; // 出场均衡的角色
   unbalancedCharacters: CharacterStats[]; // 出场不均衡的角色
-  averageAppearanceRate: number;         // 平均出场率
-  recommendations: string[];             // 优化建议
+  averageAppearanceRate: number; // 平均出场率
+  recommendations: string[]; // 优化建议
 }
 
 // ============================================================
@@ -70,11 +70,11 @@ export interface ReportSummary {
 
 const CONFIG = {
   // 趋势判断阈值
-  trendThreshold: 0.15,        // 上升/下降判定阈值 (15%)
+  trendThreshold: 0.15, // 上升/下降判定阈值 (15%)
   // 平衡性阈值
   balanceThreshold: {
-    underUtilized: 20,         // 出场率低于此值为利用不足
-    overUtilized: 80,          // 出场率高于此值为过度使用
+    underUtilized: 20, // 出场率低于此值为利用不足
+    overUtilized: 80, // 出场率高于此值为过度使用
   },
   // 最小章节数（用于趋势判断）
   minChaptersForTrend: 3,
@@ -105,13 +105,10 @@ export function analyzeCharacterStatistics(
   const sortedChapters = [...chapters].sort((a, b) => a.order - b.order);
 
   // 计算总字数
-  const totalWordCount = sortedChapters.reduce(
-    (sum, ch) => sum + (ch.content?.length || 0),
-    0
-  );
+  const totalWordCount = sortedChapters.reduce((sum, ch) => sum + (ch.content?.length || 0), 0);
 
   // 为每个角色计算统计数据
-  const characterStats = characters.map(char =>
+  const characterStats = characters.map((char) =>
     calculateCharacterStats(char, sortedChapters, totalWordCount)
   );
 
@@ -177,17 +174,17 @@ function calculateCharacterStats(
 
   // 计算出场占比
   const totalPossibleAppearances = chapters.length;
-  const percentage = totalPossibleAppearances > 0
-    ? Math.round((chapterBreakdown.length / totalPossibleAppearances) * 100)
-    : 0;
+  const percentage =
+    totalPossibleAppearances > 0
+      ? Math.round((chapterBreakdown.length / totalPossibleAppearances) * 100)
+      : 0;
 
   // 计算趋势
   const trend = calculateTrend(chapterBreakdown);
 
   // 计算平均每章出场次数
-  const averagePerChapter = chapters.length > 0
-    ? parseFloat((totalAppearances / chapters.length).toFixed(2))
-    : 0;
+  const averagePerChapter =
+    chapters.length > 0 ? parseFloat((totalAppearances / chapters.length).toFixed(2)) : 0;
 
   return {
     characterId: character.id,
@@ -231,9 +228,7 @@ function calculateDensity(count: number, wordCount: number): number {
  * 计算出场趋势
  * 通过比较前半部分和后半部分的出场密度来判断
  */
-function calculateTrend(
-  breakdown: ChapterBreakdown[]
-): 'rising' | 'falling' | 'stable' {
+function calculateTrend(breakdown: ChapterBreakdown[]): 'rising' | 'falling' | 'stable' {
   // 章节数不足，无法判断趋势
   if (breakdown.length < CONFIG.minChaptersForTrend) {
     return 'stable';
@@ -244,19 +239,18 @@ function calculateTrend(
   const secondHalf = breakdown.slice(midPoint);
 
   // 计算前半部分平均密度
-  const firstHalfDensity = firstHalf.length > 0
-    ? firstHalf.reduce((sum, b) => sum + b.density, 0) / firstHalf.length
-    : 0;
+  const firstHalfDensity =
+    firstHalf.length > 0 ? firstHalf.reduce((sum, b) => sum + b.density, 0) / firstHalf.length : 0;
 
   // 计算后半部分平均密度
-  const secondHalfDensity = secondHalf.length > 0
-    ? secondHalf.reduce((sum, b) => sum + b.density, 0) / secondHalf.length
-    : 0;
+  const secondHalfDensity =
+    secondHalf.length > 0
+      ? secondHalf.reduce((sum, b) => sum + b.density, 0) / secondHalf.length
+      : 0;
 
   // 判断趋势
-  const changeRate = firstHalfDensity > 0
-    ? (secondHalfDensity - firstHalfDensity) / firstHalfDensity
-    : 0;
+  const changeRate =
+    firstHalfDensity > 0 ? (secondHalfDensity - firstHalfDensity) / firstHalfDensity : 0;
 
   if (changeRate > CONFIG.trendThreshold) {
     return 'rising';
@@ -274,10 +268,7 @@ function calculateTrend(
 /**
  * 生成报告摘要
  */
-function generateSummary(
-  stats: CharacterStats[],
-  totalChapters: number
-): ReportSummary {
+function generateSummary(stats: CharacterStats[], totalChapters: number): ReportSummary {
   // 按出场次数排序
   const sorted = [...stats].sort((a, b) => b.totalAppearances - a.totalAppearances);
 
@@ -286,30 +277,29 @@ function generateSummary(
   const leastActive = sorted[sorted.length - 1] || null;
 
   // 分类角色
-  const risingStars = stats.filter(s => s.trend === 'rising');
-  const fadingStars = stats.filter(s => s.trend === 'falling');
+  const risingStars = stats.filter((s) => s.trend === 'rising');
+  const fadingStars = stats.filter((s) => s.trend === 'falling');
 
   // 平衡性分类
   const balancedCharacters = stats.filter(
-    s => s.percentage >= CONFIG.balanceThreshold.underUtilized &&
-         s.percentage <= CONFIG.balanceThreshold.overUtilized
+    (s) =>
+      s.percentage >= CONFIG.balanceThreshold.underUtilized &&
+      s.percentage <= CONFIG.balanceThreshold.overUtilized
   );
   const unbalancedCharacters = stats.filter(
-    s => s.percentage < CONFIG.balanceThreshold.underUtilized ||
-         s.percentage > CONFIG.balanceThreshold.overUtilized
+    (s) =>
+      s.percentage < CONFIG.balanceThreshold.underUtilized ||
+      s.percentage > CONFIG.balanceThreshold.overUtilized
   );
 
   // 计算平均出场率
-  const averageAppearanceRate = stats.length > 0
-    ? Math.round(stats.reduce((sum, s) => sum + s.percentage, 0) / stats.length)
-    : 0;
+  const averageAppearanceRate =
+    stats.length > 0
+      ? Math.round(stats.reduce((sum, s) => sum + s.percentage, 0) / stats.length)
+      : 0;
 
   // 生成建议
-  const recommendations = generateRecommendations(
-    stats,
-    totalChapters,
-    averageAppearanceRate
-  );
+  const recommendations = generateRecommendations(stats, totalChapters, averageAppearanceRate);
 
   return {
     mostActive,
@@ -334,42 +324,36 @@ function generateRecommendations(
   const recommendations: string[] = [];
 
   // 检查利用不足的角色
-  const underUtilized = stats.filter(
-    s => s.percentage < CONFIG.balanceThreshold.underUtilized
-  );
+  const underUtilized = stats.filter((s) => s.percentage < CONFIG.balanceThreshold.underUtilized);
   if (underUtilized.length > 0) {
     recommendations.push(
-      `以下角色出场较少，可考虑增加戏份：${underUtilized.map(c => c.characterName).join('、')}`
+      `以下角色出场较少，可考虑增加戏份：${underUtilized.map((c) => c.characterName).join('、')}`
     );
   }
 
   // 检查过度使用的角色
-  const overUtilized = stats.filter(
-    s => s.percentage > CONFIG.balanceThreshold.overUtilized
-  );
+  const overUtilized = stats.filter((s) => s.percentage > CONFIG.balanceThreshold.overUtilized);
   if (overUtilized.length > 0) {
     recommendations.push(
-      `以下角色出场过于频繁，可考虑分配给其他角色：${overUtilized.map(c => c.characterName).join('、')}`
+      `以下角色出场过于频繁，可考虑分配给其他角色：${overUtilized.map((c) => c.characterName).join('、')}`
     );
   }
 
   // 检查趋势下降的重要角色
-  const fadingImportant = stats.filter(
-    s => s.trend === 'falling' && s.percentage > averageRate
-  );
+  const fadingImportant = stats.filter((s) => s.trend === 'falling' && s.percentage > averageRate);
   if (fadingImportant.length > 0) {
     recommendations.push(
-      `重要角色${fadingImportant.map(c => c.characterName).join('、')}出场呈下降趋势，建议关注其后续发展`
+      `重要角色${fadingImportant.map((c) => c.characterName).join('、')}出场呈下降趋势，建议关注其后续发展`
     );
   }
 
   // 检查突然出现的新角色
   const lateAppearances = stats.filter(
-    s => s.firstAppearance && s.firstAppearance > totalChapters * 0.7
+    (s) => s.firstAppearance && s.firstAppearance > totalChapters * 0.7
   );
   if (lateAppearances.length > 0) {
     recommendations.push(
-      `新角色${lateAppearances.map(c => c.characterName).join('、')}在后期才出现，确保有足够的铺垫`
+      `新角色${lateAppearances.map((c) => c.characterName).join('、')}在后期才出现，确保有足够的铺垫`
     );
   }
 
@@ -412,9 +396,12 @@ function createEmptyReport(): StatisticsReport {
  */
 export function getTrendIcon(trend: 'rising' | 'falling' | 'stable'): string {
   switch (trend) {
-    case 'rising': return '↗';
-    case 'falling': return '↘';
-    case 'stable': return '→';
+    case 'rising':
+      return '↗';
+    case 'falling':
+      return '↘';
+    case 'stable':
+      return '→';
   }
 }
 
@@ -423,9 +410,12 @@ export function getTrendIcon(trend: 'rising' | 'falling' | 'stable'): string {
  */
 export function getTrendLabel(trend: 'rising' | 'falling' | 'stable'): string {
   switch (trend) {
-    case 'rising': return '上升趋势';
-    case 'falling': return '下降趋势';
-    case 'stable': return '稳定';
+    case 'rising':
+      return '上升趋势';
+    case 'falling':
+      return '下降趋势';
+    case 'stable':
+      return '稳定';
   }
 }
 

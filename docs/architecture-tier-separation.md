@@ -82,11 +82,11 @@ export type UserTier = 'FREE' | 'PREMIUM';
 
 export interface FeatureFlags {
   // 高级版专属功能
-  promptEditing: boolean;          // 是否允许编辑prompt
-  callConfirmation: boolean;       // 是否启用AI调用确认
-  customPromptLibrary: boolean;    // 是否启用自定义prompt库
+  promptEditing: boolean; // 是否允许编辑prompt
+  callConfirmation: boolean; // 是否启用AI调用确认
+  customPromptLibrary: boolean; // 是否启用自定义prompt库
   advancedModelSelection: boolean; // 是否启用高级模型选择
-  callHistoryTracking: boolean;    // 是否启用调用历史追踪
+  callHistoryTracking: boolean; // 是否启用调用历史追踪
 
   // 通用功能（两个版本都可用）
   basicGeneration: boolean;
@@ -209,9 +209,11 @@ export class AICallInterceptor {
       this.resolveCall = resolve;
 
       // 触发事件，通知UI显示确认对话框
-      window.dispatchEvent(new CustomEvent('ai-call-intercepted', {
-        detail: context
-      }));
+      window.dispatchEvent(
+        new CustomEvent('ai-call-intercepted', {
+          detail: context,
+        })
+      );
     });
   }
 
@@ -358,7 +360,7 @@ export class PromptService {
 
     const saved = await storageService.getItem<CustomPrompt[]>(STORAGE_KEYS.CUSTOM_PROMPTS);
     if (saved) {
-      saved.forEach(p => this.customPrompts.set(p.key, p));
+      saved.forEach((p) => this.customPrompts.set(p.key, p));
     }
   }
 
@@ -790,10 +792,7 @@ export interface IFeatureFlagService {
   requirePremium(feature: string): void;
 
   // 监听功能开关变化
-  onFeatureChange(
-    feature: keyof FeatureFlags,
-    callback: (enabled: boolean) => void
-  ): () => void;
+  onFeatureChange(feature: keyof FeatureFlags, callback: (enabled: boolean) => void): () => void;
 }
 ```
 
@@ -803,42 +802,45 @@ export interface IFeatureFlagService {
 
 ### 6.1 技术风险
 
-| 风险项 | 严重程度 | 概率 | 缓解措施 |
-|--------|----------|------|----------|
-| **高级版bug影响普通版** | 高 | 中 | 1. 错误边界隔离<br>2. 代码分割懒加载<br>3. 独立的错误处理逻辑 |
-| **配置冲突** | 中 | 中 | 1. 严格的配置验证<br>2. 配置合并时优先级明确<br>3. 向后兼容性测试 |
-| **性能影响** | 中 | 低 | 1. 懒加载高级版组件<br>2. 条件渲染减少不必要的组件挂载<br>3. 独立的状态管理 |
-| **数据迁移问题** | 低 | 低 | 1. 平滑迁移策略<br>2. 数据版本控制<br>3. 回滚机制 |
+| 风险项                  | 严重程度 | 概率 | 缓解措施                                                                    |
+| ----------------------- | -------- | ---- | --------------------------------------------------------------------------- |
+| **高级版bug影响普通版** | 高       | 中   | 1. 错误边界隔离<br>2. 代码分割懒加载<br>3. 独立的错误处理逻辑               |
+| **配置冲突**            | 中       | 中   | 1. 严格的配置验证<br>2. 配置合并时优先级明确<br>3. 向后兼容性测试           |
+| **性能影响**            | 中       | 低   | 1. 懒加载高级版组件<br>2. 条件渲染减少不必要的组件挂载<br>3. 独立的状态管理 |
+| **数据迁移问题**        | 低       | 低   | 1. 平滑迁移策略<br>2. 数据版本控制<br>3. 回滚机制                           |
 
 ### 6.2 业务风险
 
-| 风险项 | 严重程度 | 概率 | 缓解措施 |
-|--------|----------|------|----------|
-| **用户体验割裂** | 中 | 中 | 1. 清晰的功能分级说明<br>2. 平滑的升级引导<br>3. 保留核心功能在普通版 |
-| **付费转化率低** | 中 | 中 | 1. 高级版功能价值明确<br>2. 提供试用机制<br>3. 收集用户反馈迭代 |
-| **滥用高级功能** | 低 | 低 | 1. 使用量限制<br>2. 异常检测<br>3. API调用频率限制 |
+| 风险项           | 严重程度 | 概率 | 缓解措施                                                              |
+| ---------------- | -------- | ---- | --------------------------------------------------------------------- |
+| **用户体验割裂** | 中       | 中   | 1. 清晰的功能分级说明<br>2. 平滑的升级引导<br>3. 保留核心功能在普通版 |
+| **付费转化率低** | 中       | 中   | 1. 高级版功能价值明确<br>2. 提供试用机制<br>3. 收集用户反馈迭代       |
+| **滥用高级功能** | 低       | 低   | 1. 使用量限制<br>2. 异常检测<br>3. API调用频率限制                    |
 
 ### 6.3 安全风险
 
-| 风险项 | 严重程度 | 概率 | 缓解措施 |
-|--------|----------|------|----------|
-| **权限绕过** | 高 | 低 | 1. 前后端双重验证<br>2. 功能开关在后端也需验证<br>3. 定期安全审计 |
-| **数据泄露** | 中 | 低 | 1. 敏感数据加密<br>2. 访问日志记录<br>3. 权限最小化原则 |
-| **Prompt注入** | 中 | 中 | 1. Prompt内容验证<br>2. 输入清理<br>3. 沙箱隔离 |
+| 风险项         | 严重程度 | 概率 | 缓解措施                                                          |
+| -------------- | -------- | ---- | ----------------------------------------------------------------- |
+| **权限绕过**   | 高       | 低   | 1. 前后端双重验证<br>2. 功能开关在后端也需验证<br>3. 定期安全审计 |
+| **数据泄露**   | 中       | 低   | 1. 敏感数据加密<br>2. 访问日志记录<br>3. 权限最小化原则           |
+| **Prompt注入** | 中       | 中   | 1. Prompt内容验证<br>2. 输入清理<br>3. 沙箱隔离                   |
 
 ### 6.4 风险缓解优先级
 
 #### 高优先级（必须实施）
+
 1. **错误边界隔离**：确保高级版bug不影响普通版
 2. **前后端双重验证**：防止权限绕过
 3. **配置验证机制**：避免配置冲突
 
 #### 中优先级（建议实施）
+
 1. **使用量监控**：防止滥用
 2. **平滑升级路径**：改善用户体验
 3. **数据迁移工具**：降低升级成本
 
 #### 低优先级（可选实施）
+
 1. **A/B测试框架**：优化功能开关策略
 2. **高级版试用机制**：提升付费转化
 3. **详细的使用分析**：指导产品迭代
@@ -850,16 +852,19 @@ export interface IFeatureFlagService {
 ### 7.1 分阶段实施
 
 **第一阶段（1-2周）**：
+
 - 实现基础功能开关系统
 - 扩展全局配置
 - 集成FeatureFlagProvider
 
 **第二阶段（2-3周）**：
+
 - 实现AI调用拦截器
 - 开发Prompt编辑器
 - 添加调用确认对话框
 
 **第三阶段（1-2周）**：
+
 - 错误边界和降级策略
 - 代码分割和懒加载
 - 全面测试和bug修复

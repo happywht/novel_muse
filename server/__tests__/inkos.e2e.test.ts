@@ -33,15 +33,15 @@ const testMuseProject = {
       arc: {
         startingPoint: '普通少年',
         midpoint: '获得传承',
-        endingPoint: '成为强者'
-      }
+        endingPoint: '成为强者',
+      },
     },
     {
       id: 'char-002',
       name: '苏晴',
       role: 'DEUTERAGONIST',
-      description: '女主角，神秘身世'
-    }
+      description: '女主角，神秘身世',
+    },
   ],
   world: {
     settings: [
@@ -49,12 +49,12 @@ const testMuseProject = {
         id: 'world-001',
         category: 'GEOGRAPHY',
         name: '九州大陆',
-        description: '故事发生的主要大陆'
-      }
-    ]
+        description: '故事发生的主要大陆',
+      },
+    ],
   },
   plotOutline: '第一卷：觉醒篇\n第二卷：成长篇\n第三卷：争霸篇',
-  chapters: []
+  chapters: [],
 };
 
 describe('inkos API E2E Tests', () => {
@@ -99,7 +99,7 @@ describe('inkos API E2E Tests', () => {
           characters: testMuseProject.characters,
           world: testMuseProject.world,
           plotOutline: testMuseProject.plotOutline,
-          chapters: testMuseProject.chapters
+          chapters: testMuseProject.chapters,
         })
         .expect('Content-Type', /json/);
 
@@ -112,13 +112,11 @@ describe('inkos API E2E Tests', () => {
   describe('GET /api/inkos/status/:taskId', () => {
     it('should return task status', async () => {
       // 先创建一个任务
-      const importResponse = await request(app)
-        .post('/api/inkos/import')
-        .send({
-          projectId: 'test-status-001',
-          title: 'Status Test Project',
-          premise: 'Testing status endpoint'
-        });
+      const importResponse = await request(app).post('/api/inkos/import').send({
+        projectId: 'test-status-001',
+        title: 'Status Test Project',
+        premise: 'Testing status endpoint',
+      });
 
       const taskId = importResponse.body.taskId;
 
@@ -166,14 +164,50 @@ describe('inkos API E2E Tests', () => {
     });
   });
 
-  describe('GET /api/inkos/audit', () => {
-    it('should require projectId', async () => {
+  describe('POST /api/inkos/audit', () => {
+    it('should require projectId in request body', async () => {
       const response = await request(app)
-        .get('/api/inkos/audit')
+        .post('/api/inkos/audit')
+        .send({})
+        .expect('Content-Type', /json/)
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toHaveProperty('code');
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('should create audit task with projectId', async () => {
+      const response = await request(app)
+        .post('/api/inkos/audit')
+        .send({
+          projectId: 'test-project-001',
+        })
         .expect('Content-Type', /json/);
 
-      // 可能返回400或需要projectId参数
-      expect([400, 422]).toContain(response.status);
+      // 可能返回200或202
+      expect([200, 202]).toContain(response.status);
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data).toHaveProperty('taskId');
+    });
+
+    it('should accept optional chapterId and dimensions', async () => {
+      const response = await request(app)
+        .post('/api/inkos/audit')
+        .send({
+          projectId: 'test-project-001',
+          chapterId: 'chapter-001',
+          dimensions: ['plot_structure', 'char_depth'],
+          options: {
+            checkContinuity: true,
+            checkAITells: true,
+          },
+        })
+        .expect('Content-Type', /json/);
+
+      expect([200, 202]).toContain(response.status);
+      expect(response.body).toHaveProperty('data');
+      expect(response.body.data).toHaveProperty('taskId');
     });
   });
 });
@@ -185,7 +219,7 @@ describe('inkos Data Conversion Tests', () => {
       const expectedInkosFields = {
         name: museCharacter.name,
         role: museCharacter.role,
-        description: museCharacter.description
+        description: museCharacter.description,
       };
 
       expect(expectedInkosFields.name).toBe('林云');

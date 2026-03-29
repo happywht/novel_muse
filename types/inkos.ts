@@ -3,7 +3,7 @@
  * Frontend type definitions for Muse-inkos API communication
  */
 
-import type { ProjectState, Character, Chapter, WorldSetting } from './index';
+import type { ProjectState, Character, Chapter, WorldSetting } from '../types';
 
 // ============================================
 // Request Types
@@ -257,13 +257,58 @@ export interface TaskStartedResponse {
 }
 
 /**
- * Error response
+ * Error codes for API responses
+ */
+export enum ErrorCode {
+  // Client errors (4xx)
+  BAD_REQUEST = 'BAD_REQUEST',
+  INVALID_INPUT = 'INVALID_INPUT',
+  MISSING_PARAMETER = 'MISSING_PARAMETER',
+  NOT_FOUND = 'NOT_FOUND',
+  UNAUTHORIZED = 'UNAUTHORIZED',
+  FORBIDDEN = 'FORBIDDEN',
+  CONFLICT = 'CONFLICT',
+  VALIDATION_ERROR = 'VALIDATION_ERROR',
+
+  // Server errors (5xx)
+  INTERNAL_ERROR = 'INTERNAL_ERROR',
+  SERVICE_UNAVAILABLE = 'SERVICE_UNAVAILABLE',
+  TIMEOUT = 'TIMEOUT',
+  DEPENDENCY_ERROR = 'DEPENDENCY_ERROR',
+}
+
+/**
+ * Standard API error response format
+ * All API errors follow this structure for consistency
+ */
+export interface ApiErrorResponse {
+  error: {
+    code: string; // Machine-readable error code (e.g., "INVALID_INPUT", "NOT_FOUND")
+    message: string; // Human-readable error message
+    details?: unknown[]; // Additional error details (e.g., validation errors)
+  };
+  requestId: string; // Unique request identifier for debugging
+  timestamp: string; // ISO 8601 timestamp
+}
+
+/**
+ * Legacy error response format (deprecated)
+ * @deprecated Use ApiErrorResponse instead
  */
 export interface ErrorResponse {
   error: string;
   message?: string;
   details?: unknown;
   timestamp?: string;
+}
+
+/**
+ * Standard success response wrapper
+ */
+export interface ApiSuccessResponse<T> {
+  data: T;
+  requestId: string;
+  timestamp: string;
 }
 
 // ============================================

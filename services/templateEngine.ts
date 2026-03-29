@@ -175,25 +175,27 @@ export class PromptTemplateEngine {
         return '';
       }
 
-      return items.map((item, index) => {
-        let itemContent = content;
+      return items
+        .map((item, index) => {
+          let itemContent = content;
 
-        // 替换 {{this}} 为当前项
-        itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
+          // 替换 {{this}} 为当前项
+          itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
 
-        // 替换 {{@index}} 为索引
-        itemContent = itemContent.replace(/\{\{@index\}\}/g, String(index));
+          // 替换 {{@index}} 为索引
+          itemContent = itemContent.replace(/\{\{@index\}\}/g, String(index));
 
-        // 如果项是对象，替换其属性
-        if (typeof item === 'object' && item !== null) {
-          Object.keys(item).forEach(key => {
-            const pattern = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-            itemContent = itemContent.replace(pattern, String(item[key] ?? ''));
-          });
-        }
+          // 如果项是对象，替换其属性
+          if (typeof item === 'object' && item !== null) {
+            Object.keys(item).forEach((key) => {
+              const pattern = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
+              itemContent = itemContent.replace(pattern, String(item[key] ?? ''));
+            });
+          }
 
-        return itemContent;
-      }).join('');
+          return itemContent;
+        })
+        .join('');
     });
   }
 
@@ -287,7 +289,7 @@ export class PromptTemplateEngine {
     let hash = 0;
     for (let i = 0; i < template.length; i++) {
       const char = template.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32bit integer
     }
     return `template_${hash}`;
@@ -301,11 +303,8 @@ export const templateEngine = new PromptTemplateEngine();
 export const renderTemplate = (template: string, variables: Record<string, any>) =>
   templateEngine.render(template, variables);
 
-export const compileTemplate = (template: string) =>
-  templateEngine.compile(template);
+export const compileTemplate = (template: string) => templateEngine.compile(template);
 
-export const extractVariables = (template: string) =>
-  templateEngine.extractVariables(template);
+export const extractVariables = (template: string) => templateEngine.extractVariables(template);
 
-export const estimateTokens = (text: string) =>
-  templateEngine.estimateTokens(text);
+export const estimateTokens = (text: string) => templateEngine.estimateTokens(text);

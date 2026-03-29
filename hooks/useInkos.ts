@@ -90,56 +90,65 @@ export function useInkos(): UseInkosReturn {
   }, []);
 
   // Start task helper
-  const startTask = useCallback(async (
-    endpoint: string,
-    body: any
-  ): Promise<{ taskId: string }> => {
-    try {
-      setError(null);
-      setIsRunning(true);
+  const startTask = useCallback(
+    async (endpoint: string, body: any): Promise<{ taskId: string }> => {
+      try {
+        setError(null);
+        setIsRunning(true);
 
-      const response = await fetch(`${API_BASE}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+        const response = await fetch(`${API_BASE}${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Request failed with status ${response.status}`);
+        }
+
+        const data = await response.json();
+        setCurrentTask({
+          taskId: data.taskId,
+          status: 'pending',
+          progress: 0,
+          startedAt: new Date().toISOString(),
+        });
+
+        return { taskId: data.taskId };
+      } catch (err) {
+        setIsRunning(false);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setError(errorMessage);
+        throw err;
       }
-
-      const data = await response.json();
-      setCurrentTask({
-        taskId: data.taskId,
-        status: 'pending',
-        progress: 0,
-        startedAt: new Date().toISOString(),
-      });
-
-      return { taskId: data.taskId };
-    } catch (err) {
-      setIsRunning(false);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-      throw err;
-    }
-  }, []);
+    },
+    []
+  );
 
   // Import project
-  const importProject = useCallback(async (request: ImportRequest) => {
-    return startTask('/import', request);
-  }, [startTask]);
+  const importProject = useCallback(
+    async (request: ImportRequest) => {
+      return startTask('/import', request);
+    },
+    [startTask]
+  );
 
   // Export project
-  const exportProject = useCallback(async (request: ExportRequest) => {
-    return startTask('/export', request);
-  }, [startTask]);
+  const exportProject = useCallback(
+    async (request: ExportRequest) => {
+      return startTask('/export', request);
+    },
+    [startTask]
+  );
 
   // Write chapter
-  const writeChapter = useCallback(async (request: WriteRequest) => {
-    return startTask('/write', request);
-  }, [startTask]);
+  const writeChapter = useCallback(
+    async (request: WriteRequest) => {
+      return startTask('/write', request);
+    },
+    [startTask]
+  );
 
   // Run audit
   const runAudit = useCallback(async (request: AuditRequest) => {
@@ -222,75 +231,76 @@ export function useInkos(): UseInkosReturn {
   }, []);
 
   // Subscribe to task via SSE
-  const subscribeToTask = useCallback((taskId: string, projectId: string) => {
-    // Close existing connection
-    if (eventSource) {
-      eventSource.close();
-    }
-
-    const newEventSource = new EventSource(
-      `${API_BASE}/stream/${taskId}?projectId=${projectId}`
-    );
-
-    newEventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        if (data.type === 'progress') {
-          setProgress({
-            phase: data.phase || 'writing',
-            percentage: data.percentage || 0,
-            message: data.message || '',
-            chapterNumber: data.chapterNumber,
-          });
-
-          if (currentTask) {
-            setCurrentTask({
-              ...currentTask,
-              progress: data.percentage || 0,
-              message: data.message,
-            });
-          }
-        } else if (data.type === 'complete') {
-          setIsRunning(false);
-          setProgress(null);
-          if (currentTask) {
-            setCurrentTask({
-              ...currentTask,
-              status: 'complete',
-              result: data.result,
-              completedAt: new Date().toISOString(),
-            });
-          }
-          newEventSource.close();
-          setEventSource(null);
-        } else if (data.type === 'error') {
-          setIsRunning(false);
-          setError(data.message || 'Task failed');
-          if (currentTask) {
-            setCurrentTask({
-              ...currentTask,
-              status: 'error',
-              error: data.message,
-            });
-          }
-          newEventSource.close();
-          setEventSource(null);
-        }
-      } catch (err) {
-        console.error('Failed to parse SSE data:', err);
+  const subscribeToTask = useCallback(
+    (taskId: string, projectId: string) => {
+      // Close existing connection
+      if (eventSource) {
+        eventSource.close();
       }
-    };
 
-    newEventSource.onerror = (err) => {
-      console.error('SSE connection error:', err);
-      setError('Connection to task stream failed');
-      newEventSource.close();
-      setEventSource(null);
-    };
+      const newEventSource = new EventSource(`${API_BASE}/stream/${taskId}?projectId=${projectId}`);
 
-    setEventSource(newEventSource);
-  }, [currentTask, eventSource]);
+      newEventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          if (data.type === 'progress') {
+            setProgress({
+              phase: data.phase || 'writing',
+              percentage: data.percentage || 0,
+              message: data.message || '',
+              chapterNumber: data.chapterNumber,
+            });
+
+            if (currentTask) {
+              setCurrentTask({
+                ...currentTask,
+                progress: data.percentage || 0,
+                message: data.message,
+              });
+            }
+          } else if (data.type === 'complete') {
+            setIsRunning(false);
+            setProgress(null);
+            if (currentTask) {
+              setCurrentTask({
+                ...currentTask,
+                status: 'complete',
+                result: data.result,
+                completedAt: new Date().toISOString(),
+              });
+            }
+            newEventSource.close();
+            setEventSource(null);
+          } else if (data.type === 'error') {
+            setIsRunning(false);
+            setError(data.message || 'Task failed');
+            if (currentTask) {
+              setCurrentTask({
+                ...currentTask,
+                status: 'error',
+                error: data.message,
+              });
+            }
+            newEventSource.close();
+            setEventSource(null);
+          }
+        } catch (err) {
+          console.error('Failed to parse SSE data:', err);
+        }
+      };
+
+      newEventSource.onerror = (err) => {
+        console.error('SSE connection error:', err);
+        setError('Connection to task stream failed');
+        newEventSource.close();
+        setEventSource(null);
+      };
+
+      setEventSource(newEventSource);
+    },
+    [currentTask, eventSource]
+  );
 
   // Unsubscribe from task
   const unsubscribeFromTask = useCallback(() => {

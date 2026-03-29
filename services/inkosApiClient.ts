@@ -18,7 +18,8 @@ import type {
   AuditResult,
   HealthCheckResult,
   TaskStartedResponse,
-  ErrorResponse,
+  ApiErrorResponse,
+  ApiSuccessResponse,
   GenreInfo,
   AuditDimensionInfo,
   InkosSSEEvent,
@@ -41,7 +42,9 @@ export class InkosApiError extends Error {
   constructor(
     message: string,
     public statusCode: number,
-    public details?: unknown
+    public code: string = 'UNKNOWN_ERROR',
+    public details?: unknown[],
+    public requestId?: string
   ) {
     super(message);
     this.name = 'InkosApiError';
@@ -49,31 +52,42 @@ export class InkosApiError extends Error {
 }
 
 /**
- * Parse API error response
+ * Parse API error response (supports both new and legacy formats)
  */
 async function parseErrorResponse(response: Response): Promise<InkosApiError> {
   try {
-    const errorData = (await response.json()) as ErrorResponse;
+    const errorData = (await response.json()) as ApiErrorResponse | { error: string; message?: string; details?: unknown };
+
+    // Check for new standardized format
+    if ('error' in errorData && typeof errorData.error === 'object' && 'code' in errorData.error) {
+      const apiError = errorData as ApiErrorResponse;
+      return new InkosApiError(
+        apiError.error.message,
+        response.status,
+        apiError.error.code,
+        apiError.error.details as unknown[] | undefined,
+        apiError.requestId
+      );
+    }
+
+    // Handle legacy format for backward compatibility
+    const legacyError = errorData as { error: string; message?: string; details?: unknown };
     return new InkosApiError(
-      errorData.message || errorData.error || 'Unknown error',
+      legacyError.message || legacyError.error || 'Unknown error',
       response.status,
-      errorData.details
+      'LEGACY_ERROR',
+      legacyError.details ? [legacyError.details] : undefined
     );
   } catch {
-    return new InkosApiError(
-      response.statusText || 'Request failed',
-      response.status
-    );
+    return new InkosApiError(response.statusText || 'Request failed', response.status);
   }
 }
 
 /**
  * Make API request with error handling
+ * Automatically extracts data from standardized success responses
  */
-async function apiRequest<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${INKOS_API_BASE}${endpoint}`;
 
   const response = await fetch(url, {
@@ -88,7 +102,15 @@ async function apiRequest<T>(
     throw await parseErrorResponse(response);
   }
 
-  return response.json();
+  const json = await response.json();
+
+  // Handle standardized success response format
+  if (json && typeof json === 'object' && 'data' in json && 'requestId' in json) {
+    return (json as ApiSuccessResponse<T>).data;
+  }
+
+  // Return raw response for non-standardized endpoints
+  return json as T;
 }
 
 // ============================================
@@ -173,9 +195,7 @@ function buildImportRequest(project: ProjectState): ImportRequest {
 /**
  * Import Muse project to inkos format
  */
-export async function importToInkos(
-  project: ProjectState
-): Promise<TaskStartedResponse> {
+export async function importToInkos(project: ProjectState): Promise<TaskStartedResponse> {
   const request = buildImportRequest(project);
   return apiRequest<TaskStartedResponse>('/import', {
     method: 'POST',
@@ -237,6 +257,12 @@ export async function writeChapter(
 
 /**
  * Run 33-dimension audit
+ *
+ * @deprecated Use runAudit instead - now uses POST method exclusively
+ *
+ * @param projectId - Muse project ID (required)
+ * @param options - Audit options including chapterId, dimensions, and check flags
+ * @returns Task started response with taskId
  */
 export async function runAudit(
   projectId: string,
@@ -249,37 +275,29 @@ export async function runAudit(
     checkStyle?: boolean;
   }
 ): Promise<TaskStartedResponse> {
-  const params = new URLSearchParams();
-  params.set('projectId', projectId);
+  const request: AuditRequest = {
+    projectId,
+    chapterId: options?.chapterId,
+    dimensions: options?.dimensions,
+    options: {
+      checkContinuity: options?.checkContinuity,
+      checkAITells: options?.checkAITells,
+      checkSensitiveWords: options?.checkSensitiveWords,
+      checkStyle: options?.checkStyle,
+    },
+  };
 
-  if (options?.chapterId) {
-    params.set('chapterId', options.chapterId);
-  }
-  if (options?.dimensions && options.dimensions.length > 0) {
-    params.set('dimensions', options.dimensions.join(','));
-  }
-  if (options?.checkContinuity !== undefined) {
-    params.set('checkContinuity', String(options.checkContinuity));
-  }
-  if (options?.checkAITells !== undefined) {
-    params.set('checkAITells', String(options.checkAITells));
-  }
-  if (options?.checkSensitiveWords !== undefined) {
-    params.set('checkSensitiveWords', String(options.checkSensitiveWords));
-  }
-  if (options?.checkStyle !== undefined) {
-    params.set('checkStyle', String(options.checkStyle));
-  }
-
-  return apiRequest<TaskStartedResponse>(`/audit?${params.toString()}`);
+  return apiRequest<TaskStartedResponse>('/audit', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
 }
 
 /**
- * Run audit with POST request (for complex options)
+ * Run audit with full request object
+ * Use this for more control over the audit request
  */
-export async function runAuditPost(
-  request: AuditRequest
-): Promise<TaskStartedResponse> {
+export async function runAuditWithRequest(request: AuditRequest): Promise<TaskStartedResponse> {
   return apiRequest<TaskStartedResponse>('/audit', {
     method: 'POST',
     body: JSON.stringify(request),
@@ -494,9 +512,9 @@ export const inkosApiClient = {
   // Write
   writeChapter,
 
-  // Audit
+  // Audit (POST method only)
   runAudit,
-  runAuditPost,
+  runAuditWithRequest,
 
   // Task Management
   getTaskStatus,

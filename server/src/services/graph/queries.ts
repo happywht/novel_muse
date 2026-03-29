@@ -1,10 +1,10 @@
 import { getDriver } from './client';
 
 export interface PhysicalStatus {
-    name: string;
-    location: string;
-    state: string;
-    isDead: boolean;
+  name: string;
+  location: string;
+  state: string;
+  isDead: boolean;
 }
 
 /**
@@ -12,105 +12,108 @@ export interface PhysicalStatus {
  * @param projectId Project ID
  * @param includeTypes Optional list of node labels to include (e.g., ['Character', 'WorldSetting'])
  */
-export const getProjectGraph = async (projectId: string, includeTypes?: string[]): Promise<{
-    nodes: any[];
-    edges: any[];
+export const getProjectGraph = async (
+  projectId: string,
+  includeTypes?: string[]
+): Promise<{
+  nodes: any[];
+  edges: any[];
 }> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // Build the where clause for labels if provided
-        const labelFilter = (includeTypes && includeTypes.length > 0)
-            ? `AND any(label IN labels(n) WHERE label IN $includeTypes)`
-            : '';
+  try {
+    // Build the where clause for labels if provided
+    const labelFilter =
+      includeTypes && includeTypes.length > 0
+        ? `AND any(label IN labels(n) WHERE label IN $includeTypes)`
+        : '';
 
-        // Get all nodes
-        const nodesResult = await session.run(
-            `MATCH (n {projectId: $projectId})
+    // Get all nodes
+    const nodesResult = await session.run(
+      `MATCH (n {projectId: $projectId})
              WHERE 1=1 ${labelFilter}
              RETURN n, labels(n) as labels`,
-            { projectId, includeTypes }
-        );
+      { projectId, includeTypes }
+    );
 
-        const nodes = nodesResult.records.map(record => {
-            const node = record.get('n');
-            const labels = record.get('labels') as string[];
-            return {
-                id: node.properties.id,
-                label: node.properties.name || node.properties.title || node.properties.description?.substring(0, 30),
-                type: labels[0] || 'Unknown',
-                properties: { ...node.properties },
-            };
-        });
+    const nodes = nodesResult.records.map((record) => {
+      const node = record.get('n');
+      const labels = record.get('labels') as string[];
+      return {
+        id: node.properties.id,
+        label:
+          node.properties.name ||
+          node.properties.title ||
+          node.properties.description?.substring(0, 30),
+        type: labels[0] || 'Unknown',
+        properties: { ...node.properties },
+      };
+    });
 
-        // Get only edges between included nodes
-        const nodeIds = nodes.map(n => n.id);
-        const edgesResult = await session.run(
-            `MATCH (a {projectId: $projectId})-[r]->(b {projectId: $projectId})
+    // Get only edges between included nodes
+    const nodeIds = nodes.map((n) => n.id);
+    const edgesResult = await session.run(
+      `MATCH (a {projectId: $projectId})-[r]->(b {projectId: $projectId})
              WHERE a.id IN $nodeIds AND b.id IN $nodeIds
              RETURN a.id as source, b.id as target, type(r) as relType, properties(r) as props`,
-            { projectId, nodeIds }
-        );
+      { projectId, nodeIds }
+    );
 
-        const edges = edgesResult.records.map(record => ({
-            source: record.get('source'),
-            target: record.get('target'),
-            type: record.get('relType'),
-            properties: record.get('props') || {},
-        }));
+    const edges = edgesResult.records.map((record) => ({
+      source: record.get('source'),
+      target: record.get('target'),
+      type: record.get('relType'),
+      properties: record.get('props') || {},
+    }));
 
-        return { nodes, edges };
-    } finally {
-        await session.close();
-    }
+    return { nodes, edges };
+  } finally {
+    await session.close();
+  }
 };
 
 /**
  * Find shortest path between two entities
  */
-export const findPath = async (
-    projectId: string,
-    fromId: string,
-    toId: string
-): Promise<any[]> => {
-    const d = getDriver();
-    const session = d.session();
+export const findPath = async (projectId: string, fromId: string, toId: string): Promise<any[]> => {
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        const result = await session.run(
-            `MATCH path = shortestPath(
+  try {
+    const result = await session.run(
+      `MATCH path = shortestPath(
         (a {id: $fromId, projectId: $projectId})-[*..10]-(b {id: $toId, projectId: $projectId})
        )
        RETURN [n in nodes(path) | {id: n.id, name: coalesce(n.name, n.title), type: labels(n)[0]}] as nodes,
               [r in relationships(path) | {type: type(r)}] as rels`,
-            { fromId, toId, projectId }
-        );
+      { fromId, toId, projectId }
+    );
 
-        if (result.records.length === 0) return [];
+    if (result.records.length === 0) return [];
 
-        return result.records.map(r => ({
-            nodes: r.get('nodes'),
-            relationships: r.get('rels'),
-        }));
-    } finally {
-        await session.close();
-    }
+    return result.records.map((r) => ({
+      nodes: r.get('nodes'),
+      relationships: r.get('rels'),
+    }));
+  } finally {
+    await session.close();
+  }
 };
 
 /**
  * Get neighbors of a specific node
  */
 export const getNeighbors = async (
-    projectId: string,
-    nodeId: string
+  projectId: string,
+  nodeId: string
 ): Promise<{ node: any; neighbors: any[] }> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        const result = await session.run(
-            `MATCH (center {id: $nodeId, projectId: $projectId})
+  try {
+    const result = await session.run(
+      `MATCH (center {id: $nodeId, projectId: $projectId})
        OPTIONAL MATCH (center)-[r]-(neighbor {projectId: $projectId})
        RETURN center,
               labels(center) as centerLabels,
@@ -120,85 +123,87 @@ export const getNeighbors = async (
                 relType: type(r),
                 direction: CASE WHEN startNode(r) = center THEN 'OUT' ELSE 'IN' END
               }) as neighbors`,
-            { nodeId, projectId }
-        );
+      { nodeId, projectId }
+    );
 
-        if (result.records.length === 0) {
-            return { node: null, neighbors: [] };
-        }
-
-        const record = result.records[0];
-        const centerNode = record.get('center');
-        const centerLabels = record.get('centerLabels') as string[];
-
-        return {
-            node: {
-                id: centerNode.properties.id,
-                label: centerNode.properties.name || centerNode.properties.title,
-                type: centerLabels[0],
-                properties: { ...centerNode.properties },
-            },
-            neighbors: (record.get('neighbors') as any[])
-                .filter(n => n.node)
-                .map(n => ({
-                    id: n.node.properties.id,
-                    label: n.node.properties.name || n.node.properties.title,
-                    type: n.labels[0],
-                    relType: n.relType,
-                    direction: n.direction,
-                })),
-        };
-    } finally {
-        await session.close();
+    if (result.records.length === 0) {
+      return { node: null, neighbors: [] };
     }
+
+    const record = result.records[0];
+    const centerNode = record.get('center');
+    const centerLabels = record.get('centerLabels') as string[];
+
+    return {
+      node: {
+        id: centerNode.properties.id,
+        label: centerNode.properties.name || centerNode.properties.title,
+        type: centerLabels[0],
+        properties: { ...centerNode.properties },
+      },
+      neighbors: (record.get('neighbors') as any[])
+        .filter((n) => n.node)
+        .map((n) => ({
+          id: n.node.properties.id,
+          label: n.node.properties.name || n.node.properties.title,
+          type: n.labels[0],
+          relType: n.relType,
+          direction: n.direction,
+        })),
+    };
+  } finally {
+    await session.close();
+  }
 };
 
 /**
  * Create a manual edge
  */
 export const createEdge = async (
-    projectId: string,
-    sourceId: string,
-    targetId: string,
-    relType: string
+  projectId: string,
+  sourceId: string,
+  targetId: string,
+  relType: string
 ): Promise<void> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    // Sanitize relType to prevent Cypher injection
-    const sanitizedRelType = relType.replace(/[^A-Z_]/gi, '').toUpperCase();
-    if (!sanitizedRelType) {
-        throw new Error('Invalid relationship type');
-    }
+  // Sanitize relType to prevent Cypher injection
+  const sanitizedRelType = relType.replace(/[^A-Z_]/gi, '').toUpperCase();
+  if (!sanitizedRelType) {
+    throw new Error('Invalid relationship type');
+  }
 
-    try {
-        await session.run(
-            `MATCH (a {id: $sourceId, projectId: $projectId})
+  try {
+    await session.run(
+      `MATCH (a {id: $sourceId, projectId: $projectId})
              MATCH (b {id: $targetId, projectId: $projectId})
              MERGE (a)-[r:${sanitizedRelType}]->(b)
              RETURN r`,
-            { sourceId, targetId, projectId }
-        );
-        console.log(`🔗 Created edge ${sourceId} -[:${sanitizedRelType}]-> ${targetId} in project ${projectId}`);
-    } finally {
-        await session.close();
-    }
+      { sourceId, targetId, projectId }
+    );
+    console.log(
+      `🔗 Created edge ${sourceId} -[:${sanitizedRelType}]-> ${targetId} in project ${projectId}`
+    );
+  } finally {
+    await session.close();
+  }
 };
 
 /**
  * Get physical status (location, health, state) for a set of character names
  */
 export const getPhysicalStatus = async (
-    projectId: string,
-    characterNames: string[],
-    branchId: string = 'main'
+  projectId: string,
+  characterNames: string[],
+  branchId: string = 'main'
 ): Promise<PhysicalStatus[]> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        const result = await session.run(
-            `MATCH (c:Character {projectId: $projectId})
+  try {
+    const result = await session.run(
+      `MATCH (c:Character {projectId: $projectId})
              WHERE (c.branchId IS NULL OR c.branchId = 'main' OR c.branchId = $branchId)
              AND c.name IN $names
              OPTIONAL MATCH (c)-[r:LOCATED_IN]->(l:WorldSetting)
@@ -208,21 +213,21 @@ export const getPhysicalStatus = async (
                     l.title as location,
                     c.state as state,
                     c.isDead as isDead`,
-            { projectId, names: characterNames, branchId }
-        );
+      { projectId, names: characterNames, branchId }
+    );
 
-        return result.records.map(record => ({
-            name: record.get('name'),
-            location: record.get('location') || '未知地点',
-            state: record.get('state') || '正常',
-            isDead: record.get('isDead') === true
-        }));
-    } catch (err) {
-        console.error("Failed to fetch physical status:", err);
-        return [];
-    } finally {
-        await session.close();
-    }
+    return result.records.map((record) => ({
+      name: record.get('name'),
+      location: record.get('location') || '未知地点',
+      state: record.get('state') || '正常',
+      isDead: record.get('isDead') === true,
+    }));
+  } catch (err) {
+    console.error('Failed to fetch physical status:', err);
+    return [];
+  } finally {
+    await session.close();
+  }
 };
 
 /**
@@ -231,188 +236,192 @@ export const getPhysicalStatus = async (
  * @param plotNodeId 情节节点ID（可选，不传则获取整个项目的情节图）
  */
 export const getPlotNodeContext = async (
-    projectId: string,
-    plotNodeId?: string
+  projectId: string,
+  plotNodeId?: string
 ): Promise<{
-    plotNodes: any[];
-    characters: any[];
-    worldSettings: any[];
-    relationships: any[];
+  plotNodes: any[];
+  characters: any[];
+  worldSettings: any[];
+  relationships: any[];
 }> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 如果指定了 plotNodeId，获取该节点及其关联信息
-        // 否则获取整个项目的情节图
+  try {
+    // 如果指定了 plotNodeId，获取该节点及其关联信息
+    // 否则获取整个项目的情节图
 
-        // 1. 获取 PlotNodes
-        const plotNodesResult = plotNodeId
-            ? await session.run(
-                `MATCH (pn:PlotNode {projectId: $projectId, id: $plotNodeId}) RETURN pn`,
-                { projectId, plotNodeId }
-            )
-            : await session.run(
-                `MATCH (pn:PlotNode {projectId: $projectId}) RETURN pn ORDER BY pn.order`,
-                { projectId }
-            );
+    // 1. 获取 PlotNodes
+    const plotNodesResult = plotNodeId
+      ? await session.run(
+          `MATCH (pn:PlotNode {projectId: $projectId, id: $plotNodeId}) RETURN pn`,
+          { projectId, plotNodeId }
+        )
+      : await session.run(
+          `MATCH (pn:PlotNode {projectId: $projectId}) RETURN pn ORDER BY pn.order`,
+          { projectId }
+        );
 
-        // 2. 获取关联的 Characters
-        const charsResult = await session.run(
-            `MATCH (pn:PlotNode {projectId: $projectId})-[:INVOLVES]->(c:Character)
+    // 2. 获取关联的 Characters
+    const charsResult = await session.run(
+      `MATCH (pn:PlotNode {projectId: $projectId})-[:INVOLVES]->(c:Character)
              RETURN DISTINCT c`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        // 3. 获取关联的 WorldSettings
-        const settingsResult = await session.run(
-            `MATCH (pn:PlotNode {projectId: $projectId})-[:LOCATED_AT]->(w:WorldSetting)
+    // 3. 获取关联的 WorldSettings
+    const settingsResult = await session.run(
+      `MATCH (pn:PlotNode {projectId: $projectId})-[:LOCATED_AT]->(w:WorldSetting)
              RETURN DISTINCT w`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        // 4. 获取角色之间的关系
-        const relsResult = await session.run(
-            `MATCH (c1:Character {projectId: $projectId})-[r]->(c2:Character {projectId: $projectId})
+    // 4. 获取角色之间的关系
+    const relsResult = await session.run(
+      `MATCH (c1:Character {projectId: $projectId})-[r]->(c2:Character {projectId: $projectId})
              WHERE type(r) IN ['ENEMY_OF', 'ALLY_OF', 'LOVES', 'KIN_OF', 'MENTORS', 'RIVAL_OF', 'SERVES', 'FRIEND_OF']
              RETURN c1.name as subject, type(r) as relation, c2.name as object, r.weight as weight`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        return {
-            plotNodes: plotNodesResult.records.map(r => r.get('pn').properties),
-            characters: charsResult.records.map(r => r.get('c').properties),
-            worldSettings: settingsResult.records.map(r => r.get('w').properties),
-            relationships: relsResult.records.map(r => ({
-                subject: r.get('subject'),
-                relation: r.get('relation'),
-                object: r.get('object'),
-                weight: r.get('weight')
-            }))
-        };
-    } finally {
-        await session.close();
-    }
+    return {
+      plotNodes: plotNodesResult.records.map((r) => r.get('pn').properties),
+      characters: charsResult.records.map((r) => r.get('c').properties),
+      worldSettings: settingsResult.records.map((r) => r.get('w').properties),
+      relationships: relsResult.records.map((r) => ({
+        subject: r.get('subject'),
+        relation: r.get('relation'),
+        object: r.get('object'),
+        weight: r.get('weight'),
+      })),
+    };
+  } finally {
+    await session.close();
+  }
 };
 
 /**
  * 获取情节的上下游链路
  */
 export const getPlotLineage = async (
-    projectId: string,
-    plotNodeId: string
+  projectId: string,
+  plotNodeId: string
 ): Promise<{
-    node: any;
-    predecessors: any[];
-    successors: any[];
+  node: any;
+  predecessors: any[];
+  successors: any[];
 }> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 获取当前节点
-        const nodeResult = await session.run(
-            `MATCH (pn:PlotNode {projectId: $projectId, id: $plotNodeId}) RETURN pn`,
-            { projectId, plotNodeId }
-        );
+  try {
+    // 获取当前节点
+    const nodeResult = await session.run(
+      `MATCH (pn:PlotNode {projectId: $projectId, id: $plotNodeId}) RETURN pn`,
+      { projectId, plotNodeId }
+    );
 
-        // 获取前驱节点
-        const predResult = await session.run(
-            `MATCH (prev:PlotNode {projectId: $projectId})-[:PRECEDES]->(pn:PlotNode {id: $plotNodeId})
+    // 获取前驱节点
+    const predResult = await session.run(
+      `MATCH (prev:PlotNode {projectId: $projectId})-[:PRECEDES]->(pn:PlotNode {id: $plotNodeId})
              RETURN prev ORDER BY prev.order`,
-            { projectId, plotNodeId }
-        );
+      { projectId, plotNodeId }
+    );
 
-        // 获取后继节点
-        const succResult = await session.run(
-            `MATCH (pn:PlotNode {id: $plotNodeId})-[:PRECEDES]->(next:PlotNode {projectId: $projectId})
+    // 获取后继节点
+    const succResult = await session.run(
+      `MATCH (pn:PlotNode {id: $plotNodeId})-[:PRECEDES]->(next:PlotNode {projectId: $projectId})
              RETURN next ORDER BY next.order`,
-            { projectId, plotNodeId }
-        );
+      { projectId, plotNodeId }
+    );
 
-        return {
-            node: nodeResult.records[0]?.get('pn').properties || null,
-            predecessors: predResult.records.map(r => r.get('prev').properties),
-            successors: succResult.records.map(r => r.get('next').properties)
-        };
-    } finally {
-        await session.close();
-    }
+    return {
+      node: nodeResult.records[0]?.get('pn').properties || null,
+      predecessors: predResult.records.map((r) => r.get('prev').properties),
+      successors: succResult.records.map((r) => r.get('next').properties),
+    };
+  } finally {
+    await session.close();
+  }
 };
 
 /**
  * 获取角色参与的所有冲突场景
  */
 export const getCharacterConflicts = async (
-    projectId: string,
-    characterId: string
-): Promise<Array<{
+  projectId: string,
+  characterId: string
+): Promise<
+  Array<{
     plotNode: any;
     conflictType: string;
     stakes: string;
     intensity: number;
     otherParticipants: any[];
-}>> => {
-    const d = getDriver();
-    const session = d.session();
+  }>
+> => {
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        const result = await session.run(
-            `MATCH (c:Character {id: $characterId, projectId: $projectId})<-[r:HAS_CONFLICT_PARTICIPANT]-(pn:PlotNode)
+  try {
+    const result = await session.run(
+      `MATCH (c:Character {id: $characterId, projectId: $projectId})<-[r:HAS_CONFLICT_PARTICIPANT]-(pn:PlotNode)
              MATCH (other:Character)<-[:HAS_CONFLICT_PARTICIPANT]-(pn)
              WHERE other.id <> $characterId
              RETURN pn, r.conflictType as conflictType, r.stakes as stakes, r.intensity as intensity, collect(other) as otherParticipants
              ORDER BY r.intensity DESC`,
-            { projectId, characterId }
-        );
+      { projectId, characterId }
+    );
 
-        return result.records.map(record => ({
-            plotNode: record.get('pn').properties,
-            conflictType: record.get('conflictType'),
-            stakes: record.get('stakes'),
-            intensity: record.get('intensity'),
-            otherParticipants: record.get('otherParticipants').map((n: any) => n.properties)
-        }));
-    } finally {
-        await session.close();
-    }
+    return result.records.map((record) => ({
+      plotNode: record.get('pn').properties,
+      conflictType: record.get('conflictType'),
+      stakes: record.get('stakes'),
+      intensity: record.get('intensity'),
+      otherParticipants: record.get('otherParticipants').map((n: any) => n.properties),
+    }));
+  } finally {
+    await session.close();
+  }
 };
 
 /**
  * 获取项目中所有高强度的冲突场景（intensity >= 7）
  */
 export const getHighIntensityConflicts = async (
-    projectId: string
-): Promise<Array<{
+  projectId: string
+): Promise<
+  Array<{
     plotNode: any;
     conflictType: string;
     stakes: string;
     intensity: number;
     participants: any[];
-}>> => {
-    const d = getDriver();
-    const session = d.session();
+  }>
+> => {
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        const result = await session.run(
-            `MATCH (pn:PlotNode {projectId: $projectId})-[r:HAS_CONFLICT_PARTICIPANT]->(c:Character)
+  try {
+    const result = await session.run(
+      `MATCH (pn:PlotNode {projectId: $projectId})-[r:HAS_CONFLICT_PARTICIPANT]->(c:Character)
              WHERE r.intensity >= 7
              WITH pn, r, collect(c) as participants
              RETURN pn, r.conflictType as conflictType, r.stakes as stakes, r.intensity as intensity, participants
              ORDER BY r.intensity DESC`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        return result.records.map(record => ({
-            plotNode: record.get('pn').properties,
-            conflictType: record.get('conflictType'),
-            stakes: record.get('stakes'),
-            intensity: record.get('intensity'),
-            participants: record.get('participants').map((n: any) => n.properties)
-        }));
-    } finally {
-        await session.close();
-    }
+    return result.records.map((record) => ({
+      plotNode: record.get('pn').properties,
+      conflictType: record.get('conflictType'),
+      stakes: record.get('stakes'),
+      intensity: record.get('intensity'),
+      participants: record.get('participants').map((n: any) => n.properties),
+    }));
+  } finally {
+    await session.close();
+  }
 };
 
 /**
@@ -422,144 +431,143 @@ export const getHighIntensityConflicts = async (
  * @param depth 查询深度（默认2）
  */
 export const getWorldSettingNetwork = async (
-    projectId: string,
-    settingId?: string,
-    depth: number = 2
+  projectId: string,
+  settingId?: string,
+  depth: number = 2
 ): Promise<{
-    settings: any[];
-    relationships: Array<{
-        source: string;
-        target: string;
-        type: string;
-    }>;
-    relatedCharacters: any[];
-    relatedPlotNodes: any[];
+  settings: any[];
+  relationships: Array<{
+    source: string;
+    target: string;
+    type: string;
+  }>;
+  relatedCharacters: any[];
+  relatedPlotNodes: any[];
 }> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 1. 获取 WorldSetting 节点
-        const settingsResult = settingId
-            ? await session.run(
-                `MATCH (w:WorldSetting {projectId: $projectId, id: $settingId}) RETURN w`,
-                { projectId, settingId }
-            )
-            : await session.run(
-                `MATCH (w:WorldSetting {projectId: $projectId}) RETURN w`,
-                { projectId }
-            );
+  try {
+    // 1. 获取 WorldSetting 节点
+    const settingsResult = settingId
+      ? await session.run(
+          `MATCH (w:WorldSetting {projectId: $projectId, id: $settingId}) RETURN w`,
+          { projectId, settingId }
+        )
+      : await session.run(`MATCH (w:WorldSetting {projectId: $projectId}) RETURN w`, { projectId });
 
-        // 2. 获取 WorldSetting 之间的关系
-        const relsResult = await session.run(
-            `MATCH (w1:WorldSetting {projectId: $projectId})-[r:CONTAINS|DEPENDS_ON|CONFLICTS_WITH|ADJACENT_TO]-(w2:WorldSetting {projectId: $projectId})
+    // 2. 获取 WorldSetting 之间的关系
+    const relsResult = await session.run(
+      `MATCH (w1:WorldSetting {projectId: $projectId})-[r:CONTAINS|DEPENDS_ON|CONFLICTS_WITH|ADJACENT_TO]-(w2:WorldSetting {projectId: $projectId})
              RETURN w1.id as source, type(r) as type, w2.id as target`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        // 3. 获取关联的角色
-        const charsResult = await session.run(
-            `MATCH (c:Character {projectId: $projectId})-[r:RESIDES_IN|ORIGINATED_FROM|CONTROLS_TERRITORY]->(w:WorldSetting {projectId: $projectId})
+    // 3. 获取关联的角色
+    const charsResult = await session.run(
+      `MATCH (c:Character {projectId: $projectId})-[r:RESIDES_IN|ORIGINATED_FROM|CONTROLS_TERRITORY]->(w:WorldSetting {projectId: $projectId})
              RETURN DISTINCT c`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        // 4. 获取关联的情节节点
-        const plotsResult = await session.run(
-            `MATCH (pn:PlotNode {projectId: $projectId})-[:LOCATED_IN]->(w:WorldSetting {projectId: $projectId})
+    // 4. 获取关联的情节节点
+    const plotsResult = await session.run(
+      `MATCH (pn:PlotNode {projectId: $projectId})-[:LOCATED_IN]->(w:WorldSetting {projectId: $projectId})
              RETURN DISTINCT pn`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        return {
-            settings: settingsResult.records.map(r => r.get('w').properties),
-            relationships: relsResult.records.map(r => ({
-                source: r.get('source'),
-                target: r.get('target'),
-                type: r.get('type')
-            })),
-            relatedCharacters: charsResult.records.map(r => r.get('c').properties),
-            relatedPlotNodes: plotsResult.records.map(r => r.get('pn').properties)
-        };
-    } finally {
-        await session.close();
-    }
+    return {
+      settings: settingsResult.records.map((r) => r.get('w').properties),
+      relationships: relsResult.records.map((r) => ({
+        source: r.get('source'),
+        target: r.get('target'),
+        type: r.get('type'),
+      })),
+      relatedCharacters: charsResult.records.map((r) => r.get('c').properties),
+      relatedPlotNodes: plotsResult.records.map((r) => r.get('pn').properties),
+    };
+  } finally {
+    await session.close();
+  }
 };
 
 /**
  * 获取角色与世界设定的所有关联
  */
 export const getCharacterWorldRelations = async (
-    projectId: string,
-    characterId: string
-): Promise<Array<{
+  projectId: string,
+  characterId: string
+): Promise<
+  Array<{
     setting: any;
     relationType: string;
-}>> => {
-    const d = getDriver();
-    const session = d.session();
+  }>
+> => {
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        const result = await session.run(
-            `MATCH (c:Character {id: $characterId, projectId: $projectId})-[r:RESIDES_IN|ORIGINATED_FROM|CONTROLS_TERRITORY|EXILED_FROM]->(w:WorldSetting)
+  try {
+    const result = await session.run(
+      `MATCH (c:Character {id: $characterId, projectId: $projectId})-[r:RESIDES_IN|ORIGINATED_FROM|CONTROLS_TERRITORY|EXILED_FROM]->(w:WorldSetting)
              RETURN w as setting, type(r) as relationType`,
-            { projectId, characterId }
-        );
+      { projectId, characterId }
+    );
 
-        return result.records.map(r => ({
-            setting: r.get('setting').properties,
-            relationType: r.get('relationType')
-        }));
-    } finally {
-        await session.close();
-    }
+    return result.records.map((r) => ({
+      setting: r.get('setting').properties,
+      relationType: r.get('relationType'),
+    }));
+  } finally {
+    await session.close();
+  }
 };
 
 /**
  * 获取世界设定的层级结构（地理层级等）
  */
 export const getSettingHierarchy = async (
-    projectId: string,
-    rootSettingId?: string
+  projectId: string,
+  rootSettingId?: string
 ): Promise<{
-    root: any | null;
-    hierarchy: any[];
+  root: any | null;
+  hierarchy: any[];
 }> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 如果指定了根节点，从该节点开始
-        // 否则查找所有顶级节点（没有父节点的）
+  try {
+    // 如果指定了根节点，从该节点开始
+    // 否则查找所有顶级节点（没有父节点的）
 
-        const rootsResult = rootSettingId
-            ? await session.run(
-                `MATCH (w:WorldSetting {id: $rootId, projectId: $projectId})
+    const rootsResult = rootSettingId
+      ? await session.run(
+          `MATCH (w:WorldSetting {id: $rootId, projectId: $projectId})
                  WHERE NOT (w)<-[:CONTAINS]-(:WorldSetting)
                  RETURN w`,
-                { projectId, rootId: rootSettingId }
-            )
-            : await session.run(
-                `MATCH (w:WorldSetting {projectId: $projectId})
+          { projectId, rootId: rootSettingId }
+        )
+      : await session.run(
+          `MATCH (w:WorldSetting {projectId: $projectId})
                  WHERE NOT (w)<-[:CONTAINS]-(:WorldSetting)
                  RETURN w`,
-                { projectId }
-            );
-
-        // 获取所有层级关系
-        const hierarchyResult = await session.run(
-            `MATCH path = (parent:WorldSetting {projectId: $projectId})-[:CONTAINS*1..5]->(child:WorldSetting)
-             RETURN [node in nodes(path) | {id: node.id, title: node.title}] as path`,
-            { projectId }
+          { projectId }
         );
 
-        return {
-            root: rootsResult.records[0]?.get('w').properties || null,
-            hierarchy: hierarchyResult.records.map(r => r.get('path'))
-        };
-    } finally {
-        await session.close();
-    }
+    // 获取所有层级关系
+    const hierarchyResult = await session.run(
+      `MATCH path = (parent:WorldSetting {projectId: $projectId})-[:CONTAINS*1..5]->(child:WorldSetting)
+             RETURN [node in nodes(path) | {id: node.id, title: node.title}] as path`,
+      { projectId }
+    );
+
+    return {
+      root: rootsResult.records[0]?.get('w').properties || null,
+      hierarchy: hierarchyResult.records.map((r) => r.get('path')),
+    };
+  } finally {
+    await session.close();
+  }
 };
 
 // ============================================================
@@ -570,13 +578,13 @@ export const getSettingHierarchy = async (
  * 角色特征接口
  */
 export interface CharacterTraits {
-    characterId: string;
-    characterName: string;
-    desire: string | null;
-    fear: string | null;
-    weakness: string | null;
-    signature: string | null;
-    contrast: string | null;
+  characterId: string;
+  characterName: string;
+  desire: string | null;
+  fear: string | null;
+  weakness: string | null;
+  signature: string | null;
+  contrast: string | null;
 }
 
 /**
@@ -585,15 +593,15 @@ export interface CharacterTraits {
  * @param characterId 角色ID
  */
 export const getCharacterTraits = async (
-    projectId: string,
-    characterId: string
+  projectId: string,
+  characterId: string
 ): Promise<CharacterTraits | null> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        const result = await session.run(
-            `MATCH (c:Character {id: $characterId, projectId: $projectId})
+  try {
+    const result = await session.run(
+      `MATCH (c:Character {id: $characterId, projectId: $projectId})
              RETURN c.id as characterId,
                     c.name as characterName,
                     c.desire as desire,
@@ -601,45 +609,45 @@ export const getCharacterTraits = async (
                     c.weakness as weakness,
                     c.signature as signature,
                     c.contrast as contrast`,
-            { projectId, characterId }
-        );
+      { projectId, characterId }
+    );
 
-        if (result.records.length === 0) {
-            return null;
-        }
-
-        const record = result.records[0];
-        return {
-            characterId: record.get('characterId'),
-            characterName: record.get('characterName'),
-            desire: record.get('desire'),
-            fear: record.get('fear'),
-            weakness: record.get('weakness'),
-            signature: record.get('signature'),
-            contrast: record.get('contrast')
-        };
-    } finally {
-        await session.close();
+    if (result.records.length === 0) {
+      return null;
     }
+
+    const record = result.records[0];
+    return {
+      characterId: record.get('characterId'),
+      characterName: record.get('characterName'),
+      desire: record.get('desire'),
+      fear: record.get('fear'),
+      weakness: record.get('weakness'),
+      signature: record.get('signature'),
+      contrast: record.get('contrast'),
+    };
+  } finally {
+    await session.close();
+  }
 };
 
 /**
  * 角色演变记录接口
  */
 export interface CharacterEvolutionRecord {
-    echoId: string;
-    timestamp: number;
-    type: 'CHARACTER' | 'WORLD';
-    description: string;
-    reason: string;
-    status: string;
-    triples: Array<{
-        subject: string;
-        relation: string;
-        object: string;
-        weight?: number;
-        trajectory?: string;
-    }>;
+  echoId: string;
+  timestamp: number;
+  type: 'CHARACTER' | 'WORLD';
+  description: string;
+  reason: string;
+  status: string;
+  triples: Array<{
+    subject: string;
+    relation: string;
+    object: string;
+    weight?: number;
+    trajectory?: string;
+  }>;
 }
 
 /**
@@ -648,30 +656,30 @@ export interface CharacterEvolutionRecord {
  * @param characterId 角色ID
  */
 export const getCharacterEvolution = async (
-    projectId: string,
-    characterId: string
+  projectId: string,
+  characterId: string
 ): Promise<CharacterEvolutionRecord[]> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 先获取角色名称
-        const charResult = await session.run(
-            `MATCH (c:Character {id: $characterId, projectId: $projectId})
+  try {
+    // 先获取角色名称
+    const charResult = await session.run(
+      `MATCH (c:Character {id: $characterId, projectId: $projectId})
              RETURN c.name as name`,
-            { projectId, characterId }
-        );
+      { projectId, characterId }
+    );
 
-        if (charResult.records.length === 0) {
-            return [];
-        }
+    if (charResult.records.length === 0) {
+      return [];
+    }
 
-        const characterName = charResult.records[0].get('name');
+    const characterName = charResult.records[0].get('name');
 
-        // 查找与该角色相关的所有 Echo 节点
-        // Echo 通过 targetId 或 targetName 关联角色
-        const result = await session.run(
-            `MATCH (e:Echo {projectId: $projectId, type: 'CHARACTER'})
+    // 查找与该角色相关的所有 Echo 节点
+    // Echo 通过 targetId 或 targetName 关联角色
+    const result = await session.run(
+      `MATCH (e:Echo {projectId: $projectId, type: 'CHARACTER'})
              WHERE e.targetId = $characterId OR e.targetName = $characterName
              RETURN e.id as echoId,
                     e.timestamp as timestamp,
@@ -681,35 +689,35 @@ export const getCharacterEvolution = async (
                     e.status as status,
                     e.triples as triples
              ORDER BY e.timestamp DESC`,
-            { projectId, characterId, characterName }
-        );
+      { projectId, characterId, characterName }
+    );
 
-        return result.records.map(record => ({
-            echoId: record.get('echoId'),
-            timestamp: record.get('timestamp')?.toNumber?.() || record.get('timestamp'),
-            type: record.get('type'),
-            description: record.get('description'),
-            reason: record.get('reason'),
-            status: record.get('status'),
-            triples: record.get('triples') || []
-        }));
-    } finally {
-        await session.close();
-    }
+    return result.records.map((record) => ({
+      echoId: record.get('echoId'),
+      timestamp: record.get('timestamp')?.toNumber?.() || record.get('timestamp'),
+      type: record.get('type'),
+      description: record.get('description'),
+      reason: record.get('reason'),
+      status: record.get('status'),
+      triples: record.get('triples') || [],
+    }));
+  } finally {
+    await session.close();
+  }
 };
 
 /**
  * 角色伏笔接口
  */
 export interface CharacterForeshadowing {
-    id: string;
-    type: string;
-    subject: string;
-    relation: string;
-    object: string;
-    status: 'OPEN' | 'RESOLVED' | 'ABANDONED';
-    weight?: number;
-    relatedPlotNodes?: any[];
+  id: string;
+  type: string;
+  subject: string;
+  relation: string;
+  object: string;
+  status: 'OPEN' | 'RESOLVED' | 'ABANDONED';
+  weight?: number;
+  relatedPlotNodes?: any[];
 }
 
 /**
@@ -718,31 +726,31 @@ export interface CharacterForeshadowing {
  * @param characterId 角色ID
  */
 export const getCharacterForeshadowing = async (
-    projectId: string,
-    characterId: string
+  projectId: string,
+  characterId: string
 ): Promise<CharacterForeshadowing[]> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 获取角色名称用于匹配
-        const charResult = await session.run(
-            `MATCH (c:Character {id: $characterId, projectId: $projectId})
+  try {
+    // 获取角色名称用于匹配
+    const charResult = await session.run(
+      `MATCH (c:Character {id: $characterId, projectId: $projectId})
              RETURN c.name as name`,
-            { projectId, characterId }
-        );
+      { projectId, characterId }
+    );
 
-        if (charResult.records.length === 0) {
-            return [];
-        }
+    if (charResult.records.length === 0) {
+      return [];
+    }
 
-        const characterName = charResult.records[0].get('name');
+    const characterName = charResult.records[0].get('name');
 
-        // 查找与该角色相关的伏笔
-        // 伏笔存储在 KnowledgeTriple 中，isForeshadowing = true
-        // 角色可能作为 subject 或 object 出现
-        const result = await session.run(
-            `MATCH (t:KnowledgeTriple {projectId: $projectId, isForeshadowing: true})
+    // 查找与该角色相关的伏笔
+    // 伏笔存储在 KnowledgeTriple 中，isForeshadowing = true
+    // 角色可能作为 subject 或 object 出现
+    const result = await session.run(
+      `MATCH (t:KnowledgeTriple {projectId: $projectId, isForeshadowing: true})
              WHERE t.subject = $characterName OR t.object = $characterName
              RETURN t.id as id,
                     t.type as type,
@@ -751,51 +759,51 @@ export const getCharacterForeshadowing = async (
                     t.object as object,
                     t.status as status,
                     t.weight as weight`,
-            { projectId, characterName }
-        );
+      { projectId, characterName }
+    );
 
-        // 获取关联的 PlotNode
-        const foreshadowingList: CharacterForeshadowing[] = [];
+    // 获取关联的 PlotNode
+    const foreshadowingList: CharacterForeshadowing[] = [];
 
-        for (const record of result.records) {
-            const foreshadowingId = record.get('id');
+    for (const record of result.records) {
+      const foreshadowingId = record.get('id');
 
-            // 查找关联的 PlotNode
-            const plotResult = await session.run(
-                `MATCH (pn:PlotNode {projectId: $projectId})-[:HAS_FORESHADOWING]->(t:KnowledgeTriple {id: $foreshadowingId})
+      // 查找关联的 PlotNode
+      const plotResult = await session.run(
+        `MATCH (pn:PlotNode {projectId: $projectId})-[:HAS_FORESHADOWING]->(t:KnowledgeTriple {id: $foreshadowingId})
                  RETURN pn`,
-                { projectId, foreshadowingId }
-            );
+        { projectId, foreshadowingId }
+      );
 
-            foreshadowingList.push({
-                id: foreshadowingId,
-                type: record.get('type'),
-                subject: record.get('subject'),
-                relation: record.get('relation'),
-                object: record.get('object'),
-                status: record.get('status') || 'OPEN',
-                weight: record.get('weight'),
-                relatedPlotNodes: plotResult.records.map(r => r.get('pn').properties)
-            });
-        }
-
-        return foreshadowingList;
-    } finally {
-        await session.close();
+      foreshadowingList.push({
+        id: foreshadowingId,
+        type: record.get('type'),
+        subject: record.get('subject'),
+        relation: record.get('relation'),
+        object: record.get('object'),
+        status: record.get('status') || 'OPEN',
+        weight: record.get('weight'),
+        relatedPlotNodes: plotResult.records.map((r) => r.get('pn').properties),
+      });
     }
+
+    return foreshadowingList;
+  } finally {
+    await session.close();
+  }
 };
 
 /**
  * 角色物理状态接口（扩展版）
  */
 export interface CharacterPhysicalStatus {
-    characterId: string;
-    characterName: string;
-    location: string | null;
-    locationId: string | null;
-    state: string;
-    isDead: boolean;
-    healthStatus?: string;
+  characterId: string;
+  characterName: string;
+  location: string | null;
+  locationId: string | null;
+  state: string;
+  isDead: boolean;
+  healthStatus?: string;
 }
 
 /**
@@ -804,20 +812,18 @@ export interface CharacterPhysicalStatus {
  * @param characterId 角色ID（可选，不传则返回所有角色状态）
  */
 export const getCharacterPhysicalStatus = async (
-    projectId: string,
-    characterId?: string
+  projectId: string,
+  characterId?: string
 ): Promise<CharacterPhysicalStatus[]> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 构建查询：如果指定 characterId 则只查询该角色，否则查询所有角色
-        const whereClause = characterId
-            ? 'AND c.id = $characterId'
-            : '';
+  try {
+    // 构建查询：如果指定 characterId 则只查询该角色，否则查询所有角色
+    const whereClause = characterId ? 'AND c.id = $characterId' : '';
 
-        const result = await session.run(
-            `MATCH (c:Character {projectId: $projectId})
+    const result = await session.run(
+      `MATCH (c:Character {projectId: $projectId})
              WHERE 1=1 ${whereClause}
              OPTIONAL MATCH (c)-[r:LOCATED_IN]->(l:WorldSetting)
              WHERE (r.branchId IS NULL OR r.branchId = 'main')
@@ -829,21 +835,21 @@ export const getCharacterPhysicalStatus = async (
                     c.physicalStatus as healthStatus,
                     c.isDead as isDead
              ORDER BY c.name`,
-            { projectId, characterId }
-        );
+      { projectId, characterId }
+    );
 
-        return result.records.map(record => ({
-            characterId: record.get('characterId'),
-            characterName: record.get('characterName'),
-            locationId: record.get('locationId'),
-            location: record.get('location'),
-            state: record.get('state') || '正常',
-            healthStatus: record.get('healthStatus'),
-            isDead: record.get('isDead') === true
-        }));
-    } finally {
-        await session.close();
-    }
+    return result.records.map((record) => ({
+      characterId: record.get('characterId'),
+      characterName: record.get('characterName'),
+      locationId: record.get('locationId'),
+      location: record.get('location'),
+      state: record.get('state') || '正常',
+      healthStatus: record.get('healthStatus'),
+      isDead: record.get('isDead') === true,
+    }));
+  } finally {
+    await session.close();
+  }
 };
 
 // ============================================================
@@ -854,19 +860,19 @@ export const getCharacterPhysicalStatus = async (
  * 情节依赖关系接口
  */
 export interface PlotDependencies {
-    currentNode: any;
-    upstreamNodes: Array<{
-        node: any;
-        relationshipType: string;
-        distance: number;
-    }>;
-    downstreamNodes: Array<{
-        node: any;
-        relationshipType: string;
-        distance: number;
-    }>;
-    relatedCharacters: any[];
-    relatedLocations: any[];
+  currentNode: any;
+  upstreamNodes: Array<{
+    node: any;
+    relationshipType: string;
+    distance: number;
+  }>;
+  downstreamNodes: Array<{
+    node: any;
+    relationshipType: string;
+    distance: number;
+  }>;
+  relatedCharacters: any[];
+  relatedLocations: any[];
 }
 
 /**
@@ -876,98 +882,98 @@ export interface PlotDependencies {
  * @param maxDepth 最大查询深度（默认3）
  */
 export const getPlotDependencies = async (
-    projectId: string,
-    plotNodeId: string,
-    maxDepth: number = 3
+  projectId: string,
+  plotNodeId: string,
+  maxDepth: number = 3
 ): Promise<PlotDependencies> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 1. 获取当前节点
-        const currentResult = await session.run(
-            `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId}) RETURN pn`,
-            { projectId, plotNodeId }
-        );
+  try {
+    // 1. 获取当前节点
+    const currentResult = await session.run(
+      `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId}) RETURN pn`,
+      { projectId, plotNodeId }
+    );
 
-        if (currentResult.records.length === 0) {
-            return {
-                currentNode: null,
-                upstreamNodes: [],
-                downstreamNodes: [],
-                relatedCharacters: [],
-                relatedLocations: []
-            };
-        }
+    if (currentResult.records.length === 0) {
+      return {
+        currentNode: null,
+        upstreamNodes: [],
+        downstreamNodes: [],
+        relatedCharacters: [],
+        relatedLocations: [],
+      };
+    }
 
-        const currentNode = currentResult.records[0].get('pn').properties;
+    const currentNode = currentResult.records[0].get('pn').properties;
 
-        // 2. 获取上游节点（通过 PRECEDES 关系）
-        const upstreamResult = await session.run(
-            `MATCH path = (upstream:PlotNode {projectId: $projectId})-[:PRECEDES*1..${maxDepth}]->(pn:PlotNode {id: $plotNodeId})
+    // 2. 获取上游节点（通过 PRECEDES 关系）
+    const upstreamResult = await session.run(
+      `MATCH path = (upstream:PlotNode {projectId: $projectId})-[:PRECEDES*1..${maxDepth}]->(pn:PlotNode {id: $plotNodeId})
              RETURN upstream, length(path) as distance
              ORDER BY distance`,
-            { projectId, plotNodeId }
-        );
+      { projectId, plotNodeId }
+    );
 
-        // 3. 获取下游节点（通过 PRECEDES 关系）
-        const downstreamResult = await session.run(
-            `MATCH path = (pn:PlotNode {id: $plotNodeId})-[:PRECEDES*1..${maxDepth}]->(downstream:PlotNode {projectId: $projectId})
+    // 3. 获取下游节点（通过 PRECEDES 关系）
+    const downstreamResult = await session.run(
+      `MATCH path = (pn:PlotNode {id: $plotNodeId})-[:PRECEDES*1..${maxDepth}]->(downstream:PlotNode {projectId: $projectId})
              RETURN downstream, length(path) as distance
              ORDER BY distance`,
-            { projectId, plotNodeId }
-        );
+      { projectId, plotNodeId }
+    );
 
-        // 4. 获取关联角色
-        const charsResult = await session.run(
-            `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})-[:INVOLVES]->(c:Character)
+    // 4. 获取关联角色
+    const charsResult = await session.run(
+      `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})-[:INVOLVES]->(c:Character)
              RETURN DISTINCT c`,
-            { projectId, plotNodeId }
-        );
+      { projectId, plotNodeId }
+    );
 
-        // 5. 获取关联地点
-        const locsResult = await session.run(
-            `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})-[:LOCATED_IN]->(w:WorldSetting)
+    // 5. 获取关联地点
+    const locsResult = await session.run(
+      `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})-[:LOCATED_IN]->(w:WorldSetting)
              RETURN DISTINCT w`,
-            { projectId, plotNodeId }
-        );
+      { projectId, plotNodeId }
+    );
 
-        return {
-            currentNode,
-            upstreamNodes: upstreamResult.records.map(r => ({
-                node: r.get('upstream').properties,
-                relationshipType: 'PRECEDES',
-                distance: r.get('distance').toNumber ? r.get('distance').toNumber() : r.get('distance')
-            })),
-            downstreamNodes: downstreamResult.records.map(r => ({
-                node: r.get('downstream').properties,
-                relationshipType: 'PRECEDES',
-                distance: r.get('distance').toNumber ? r.get('distance').toNumber() : r.get('distance')
-            })),
-            relatedCharacters: charsResult.records.map(r => r.get('c').properties),
-            relatedLocations: locsResult.records.map(r => r.get('w').properties)
-        };
-    } finally {
-        await session.close();
-    }
+    return {
+      currentNode,
+      upstreamNodes: upstreamResult.records.map((r) => ({
+        node: r.get('upstream').properties,
+        relationshipType: 'PRECEDES',
+        distance: r.get('distance').toNumber ? r.get('distance').toNumber() : r.get('distance'),
+      })),
+      downstreamNodes: downstreamResult.records.map((r) => ({
+        node: r.get('downstream').properties,
+        relationshipType: 'PRECEDES',
+        distance: r.get('distance').toNumber ? r.get('distance').toNumber() : r.get('distance'),
+      })),
+      relatedCharacters: charsResult.records.map((r) => r.get('c').properties),
+      relatedLocations: locsResult.records.map((r) => r.get('w').properties),
+    };
+  } finally {
+    await session.close();
+  }
 };
 
 /**
  * 冲突解决建议接口
  */
 export interface ConflictResolutionSuggestion {
-    sourcePlotNode: any;
-    suggestions: Array<{
-        type: 'HISTORICAL' | 'RELATIONSHIP' | 'STRUCTURAL';
-        description: string;
-        referenceNodes: any[];
-        confidence: number;
-    }>;
-    relatedPatterns: Array<{
-        pattern: string;
-        frequency: number;
-        examples: any[];
-    }>;
+  sourcePlotNode: any;
+  suggestions: Array<{
+    type: 'HISTORICAL' | 'RELATIONSHIP' | 'STRUCTURAL';
+    description: string;
+    referenceNodes: any[];
+    confidence: number;
+  }>;
+  relatedPatterns: Array<{
+    pattern: string;
+    frequency: number;
+    examples: any[];
+  }>;
 }
 
 /**
@@ -976,35 +982,35 @@ export interface ConflictResolutionSuggestion {
  * @param plotNodeId 情节节点ID
  */
 export const getConflictResolutionSuggestions = async (
-    projectId: string,
-    plotNodeId: string
+  projectId: string,
+  plotNodeId: string
 ): Promise<ConflictResolutionSuggestion> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 1. 获取当前情节节点及其冲突信息
-        const nodeResult = await session.run(
-            `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})
+  try {
+    // 1. 获取当前情节节点及其冲突信息
+    const nodeResult = await session.run(
+      `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})
              OPTIONAL MATCH (pn)-[r:HAS_CONFLICT_PARTICIPANT]->(c:Character)
              RETURN pn, collect({character: c, conflictType: r.conflictType, intensity: r.intensity, stakes: r.stakes}) as conflicts`,
-            { projectId, plotNodeId }
-        );
+      { projectId, plotNodeId }
+    );
 
-        if (nodeResult.records.length === 0) {
-            return {
-                sourcePlotNode: null,
-                suggestions: [],
-                relatedPatterns: []
-            };
-        }
+    if (nodeResult.records.length === 0) {
+      return {
+        sourcePlotNode: null,
+        suggestions: [],
+        relatedPatterns: [],
+      };
+    }
 
-        const sourcePlotNode = nodeResult.records[0].get('pn').properties;
-        const conflicts = nodeResult.records[0].get('conflicts');
+    const sourcePlotNode = nodeResult.records[0].get('pn').properties;
+    const conflicts = nodeResult.records[0].get('conflicts');
 
-        // 2. 基于冲突类型查找类似的历史冲突
-        const historicalSuggestions = await session.run(
-            `MATCH (pn:PlotNode {projectId: $projectId})-[r:HAS_CONFLICT_PARTICIPANT]->(c:Character)
+    // 2. 基于冲突类型查找类似的历史冲突
+    const historicalSuggestions = await session.run(
+      `MATCH (pn:PlotNode {projectId: $projectId})-[r:HAS_CONFLICT_PARTICIPANT]->(c:Character)
              WHERE pn.id <> $plotNodeId AND r.conflictType IN $conflictTypes
              WITH pn, r, c
              MATCH (pn)-[:PRECEDES]->(next:PlotNode)
@@ -1012,97 +1018,106 @@ export const getConflictResolutionSuggestions = async (
              RETURN DISTINCT pn as sourceNode, next as resolutionNode, r.conflictType as conflictType, r.intensity as intensity
              ORDER BY r.intensity DESC
              LIMIT 5`,
-            {
-                projectId,
-                plotNodeId,
-                conflictTypes: conflicts.filter((cf: any) => cf.character).map((cf: any) => cf.conflictType || 'CONFRONTATION')
-            }
-        );
+      {
+        projectId,
+        plotNodeId,
+        conflictTypes: conflicts
+          .filter((cf: any) => cf.character)
+          .map((cf: any) => cf.conflictType || 'CONFRONTATION'),
+      }
+    );
 
-        // 3. 基于角色关系分析冲突解决可能
-        const relationshipSuggestions = await session.run(
-            `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})-[r:HAS_CONFLICT_PARTICIPANT]->(c1:Character)
+    // 3. 基于角色关系分析冲突解决可能
+    const relationshipSuggestions = await session.run(
+      `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})-[r:HAS_CONFLICT_PARTICIPANT]->(c1:Character)
              MATCH (c1)-[rel]->(c2:Character)
              WHERE type(rel) IN ['ALLY_OF', 'MENTORS', 'KIN_OF', 'FRIEND_OF']
              RETURN DISTINCT c1.name as participant, type(rel) as relationType, c2.name as relatedCharacter, rel.weight as weight
              ORDER BY rel.weight DESC`,
-            { projectId, plotNodeId }
-        );
+      { projectId, plotNodeId }
+    );
 
-        // 4. 分析冲突模式
-        const patternResult = await session.run(
-            `MATCH (pn:PlotNode {projectId: $projectId})-[r:HAS_CONFLICT_PARTICIPANT]->(c:Character)
+    // 4. 分析冲突模式
+    const patternResult = await session.run(
+      `MATCH (pn:PlotNode {projectId: $projectId})-[r:HAS_CONFLICT_PARTICIPANT]->(c:Character)
              WITH r.conflictType as conflictType, count(pn) as frequency, collect(pn) as examples
              RETURN conflictType, frequency, examples[0..3] as examples
              ORDER BY frequency DESC`,
-            { projectId }
+      { projectId }
+    );
+
+    // 5. 构建建议
+    const suggestions: ConflictResolutionSuggestion['suggestions'] = [];
+
+    // 添加历史建议
+    if (historicalSuggestions.records.length > 0) {
+      suggestions.push({
+        type: 'HISTORICAL',
+        description: `在项目中找到 ${historicalSuggestions.records.length} 个类似冲突的解决案例`,
+        referenceNodes: historicalSuggestions.records.map((r) => ({
+          sourceNode: r.get('sourceNode').properties,
+          resolutionNode: r.get('resolutionNode')?.properties,
+          conflictType: r.get('conflictType'),
+          intensity: r.get('intensity'),
+        })),
+        confidence: 0.7,
+      });
+    }
+
+    // 添加关系建议
+    if (relationshipSuggestions.records.length > 0) {
+      const allies = relationshipSuggestions.records
+        .filter((r) =>
+          ['ALLY_OF', 'MENTORS', 'KIN_OF', 'FRIEND_OF'].includes(r.get('relationType'))
+        )
+        .map(
+          (r) =>
+            `${r.get('participant')} 与 ${r.get('relatedCharacter')} 是${r.get('relationType')}关系`
         );
 
-        // 5. 构建建议
-        const suggestions: ConflictResolutionSuggestion['suggestions'] = [];
-
-        // 添加历史建议
-        if (historicalSuggestions.records.length > 0) {
-            suggestions.push({
-                type: 'HISTORICAL',
-                description: `在项目中找到 ${historicalSuggestions.records.length} 个类似冲突的解决案例`,
-                referenceNodes: historicalSuggestions.records.map(r => ({
-                    sourceNode: r.get('sourceNode').properties,
-                    resolutionNode: r.get('resolutionNode')?.properties,
-                    conflictType: r.get('conflictType'),
-                    intensity: r.get('intensity')
-                })),
-                confidence: 0.7
-            });
-        }
-
-        // 添加关系建议
-        if (relationshipSuggestions.records.length > 0) {
-            const allies = relationshipSuggestions.records
-                .filter(r => ['ALLY_OF', 'MENTORS', 'KIN_OF', 'FRIEND_OF'].includes(r.get('relationType')))
-                .map(r => `${r.get('participant')} 与 ${r.get('relatedCharacter')} 是${r.get('relationType')}关系`);
-
-            suggestions.push({
-                type: 'RELATIONSHIP',
-                description: `冲突参与者存在以下关系，可利用这些关系解决冲突: ${allies.join('; ')}`,
-                referenceNodes: relationshipSuggestions.records.map(r => ({
-                    participant: r.get('participant'),
-                    relationType: r.get('relationType'),
-                    relatedCharacter: r.get('relatedCharacter'),
-                    weight: r.get('weight')
-                })),
-                confidence: 0.8
-            });
-        }
-
-        // 添加结构性建议
-        const conflictIntensity = conflicts.reduce((max: number, cf: any) =>
-            Math.max(max, cf.intensity || 5), 0);
-
-        if (conflictIntensity >= 7) {
-            suggestions.push({
-                type: 'STRUCTURAL',
-                description: `当前冲突强度为 ${conflictIntensity}，建议在后续情节中逐步降温或提供戏剧性解决方案`,
-                referenceNodes: [],
-                confidence: 0.6
-            });
-        }
-
-        // 构建模式数据
-        const relatedPatterns = patternResult.records.map(r => ({
-            pattern: r.get('conflictType') || 'CONFRONTATION',
-            frequency: r.get('frequency').toNumber ? r.get('frequency').toNumber() : r.get('frequency'),
-            examples: (r.get('examples') || []).map((n: any) => n.properties)
-        }));
-
-        return {
-            sourcePlotNode,
-            suggestions,
-            relatedPatterns
-        };
-    } finally {
-        await session.close();
+      suggestions.push({
+        type: 'RELATIONSHIP',
+        description: `冲突参与者存在以下关系，可利用这些关系解决冲突: ${allies.join('; ')}`,
+        referenceNodes: relationshipSuggestions.records.map((r) => ({
+          participant: r.get('participant'),
+          relationType: r.get('relationType'),
+          relatedCharacter: r.get('relatedCharacter'),
+          weight: r.get('weight'),
+        })),
+        confidence: 0.8,
+      });
     }
+
+    // 添加结构性建议
+    const conflictIntensity = conflicts.reduce(
+      (max: number, cf: any) => Math.max(max, cf.intensity || 5),
+      0
+    );
+
+    if (conflictIntensity >= 7) {
+      suggestions.push({
+        type: 'STRUCTURAL',
+        description: `当前冲突强度为 ${conflictIntensity}，建议在后续情节中逐步降温或提供戏剧性解决方案`,
+        referenceNodes: [],
+        confidence: 0.6,
+      });
+    }
+
+    // 构建模式数据
+    const relatedPatterns = patternResult.records.map((r) => ({
+      pattern: r.get('conflictType') || 'CONFRONTATION',
+      frequency: r.get('frequency').toNumber ? r.get('frequency').toNumber() : r.get('frequency'),
+      examples: (r.get('examples') || []).map((n: any) => n.properties),
+    }));
+
+    return {
+      sourcePlotNode,
+      suggestions,
+      relatedPatterns,
+    };
+  } finally {
+    await session.close();
+  }
 };
 
 // ============================================================
@@ -1116,45 +1131,47 @@ export const getConflictResolutionSuggestions = async (
  * @param character2Id 角色2 ID
  */
 export const getRelationshipTimeline = async (
-    projectId: string,
-    character1Id: string,
-    character2Id: string
-): Promise<Array<{
+  projectId: string,
+  character1Id: string,
+  character2Id: string
+): Promise<
+  Array<{
     timestamp: number;
     echoId: string;
     relation: string;
     trajectory: string;
     weight: number;
     description: string;
-}>> => {
-    const d = getDriver();
-    const session = d.session();
+  }>
+> => {
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 获取两个角色的名称
-        const charsResult = await session.run(
-            `MATCH (c:Character {projectId: $projectId})
+  try {
+    // 获取两个角色的名称
+    const charsResult = await session.run(
+      `MATCH (c:Character {projectId: $projectId})
              WHERE c.id IN [$char1Id, $char2Id]
              RETURN c.id as id, c.name as name`,
-            { projectId, char1Id: character1Id, char2Id: character2Id }
-        );
+      { projectId, char1Id: character1Id, char2Id: character2Id }
+    );
 
-        if (charsResult.records.length < 2) {
-            return [];
-        }
+    if (charsResult.records.length < 2) {
+      return [];
+    }
 
-        const charNameMap: Record<string, string> = {};
-        charsResult.records.forEach(r => {
-            charNameMap[r.get('id')] = r.get('name');
-        });
+    const charNameMap: Record<string, string> = {};
+    charsResult.records.forEach((r) => {
+      charNameMap[r.get('id')] = r.get('name');
+    });
 
-        const char1Name = charNameMap[character1Id];
-        const char2Name = charNameMap[character2Id];
+    const char1Name = charNameMap[character1Id];
+    const char2Name = charNameMap[character2Id];
 
-        // 查找两个角色之间的关系演变时间线
-        // 从 Echo 节点的 triples 中提取涉及这两个角色的关系变化
-        const result = await session.run(
-            `MATCH (e:Echo {projectId: $projectId, status: 'ACCEPTED'})
+    // 查找两个角色之间的关系演变时间线
+    // 从 Echo 节点的 triples 中提取涉及这两个角色的关系变化
+    const result = await session.run(
+      `MATCH (e:Echo {projectId: $projectId, status: 'ACCEPTED'})
              WHERE e.triples IS NOT NULL
              UNWIND e.triples AS triple
              WITH e, triple
@@ -1167,20 +1184,20 @@ export const getRelationshipTimeline = async (
                     triple.trajectory as trajectory,
                     triple.weight as weight
              ORDER BY e.timestamp DESC`,
-            { projectId, char1Name, char2Name }
-        );
+      { projectId, char1Name, char2Name }
+    );
 
-        return result.records.map(record => ({
-            timestamp: record.get('timestamp')?.toNumber?.() || record.get('timestamp') || 0,
-            echoId: record.get('echoId'),
-            relation: record.get('relation') || 'RELATED_TO',
-            trajectory: record.get('trajectory') || 'stable',
-            weight: record.get('weight') || 50,
-            description: record.get('description') || ''
-        }));
-    } finally {
-        await session.close();
-    }
+    return result.records.map((record) => ({
+      timestamp: record.get('timestamp')?.toNumber?.() || record.get('timestamp') || 0,
+      echoId: record.get('echoId'),
+      relation: record.get('relation') || 'RELATED_TO',
+      trajectory: record.get('trajectory') || 'stable',
+      weight: record.get('weight') || 50,
+      description: record.get('description') || '',
+    }));
+  } finally {
+    await session.close();
+  }
 };
 
 /**
@@ -1189,24 +1206,26 @@ export const getRelationshipTimeline = async (
  * @param branchId 分支ID（可选）
  */
 export const getEchoForeshadowing = async (
-    projectId: string,
-    branchId: string = 'main'
-): Promise<Array<{
+  projectId: string,
+  branchId: string = 'main'
+): Promise<
+  Array<{
     subject: string;
     relation: string;
     object: string;
     echoId: string;
     createdAt: number;
     relatedChapter?: string;
-}>> => {
-    const d = getDriver();
-    const session = d.session();
+  }>
+> => {
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 查找未回收的伏笔
-        // 伏笔存储在 Echo 的 triples 中，isForeshadowing = true 且 status = 'OPEN'
-        const result = await session.run(
-            `MATCH (e:Echo {projectId: $projectId, status: 'ACCEPTED'})
+  try {
+    // 查找未回收的伏笔
+    // 伏笔存储在 Echo 的 triples 中，isForeshadowing = true 且 status = 'OPEN'
+    const result = await session.run(
+      `MATCH (e:Echo {projectId: $projectId, status: 'ACCEPTED'})
              WHERE e.triples IS NOT NULL
              AND (e.branchId IS NULL OR e.branchId = 'main' OR e.branchId = $branchId)
              UNWIND e.triples AS triple
@@ -1218,45 +1237,45 @@ export const getEchoForeshadowing = async (
                     triple.relation as relation,
                     triple.object as object
              ORDER BY e.timestamp DESC`,
-            { projectId, branchId }
-        );
+      { projectId, branchId }
+    );
 
-        const foreshadowingList: Array<{
-            subject: string;
-            relation: string;
-            object: string;
-            echoId: string;
-            createdAt: number;
-            relatedChapter?: string;
-        }> = [];
+    const foreshadowingList: Array<{
+      subject: string;
+      relation: string;
+      object: string;
+      echoId: string;
+      createdAt: number;
+      relatedChapter?: string;
+    }> = [];
 
-        for (const record of result.records) {
-            const echoId = record.get('echoId');
+    for (const record of result.records) {
+      const echoId = record.get('echoId');
 
-            // 查找关联的章节
-            const chapterResult = await session.run(
-                `MATCH (ch:Chapter {projectId: $projectId})-[:IMPLEMENTS]->(pn:PlotNode)
+      // 查找关联的章节
+      const chapterResult = await session.run(
+        `MATCH (ch:Chapter {projectId: $projectId})-[:IMPLEMENTS]->(pn:PlotNode)
                  OPTIONAL MATCH (pn)-[:HAS_ECHO]->(e:Echo {id: $echoId})
                  RETURN ch.title as chapterTitle`,
-                { projectId, echoId }
-            );
+        { projectId, echoId }
+      );
 
-            const relatedChapter = chapterResult.records[0]?.get('chapterTitle') || undefined;
+      const relatedChapter = chapterResult.records[0]?.get('chapterTitle') || undefined;
 
-            foreshadowingList.push({
-                subject: record.get('subject'),
-                relation: record.get('relation'),
-                object: record.get('object'),
-                echoId,
-                createdAt: record.get('timestamp')?.toNumber?.() || record.get('timestamp') || 0,
-                relatedChapter
-            });
-        }
-
-        return foreshadowingList;
-    } finally {
-        await session.close();
+      foreshadowingList.push({
+        subject: record.get('subject'),
+        relation: record.get('relation'),
+        object: record.get('object'),
+        echoId,
+        createdAt: record.get('timestamp')?.toNumber?.() || record.get('timestamp') || 0,
+        relatedChapter,
+      });
     }
+
+    return foreshadowingList;
+  } finally {
+    await session.close();
+  }
 };
 
 /**
@@ -1264,81 +1283,83 @@ export const getEchoForeshadowing = async (
  * @param projectId 项目ID
  */
 export const detectContradictions = async (
-    projectId: string
-): Promise<Array<{
+  projectId: string
+): Promise<
+  Array<{
     type: 'RELATIONSHIP_CONFLICT' | 'STATE_MISMATCH' | 'TEMPORAL_ERROR';
     description: string;
     entities: string[];
     conflictingEchoes: string[];
     severity: 'HIGH' | 'MEDIUM' | 'LOW';
-}>> => {
-    const d = getDriver();
-    const session = d.session();
-    const contradictions: Array<{
-        type: 'RELATIONSHIP_CONFLICT' | 'STATE_MISMATCH' | 'TEMPORAL_ERROR';
-        description: string;
-        entities: string[];
-        conflictingEchoes: string[];
-        severity: 'HIGH' | 'MEDIUM' | 'LOW';
-    }> = [];
+  }>
+> => {
+  const d = getDriver();
+  const session = d.session();
+  const contradictions: Array<{
+    type: 'RELATIONSHIP_CONFLICT' | 'STATE_MISMATCH' | 'TEMPORAL_ERROR';
+    description: string;
+    entities: string[];
+    conflictingEchoes: string[];
+    severity: 'HIGH' | 'MEDIUM' | 'LOW';
+  }> = [];
 
-    try {
-        // 1. 检测关系矛盾 (RELATIONSHIP_CONFLICT)
-        // 查找同一对角色之间存在矛盾关系（如同时是敌人和盟友）
-        const relationshipConflicts = await session.run(
-            `MATCH (c1:Character {projectId: $projectId})-[r1:ENEMY_OF]->(c2:Character {projectId: $projectId})
+  try {
+    // 1. 检测关系矛盾 (RELATIONSHIP_CONFLICT)
+    // 查找同一对角色之间存在矛盾关系（如同时是敌人和盟友）
+    const relationshipConflicts = await session.run(
+      `MATCH (c1:Character {projectId: $projectId})-[r1:ENEMY_OF]->(c2:Character {projectId: $projectId})
              MATCH (c1)-[r2:ALLY_OF]->(c2)
              WITH c1, c2, r1, r2
              OPTIONAL MATCH (c1)<-[:HAS_ECHO]-(e1:Echo)
              OPTIONAL MATCH (c2)<-[:HAS_ECHO]-(e2:Echo)
              RETURN c1.name as char1, c2.name as char2,
                     collect(DISTINCT e1.id) + collect(DISTINCT e2.id) as echoIds`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        for (const record of relationshipConflicts.records) {
-            const char1 = record.get('char1');
-            const char2 = record.get('char2');
-            const echoIds = (record.get('echoIds') || []).filter((id: string) => id);
+    for (const record of relationshipConflicts.records) {
+      const char1 = record.get('char1');
+      const char2 = record.get('char2');
+      const echoIds = (record.get('echoIds') || []).filter((id: string) => id);
 
-            contradictions.push({
-                type: 'RELATIONSHIP_CONFLICT',
-                description: `"${char1}" 与 "${char2}" 同时存在敌对和盟友关系，可能存在逻辑矛盾`,
-                entities: [char1, char2],
-                conflictingEchoes: echoIds,
-                severity: 'HIGH'
-            });
-        }
+      contradictions.push({
+        type: 'RELATIONSHIP_CONFLICT',
+        description: `"${char1}" 与 "${char2}" 同时存在敌对和盟友关系，可能存在逻辑矛盾`,
+        entities: [char1, char2],
+        conflictingEchoes: echoIds,
+        severity: 'HIGH',
+      });
+    }
 
-        // 2. 检测状态不匹配 (STATE_MISMATCH)
-        // 查找角色状态矛盾（如已死亡但仍有后续活动）
-        const stateMismatches = await session.run(
-            `MATCH (c:Character {projectId: $projectId, isDead: true})
+    // 2. 检测状态不匹配 (STATE_MISMATCH)
+    // 查找角色状态矛盾（如已死亡但仍有后续活动）
+    const stateMismatches = await session.run(
+      `MATCH (c:Character {projectId: $projectId, isDead: true})
              MATCH (pn:PlotNode {projectId: $projectId})-[:INVOLVES]->(c)
              OPTIONAL MATCH (c)<-[:HAS_ECHO]-(e:Echo)
              RETURN c.name as charName, pn.title as plotTitle,
                     collect(DISTINCT e.id) as echoIds`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        for (const record of stateMismatches.records) {
-            const charName = record.get('charName');
-            const plotTitle = record.get('plotTitle');
-            const echoIds = (record.get('echoIds') || []).filter((id: string) => id);
+    for (const record of stateMismatches.records) {
+      const charName = record.get('charName');
+      const plotTitle = record.get('plotTitle');
+      const echoIds = (record.get('echoIds') || []).filter((id: string) => id);
 
-            contradictions.push({
-                type: 'STATE_MISMATCH',
-                description: `"${charName}" 已被标记为死亡，但仍参与情节 "${plotTitle}"`,
-                entities: [charName, plotTitle],
-                conflictingEchoes: echoIds,
-                severity: 'HIGH'
-            });
-        }
+      contradictions.push({
+        type: 'STATE_MISMATCH',
+        description: `"${charName}" 已被标记为死亡，但仍参与情节 "${plotTitle}"`,
+        entities: [charName, plotTitle],
+        conflictingEchoes: echoIds,
+        severity: 'HIGH',
+      });
+    }
 
-        // 3. 检测时间线错误 (TEMPORAL_ERROR)
-        // 查找时间戳顺序错误的 Echo（后创建的 Echo 但描述的是更早的事件）
-        const temporalErrors = await session.run(
-            `MATCH (e1:Echo {projectId: $projectId, status: 'ACCEPTED'})
+    // 3. 检测时间线错误 (TEMPORAL_ERROR)
+    // 查找时间戳顺序错误的 Echo（后创建的 Echo 但描述的是更早的事件）
+    const temporalErrors = await session.run(
+      `MATCH (e1:Echo {projectId: $projectId, status: 'ACCEPTED'})
              MATCH (e2:Echo {projectId: $projectId, status: 'ACCEPTED'})
              WHERE e1.timestamp > e2.timestamp
                AND e1.triples IS NOT NULL AND e2.triples IS NOT NULL
@@ -1352,61 +1373,61 @@ export const detectContradictions = async (
              RETURN DISTINCT e1.id as laterEchoId, e2.id as earlierEchoId,
                     t1.subject as subject, t1.relation as relation, t1.object as object,
                     t1.trajectory as laterTrajectory, t2.trajectory as earlierTrajectory`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        for (const record of temporalErrors.records) {
-            const subject = record.get('subject');
-            const relation = record.get('relation');
-            const object = record.get('object');
-            const laterTrajectory = record.get('laterTrajectory');
-            const earlierTrajectory = record.get('earlierTrajectory');
-            const laterEchoId = record.get('laterEchoId');
-            const earlierEchoId = record.get('earlierEchoId');
+    for (const record of temporalErrors.records) {
+      const subject = record.get('subject');
+      const relation = record.get('relation');
+      const object = record.get('object');
+      const laterTrajectory = record.get('laterTrajectory');
+      const earlierTrajectory = record.get('earlierTrajectory');
+      const laterEchoId = record.get('laterEchoId');
+      const earlierEchoId = record.get('earlierEchoId');
 
-            // 只有当轨迹变化不合理时才报告（如从 rising 变为 falling 又变回 rising）
-            if (laterTrajectory === 'rising' && earlierTrajectory === 'falling') {
-                contradictions.push({
-                    type: 'TEMPORAL_ERROR',
-                    description: `"${subject}" 与 "${object}" 的关系轨迹出现异常：先下降后上升，可能存在时间线错误`,
-                    entities: [subject, object],
-                    conflictingEchoes: [laterEchoId, earlierEchoId],
-                    severity: 'MEDIUM'
-                });
-            }
-        }
+      // 只有当轨迹变化不合理时才报告（如从 rising 变为 falling 又变回 rising）
+      if (laterTrajectory === 'rising' && earlierTrajectory === 'falling') {
+        contradictions.push({
+          type: 'TEMPORAL_ERROR',
+          description: `"${subject}" 与 "${object}" 的关系轨迹出现异常：先下降后上升，可能存在时间线错误`,
+          entities: [subject, object],
+          conflictingEchoes: [laterEchoId, earlierEchoId],
+          severity: 'MEDIUM',
+        });
+      }
+    }
 
-        // 4. 检测角色位置矛盾
-        const locationConflicts = await session.run(
-            `MATCH (c:Character {projectId: $projectId})
+    // 4. 检测角色位置矛盾
+    const locationConflicts = await session.run(
+      `MATCH (c:Character {projectId: $projectId})
              MATCH (c)-[r1:LOCATED_IN]->(l1:WorldSetting {projectId: $projectId})
              MATCH (c)-[r2:LOCATED_IN]->(l2:WorldSetting {projectId: $projectId})
              WHERE l1.id <> l2.id
              OPTIONAL MATCH (c)<-[:HAS_ECHO]-(e:Echo)
              RETURN c.name as charName, l1.title as loc1, l2.title as loc2,
                     collect(DISTINCT e.id) as echoIds`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        for (const record of locationConflicts.records) {
-            const charName = record.get('charName');
-            const loc1 = record.get('loc1');
-            const loc2 = record.get('loc2');
-            const echoIds = (record.get('echoIds') || []).filter((id: string) => id);
+    for (const record of locationConflicts.records) {
+      const charName = record.get('charName');
+      const loc1 = record.get('loc1');
+      const loc2 = record.get('loc2');
+      const echoIds = (record.get('echoIds') || []).filter((id: string) => id);
 
-            contradictions.push({
-                type: 'STATE_MISMATCH',
-                description: `"${charName}" 同时位于 "${loc1}" 和 "${loc2}"，可能存在位置矛盾`,
-                entities: [charName, loc1, loc2],
-                conflictingEchoes: echoIds,
-                severity: 'MEDIUM'
-            });
-        }
-
-        return contradictions;
-    } finally {
-        await session.close();
+      contradictions.push({
+        type: 'STATE_MISMATCH',
+        description: `"${charName}" 同时位于 "${loc1}" 和 "${loc2}"，可能存在位置矛盾`,
+        entities: [charName, loc1, loc2],
+        conflictingEchoes: echoIds,
+        severity: 'MEDIUM',
+      });
     }
+
+    return contradictions;
+  } finally {
+    await session.close();
+  }
 };
 
 /**
@@ -1415,53 +1436,58 @@ export const detectContradictions = async (
  * @param targetId 目标实体ID（Character或WorldSetting）
  */
 export const getEchoHistory = async (
-    projectId: string,
-    targetId: string
-): Promise<Array<{
+  projectId: string,
+  targetId: string
+): Promise<
+  Array<{
     echoId: string;
     description: string;
     status: string;
     timestamp: number;
     triples: any[];
-}>> => {
-    const d = getDriver();
-    const session = d.session();
+  }>
+> => {
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 查找目标实体（可能是 Character 或 WorldSetting）
-        const entityResult = await session.run(
-            `MATCH (n {id: $targetId, projectId: $projectId})
+  try {
+    // 查找目标实体（可能是 Character 或 WorldSetting）
+    const entityResult = await session.run(
+      `MATCH (n {id: $targetId, projectId: $projectId})
              RETURN n.name as name, n.title as title, labels(n) as labels`,
-            { projectId, targetId }
-        );
+      { projectId, targetId }
+    );
 
-        if (entityResult.records.length === 0) {
-            return [];
-        }
+    if (entityResult.records.length === 0) {
+      return [];
+    }
 
-        const record = entityResult.records[0];
-        const entityName = record.get('name') || record.get('title');
-        const entityLabels = record.get('labels') as string[];
+    const record = entityResult.records[0];
+    const entityName = record.get('name') || record.get('title');
+    const entityLabels = record.get('labels') as string[];
 
-        // 确定实体类型
-        const entityType = entityLabels.includes('Character') ? 'CHARACTER' :
-                          entityLabels.includes('WorldSetting') ? 'WORLD' : 'UNKNOWN';
+    // 确定实体类型
+    const entityType = entityLabels.includes('Character')
+      ? 'CHARACTER'
+      : entityLabels.includes('WorldSetting')
+        ? 'WORLD'
+        : 'UNKNOWN';
 
-        // 方法1: 通过 HAS_ECHO 关系直接查找
-        const directEchoes = await session.run(
-            `MATCH (n {id: $targetId, projectId: $projectId})-[:HAS_ECHO]->(e:Echo)
+    // 方法1: 通过 HAS_ECHO 关系直接查找
+    const directEchoes = await session.run(
+      `MATCH (n {id: $targetId, projectId: $projectId})-[:HAS_ECHO]->(e:Echo)
              RETURN e.id as echoId,
                     e.description as description,
                     e.status as status,
                     e.timestamp as timestamp,
                     e.triples as triples
              ORDER BY e.timestamp DESC`,
-            { projectId, targetId }
-        );
+      { projectId, targetId }
+    );
 
-        // 方法2: 通过 targetId 和 targetName 属性查找
-        const indirectEchoes = await session.run(
-            `MATCH (e:Echo {projectId: $projectId})
+    // 方法2: 通过 targetId 和 targetName 属性查找
+    const indirectEchoes = await session.run(
+      `MATCH (e:Echo {projectId: $projectId})
              WHERE e.targetId = $targetId OR e.targetName = $entityName
              RETURN e.id as echoId,
                     e.description as description,
@@ -1469,47 +1495,50 @@ export const getEchoHistory = async (
                     e.timestamp as timestamp,
                     e.triples as triples
              ORDER BY e.timestamp DESC`,
-            { projectId, targetId, entityName }
-        );
+      { projectId, targetId, entityName }
+    );
 
-        // 合并结果，去重
-        const echoMap = new Map<string, {
-            echoId: string;
-            description: string;
-            status: string;
-            timestamp: number;
-            triples: any[];
-        }>();
+    // 合并结果，去重
+    const echoMap = new Map<
+      string,
+      {
+        echoId: string;
+        description: string;
+        status: string;
+        timestamp: number;
+        triples: any[];
+      }
+    >();
 
-        // 处理直接关联的 Echo
-        for (const rec of directEchoes.records) {
-            const echoId = rec.get('echoId');
-            echoMap.set(echoId, {
-                echoId,
-                description: rec.get('description') || '',
-                status: rec.get('status') || 'PENDING',
-                timestamp: rec.get('timestamp')?.toNumber?.() || rec.get('timestamp') || 0,
-                triples: rec.get('triples') || []
-            });
-        }
+    // 处理直接关联的 Echo
+    for (const rec of directEchoes.records) {
+      const echoId = rec.get('echoId');
+      echoMap.set(echoId, {
+        echoId,
+        description: rec.get('description') || '',
+        status: rec.get('status') || 'PENDING',
+        timestamp: rec.get('timestamp')?.toNumber?.() || rec.get('timestamp') || 0,
+        triples: rec.get('triples') || [],
+      });
+    }
 
-        // 处理间接关联的 Echo（如果还没有添加）
-        for (const rec of indirectEchoes.records) {
-            const echoId = rec.get('echoId');
-            if (!echoMap.has(echoId)) {
-                echoMap.set(echoId, {
-                    echoId,
-                    description: rec.get('description') || '',
-                    status: rec.get('status') || 'PENDING',
-                    timestamp: rec.get('timestamp')?.toNumber?.() || rec.get('timestamp') || 0,
-                    triples: rec.get('triples') || []
-                });
-            }
-        }
+    // 处理间接关联的 Echo（如果还没有添加）
+    for (const rec of indirectEchoes.records) {
+      const echoId = rec.get('echoId');
+      if (!echoMap.has(echoId)) {
+        echoMap.set(echoId, {
+          echoId,
+          description: rec.get('description') || '',
+          status: rec.get('status') || 'PENDING',
+          timestamp: rec.get('timestamp')?.toNumber?.() || rec.get('timestamp') || 0,
+          triples: rec.get('triples') || [],
+        });
+      }
+    }
 
-        // 方法3: 通过 triples 中的 subject 或 object 查找
-        const triplesEchoes = await session.run(
-            `MATCH (e:Echo {projectId: $projectId, status: 'ACCEPTED'})
+    // 方法3: 通过 triples 中的 subject 或 object 查找
+    const triplesEchoes = await session.run(
+      `MATCH (e:Echo {projectId: $projectId, status: 'ACCEPTED'})
              WHERE e.triples IS NOT NULL
              UNWIND e.triples AS triple
              WITH e, triple
@@ -1520,29 +1549,29 @@ export const getEchoHistory = async (
                     e.timestamp as timestamp,
                     e.triples as triples
              ORDER BY e.timestamp DESC`,
-            { projectId, entityName }
-        );
+      { projectId, entityName }
+    );
 
-        for (const rec of triplesEchoes.records) {
-            const echoId = rec.get('echoId');
-            if (!echoMap.has(echoId)) {
-                echoMap.set(echoId, {
-                    echoId,
-                    description: rec.get('description') || '',
-                    status: rec.get('status') || 'PENDING',
-                    timestamp: rec.get('timestamp')?.toNumber?.() || rec.get('timestamp') || 0,
-                    triples: rec.get('triples') || []
-                });
-            }
-        }
-
-        // 按时间戳降序排序
-        const result = Array.from(echoMap.values()).sort((a, b) => b.timestamp - a.timestamp);
-
-        return result;
-    } finally {
-        await session.close();
+    for (const rec of triplesEchoes.records) {
+      const echoId = rec.get('echoId');
+      if (!echoMap.has(echoId)) {
+        echoMap.set(echoId, {
+          echoId,
+          description: rec.get('description') || '',
+          status: rec.get('status') || 'PENDING',
+          timestamp: rec.get('timestamp')?.toNumber?.() || rec.get('timestamp') || 0,
+          triples: rec.get('triples') || [],
+        });
+      }
     }
+
+    // 按时间戳降序排序
+    const result = Array.from(echoMap.values()).sort((a, b) => b.timestamp - a.timestamp);
+
+    return result;
+  } finally {
+    await session.close();
+  }
 };
 
 // ============================================================
@@ -1555,122 +1584,123 @@ export const getEchoHistory = async (
  * @param chapterId 章节ID
  */
 export const getChapterDependencies = async (
-    projectId: string,
-    chapterId: string
+  projectId: string,
+  chapterId: string
 ): Promise<{
-    chapter: any;
-    plotNode?: any;
-    involvedCharacters: any[];
-    setLocation?: any;
-    beats: any[];
-    predecessor?: any;
-    successor?: any;
+  chapter: any;
+  plotNode?: any;
+  involvedCharacters: any[];
+  setLocation?: any;
+  beats: any[];
+  predecessor?: any;
+  successor?: any;
 }> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 1. 获取章节基本信息
-        const chapterResult = await session.run(
-            `MATCH (ch:Chapter {id: $chapterId, projectId: $projectId})
+  try {
+    // 1. 获取章节基本信息
+    const chapterResult = await session.run(
+      `MATCH (ch:Chapter {id: $chapterId, projectId: $projectId})
              RETURN ch`,
-            { projectId, chapterId }
-        );
+      { projectId, chapterId }
+    );
 
-        if (chapterResult.records.length === 0) {
-            return {
-                chapter: null,
-                plotNode: undefined,
-                involvedCharacters: [],
-                setLocation: undefined,
-                beats: [],
-                predecessor: undefined,
-                successor: undefined
-            };
-        }
-
-        const chapter = chapterResult.records[0].get('ch').properties;
-
-        // 2. 获取关联的 PlotNode
-        const plotNodeResult = await session.run(
-            `MATCH (ch:Chapter {id: $chapterId, projectId: $projectId})-[:IMPLEMENTS]->(pn:PlotNode)
-             RETURN pn`,
-            { projectId, chapterId }
-        );
-
-        const plotNode = plotNodeResult.records.length > 0
-            ? plotNodeResult.records[0].get('pn').properties
-            : undefined;
-
-        // 3. 获取涉及的角色
-        const charsResult = await session.run(
-            `MATCH (ch:Chapter {id: $chapterId, projectId: $projectId})-[:INVOLVES]->(c:Character)
-             RETURN DISTINCT c`,
-            { projectId, chapterId }
-        );
-
-        const involvedCharacters = charsResult.records.map(r => r.get('c').properties);
-
-        // 4. 获取场景地点
-        const locationResult = await session.run(
-            `MATCH (ch:Chapter {id: $chapterId, projectId: $projectId})-[:LOCATED_IN]->(w:WorldSetting)
-             RETURN w`,
-            { projectId, chapterId }
-        );
-
-        const setLocation = locationResult.records.length > 0
-            ? locationResult.records[0].get('w').properties
-            : undefined;
-
-        // 5. 获取章节的 Beats（从章节属性中提取）
-        // 注意：ChapterBeat 存储在 Chapter 节点的 beats 属性中（JSON字符串）
-        let beats: any[] = [];
-        if (chapter.beats) {
-            try {
-                const beatsData = typeof chapter.beats === 'string'
-                    ? JSON.parse(chapter.beats)
-                    : chapter.beats;
-                beats = Array.isArray(beatsData) ? beatsData : [];
-            } catch (e) {
-                console.warn('Failed to parse chapter beats:', e);
-                beats = [];
-            }
-        }
-
-        // 6. 获取前驱章节
-        const predecessorResult = await session.run(
-            `MATCH (prev:Chapter {projectId: $projectId})-[:PRECEDES]->(ch:Chapter {id: $chapterId, projectId: $projectId})
-             RETURN prev`,
-            { projectId, chapterId }
-        );
-
-        const predecessor = predecessorResult.records.length > 0
-            ? predecessorResult.records[0].get('prev').properties
-            : undefined;
-
-        // 7. 获取后继章节
-        const successorResult = await session.run(
-            `MATCH (ch:Chapter {id: $chapterId, projectId: $projectId})-[:PRECEDES]->(next:Chapter {projectId: $projectId})
-             RETURN next`,
-            { projectId, chapterId }
-        );
-
-        const successor = successorResult.records.length > 0
-            ? successorResult.records[0].get('next').properties
-            : undefined;
-
-        return {
-            chapter,
-            plotNode,
-            involvedCharacters,
-            setLocation,
-            beats,
-            predecessor,
-            successor
-        };
-    } finally {
-        await session.close();
+    if (chapterResult.records.length === 0) {
+      return {
+        chapter: null,
+        plotNode: undefined,
+        involvedCharacters: [],
+        setLocation: undefined,
+        beats: [],
+        predecessor: undefined,
+        successor: undefined,
+      };
     }
+
+    const chapter = chapterResult.records[0].get('ch').properties;
+
+    // 2. 获取关联的 PlotNode
+    const plotNodeResult = await session.run(
+      `MATCH (ch:Chapter {id: $chapterId, projectId: $projectId})-[:IMPLEMENTS]->(pn:PlotNode)
+             RETURN pn`,
+      { projectId, chapterId }
+    );
+
+    const plotNode =
+      plotNodeResult.records.length > 0
+        ? plotNodeResult.records[0].get('pn').properties
+        : undefined;
+
+    // 3. 获取涉及的角色
+    const charsResult = await session.run(
+      `MATCH (ch:Chapter {id: $chapterId, projectId: $projectId})-[:INVOLVES]->(c:Character)
+             RETURN DISTINCT c`,
+      { projectId, chapterId }
+    );
+
+    const involvedCharacters = charsResult.records.map((r) => r.get('c').properties);
+
+    // 4. 获取场景地点
+    const locationResult = await session.run(
+      `MATCH (ch:Chapter {id: $chapterId, projectId: $projectId})-[:LOCATED_IN]->(w:WorldSetting)
+             RETURN w`,
+      { projectId, chapterId }
+    );
+
+    const setLocation =
+      locationResult.records.length > 0 ? locationResult.records[0].get('w').properties : undefined;
+
+    // 5. 获取章节的 Beats（从章节属性中提取）
+    // 注意：ChapterBeat 存储在 Chapter 节点的 beats 属性中（JSON字符串）
+    let beats: any[] = [];
+    if (chapter.beats) {
+      try {
+        const beatsData =
+          typeof chapter.beats === 'string' ? JSON.parse(chapter.beats) : chapter.beats;
+        beats = Array.isArray(beatsData) ? beatsData : [];
+      } catch (e) {
+        console.warn('Failed to parse chapter beats:', e);
+        beats = [];
+      }
+    }
+
+    // 6. 获取前驱章节
+    const predecessorResult = await session.run(
+      `MATCH (prev:Chapter {projectId: $projectId})-[:PRECEDES]->(ch:Chapter {id: $chapterId, projectId: $projectId})
+             RETURN prev`,
+      { projectId, chapterId }
+    );
+
+    const predecessor =
+      predecessorResult.records.length > 0
+        ? predecessorResult.records[0].get('prev').properties
+        : undefined;
+
+    // 7. 获取后继章节
+    const successorResult = await session.run(
+      `MATCH (ch:Chapter {id: $chapterId, projectId: $projectId})-[:PRECEDES]->(next:Chapter {projectId: $projectId})
+             RETURN next`,
+      { projectId, chapterId }
+    );
+
+    const successor =
+      successorResult.records.length > 0
+        ? successorResult.records[0].get('next').properties
+        : undefined;
+
+    return {
+      chapter,
+      plotNode,
+      involvedCharacters,
+      setLocation,
+      beats,
+      predecessor,
+      successor,
+    };
+  } finally {
+    await session.close();
+  }
 };
 
 /**
@@ -1679,92 +1709,95 @@ export const getChapterDependencies = async (
  * @param chapterId 章节ID
  */
 export const getChapterCharacterNetwork = async (
-    projectId: string,
-    chapterId: string
+  projectId: string,
+  chapterId: string
 ): Promise<{
-    characters: any[];
-    relationships: Array<{
-        subject: string;
-        relation: string;
-        object: string;
-        weight: number;
-    }>;
+  characters: any[];
+  relationships: Array<{
+    subject: string;
+    relation: string;
+    object: string;
+    weight: number;
+  }>;
 }> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 1. 获取章节涉及的所有角色
-        const charsResult = await session.run(
-            `MATCH (ch:Chapter {id: $chapterId, projectId: $projectId})-[:INVOLVES]->(c:Character)
+  try {
+    // 1. 获取章节涉及的所有角色
+    const charsResult = await session.run(
+      `MATCH (ch:Chapter {id: $chapterId, projectId: $projectId})-[:INVOLVES]->(c:Character)
              RETURN DISTINCT c`,
-            { projectId, chapterId }
-        );
+      { projectId, chapterId }
+    );
 
-        const characters = charsResult.records.map(r => r.get('c').properties);
+    const characters = charsResult.records.map((r) => r.get('c').properties);
 
-        if (characters.length === 0) {
-            return {
-                characters: [],
-                relationships: []
-            };
-        }
+    if (characters.length === 0) {
+      return {
+        characters: [],
+        relationships: [],
+      };
+    }
 
-        // 2. 获取这些角色之间的关系
-        // 提取角色名称列表
-        const charNames = characters.map(c => c.name);
+    // 2. 获取这些角色之间的关系
+    // 提取角色名称列表
+    const charNames = characters.map((c) => c.name);
 
-        // 查询角色之间的关系（通过关系边）
-        const relationshipsResult = await session.run(
-            `MATCH (c1:Character {projectId: $projectId})-[r]->(c2:Character {projectId: $projectId})
+    // 查询角色之间的关系（通过关系边）
+    const relationshipsResult = await session.run(
+      `MATCH (c1:Character {projectId: $projectId})-[r]->(c2:Character {projectId: $projectId})
              WHERE c1.name IN $charNames AND c2.name IN $charNames
              AND type(r) IN ['ENEMY_OF', 'ALLY_OF', 'LOVES', 'KIN_OF', 'MENTORS', 'RIVAL_OF', 'SERVES', 'FRIEND_OF', 'RELATED_TO']
              RETURN c1.name as subject, type(r) as relation, c2.name as object, r.weight as weight`,
-            { projectId, charNames }
-        );
+      { projectId, charNames }
+    );
 
-        // 同时查询 KnowledgeTriple 中的关系（可能包含更多细节）
-        const triplesResult = await session.run(
-            `MATCH (t:KnowledgeTriple {projectId: $projectId})
+    // 同时查询 KnowledgeTriple 中的关系（可能包含更多细节）
+    const triplesResult = await session.run(
+      `MATCH (t:KnowledgeTriple {projectId: $projectId})
              WHERE t.subject IN $charNames AND t.object IN $charNames
              RETURN t.subject as subject, t.relation as relation, t.object as object, t.weight as weight`,
-            { projectId, charNames }
-        );
+      { projectId, charNames }
+    );
 
-        // 合并关系数据
-        const relationshipMap = new Map<string, { subject: string; relation: string; object: string; weight: number }>();
+    // 合并关系数据
+    const relationshipMap = new Map<
+      string,
+      { subject: string; relation: string; object: string; weight: number }
+    >();
 
-        // 添加关系边数据
-        for (const record of relationshipsResult.records) {
-            const key = `${record.get('subject')}-${record.get('relation')}-${record.get('object')}`;
-            relationshipMap.set(key, {
-                subject: record.get('subject'),
-                relation: record.get('relation'),
-                object: record.get('object'),
-                weight: record.get('weight') || 50
-            });
-        }
-
-        // 添加 KnowledgeTriple 数据（如果还没有的话）
-        for (const record of triplesResult.records) {
-            const key = `${record.get('subject')}-${record.get('relation')}-${record.get('object')}`;
-            if (!relationshipMap.has(key)) {
-                relationshipMap.set(key, {
-                    subject: record.get('subject'),
-                    relation: record.get('relation'),
-                    object: record.get('object'),
-                    weight: record.get('weight') || 50
-                });
-            }
-        }
-
-        return {
-            characters,
-            relationships: Array.from(relationshipMap.values())
-        };
-    } finally {
-        await session.close();
+    // 添加关系边数据
+    for (const record of relationshipsResult.records) {
+      const key = `${record.get('subject')}-${record.get('relation')}-${record.get('object')}`;
+      relationshipMap.set(key, {
+        subject: record.get('subject'),
+        relation: record.get('relation'),
+        object: record.get('object'),
+        weight: record.get('weight') || 50,
+      });
     }
+
+    // 添加 KnowledgeTriple 数据（如果还没有的话）
+    for (const record of triplesResult.records) {
+      const key = `${record.get('subject')}-${record.get('relation')}-${record.get('object')}`;
+      if (!relationshipMap.has(key)) {
+        relationshipMap.set(key, {
+          subject: record.get('subject'),
+          relation: record.get('relation'),
+          object: record.get('object'),
+          weight: record.get('weight') || 50,
+        });
+      }
+    }
+
+    return {
+      characters,
+      relationships: Array.from(relationshipMap.values()),
+    };
+  } finally {
+    await session.close();
+  }
 };
 
 /**
@@ -1773,39 +1806,39 @@ export const getChapterCharacterNetwork = async (
  * @param foreshadowingId 伏笔ID
  */
 export const getForeshadowingChain = async (
-    projectId: string,
-    foreshadowingId: string
+  projectId: string,
+  foreshadowingId: string
 ): Promise<{
-    source: any;
-    chain: Array<{
-        chapter: any;
-        status: 'PLANTED' | 'HINTED' | 'RESOLVED';
-    }>;
+  source: any;
+  chain: Array<{
+    chapter: any;
+    status: 'PLANTED' | 'HINTED' | 'RESOLVED';
+  }>;
 }> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 1. 获取伏笔源信息（从 KnowledgeTriple 中查找）
-        const sourceResult = await session.run(
-            `MATCH (t:KnowledgeTriple {id: $foreshadowingId, projectId: $projectId, isForeshadowing: true})
+  try {
+    // 1. 获取伏笔源信息（从 KnowledgeTriple 中查找）
+    const sourceResult = await session.run(
+      `MATCH (t:KnowledgeTriple {id: $foreshadowingId, projectId: $projectId, isForeshadowing: true})
              RETURN t`,
-            { projectId, foreshadowingId }
-        );
+      { projectId, foreshadowingId }
+    );
 
-        if (sourceResult.records.length === 0) {
-            return {
-                source: null,
-                chain: []
-            };
-        }
+    if (sourceResult.records.length === 0) {
+      return {
+        source: null,
+        chain: [],
+      };
+    }
 
-        const source = sourceResult.records[0].get('t').properties;
+    const source = sourceResult.records[0].get('t').properties;
 
-        // 2. 查找所有引用此伏笔的章节
-        // 通过 PlotNode 的 HAS_FORESHADOWING 关系查找
-        const chainResult = await session.run(
-            `MATCH (t:KnowledgeTriple {id: $foreshadowingId, projectId: $projectId})
+    // 2. 查找所有引用此伏笔的章节
+    // 通过 PlotNode 的 HAS_FORESHADOWING 关系查找
+    const chainResult = await session.run(
+      `MATCH (t:KnowledgeTriple {id: $foreshadowingId, projectId: $projectId})
              OPTIONAL MATCH (pn:PlotNode {projectId: $projectId})-[:HAS_FORESHADOWING]->(t)
              OPTIONAL MATCH (ch:Chapter {projectId: $projectId})-[:IMPLEMENTS]->(pn)
              OPTIONAL MATCH (ch2:Chapter {projectId: $projectId})-[:INVOLVES]->(c:Character)
@@ -1819,21 +1852,21 @@ export const getForeshadowingChain = async (
                         ELSE 'HINTED'
                     END as status
              ORDER BY chapter.order`,
-            { projectId, foreshadowingId }
-        );
+      { projectId, foreshadowingId }
+    );
 
-        const chain = chainResult.records.map(r => ({
-            chapter: r.get('chapter').properties,
-            status: r.get('status') as 'PLANTED' | 'HINTED' | 'RESOLVED'
-        }));
+    const chain = chainResult.records.map((r) => ({
+      chapter: r.get('chapter').properties,
+      status: r.get('status') as 'PLANTED' | 'HINTED' | 'RESOLVED',
+    }));
 
-        return {
-            source,
-            chain
-        };
-    } finally {
-        await session.close();
-    }
+    return {
+      source,
+      chain,
+    };
+  } finally {
+    await session.close();
+  }
 };
 
 /**
@@ -1841,22 +1874,24 @@ export const getForeshadowingChain = async (
  * @param projectId 项目ID
  */
 export const getConflictHeatmapData = async (
-    projectId: string
-): Promise<Array<{
+  projectId: string
+): Promise<
+  Array<{
     chapterId: string;
     chapterTitle: string;
     intensity: number;
     conflictType: string;
     participants: string[];
-}>> => {
-    const d = getDriver();
-    const session = d.session();
+  }>
+> => {
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 查询所有章节的冲突数据
-        // 冲突信息主要存储在 PlotNode 的 conflictScenario 属性中
-        const result = await session.run(
-            `MATCH (ch:Chapter {projectId: $projectId})
+  try {
+    // 查询所有章节的冲突数据
+    // 冲突信息主要存储在 PlotNode 的 conflictScenario 属性中
+    const result = await session.run(
+      `MATCH (ch:Chapter {projectId: $projectId})
              OPTIONAL MATCH (ch)-[:IMPLEMENTS]->(pn:PlotNode)
              OPTIONAL MATCH (ch)-[:INVOLVES]->(c:Character)
              WITH ch, pn, collect(DISTINCT c.name) as charNames
@@ -1866,61 +1901,60 @@ export const getConflictHeatmapData = async (
                     pn.conflictScenario as conflictScenario,
                     charNames as participants
              ORDER BY chapterOrder`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        const heatmapData: Array<{
-            chapterId: string;
-            chapterTitle: string;
-            intensity: number;
-            conflictType: string;
-            participants: string[];
-        }> = [];
+    const heatmapData: Array<{
+      chapterId: string;
+      chapterTitle: string;
+      intensity: number;
+      conflictType: string;
+      participants: string[];
+    }> = [];
 
-        for (const record of result.records) {
-            const chapterId = record.get('chapterId');
-            const chapterTitle = record.get('chapterTitle');
-            const participants = record.get('participants') || [];
-            const conflictScenario = record.get('conflictScenario');
+    for (const record of result.records) {
+      const chapterId = record.get('chapterId');
+      const chapterTitle = record.get('chapterTitle');
+      const participants = record.get('participants') || [];
+      const conflictScenario = record.get('conflictScenario');
 
-            let intensity = 0;
-            let conflictType = 'NONE';
+      let intensity = 0;
+      let conflictType = 'NONE';
 
-            // 解析冲突场景数据
-            if (conflictScenario) {
-                try {
-                    const scenario = typeof conflictScenario === 'string'
-                        ? JSON.parse(conflictScenario)
-                        : conflictScenario;
+      // 解析冲突场景数据
+      if (conflictScenario) {
+        try {
+          const scenario =
+            typeof conflictScenario === 'string' ? JSON.parse(conflictScenario) : conflictScenario;
 
-                    if (scenario) {
-                        intensity = scenario.intensity || 0;
-                        conflictType = scenario.type || 'NONE';
-                    }
-                } catch (e) {
-                    console.warn('Failed to parse conflict scenario:', e);
-                }
-            }
-
-            // 如果有参与角色但没有冲突场景，根据角色数量推断基础冲突强度
-            if (intensity === 0 && participants.length >= 2) {
-                intensity = 3; // 基础冲突强度
-                conflictType = 'CONFRONTATION';
-            }
-
-            heatmapData.push({
-                chapterId,
-                chapterTitle,
-                intensity,
-                conflictType,
-                participants
-            });
+          if (scenario) {
+            intensity = scenario.intensity || 0;
+            conflictType = scenario.type || 'NONE';
+          }
+        } catch (e) {
+          console.warn('Failed to parse conflict scenario:', e);
         }
+      }
 
-        return heatmapData;
-    } finally {
-        await session.close();
+      // 如果有参与角色但没有冲突场景，根据角色数量推断基础冲突强度
+      if (intensity === 0 && participants.length >= 2) {
+        intensity = 3; // 基础冲突强度
+        conflictType = 'CONFRONTATION';
+      }
+
+      heatmapData.push({
+        chapterId,
+        chapterTitle,
+        intensity,
+        conflictType,
+        participants,
+      });
     }
+
+    return heatmapData;
+  } finally {
+    await session.close();
+  }
 };
 
 // ==================== WorldSetting 图谱查询 API ====================
@@ -1931,22 +1965,24 @@ export const getConflictHeatmapData = async (
  * @param rootId 可选的根节点ID，不传则返回完整森林
  */
 export const getWorldSettingHierarchy = async (
-    projectId: string,
-    rootId?: string
-): Promise<Array<{
+  projectId: string,
+  rootId?: string
+): Promise<
+  Array<{
     node: any;
     children: any[];
     depth: number;
-}>> => {
-    const d = getDriver();
-    const session = d.session();
+  }>
+> => {
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        if (rootId) {
-            // 获取指定根节点的子树（限制深度为10层）
-            // 使用简单的路径查询，不依赖APOC插件
-            const result = await session.run(
-                `MATCH (root:WorldSetting {id: $rootId, projectId: $projectId})
+  try {
+    if (rootId) {
+      // 获取指定根节点的子树（限制深度为10层）
+      // 使用简单的路径查询，不依赖APOC插件
+      const result = await session.run(
+        `MATCH (root:WorldSetting {id: $rootId, projectId: $projectId})
                  OPTIONAL MATCH path = (root)-[:CONTAINS*0..10]->(descendant:WorldSetting)
                  WITH COALESCE(descendant, root) as node,
                       COALESCE(length(path), 0) as depth
@@ -1955,37 +1991,37 @@ export const getWorldSettingHierarchy = async (
                         depth,
                         [(node)-[:CONTAINS]->(child:WorldSetting) | child] as children
                  ORDER BY depth, node.title`,
-                { projectId, rootId }
-            );
+        { projectId, rootId }
+      );
 
-            return result.records.map(record => ({
-                node: record.get('node').properties,
-                children: (record.get('children') || []).map((c: any) => c.properties),
-                depth: record.get('depth').toNumber ? record.get('depth').toNumber() : record.get('depth')
-            }));
-        } else {
-            // 获取完整森林（所有根节点及其子树）
-            // 首先找到所有根节点（没有parentId的节点）
-            const rootsResult = await session.run(
-                `MATCH (w:WorldSetting {projectId: $projectId})
+      return result.records.map((record) => ({
+        node: record.get('node').properties,
+        children: (record.get('children') || []).map((c: any) => c.properties),
+        depth: record.get('depth').toNumber ? record.get('depth').toNumber() : record.get('depth'),
+      }));
+    } else {
+      // 获取完整森林（所有根节点及其子树）
+      // 首先找到所有根节点（没有parentId的节点）
+      const rootsResult = await session.run(
+        `MATCH (w:WorldSetting {projectId: $projectId})
                  WHERE NOT (w)<-[:CONTAINS]-(:WorldSetting)
                  RETURN w.id as rootId
                  ORDER BY w.title`,
-                { projectId }
-            );
+        { projectId }
+      );
 
-            const hierarchy: Array<{
-                node: any;
-                children: any[];
-                depth: number;
-            }> = [];
+      const hierarchy: Array<{
+        node: any;
+        children: any[];
+        depth: number;
+      }> = [];
 
-            // 对每个根节点获取其子树
-            for (const rootRecord of rootsResult.records) {
-                const currentRootId = rootRecord.get('rootId');
+      // 对每个根节点获取其子树
+      for (const rootRecord of rootsResult.records) {
+        const currentRootId = rootRecord.get('rootId');
 
-                const treeResult = await session.run(
-                    `MATCH (root:WorldSetting {id: $rootId, projectId: $projectId})
+        const treeResult = await session.run(
+          `MATCH (root:WorldSetting {id: $rootId, projectId: $projectId})
                      MATCH path = (root)-[:CONTAINS*0..10]->(descendant)
                      WITH nodes(path) as pathNodes, length(path) as depth
                      WITH pathNodes[-1] as node, depth
@@ -1993,23 +2029,25 @@ export const getWorldSettingHierarchy = async (
                             depth,
                             [(node)-[:CONTAINS]->(child:WorldSetting) | child] as children
                      ORDER BY depth, node.title`,
-                    { projectId, rootId: currentRootId }
-                );
+          { projectId, rootId: currentRootId }
+        );
 
-                for (const record of treeResult.records) {
-                    hierarchy.push({
-                        node: record.get('node').properties,
-                        children: (record.get('children') || []).map((c: any) => c.properties),
-                        depth: record.get('depth').toNumber ? record.get('depth').toNumber() : record.get('depth')
-                    });
-                }
-            }
-
-            return hierarchy;
+        for (const record of treeResult.records) {
+          hierarchy.push({
+            node: record.get('node').properties,
+            children: (record.get('children') || []).map((c: any) => c.properties),
+            depth: record.get('depth').toNumber
+              ? record.get('depth').toNumber()
+              : record.get('depth'),
+          });
         }
-    } finally {
-        await session.close();
+      }
+
+      return hierarchy;
     }
+  } finally {
+    await session.close();
+  }
 };
 
 /**
@@ -2018,20 +2056,20 @@ export const getWorldSettingHierarchy = async (
  * @param characterId 角色ID
  */
 export const getCharacterLocationContext = async (
-    projectId: string,
-    characterId: string
+  projectId: string,
+  characterId: string
 ): Promise<{
-    origin?: any;
-    residence?: any;
-    controlledTerritories: any[];
-    exiledFrom: any[];
+  origin?: any;
+  residence?: any;
+  controlledTerritories: any[];
+  exiledFrom: any[];
 }> => {
-    const d = getDriver();
-    const session = d.session();
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        const result = await session.run(
-            `MATCH (c:Character {id: $characterId, projectId: $projectId})
+  try {
+    const result = await session.run(
+      `MATCH (c:Character {id: $characterId, projectId: $projectId})
              OPTIONAL MATCH (c)-[:ORIGINATED_FROM]->(origin:WorldSetting)
              OPTIONAL MATCH (c)-[:RESIDES_IN]->(residence:WorldSetting)
              OPTIONAL MATCH (c)-[:CONTROLS_TERRITORY]->(territory:WorldSetting)
@@ -2040,33 +2078,35 @@ export const getCharacterLocationContext = async (
                     residence,
                     collect(DISTINCT territory) as controlledTerritories,
                     collect(DISTINCT exile) as exiledFrom`,
-            { projectId, characterId }
-        );
+      { projectId, characterId }
+    );
 
-        if (result.records.length === 0) {
-            return {
-                origin: undefined,
-                residence: undefined,
-                controlledTerritories: [],
-                exiledFrom: []
-            };
-        }
-
-        const record = result.records[0];
-        const originNode = record.get('origin');
-        const residenceNode = record.get('residence');
-        const territories = record.get('controlledTerritories') || [];
-        const exiles = record.get('exiledFrom') || [];
-
-        return {
-            origin: originNode ? originNode.properties : undefined,
-            residence: residenceNode ? residenceNode.properties : undefined,
-            controlledTerritories: territories.map((t: any) => t.properties).filter((t: any) => t !== null),
-            exiledFrom: exiles.map((e: any) => e.properties).filter((e: any) => e !== null)
-        };
-    } finally {
-        await session.close();
+    if (result.records.length === 0) {
+      return {
+        origin: undefined,
+        residence: undefined,
+        controlledTerritories: [],
+        exiledFrom: [],
+      };
     }
+
+    const record = result.records[0];
+    const originNode = record.get('origin');
+    const residenceNode = record.get('residence');
+    const territories = record.get('controlledTerritories') || [];
+    const exiles = record.get('exiledFrom') || [];
+
+    return {
+      origin: originNode ? originNode.properties : undefined,
+      residence: residenceNode ? residenceNode.properties : undefined,
+      controlledTerritories: territories
+        .map((t: any) => t.properties)
+        .filter((t: any) => t !== null),
+      exiledFrom: exiles.map((e: any) => e.properties).filter((e: any) => e !== null),
+    };
+  } finally {
+    await session.close();
+  }
 };
 
 /**
@@ -2075,18 +2115,20 @@ export const getCharacterLocationContext = async (
  * @param locationId 地点ID
  */
 export const getLocationCharacters = async (
-    projectId: string,
-    locationId: string
-): Promise<Array<{
+  projectId: string,
+  locationId: string
+): Promise<
+  Array<{
     character: any;
     relationship: 'ORIGINATED_FROM' | 'RESIDES_IN' | 'CONTROLS_TERRITORY' | 'EXILED_FROM';
-}>> => {
-    const d = getDriver();
-    const session = d.session();
+  }>
+> => {
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        const result = await session.run(
-            `MATCH (w:WorldSetting {id: $locationId, projectId: $projectId})
+  try {
+    const result = await session.run(
+      `MATCH (w:WorldSetting {id: $locationId, projectId: $projectId})
              OPTIONAL MATCH (c1:Character)-[:ORIGINATED_FROM]->(w)
              OPTIONAL MATCH (c2:Character)-[:RESIDES_IN]->(w)
              OPTIONAL MATCH (c3:Character)-[:CONTROLS_TERRITORY]->(w)
@@ -2101,16 +2143,20 @@ export const getLocationCharacters = async (
              WHERE item.char IS NOT NULL
              RETURN DISTINCT item.char as character, item.rel as relationship
              ORDER BY relationship, character.name`,
-            { projectId, locationId }
-        );
+      { projectId, locationId }
+    );
 
-        return result.records.map(record => ({
-            character: record.get('character').properties,
-            relationship: record.get('relationship') as 'ORIGINATED_FROM' | 'RESIDES_IN' | 'CONTROLS_TERRITORY' | 'EXILED_FROM'
-        }));
-    } finally {
-        await session.close();
-    }
+    return result.records.map((record) => ({
+      character: record.get('character').properties,
+      relationship: record.get('relationship') as
+        | 'ORIGINATED_FROM'
+        | 'RESIDES_IN'
+        | 'CONTROLS_TERRITORY'
+        | 'EXILED_FROM',
+    }));
+  } finally {
+    await session.close();
+  }
 };
 
 /**
@@ -2118,91 +2164,93 @@ export const getLocationCharacters = async (
  * @param projectId 项目ID
  */
 export const getTerritoryControl = async (
-    projectId: string
-): Promise<Array<{
+  projectId: string
+): Promise<
+  Array<{
     character: any;
     territories: any[];
     conflicts: Array<{
-        territory: any;
-        contestedBy: any[];
+      territory: any;
+      contestedBy: any[];
     }>;
-}>> => {
-    const d = getDriver();
-    const session = d.session();
+  }>
+> => {
+  const d = getDriver();
+  const session = d.session();
 
-    try {
-        // 1. 获取所有有领土控制权的角色及其控制的领土
-        const controlResult = await session.run(
-            `MATCH (c:Character {projectId: $projectId})-[:CONTROLS_TERRITORY]->(t:WorldSetting)
+  try {
+    // 1. 获取所有有领土控制权的角色及其控制的领土
+    const controlResult = await session.run(
+      `MATCH (c:Character {projectId: $projectId})-[:CONTROLS_TERRITORY]->(t:WorldSetting)
              WITH c, collect(DISTINCT t) as territories
              RETURN c, territories
              ORDER BY c.name`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        // 2. 获取每个领土的冲突情况（多个角色控制同一领土）
-        const conflictResult = await session.run(
-            `MATCH (c1:Character {projectId: $projectId})-[:CONTROLS_TERRITORY]->(t:WorldSetting)
+    // 2. 获取每个领土的冲突情况（多个角色控制同一领土）
+    const conflictResult = await session.run(
+      `MATCH (c1:Character {projectId: $projectId})-[:CONTROLS_TERRITORY]->(t:WorldSetting)
              WITH t, collect(DISTINCT c1) as controllers
              WHERE size(controllers) > 1
              RETURN t, controllers
              ORDER BY t.title`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        // 构建领土冲突映射
-        const territoryConflicts = new Map<string, any[]>();
-        for (const record of conflictResult.records) {
-            const territory = record.get('t').properties;
-            const controllers = record.get('controllers').map((c: any) => c.properties);
-            territoryConflicts.set(territory.id, controllers);
-        }
-
-        // 3. 组装最终结果
-        const result: Array<{
-            character: any;
-            territories: any[];
-            conflicts: Array<{
-                territory: any;
-                contestedBy: any[];
-            }>;
-        }> = [];
-
-        for (const record of controlResult.records) {
-            const character = record.get('c').properties;
-            const territories = (record.get('territories') || []).map((t: any) => t.properties);
-
-            // 找出该角色控制领土中的冲突
-            const conflicts: Array<{
-                territory: any;
-                contestedBy: any[];
-            }> = [];
-
-            for (const territory of territories) {
-                const controllers = territoryConflicts.get(territory.id);
-                if (controllers && controllers.length > 1) {
-                    // 排除当前角色
-                    const contestedBy = controllers.filter((c: any) => c.id !== character.id);
-                    if (contestedBy.length > 0) {
-                        conflicts.push({
-                            territory,
-                            contestedBy
-                        });
-                    }
-                }
-            }
-
-            result.push({
-                character,
-                territories,
-                conflicts
-            });
-        }
-
-        return result;
-    } finally {
-        await session.close();
+    // 构建领土冲突映射
+    const territoryConflicts = new Map<string, any[]>();
+    for (const record of conflictResult.records) {
+      const territory = record.get('t').properties;
+      const controllers = record.get('controllers').map((c: any) => c.properties);
+      territoryConflicts.set(territory.id, controllers);
     }
+
+    // 3. 组装最终结果
+    const result: Array<{
+      character: any;
+      territories: any[];
+      conflicts: Array<{
+        territory: any;
+        contestedBy: any[];
+      }>;
+    }> = [];
+
+    for (const record of controlResult.records) {
+      const character = record.get('c').properties;
+      const territories = (record.get('territories') || []).map((t: any) => t.properties);
+
+      // 找出该角色控制领土中的冲突
+      const conflicts: Array<{
+        territory: any;
+        contestedBy: any[];
+      }> = [];
+
+      for (const territory of territories) {
+        const controllers = territoryConflicts.get(territory.id);
+        if (controllers && controllers.length > 1) {
+          // 排除当前角色
+          const contestedBy = controllers.filter((c: any) => c.id !== character.id);
+          if (contestedBy.length > 0) {
+            conflicts.push({
+              territory,
+              contestedBy,
+            });
+          }
+        }
+      }
+
+      result.push({
+        character,
+        territories,
+        conflicts,
+      });
+    }
+
+    return result;
+  } finally {
+    await session.close();
+  }
 };
 
 // ============================================================
@@ -2213,16 +2261,16 @@ export const getTerritoryControl = async (
  * 一致性检测结果类型
  */
 export interface ConsistencyIssue {
-    type: 'SPATIAL_CONFLICT' | 'HIERARCHY_CYCLE' | 'LOGICAL_CONTRADICTION';
-    severity: 'HIGH' | 'MEDIUM' | 'LOW';
-    description: string;
-    entities: Array<{
-        id: string;
-        name: string;
-        type: string;
-    }>;
-    details?: string;
-    suggestion?: string;
+  type: 'SPATIAL_CONFLICT' | 'HIERARCHY_CYCLE' | 'LOGICAL_CONTRADICTION';
+  severity: 'HIGH' | 'MEDIUM' | 'LOW';
+  description: string;
+  entities: Array<{
+    id: string;
+    name: string;
+    type: string;
+  }>;
+  details?: string;
+  suggestion?: string;
 }
 
 /**
@@ -2230,19 +2278,17 @@ export interface ConsistencyIssue {
  * 包括：地理空间冲突、层级循环、逻辑矛盾
  * @param projectId 项目ID
  */
-export const checkWorldConsistency = async (
-    projectId: string
-): Promise<ConsistencyIssue[]> => {
-    const d = getDriver();
-    const session = d.session();
-    const issues: ConsistencyIssue[] = [];
+export const checkWorldConsistency = async (projectId: string): Promise<ConsistencyIssue[]> => {
+  const d = getDriver();
+  const session = d.session();
+  const issues: ConsistencyIssue[] = [];
 
-    try {
-        // ============================================================
-        // 1. 检测地理空间冲突（角色同时出现在两地）
-        // ============================================================
-        const spatialConflictResult = await session.run(
-            `MATCH (c:Character {projectId: $projectId})
+  try {
+    // ============================================================
+    // 1. 检测地理空间冲突（角色同时出现在两地）
+    // ============================================================
+    const spatialConflictResult = await session.run(
+      `MATCH (c:Character {projectId: $projectId})
              WHERE c.isDead <> true OR c.isDead IS NULL
              MATCH (c)-[r1:LOCATED_IN]->(loc1:WorldSetting)
              MATCH (c)-[r2:LOCATED_IN]->(loc2:WorldSetting)
@@ -2255,117 +2301,119 @@ export const checkWorldConsistency = async (
                     loc1.title as loc1Name,
                     loc2.id as loc2Id,
                     loc2.title as loc2Name`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        for (const record of spatialConflictResult.records) {
-            issues.push({
-                type: 'SPATIAL_CONFLICT',
-                severity: 'HIGH',
-                description: `角色「${record.get('characterName')}」同时出现在两个不同地点`,
-                entities: [
-                    { id: record.get('characterId'), name: record.get('characterName'), type: 'Character' },
-                    { id: record.get('loc1Id'), name: record.get('loc1Name'), type: 'WorldSetting' },
-                    { id: record.get('loc2Id'), name: record.get('loc2Name'), type: 'WorldSetting' }
-                ],
-                details: `角色同时被标记在「${record.get('loc1Name')}」和「${record.get('loc2Name')}」，这在物理上是不可能的。`,
-                suggestion: '请确认角色的当前位置，移除多余的LOCATED_IN关系，只保留一个正确的位置。'
-            });
-        }
+    for (const record of spatialConflictResult.records) {
+      issues.push({
+        type: 'SPATIAL_CONFLICT',
+        severity: 'HIGH',
+        description: `角色「${record.get('characterName')}」同时出现在两个不同地点`,
+        entities: [
+          { id: record.get('characterId'), name: record.get('characterName'), type: 'Character' },
+          { id: record.get('loc1Id'), name: record.get('loc1Name'), type: 'WorldSetting' },
+          { id: record.get('loc2Id'), name: record.get('loc2Name'), type: 'WorldSetting' },
+        ],
+        details: `角色同时被标记在「${record.get('loc1Name')}」和「${record.get('loc2Name')}」，这在物理上是不可能的。`,
+        suggestion: '请确认角色的当前位置，移除多余的LOCATED_IN关系，只保留一个正确的位置。',
+      });
+    }
 
-        // ============================================================
-        // 2. 检测层级循环（A属于B，B属于A）
-        // ============================================================
-        const hierarchyCycleResult = await session.run(
-            `MATCH path = (a:WorldSetting {projectId: $projectId})-[:CONTAINS*]->(b:WorldSetting)
+    // ============================================================
+    // 2. 检测层级循环（A属于B，B属于A）
+    // ============================================================
+    const hierarchyCycleResult = await session.run(
+      `MATCH path = (a:WorldSetting {projectId: $projectId})-[:CONTAINS*]->(b:WorldSetting)
              WHERE b.id = a.id
              WITH a, nodes(path) as cycleNodes
              RETURN DISTINCT a.id as rootId,
                     a.title as rootName,
                     [n in cycleNodes | {id: n.id, name: n.title}] as cycleEntities`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        for (const record of hierarchyCycleResult.records) {
-            const cycleEntities = record.get('cycleEntities');
-            issues.push({
-                type: 'HIERARCHY_CYCLE',
-                severity: 'HIGH',
-                description: `检测到世界设定的层级循环：${cycleEntities.map((e: any) => e.name).join(' -> ')}`,
-                entities: cycleEntities,
-                details: `层级关系形成闭环，这会导致无限递归和逻辑错误。`,
-                suggestion: '请检查并修正CONTAINS关系，确保层级结构是树形的（无循环）。'
-            });
-        }
+    for (const record of hierarchyCycleResult.records) {
+      const cycleEntities = record.get('cycleEntities');
+      issues.push({
+        type: 'HIERARCHY_CYCLE',
+        severity: 'HIGH',
+        description: `检测到世界设定的层级循环：${cycleEntities.map((e: any) => e.name).join(' -> ')}`,
+        entities: cycleEntities,
+        details: `层级关系形成闭环，这会导致无限递归和逻辑错误。`,
+        suggestion: '请检查并修正CONTAINS关系，确保层级结构是树形的（无循环）。',
+      });
+    }
 
-        // 检测两节点间的相互包含（A包含B，B也包含A）
-        const mutualContainResult = await session.run(
-            `MATCH (a:WorldSetting {projectId: $projectId})-[:CONTAINS]->(b:WorldSetting)
+    // 检测两节点间的相互包含（A包含B，B也包含A）
+    const mutualContainResult = await session.run(
+      `MATCH (a:WorldSetting {projectId: $projectId})-[:CONTAINS]->(b:WorldSetting)
              WHERE b.projectId = $projectId
              AND (b)-[:CONTAINS]->(a)
              RETURN a.id as aId, a.title as aName, b.id as bId, b.title as bName`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        for (const record of mutualContainResult.records) {
-            // 避免重复报告（A->B和B->A是同一个问题）
-            const aId = record.get('aId');
-            const bId = record.get('bId');
-            const existingIssue = issues.find(i =>
-                i.type === 'HIERARCHY_CYCLE' &&
-                i.entities.some(e => e.id === aId) &&
-                i.entities.some(e => e.id === bId)
-            );
-            if (!existingIssue) {
-                issues.push({
-                    type: 'HIERARCHY_CYCLE',
-                    severity: 'HIGH',
-                    description: `检测到相互包含：「${record.get('aName')}」包含「${record.get('bName')}」，而后者也包含前者`,
-                    entities: [
-                        { id: aId, name: record.get('aName'), type: 'WorldSetting' },
-                        { id: bId, name: record.get('bName'), type: 'WorldSetting' }
-                    ],
-                    details: '两个设定互相包含对方，形成循环依赖。',
-                    suggestion: '请移除其中一个CONTAINS关系，确保层级关系是单向的。'
-                });
-            }
-        }
+    for (const record of mutualContainResult.records) {
+      // 避免重复报告（A->B和B->A是同一个问题）
+      const aId = record.get('aId');
+      const bId = record.get('bId');
+      const existingIssue = issues.find(
+        (i) =>
+          i.type === 'HIERARCHY_CYCLE' &&
+          i.entities.some((e) => e.id === aId) &&
+          i.entities.some((e) => e.id === bId)
+      );
+      if (!existingIssue) {
+        issues.push({
+          type: 'HIERARCHY_CYCLE',
+          severity: 'HIGH',
+          description: `检测到相互包含：「${record.get('aName')}」包含「${record.get('bName')}」，而后者也包含前者`,
+          entities: [
+            { id: aId, name: record.get('aName'), type: 'WorldSetting' },
+            { id: bId, name: record.get('bName'), type: 'WorldSetting' },
+          ],
+          details: '两个设定互相包含对方，形成循环依赖。',
+          suggestion: '请移除其中一个CONTAINS关系，确保层级关系是单向的。',
+        });
+      }
+    }
 
-        // ============================================================
-        // 3. 检测逻辑矛盾
-        // ============================================================
+    // ============================================================
+    // 3. 检测逻辑矛盾
+    // ============================================================
 
-        // 3.1 检测角色状态矛盾（已死亡角色有活动）
-        const deadCharacterActivityResult = await session.run(
-            `MATCH (c:Character {projectId: $projectId})
+    // 3.1 检测角色状态矛盾（已死亡角色有活动）
+    const deadCharacterActivityResult = await session.run(
+      `MATCH (c:Character {projectId: $projectId})
              WHERE c.isDead = true
              MATCH (pn:PlotNode {projectId: $projectId})-[:INVOLVES]->(c)
              RETURN DISTINCT c.id as characterId,
                     c.name as characterName,
                     collect(DISTINCT {id: pn.id, title: pn.title}) as involvedPlots`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        for (const record of deadCharacterActivityResult.records) {
-            const plots = record.get('involvedPlots');
-            if (plots && plots.length > 0) {
-                issues.push({
-                    type: 'LOGICAL_CONTRADICTION',
-                    severity: 'MEDIUM',
-                    description: `已死亡角色「${record.get('characterName')}」仍被标记为参与后续情节`,
-                    entities: [
-                        { id: record.get('characterId'), name: record.get('characterName'), type: 'Character' },
-                        ...plots.map((p: any) => ({ id: p.id, name: p.title, type: 'PlotNode' }))
-                    ],
-                    details: `角色已标记为死亡，但仍参与以下情节：${plots.map((p: any) => `「${p.title}」`).join('、')}`,
-                    suggestion: '请确认情节时间线：如果是闪回/回忆场景则可忽略；否则请检查角色死亡状态或移除其参与关系。'
-                });
-            }
-        }
+    for (const record of deadCharacterActivityResult.records) {
+      const plots = record.get('involvedPlots');
+      if (plots && plots.length > 0) {
+        issues.push({
+          type: 'LOGICAL_CONTRADICTION',
+          severity: 'MEDIUM',
+          description: `已死亡角色「${record.get('characterName')}」仍被标记为参与后续情节`,
+          entities: [
+            { id: record.get('characterId'), name: record.get('characterName'), type: 'Character' },
+            ...plots.map((p: any) => ({ id: p.id, name: p.title, type: 'PlotNode' })),
+          ],
+          details: `角色已标记为死亡，但仍参与以下情节：${plots.map((p: any) => `「${p.title}」`).join('、')}`,
+          suggestion:
+            '请确认情节时间线：如果是闪回/回忆场景则可忽略；否则请检查角色死亡状态或移除其参与关系。',
+        });
+      }
+    }
 
-        // 3.2 检测同一设定的冲突描述（通过Echo三元组）
-        const conflictingDescriptionsResult = await session.run(
-            `MATCH (e1:Echo {projectId: $projectId, status: 'ACCEPTED'})
+    // 3.2 检测同一设定的冲突描述（通过Echo三元组）
+    const conflictingDescriptionsResult = await session.run(
+      `MATCH (e1:Echo {projectId: $projectId, status: 'ACCEPTED'})
              MATCH (e2:Echo {projectId: $projectId, status: 'ACCEPTED'})
              WHERE e1.id < e2.id
              AND e1.triples IS NOT NULL AND e2.triples IS NOT NULL
@@ -2382,74 +2430,74 @@ export const checkWorldConsistency = async (
                     t2.object as value2,
                     e1.id as echo1Id,
                     e2.id as echo2Id`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        for (const record of conflictingDescriptionsResult.records) {
-            issues.push({
-                type: 'LOGICAL_CONTRADICTION',
-                severity: 'MEDIUM',
-                description: `检测到「${record.get('entityName')}」的冲突描述`,
-                entities: [
-                    { id: record.get('echo1Id'), name: record.get('entityName'), type: 'Echo' },
-                    { id: record.get('echo2Id'), name: record.get('entityName'), type: 'Echo' }
-                ],
-                details: `关系「${record.get('relation')}」存在矛盾值：「${record.get('value1')}」vs「${record.get('value2')}」`,
-                suggestion: '请检查两个Echo记录，确认哪个描述是正确的，并修正或拒绝错误的那条。'
-            });
-        }
+    for (const record of conflictingDescriptionsResult.records) {
+      issues.push({
+        type: 'LOGICAL_CONTRADICTION',
+        severity: 'MEDIUM',
+        description: `检测到「${record.get('entityName')}」的冲突描述`,
+        entities: [
+          { id: record.get('echo1Id'), name: record.get('entityName'), type: 'Echo' },
+          { id: record.get('echo2Id'), name: record.get('entityName'), type: 'Echo' },
+        ],
+        details: `关系「${record.get('relation')}」存在矛盾值：「${record.get('value1')}」vs「${record.get('value2')}」`,
+        suggestion: '请检查两个Echo记录，确认哪个描述是正确的，并修正或拒绝错误的那条。',
+      });
+    }
 
-        // 3.3 检测角色关系矛盾（A是B的敌人，同时又是B的盟友）
-        const relationshipContradictionResult = await session.run(
-            `MATCH (c1:Character {projectId: $projectId})-[r1:ENEMY_OF]->(c2:Character)
+    // 3.3 检测角色关系矛盾（A是B的敌人，同时又是B的盟友）
+    const relationshipContradictionResult = await session.run(
+      `MATCH (c1:Character {projectId: $projectId})-[r1:ENEMY_OF]->(c2:Character)
              WHERE c2.projectId = $projectId
              AND EXISTS((c1)-[:ALLY_OF]->(c2))
              RETURN c1.id as c1Id, c1.name as c1Name, c2.id as c2Id, c2.name as c2Name`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        for (const record of relationshipContradictionResult.records) {
-            issues.push({
-                type: 'LOGICAL_CONTRADICTION',
-                severity: 'HIGH',
-                description: `角色关系矛盾：「${record.get('c1Name')}」同时是「${record.get('c2Name')}」的敌人和盟友`,
-                entities: [
-                    { id: record.get('c1Id'), name: record.get('c1Name'), type: 'Character' },
-                    { id: record.get('c2Id'), name: record.get('c2Name'), type: 'Character' }
-                ],
-                details: '同时存在ENEMY_OF和ALLY_OF关系，这在逻辑上是矛盾的。',
-                suggestion: '请根据剧情发展确定正确的关系类型，移除矛盾的关系边。'
-            });
-        }
+    for (const record of relationshipContradictionResult.records) {
+      issues.push({
+        type: 'LOGICAL_CONTRADICTION',
+        severity: 'HIGH',
+        description: `角色关系矛盾：「${record.get('c1Name')}」同时是「${record.get('c2Name')}」的敌人和盟友`,
+        entities: [
+          { id: record.get('c1Id'), name: record.get('c1Name'), type: 'Character' },
+          { id: record.get('c2Id'), name: record.get('c2Name'), type: 'Character' },
+        ],
+        details: '同时存在ENEMY_OF和ALLY_OF关系，这在逻辑上是矛盾的。',
+        suggestion: '请根据剧情发展确定正确的关系类型，移除矛盾的关系边。',
+      });
+    }
 
-        // 3.4 检测已删除地点的引用（孤儿引用）
-        const orphanLocationRefResult = await session.run(
-            `MATCH (c:Character {projectId: $projectId})-[r:LOCATED_IN|RESIDES_IN|ORIGINATED_FROM]->(w:WorldSetting)
+    // 3.4 检测已删除地点的引用（孤儿引用）
+    const orphanLocationRefResult = await session.run(
+      `MATCH (c:Character {projectId: $projectId})-[r:LOCATED_IN|RESIDES_IN|ORIGINATED_FROM]->(w:WorldSetting)
              WHERE w.projectId IS NULL OR w.projectId <> $projectId
              RETURN DISTINCT c.id as characterId,
                     c.name as characterName,
                     type(r) as relationType,
                     coalesce(w.title, w.id, '未知地点') as locationName`,
-            { projectId }
-        );
+      { projectId }
+    );
 
-        for (const record of orphanLocationRefResult.records) {
-            issues.push({
-                type: 'LOGICAL_CONTRADICTION',
-                severity: 'LOW',
-                description: `角色「${record.get('characterName')}」引用了无效的地点`,
-                entities: [
-                    { id: record.get('characterId'), name: record.get('characterName'), type: 'Character' }
-                ],
-                details: `关系类型「${record.get('relationType')}」指向了一个不存在的地点「${record.get('locationName')}」`,
-                suggestion: '请检查该地点是否已被删除，如果是，请更新角色的位置信息。'
-            });
-        }
-
-        return issues;
-    } finally {
-        await session.close();
+    for (const record of orphanLocationRefResult.records) {
+      issues.push({
+        type: 'LOGICAL_CONTRADICTION',
+        severity: 'LOW',
+        description: `角色「${record.get('characterName')}」引用了无效的地点`,
+        entities: [
+          { id: record.get('characterId'), name: record.get('characterName'), type: 'Character' },
+        ],
+        details: `关系类型「${record.get('relationType')}」指向了一个不存在的地点「${record.get('locationName')}」`,
+        suggestion: '请检查该地点是否已被删除，如果是，请更新角色的位置信息。',
+      });
     }
+
+    return issues;
+  } finally {
+    await session.close();
+  }
 };
 
 /**
@@ -2458,64 +2506,63 @@ export const checkWorldConsistency = async (
  * @param options 可选参数（角色ID列表、地点ID、情节节点ID）
  */
 export const getForgeContext = async (
-    projectId: string,
-    options?: {
-        characterIds?: string[];
-        locationId?: string;
-        plotNodeId?: string;
-        branchId?: string;
-    }
+  projectId: string,
+  options?: {
+    characterIds?: string[];
+    locationId?: string;
+    plotNodeId?: string;
+    branchId?: string;
+  }
 ): Promise<{
-    characters: Array<{
-        id: string;
-        name: string;
-        role: string;
-        physicalStatus: string;
-        location?: string;
-        desire?: string;
-        fear?: string;
-        weakness?: string;
-        signature?: string;
-        relationships: Array<{
-            targetName: string;
-            type: string;
-            trajectory?: string;
-            weight: number;
-        }>;
+  characters: Array<{
+    id: string;
+    name: string;
+    role: string;
+    physicalStatus: string;
+    location?: string;
+    desire?: string;
+    fear?: string;
+    weakness?: string;
+    signature?: string;
+    relationships: Array<{
+      targetName: string;
+      type: string;
+      trajectory?: string;
+      weight: number;
     }>;
-    unresolvedForeshadowing: Array<{
-        subject: string;
-        relation: string;
-        object: string;
-        status: string;
-        echoId: string;
-    }>;
-    locationContext?: {
-        title: string;
-        category: string;
-        content: string;
-    };
-    plotContext?: {
-        title: string;
-        content: string;
-        beatTag?: string;
-        relatedCharacters: string[];
-    };
+  }>;
+  unresolvedForeshadowing: Array<{
+    subject: string;
+    relation: string;
+    object: string;
+    status: string;
+    echoId: string;
+  }>;
+  locationContext?: {
+    title: string;
+    category: string;
+    content: string;
+  };
+  plotContext?: {
+    title: string;
+    content: string;
+    beatTag?: string;
+    relatedCharacters: string[];
+  };
 }> => {
-    const d = getDriver();
-    const session = d.session();
-    const branchId = options?.branchId || 'main';
+  const d = getDriver();
+  const session = d.session();
+  const branchId = options?.branchId || 'main';
 
-    try {
-        // ============================================================
-        // 1. 查询角色信息（如果指定了 characterIds，只查询这些角色）
-        // ============================================================
-        const characterWhereClause = options?.characterIds && options.characterIds.length > 0
-            ? 'AND c.id IN $characterIds'
-            : '';
+  try {
+    // ============================================================
+    // 1. 查询角色信息（如果指定了 characterIds，只查询这些角色）
+    // ============================================================
+    const characterWhereClause =
+      options?.characterIds && options.characterIds.length > 0 ? 'AND c.id IN $characterIds' : '';
 
-        const charactersResult = await session.run(
-            `MATCH (c:Character {projectId: $projectId})
+    const charactersResult = await session.run(
+      `MATCH (c:Character {projectId: $projectId})
              WHERE 1=1 ${characterWhereClause}
              OPTIONAL MATCH (c)-[locRel:LOCATED_IN]->(l:WorldSetting)
              WHERE (locRel.branchId IS NULL OR locRel.branchId = 'main')
@@ -2531,27 +2578,27 @@ export const getForgeContext = async (
                     c.weakness as weakness,
                     c.signature as signature
              ORDER BY c.name`,
-            { projectId, characterIds: options?.characterIds || [] }
-        );
+      { projectId, characterIds: options?.characterIds || [] }
+    );
 
-        // ============================================================
-        // 2. 查询角色关系
-        // ============================================================
-        const characterNames = charactersResult.records.map(r => r.get('name'));
+    // ============================================================
+    // 2. 查询角色关系
+    // ============================================================
+    const characterNames = charactersResult.records.map((r) => r.get('name'));
 
-        // 查询角色之间的直接关系边
-        const directRelsResult = await session.run(
-            `MATCH (c1:Character {projectId: $projectId})-[r]->(c2:Character {projectId: $projectId})
+    // 查询角色之间的直接关系边
+    const directRelsResult = await session.run(
+      `MATCH (c1:Character {projectId: $projectId})-[r]->(c2:Character {projectId: $projectId})
              WHERE c1.name IN $characterNames AND c2.name IN $characterNames
              AND type(r) IN ['ENEMY_OF', 'ALLY_OF', 'LOVES', 'KIN_OF', 'MENTORS', 'RIVAL_OF', 'SERVES', 'FRIEND_OF', 'RELATED_TO']
              RETURN c1.name as subject, type(r) as relation, c2.name as object,
                     r.trajectory as trajectory, r.weight as weight`,
-            { projectId, characterNames }
-        );
+      { projectId, characterNames }
+    );
 
-        // 查询 Echo 中存储的关系三元组
-        const tripleRelsResult = await session.run(
-            `MATCH (e:Echo {projectId: $projectId, status: 'ACCEPTED'})
+    // 查询 Echo 中存储的关系三元组
+    const tripleRelsResult = await session.run(
+      `MATCH (e:Echo {projectId: $projectId, status: 'ACCEPTED'})
              WHERE e.triples IS NOT NULL
              AND (e.branchId IS NULL OR e.branchId = 'main' OR e.branchId = $branchId)
              UNWIND e.triples AS triple
@@ -2559,113 +2606,128 @@ export const getForgeContext = async (
              WHERE triple.subject IN $characterNames AND triple.object IN $characterNames
              RETURN triple.subject as subject, triple.relation as relation, triple.object as object,
                     triple.trajectory as trajectory, triple.weight as weight`,
-            { projectId, characterNames, branchId }
-        );
+      { projectId, characterNames, branchId }
+    );
 
-        // 合并关系数据（使用 Map 去重）
-        const relationshipMap = new Map<string, {
-            subject: string;
-            relation: string;
-            object: string;
-            trajectory?: string;
-            weight: number;
-        }>();
+    // 合并关系数据（使用 Map 去重）
+    const relationshipMap = new Map<
+      string,
+      {
+        subject: string;
+        relation: string;
+        object: string;
+        trajectory?: string;
+        weight: number;
+      }
+    >();
 
-        // 添加直接关系边
-        for (const record of directRelsResult.records) {
-            const key = `${record.get('subject')}-${record.get('relation')}-${record.get('object')}`;
-            if (!relationshipMap.has(key)) {
-                relationshipMap.set(key, {
-                    subject: record.get('subject'),
-                    relation: record.get('relation'),
-                    object: record.get('object'),
-                    trajectory: record.get('trajectory'),
-                    weight: record.get('weight')?.toNumber?.() || record.get('weight') || 50
-                });
-            }
-        }
-
-        // 添加三元组关系（如果不存在）
-        for (const record of tripleRelsResult.records) {
-            const key = `${record.get('subject')}-${record.get('relation')}-${record.get('object')}`;
-            if (!relationshipMap.has(key)) {
-                relationshipMap.set(key, {
-                    subject: record.get('subject'),
-                    relation: record.get('relation'),
-                    object: record.get('object'),
-                    trajectory: record.get('trajectory'),
-                    weight: record.get('weight')?.toNumber?.() || record.get('weight') || 50
-                });
-            }
-        }
-
-        // 按角色聚合关系
-        const characterRelationships = new Map<string, Array<{
-            targetName: string;
-            type: string;
-            trajectory?: string;
-            weight: number;
-        }>>();
-
-        for (const rel of Array.from(relationshipMap.values())) {
-            // 添加正向关系
-            if (!characterRelationships.has(rel.subject)) {
-                characterRelationships.set(rel.subject, []);
-            }
-            characterRelationships.get(rel.subject)!.push({
-                targetName: rel.object,
-                type: rel.relation,
-                trajectory: rel.trajectory,
-                weight: rel.weight
-            });
-
-            // 如果是对称关系，也添加反向关系
-            const symmetricRelations = ['ALLY_OF', 'ENEMY_OF', 'KIN_OF', 'FRIEND_OF', 'RIVAL_OF', 'RELATED_TO'];
-            if (symmetricRelations.includes(rel.relation)) {
-                if (!characterRelationships.has(rel.object)) {
-                    characterRelationships.set(rel.object, []);
-                }
-                characterRelationships.get(rel.object)!.push({
-                    targetName: rel.subject,
-                    type: rel.relation,
-                    trajectory: rel.trajectory,
-                    weight: rel.weight
-                });
-            }
-        }
-
-        // 组装角色数据
-        const characters = charactersResult.records.map(record => {
-            const name = record.get('name');
-            const isDead = record.get('isDead') === true;
-            const state = record.get('state') || '正常';
-            const physicalStatusRaw = record.get('physicalStatus');
-
-            // 构建物理状态描述
-            let physicalStatus = isDead ? '已死亡' : state;
-            if (physicalStatusRaw) {
-                physicalStatus = isDead ? `已死亡 (${physicalStatusRaw})` : `${state} - ${physicalStatusRaw}`;
-            }
-
-            return {
-                id: record.get('id'),
-                name,
-                role: record.get('role') || '未知',
-                physicalStatus,
-                location: record.get('location') || undefined,
-                desire: record.get('desire') || undefined,
-                fear: record.get('fear') || undefined,
-                weakness: record.get('weakness') || undefined,
-                signature: record.get('signature') || undefined,
-                relationships: characterRelationships.get(name) || []
-            };
+    // 添加直接关系边
+    for (const record of directRelsResult.records) {
+      const key = `${record.get('subject')}-${record.get('relation')}-${record.get('object')}`;
+      if (!relationshipMap.has(key)) {
+        relationshipMap.set(key, {
+          subject: record.get('subject'),
+          relation: record.get('relation'),
+          object: record.get('object'),
+          trajectory: record.get('trajectory'),
+          weight: record.get('weight')?.toNumber?.() || record.get('weight') || 50,
         });
+      }
+    }
 
-        // ============================================================
-        // 3. 查询未回收的伏笔
-        // ============================================================
-        const foreshadowingResult = await session.run(
-            `MATCH (e:Echo {projectId: $projectId, status: 'ACCEPTED'})
+    // 添加三元组关系（如果不存在）
+    for (const record of tripleRelsResult.records) {
+      const key = `${record.get('subject')}-${record.get('relation')}-${record.get('object')}`;
+      if (!relationshipMap.has(key)) {
+        relationshipMap.set(key, {
+          subject: record.get('subject'),
+          relation: record.get('relation'),
+          object: record.get('object'),
+          trajectory: record.get('trajectory'),
+          weight: record.get('weight')?.toNumber?.() || record.get('weight') || 50,
+        });
+      }
+    }
+
+    // 按角色聚合关系
+    const characterRelationships = new Map<
+      string,
+      Array<{
+        targetName: string;
+        type: string;
+        trajectory?: string;
+        weight: number;
+      }>
+    >();
+
+    for (const rel of Array.from(relationshipMap.values())) {
+      // 添加正向关系
+      if (!characterRelationships.has(rel.subject)) {
+        characterRelationships.set(rel.subject, []);
+      }
+      characterRelationships.get(rel.subject)!.push({
+        targetName: rel.object,
+        type: rel.relation,
+        trajectory: rel.trajectory,
+        weight: rel.weight,
+      });
+
+      // 如果是对称关系，也添加反向关系
+      const symmetricRelations = [
+        'ALLY_OF',
+        'ENEMY_OF',
+        'KIN_OF',
+        'FRIEND_OF',
+        'RIVAL_OF',
+        'RELATED_TO',
+      ];
+      if (symmetricRelations.includes(rel.relation)) {
+        if (!characterRelationships.has(rel.object)) {
+          characterRelationships.set(rel.object, []);
+        }
+        characterRelationships.get(rel.object)!.push({
+          targetName: rel.subject,
+          type: rel.relation,
+          trajectory: rel.trajectory,
+          weight: rel.weight,
+        });
+      }
+    }
+
+    // 组装角色数据
+    const characters = charactersResult.records.map((record) => {
+      const name = record.get('name');
+      const isDead = record.get('isDead') === true;
+      const state = record.get('state') || '正常';
+      const physicalStatusRaw = record.get('physicalStatus');
+
+      // 构建物理状态描述
+      let physicalStatus = isDead ? '已死亡' : state;
+      if (physicalStatusRaw) {
+        physicalStatus = isDead
+          ? `已死亡 (${physicalStatusRaw})`
+          : `${state} - ${physicalStatusRaw}`;
+      }
+
+      return {
+        id: record.get('id'),
+        name,
+        role: record.get('role') || '未知',
+        physicalStatus,
+        location: record.get('location') || undefined,
+        desire: record.get('desire') || undefined,
+        fear: record.get('fear') || undefined,
+        weakness: record.get('weakness') || undefined,
+        signature: record.get('signature') || undefined,
+        relationships: characterRelationships.get(name) || [],
+      };
+    });
+
+    // ============================================================
+    // 3. 查询未回收的伏笔
+    // ============================================================
+    const foreshadowingResult = await session.run(
+      `MATCH (e:Echo {projectId: $projectId, status: 'ACCEPTED'})
              WHERE e.triples IS NOT NULL
              AND (e.branchId IS NULL OR e.branchId = 'main' OR e.branchId = $branchId)
              UNWIND e.triples AS triple
@@ -2677,78 +2739,80 @@ export const getForgeContext = async (
                     triple.object as object,
                     triple.status as status
              ORDER BY e.timestamp DESC`,
-            { projectId, branchId }
-        );
+      { projectId, branchId }
+    );
 
-        const unresolvedForeshadowing = foreshadowingResult.records.map(record => ({
-            subject: record.get('subject'),
-            relation: record.get('relation'),
-            object: record.get('object'),
-            status: record.get('status') || 'OPEN',
-            echoId: record.get('echoId')
-        }));
+    const unresolvedForeshadowing = foreshadowingResult.records.map((record) => ({
+      subject: record.get('subject'),
+      relation: record.get('relation'),
+      object: record.get('object'),
+      status: record.get('status') || 'OPEN',
+      echoId: record.get('echoId'),
+    }));
 
-        // ============================================================
-        // 4. 查询地点上下文（如果指定了 locationId）
-        // ============================================================
-        let locationContext: { title: string; category: string; content: string } | undefined;
+    // ============================================================
+    // 4. 查询地点上下文（如果指定了 locationId）
+    // ============================================================
+    let locationContext: { title: string; category: string; content: string } | undefined;
 
-        if (options?.locationId) {
-            const locationResult = await session.run(
-                `MATCH (w:WorldSetting {id: $locationId, projectId: $projectId})
+    if (options?.locationId) {
+      const locationResult = await session.run(
+        `MATCH (w:WorldSetting {id: $locationId, projectId: $projectId})
                  RETURN w.title as title, w.category as category, w.content as content`,
-                { projectId, locationId: options.locationId }
-            );
+        { projectId, locationId: options.locationId }
+      );
 
-            if (locationResult.records.length > 0) {
-                const loc = locationResult.records[0];
-                locationContext = {
-                    title: loc.get('title'),
-                    category: loc.get('category') || '未知',
-                    content: loc.get('content') || ''
-                };
-            }
+      if (locationResult.records.length > 0) {
+        const loc = locationResult.records[0];
+        locationContext = {
+          title: loc.get('title'),
+          category: loc.get('category') || '未知',
+          content: loc.get('content') || '',
+        };
+      }
+    }
+
+    // ============================================================
+    // 5. 查询情节上下文（如果指定了 plotNodeId）
+    // ============================================================
+    let plotContext:
+      | {
+          title: string;
+          content: string;
+          beatTag?: string;
+          relatedCharacters: string[];
         }
+      | undefined;
 
-        // ============================================================
-        // 5. 查询情节上下文（如果指定了 plotNodeId）
-        // ============================================================
-        let plotContext: {
-            title: string;
-            content: string;
-            beatTag?: string;
-            relatedCharacters: string[];
-        } | undefined;
-
-        if (options?.plotNodeId) {
-            const plotResult = await session.run(
-                `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})
+    if (options?.plotNodeId) {
+      const plotResult = await session.run(
+        `MATCH (pn:PlotNode {id: $plotNodeId, projectId: $projectId})
                  OPTIONAL MATCH (pn)-[:HAS_CHARACTER]->(c:Character)
                  RETURN pn.title as title,
                         pn.content as content,
                         pn.beatTag as beatTag,
                         collect(c.name) as relatedCharacters`,
-                { projectId, plotNodeId: options.plotNodeId }
-            );
+        { projectId, plotNodeId: options.plotNodeId }
+      );
 
-            if (plotResult.records.length > 0) {
-                const plot = plotResult.records[0];
-                plotContext = {
-                    title: plot.get('title'),
-                    content: plot.get('content') || '',
-                    beatTag: plot.get('beatTag') || undefined,
-                    relatedCharacters: plot.get('relatedCharacters') || []
-                };
-            }
-        }
-
-        return {
-            characters,
-            unresolvedForeshadowing,
-            locationContext,
-            plotContext
+      if (plotResult.records.length > 0) {
+        const plot = plotResult.records[0];
+        plotContext = {
+          title: plot.get('title'),
+          content: plot.get('content') || '',
+          beatTag: plot.get('beatTag') || undefined,
+          relatedCharacters: plot.get('relatedCharacters') || [],
         };
-    } finally {
-        await session.close();
+      }
     }
+
+    return {
+      characters,
+      unresolvedForeshadowing,
+      locationContext,
+      plotContext,
+    };
+  } finally {
+    await session.close();
+  }
 };

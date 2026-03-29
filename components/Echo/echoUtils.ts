@@ -27,7 +27,7 @@ export const CONFIDENCE_LEVELS: Record<'HIGH' | 'MEDIUM' | 'LOW', ConfidenceLeve
     border: 'border-emerald-500/50',
     text: 'text-emerald-400',
     icon: '✅',
-    threshold: { min: 0.85, max: 1.0 }
+    threshold: { min: 0.85, max: 1.0 },
   },
   MEDIUM: {
     level: 'MEDIUM',
@@ -36,7 +36,7 @@ export const CONFIDENCE_LEVELS: Record<'HIGH' | 'MEDIUM' | 'LOW', ConfidenceLeve
     border: 'border-amber-500/50',
     text: 'text-amber-400',
     icon: '⚠️',
-    threshold: { min: 0.5, max: 0.85 }
+    threshold: { min: 0.5, max: 0.85 },
   },
   LOW: {
     level: 'LOW',
@@ -45,8 +45,8 @@ export const CONFIDENCE_LEVELS: Record<'HIGH' | 'MEDIUM' | 'LOW', ConfidenceLeve
     border: 'border-slate-700/50',
     text: 'text-slate-500',
     icon: '🚫',
-    threshold: { min: 0, max: 0.5 }
-  }
+    threshold: { min: 0, max: 0.5 },
+  },
 };
 
 /**
@@ -64,9 +64,9 @@ export const getConfidenceConfig = (confidence: number | undefined): ConfidenceL
  * 按置信度分类Echoes
  */
 export interface CategorizedEchoes {
-  high: Echo[];      // 高置信度 (≥0.85) - 自动采纳
-  medium: Echo[];    // 中置信度 (0.5-0.85) - 需审核
-  low: Echo[];       // 低置信度 (<0.5) - 已过滤
+  high: Echo[]; // 高置信度 (≥0.85) - 自动采纳
+  medium: Echo[]; // 中置信度 (0.5-0.85) - 需审核
+  low: Echo[]; // 低置信度 (<0.5) - 已过滤
   total: number;
 }
 
@@ -75,10 +75,10 @@ export const categorizeEchoes = (echoes: Echo[]): CategorizedEchoes => {
     high: [],
     medium: [],
     low: [],
-    total: echoes.length
+    total: echoes.length,
   };
 
-  echoes.forEach(echo => {
+  echoes.forEach((echo) => {
     const conf = echo.confidence ?? 0.7;
 
     if (conf >= 0.85) {
@@ -115,14 +115,16 @@ export const formatConfidence = (confidence: number | undefined): string => {
 /**
  * 自动采纳高置信度Echoes
  */
-export const autoAcceptHighConfidence = (echoes: Echo[]): {
+export const autoAcceptHighConfidence = (
+  echoes: Echo[]
+): {
   accepted: Echo[];
   remaining: Echo[];
 } => {
   const accepted: Echo[] = [];
   const remaining: Echo[] = [];
 
-  echoes.forEach(echo => {
+  echoes.forEach((echo) => {
     const conf = echo.confidence ?? 0.7;
     if (conf >= 0.85) {
       accepted.push({ ...echo, status: 'AUTO_ACCEPTED' });
@@ -177,7 +179,7 @@ export interface IntegrityReport {
 const HEALTH_SCORE_PENALTY = {
   ORPHAN_NODE: -5,
   CONTRADICTION: -10,
-  PENDING_ECHO: -3
+  PENDING_ECHO: -3,
 };
 
 /**
@@ -194,7 +196,7 @@ const detectOrphanNodes = (
   const referencedCharacterIds = new Set<string>();
   const referencedWorldIds = new Set<string>();
 
-  echoes.forEach(echo => {
+  echoes.forEach((echo) => {
     if (echo.type === 'CHARACTER') {
       referencedCharacterIds.add(echo.targetId);
     } else {
@@ -203,10 +205,14 @@ const detectOrphanNodes = (
 
     // 从三元组中提取关联实体
     if (echo.triples) {
-      echo.triples.forEach(triple => {
+      echo.triples.forEach((triple) => {
         // 查找匹配的实体
-        const matchedChar = characters.find(c => c.name === triple.subject || c.name === triple.object);
-        const matchedWorld = worldSettings.find(w => w.title === triple.subject || w.title === triple.object);
+        const matchedChar = characters.find(
+          (c) => c.name === triple.subject || c.name === triple.object
+        );
+        const matchedWorld = worldSettings.find(
+          (w) => w.title === triple.subject || w.title === triple.object
+        );
 
         if (matchedChar) referencedCharacterIds.add(matchedChar.id);
         if (matchedWorld) referencedWorldIds.add(matchedWorld.id);
@@ -215,13 +221,14 @@ const detectOrphanNodes = (
   });
 
   // 检查角色孤立节点
-  characters.forEach(char => {
+  characters.forEach((char) => {
     if (!referencedCharacterIds.has(char.id)) {
       // 检查是否有任何Echo提到了这个角色
-      const isMentioned = echoes.some(echo =>
-        echo.targetName === char.name ||
-        echo.description?.includes(char.name) ||
-        echo.triples?.some(t => t.subject === char.name || t.object === char.name)
+      const isMentioned = echoes.some(
+        (echo) =>
+          echo.targetName === char.name ||
+          echo.description?.includes(char.name) ||
+          echo.triples?.some((t) => t.subject === char.name || t.object === char.name)
       );
 
       if (!isMentioned) {
@@ -231,19 +238,20 @@ const detectOrphanNodes = (
           entityName: char.name,
           description: '无任何关联关系',
           details: `角色 [${char.name}] 尚未参与任何剧情关系`,
-          entityId: char.id
+          entityId: char.id,
         });
       }
     }
   });
 
   // 检查世界设定孤立节点
-  worldSettings.forEach(setting => {
+  worldSettings.forEach((setting) => {
     if (!referencedWorldIds.has(setting.id)) {
-      const isMentioned = echoes.some(echo =>
-        echo.targetName === setting.title ||
-        echo.description?.includes(setting.title) ||
-        echo.triples?.some(t => t.subject === setting.title || t.object === setting.title)
+      const isMentioned = echoes.some(
+        (echo) =>
+          echo.targetName === setting.title ||
+          echo.description?.includes(setting.title) ||
+          echo.triples?.some((t) => t.subject === setting.title || t.object === setting.title)
       );
 
       if (!isMentioned) {
@@ -253,7 +261,7 @@ const detectOrphanNodes = (
           entityName: setting.title,
           description: '提及但未定义完整关系',
           details: `世界设定 [${setting.title}] 尚未被任何剧情引用`,
-          entityId: setting.id
+          entityId: setting.id,
         });
       }
     }
@@ -265,19 +273,19 @@ const detectOrphanNodes = (
 /**
  * 检测矛盾关系（同一关系的冲突状态）
  */
-const detectContradictions = (
-  echoes: Echo[],
-  chapters: Chapter[]
-): IntegrityIssue[] => {
+const detectContradictions = (echoes: Echo[], chapters: Chapter[]): IntegrityIssue[] => {
   const issues: IntegrityIssue[] = [];
 
   // 构建关系映射表：实体 -> 关系类型 -> 状态列表
-  const relationMap = new Map<string, Map<string, { status: string; chapter: string; echo: Echo }[]>>();
+  const relationMap = new Map<
+    string,
+    Map<string, { status: string; chapter: string; echo: Echo }[]>
+  >();
 
-  echoes.forEach(echo => {
+  echoes.forEach((echo) => {
     if (!echo.triples) return;
 
-    echo.triples.forEach(triple => {
+    echo.triples.forEach((triple) => {
       const key = `${triple.subject}-${triple.object}`;
       const relation = triple.relation;
 
@@ -291,13 +299,13 @@ const detectContradictions = (
       }
 
       // 查找关联章节
-      const chapter = chapters.find(c => c.id === echo.targetId);
+      const chapter = chapters.find((c) => c.id === echo.targetId);
       const chapterInfo = chapter ? chapter.title : '未知章节';
 
       entityRelations.get(relation)!.push({
         status: echo.status,
         chapter: chapterInfo,
-        echo
+        echo,
       });
     });
   });
@@ -310,7 +318,7 @@ const detectContradictions = (
       ['朋友', '敌人'],
       ['爱慕', '仇恨'],
       ['信任', '怀疑'],
-      ['合作', '竞争']
+      ['合作', '竞争'],
     ];
 
     contradictoryPairs.forEach(([rel1, rel2]) => {
@@ -322,8 +330,12 @@ const detectContradictions = (
         const data2 = relations.get(rel2)!;
 
         // 只有两个关系都被采纳时才报告矛盾
-        const accepted1 = data1.filter(d => d.status === 'ACCEPTED' || d.status === 'AUTO_ACCEPTED');
-        const accepted2 = data2.filter(d => d.status === 'ACCEPTED' || d.status === 'AUTO_ACCEPTED');
+        const accepted1 = data1.filter(
+          (d) => d.status === 'ACCEPTED' || d.status === 'AUTO_ACCEPTED'
+        );
+        const accepted2 = data2.filter(
+          (d) => d.status === 'ACCEPTED' || d.status === 'AUTO_ACCEPTED'
+        );
 
         if (accepted1.length > 0 && accepted2.length > 0) {
           const [subject, object] = entityKey.split('-');
@@ -333,7 +345,7 @@ const detectContradictions = (
             entityName: subject,
             description: `同时标记为 [${rel1}] 和 [${rel2}]`,
             details: `关系对象: ${object}`,
-            chapterInfo: `${accepted1[0].chapter} vs ${accepted2[0].chapter}`
+            chapterInfo: `${accepted1[0].chapter} vs ${accepted2[0].chapter}`,
           });
         }
       }
@@ -349,16 +361,16 @@ const detectContradictions = (
 const detectPendingEchoes = (echoes: Echo[]): IntegrityIssue[] => {
   const issues: IntegrityIssue[] = [];
 
-  const pendingEchoes = echoes.filter(echo => echo.status === 'PENDING');
+  const pendingEchoes = echoes.filter((echo) => echo.status === 'PENDING');
 
-  pendingEchoes.forEach(echo => {
+  pendingEchoes.forEach((echo) => {
     issues.push({
       type: 'PENDING_ECHO',
       severity: 'LOW',
       entityName: echo.targetName,
       description: `待确认的${echo.type === 'CHARACTER' ? '角色' : '世界设定'}变更`,
       details: echo.description,
-      entityId: echo.id
+      entityId: echo.id,
     });
   });
 
@@ -371,7 +383,7 @@ const detectPendingEchoes = (echoes: Echo[]): IntegrityIssue[] => {
 const calculateHealthScore = (issues: IntegrityIssue[]): number => {
   let score = 100;
 
-  issues.forEach(issue => {
+  issues.forEach((issue) => {
     const penalty = HEALTH_SCORE_PENALTY[issue.type] || 0;
     score += penalty;
   });
@@ -388,10 +400,10 @@ const calculateStats = (echoes: Echo[]): IntegrityStats => {
     autoAccepted: 0,
     manualAccepted: 0,
     rejected: 0,
-    pending: 0
+    pending: 0,
   };
 
-  echoes.forEach(echo => {
+  echoes.forEach((echo) => {
     switch (echo.status) {
       case 'AUTO_ACCEPTED':
         stats.autoAccepted++;
@@ -429,7 +441,7 @@ export const checkIntegrity = (
   const allIssues: IntegrityIssue[] = [
     ...orphanIssues,
     ...contradictionIssues,
-    ...pendingIssues
+    ...pendingIssues,
   ].sort((a, b) => {
     const severityOrder = { HIGH: 0, MEDIUM: 1, LOW: 2 };
     return severityOrder[a.severity] - severityOrder[b.severity];
@@ -444,14 +456,16 @@ export const checkIntegrity = (
   return {
     issues: allIssues,
     stats,
-    healthScore
+    healthScore,
   };
 };
 
 /**
  * 获取健康度对应的颜色配置
  */
-export const getHealthScoreConfig = (score: number): {
+export const getHealthScoreConfig = (
+  score: number
+): {
   color: string;
   bgClass: string;
   textClass: string;
@@ -462,35 +476,35 @@ export const getHealthScoreConfig = (score: number): {
       color: '#10b981',
       bgClass: 'bg-emerald-500',
       textClass: 'text-emerald-400',
-      label: '优秀'
+      label: '优秀',
     };
   } else if (score >= 70) {
     return {
       color: '#22c55e',
       bgClass: 'bg-green-500',
       textClass: 'text-green-400',
-      label: '良好'
+      label: '良好',
     };
   } else if (score >= 50) {
     return {
       color: '#eab308',
       bgClass: 'bg-yellow-500',
       textClass: 'text-yellow-400',
-      label: '一般'
+      label: '一般',
     };
   } else if (score >= 30) {
     return {
       color: '#f97316',
       bgClass: 'bg-orange-500',
       textClass: 'text-orange-400',
-      label: '较差'
+      label: '较差',
     };
   } else {
     return {
       color: '#ef4444',
       bgClass: 'bg-red-500',
       textClass: 'text-red-400',
-      label: '危险'
+      label: '危险',
     };
   }
 };
@@ -498,7 +512,9 @@ export const getHealthScoreConfig = (score: number): {
 /**
  * 获取问题严重程度对应的颜色配置
  */
-export const getSeverityConfig = (severity: IntegrityIssue['severity']): {
+export const getSeverityConfig = (
+  severity: IntegrityIssue['severity']
+): {
   icon: string;
   bgClass: string;
   textClass: string;
@@ -510,14 +526,14 @@ export const getSeverityConfig = (severity: IntegrityIssue['severity']): {
         icon: '🔴',
         bgClass: 'bg-rose-900/20',
         textClass: 'text-rose-400',
-        borderClass: 'border-rose-500/50'
+        borderClass: 'border-rose-500/50',
       };
     case 'MEDIUM':
       return {
         icon: '🟡',
         bgClass: 'bg-amber-900/20',
         textClass: 'text-amber-400',
-        borderClass: 'border-amber-500/50'
+        borderClass: 'border-amber-500/50',
       };
     case 'LOW':
     default:
@@ -525,7 +541,7 @@ export const getSeverityConfig = (severity: IntegrityIssue['severity']): {
         icon: '🟢',
         bgClass: 'bg-emerald-900/20',
         textClass: 'text-emerald-400',
-        borderClass: 'border-emerald-500/50'
+        borderClass: 'border-emerald-500/50',
       };
   }
 };
@@ -571,13 +587,13 @@ export const exportReportAsMarkdown = (report: IntegrityReport): string => {
     `| 指标 | 数量 | 占比 |`,
     `|------|------|------|`,
     `| 总Echo数 | ${report.stats.total} | 100% |`,
-    `| 高置信度自动采纳 | ${report.stats.autoAccepted} | ${report.stats.total > 0 ? Math.round(report.stats.autoAccepted / report.stats.total * 100) : 0}% |`,
-    `| 人工审核采纳 | ${report.stats.manualAccepted} | ${report.stats.total > 0 ? Math.round(report.stats.manualAccepted / report.stats.total * 100) : 0}% |`,
-    `| 人工拒绝 | ${report.stats.rejected} | ${report.stats.total > 0 ? Math.round(report.stats.rejected / report.stats.total * 100) : 0}% |`,
-    `| 待处理 | ${report.stats.pending} | ${report.stats.total > 0 ? Math.round(report.stats.pending / report.stats.total * 100) : 0}% |`,
+    `| 高置信度自动采纳 | ${report.stats.autoAccepted} | ${report.stats.total > 0 ? Math.round((report.stats.autoAccepted / report.stats.total) * 100) : 0}% |`,
+    `| 人工审核采纳 | ${report.stats.manualAccepted} | ${report.stats.total > 0 ? Math.round((report.stats.manualAccepted / report.stats.total) * 100) : 0}% |`,
+    `| 人工拒绝 | ${report.stats.rejected} | ${report.stats.total > 0 ? Math.round((report.stats.rejected / report.stats.total) * 100) : 0}% |`,
+    `| 待处理 | ${report.stats.pending} | ${report.stats.total > 0 ? Math.round((report.stats.pending / report.stats.total) * 100) : 0}% |`,
     '',
     '## 问题列表',
-    ''
+    '',
   ];
 
   if (report.issues.length === 0) {
@@ -585,7 +601,7 @@ export const exportReportAsMarkdown = (report: IntegrityReport): string => {
   } else {
     // 按类型分组
     const groupedIssues = new Map<string, IntegrityIssue[]>();
-    report.issues.forEach(issue => {
+    report.issues.forEach((issue) => {
       const type = issue.type;
       if (!groupedIssues.has(type)) {
         groupedIssues.set(type, []);
@@ -598,7 +614,7 @@ export const exportReportAsMarkdown = (report: IntegrityReport): string => {
       lines.push(`### ${label} (${issues.length})`);
       lines.push('');
 
-      issues.forEach(issue => {
+      issues.forEach((issue) => {
         lines.push(`- **[${issue.entityName}]** ${issue.description}`);
         if (issue.details) {
           lines.push(`  - ${issue.details}`);

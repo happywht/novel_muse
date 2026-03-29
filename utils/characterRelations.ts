@@ -15,33 +15,33 @@ import {
  * 中文关系名到枚举类型的映射
  */
 const CHINESE_TO_TYPE_MAP: Record<string, CharacterRelationType> = {
-  '敌人': 'ENEMY_OF',
-  '敌对': 'ENEMY_OF',
-  '仇人': 'ENEMY_OF',
-  '盟友': 'ALLY_OF',
-  '同盟': 'ALLY_OF',
-  '爱': 'LOVES',
-  '爱慕': 'LOVES',
-  '恋人': 'LOVES',
-  '爱人': 'LOVES',
-  '亲人': 'KIN_OF',
-  '亲属': 'KIN_OF',
-  '家人': 'KIN_OF',
-  '父母': 'KIN_OF',
-  '兄弟': 'KIN_OF',
-  '姐妹': 'KIN_OF',
-  '师父': 'MENTORS',
-  '徒弟': 'MENTORS',
-  '师徒': 'MENTORS',
-  '老师': 'MENTORS',
-  '竞争': 'RIVAL_OF',
-  '对手': 'RIVAL_OF',
-  '效忠': 'SERVES',
-  '下属': 'SERVES',
-  '部下': 'SERVES',
-  '朋友': 'FRIEND_OF',
-  '好友': 'FRIEND_OF',
-  '友': 'FRIEND_OF',
+  敌人: 'ENEMY_OF',
+  敌对: 'ENEMY_OF',
+  仇人: 'ENEMY_OF',
+  盟友: 'ALLY_OF',
+  同盟: 'ALLY_OF',
+  爱: 'LOVES',
+  爱慕: 'LOVES',
+  恋人: 'LOVES',
+  爱人: 'LOVES',
+  亲人: 'KIN_OF',
+  亲属: 'KIN_OF',
+  家人: 'KIN_OF',
+  父母: 'KIN_OF',
+  兄弟: 'KIN_OF',
+  姐妹: 'KIN_OF',
+  师父: 'MENTORS',
+  徒弟: 'MENTORS',
+  师徒: 'MENTORS',
+  老师: 'MENTORS',
+  竞争: 'RIVAL_OF',
+  对手: 'RIVAL_OF',
+  效忠: 'SERVES',
+  下属: 'SERVES',
+  部下: 'SERVES',
+  朋友: 'FRIEND_OF',
+  好友: 'FRIEND_OF',
+  友: 'FRIEND_OF',
 };
 
 /**
@@ -57,7 +57,7 @@ export function parseLegacyRelationships(relationships: string): ParsedLegacyRel
   const results: ParsedLegacyRelation[] = [];
 
   // 支持多种分隔符：分号、顿号、逗号
-  const parts = relationships.split(/[；;，,、]/).filter(p => p.trim());
+  const parts = relationships.split(/[；;，,、]/).filter((p) => p.trim());
 
   for (const part of parts) {
     // 支持多种格式：冒号、等号、空格
@@ -87,7 +87,7 @@ export function convertLegacyToStructured(
   return legacyRelations.map((rel, index) => {
     // 查找目标角色
     const targetChar = characters.find(
-      c => c.name === rel.targetName || c.name.includes(rel.targetName)
+      (c) => c.name === rel.targetName || c.name.includes(rel.targetName)
     );
 
     // 推断关系类型
@@ -147,7 +147,7 @@ export function isBidirectionalType(type: CharacterRelationType): boolean {
  */
 export function convertStructuredToLegacy(relations: CharacterRelation[]): string {
   return relations
-    .map(rel => {
+    .map((rel) => {
       const relationType = getRelationType(rel);
       const typeLabel = RELATION_TYPE_LABELS[relationType] || rel.description || '关联';
       const targetName = getTargetName(rel) || rel.targetCharacterId;
@@ -166,9 +166,7 @@ export function isLegacyFormat(relationships: unknown): relationships is string 
 /**
  * 检测是否为新格式关系
  */
-export function isStructuredFormat(
-  relationships: unknown
-): relationships is CharacterRelation[] {
+export function isStructuredFormat(relationships: unknown): relationships is CharacterRelation[] {
   return Array.isArray(relationships) && relationships.length > 0;
 }
 
@@ -182,14 +180,14 @@ export function mergeRelations(
   if (!existing) return newRelations;
 
   const merged = [...existing];
-  const existingIds = new Set(existing.map(r => r.targetCharacterId));
+  const existingIds = new Set(existing.map((r) => r.targetCharacterId));
 
   for (const newRel of newRelations) {
     if (!existingIds.has(newRel.targetCharacterId)) {
       merged.push(newRel);
     } else {
       // 更新已存在的关系
-      const index = merged.findIndex(r => r.targetCharacterId === newRel.targetCharacterId);
+      const index = merged.findIndex((r) => r.targetCharacterId === newRel.targetCharacterId);
       if (index >= 0) {
         merged[index] = { ...merged[index], ...newRel, updatedAt: Date.now() };
       }

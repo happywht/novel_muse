@@ -7,13 +7,13 @@ import { useState, useEffect } from 'react';
 import { getGlobalConfig } from '../config/global';
 
 type FeatureFlag =
-    | 'enableEchoSystem'
-    | 'enableKnowledgeGraph'
-    | 'enableChapterBalance'
-    | 'enableConflictVisualization'
-    | 'enableVirtualScrolling'
-    | 'enableInkosIntegration'
-    | 'debugMode';
+  | 'enableEchoSystem'
+  | 'enableKnowledgeGraph'
+  | 'enableChapterBalance'
+  | 'enableConflictVisualization'
+  | 'enableVirtualScrolling'
+  | 'enableInkosIntegration'
+  | 'debugMode';
 
 /**
  * Check if a feature is enabled in global config
@@ -21,15 +21,15 @@ type FeatureFlag =
  * @returns boolean indicating if the feature is enabled
  */
 export function useFeature(feature: FeatureFlag): boolean {
-    const [enabled, setEnabled] = useState(false);
+  const [enabled, setEnabled] = useState(false);
 
-    useEffect(() => {
-        getGlobalConfig().then(config => {
-            setEnabled(config.features[feature]);
-        });
-    }, [feature]);
+  useEffect(() => {
+    getGlobalConfig().then((config) => {
+      setEnabled(config.features[feature]);
+    });
+  }, [feature]);
 
-    return enabled;
+  return enabled;
 }
 
 /**
@@ -37,21 +37,21 @@ export function useFeature(feature: FeatureFlag): boolean {
  * @returns object with all feature flags
  */
 export function useFeatures() {
-    const [features, setFeatures] = useState({
-        enableEchoSystem: true,
-        enableKnowledgeGraph: true,
-        enableChapterBalance: true,
-        enableConflictVisualization: true,
-        enableVirtualScrolling: true,
-        enableInkosIntegration: false,
-        debugMode: false,
+  const [features, setFeatures] = useState({
+    enableEchoSystem: true,
+    enableKnowledgeGraph: true,
+    enableChapterBalance: true,
+    enableConflictVisualization: true,
+    enableVirtualScrolling: true,
+    enableInkosIntegration: false,
+    debugMode: false,
+  });
+
+  useEffect(() => {
+    getGlobalConfig().then((config) => {
+      setFeatures(config.features);
     });
+  }, []);
 
-    useEffect(() => {
-        getGlobalConfig().then(config => {
-            setFeatures(config.features);
-        });
-    }, []);
-
-    return features;
+  return features;
 }

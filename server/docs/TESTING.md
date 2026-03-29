@@ -5,6 +5,7 @@
 ## 运行测试
 
 ### 巻加测试脚本
+
 测试脚本已添加到 `package.json`:
 
 ```json
@@ -18,12 +19,14 @@
 ```
 
 ### 运行所有测试
+
 ```bash
 cd server
 npm test
 ```
 
 ### 运行特定测试文件
+
 ```bash
 cd server
 npm test -- sync.test.ts
@@ -31,19 +34,23 @@ npm test -- queries.test.ts
 ```
 
 ### 运行测试并生成覆盖率报告
+
 ```bash
 cd server
 npm run test:coverage
 ```
 
 ### 监视模式运行测试
+
 ```bash
 cd server
 npm run test:watch
 ```
+
 ## 测试覆盖范围
 
 ### sync.ts 测试
+
 - `syncEchoToGraph()` - Echo同步到图谱
   - 基本同步功能
   - 空triples处理
@@ -71,6 +78,7 @@ npm run test:watch
   - 统计信息返回
 
 ### queries.ts 测试
+
 - `getCharacterTraits()` - 角色特质查询
   - 成功查询
   - 角色不存在情况
@@ -148,6 +156,7 @@ server/
 ## Mock 说明
 
 ### Neo4j Driver Mock
+
 `__mocks__/client.ts` 提供了完整的 Neo4j driver 模拟:
 
 ```typescript
@@ -160,7 +169,9 @@ mockSession.setFailure(true, new Error('Database error'));
 // 重置所有模拟
 mockSession.reset();
 ```
+
 ### LLM Mock
+
 `__mocks__/llm.ts` 提供了 LLM 服务模拟:
 
 ```typescript
@@ -173,9 +184,11 @@ setMockLLMFailure(new Error('LLM error'));
 // 重置模拟
 resetMockLLM();
 ```
+
 ## 编写新测试
 
 ### 测试模板
+
 ```typescript
 describe('My Test Suite', () => {
   let mockSession: ReturnType<ReturnType<typeof getMockDriver>['getMockSession']>;

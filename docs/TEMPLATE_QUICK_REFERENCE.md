@@ -46,12 +46,22 @@ const context: AICallContext = {
 ## 模板语法
 
 ### 变量
+
 ```typescript
-{{variableName}}           // 简单变量
-{{object.property}}        // 嵌套属性
+{
+  {
+    variableName;
+  }
+} // 简单变量
+{
+  {
+    object.property;
+  }
+} // 嵌套属性
 ```
 
 ### 条件
+
 ```typescript
 {{#if condition}}
   条件为真时显示
@@ -59,6 +69,7 @@ const context: AICallContext = {
 ```
 
 ### 循环
+
 ```typescript
 {{#each items}}
   - {{this}}              // 当前项
@@ -70,6 +81,7 @@ const context: AICallContext = {
 ## 接口定义
 
 ### AICallContext
+
 ```typescript
 interface AICallContext {
   // 必需字段
@@ -100,6 +112,7 @@ interface AICallContext {
 ```
 
 ### AICallResult
+
 ```typescript
 interface AICallResult {
   approved: boolean;
@@ -112,6 +125,7 @@ interface AICallResult {
 ## 常见模式
 
 ### 1. 嵌套对象
+
 ```typescript
 templateData: {
   character: {
@@ -129,6 +143,7 @@ templateData: {
 ```
 
 ### 2. 数组循环
+
 ```typescript
 templateData: {
   events: [
@@ -144,6 +159,7 @@ templateData: {
 ```
 
 ### 3. 条件逻辑
+
 ```typescript
 templateData: {
   hasWeapon: true,
@@ -163,6 +179,7 @@ templateData: {
 ```
 
 ### 4. 复杂对象
+
 ```typescript
 templateData: {
   scene: {
@@ -187,6 +204,7 @@ templateData: {
 ## 最佳实践
 
 ### 1. 类型安全
+
 ```typescript
 interface TemplateData {
   genre: string;
@@ -202,12 +220,13 @@ const templateData: TemplateData = {
   sceneGoal: '建立对立关系',
   mainCharacter: {
     name: '李明',
-    personality: '冷静'
-  }
+    personality: '冷静',
+  },
 };
 ```
 
 ### 2. 变量重要性分级
+
 ```typescript
 templateMeta: {
   variables: [
@@ -220,6 +239,7 @@ templateMeta: {
 ```
 
 ### 3. 动态数据构建
+
 ```typescript
 // 从项目状态构建
 const templateData = {
@@ -232,14 +252,15 @@ const templateData = {
 
   // 可选字段
   ...(foreshadowing.length > 0 && {
-    foreshadowing: foreshadowing[0].description
-  })
+    foreshadowing: foreshadowing[0].description,
+  }),
 };
 ```
 
 ## 调试技巧
 
 ### 1. 查看渲染结果
+
 ```typescript
 const result = await interceptAICall(context);
 if (result.approved) {
@@ -249,6 +270,7 @@ if (result.approved) {
 ```
 
 ### 2. 测试模板
+
 ```typescript
 import { templateEngine } from '../services/templateEngine';
 
@@ -260,6 +282,7 @@ console.log(rendered); // "科幻 - 李明"
 ```
 
 ### 3. 提取变量
+
 ```typescript
 const variables = templateEngine.extractVariables(template);
 console.log(variables);
@@ -269,21 +292,27 @@ console.log(variables);
 ## 常见问题
 
 ### Q: 向后兼容吗？
+
 A: 是的，所有新增字段都是可选的，现有代码无需修改。
 
 ### Q: 模板渲染失败会怎样？
+
 A: 会回退到原始字符串，并在控制台输出错误信息。
 
 ### Q: 支持哪些模板语法？
+
 A: 支持变量替换、条件渲染（#if）、循环渲染（#each）。
 
 ### Q: 如何在UI中显示模板信息？
+
 A: 使用 `templateMeta` 字段，`PromptConfirmDialog` 组件会自动显示。
 
 ### Q: 可以嵌套对象吗？
+
 A: 可以，使用点号语法：`{{object.property.nestedProperty}}`。
 
 ### Q: 如何处理数组？
+
 A: 使用 `{{#each array}}...{{/each}}` 循环，`{{this}}` 引用当前项。
 
 ## 相关文件

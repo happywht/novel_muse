@@ -7,10 +7,7 @@ import { useWorldBuilder } from './WorldBuilderContext';
  * 当没有选中条目且没有草稿时显示
  */
 export const WorldForm: React.FC = () => {
-  const {
-    handleManualAdd,
-    setActiveItemId,
-  } = useWorldBuilder();
+  const { handleManualAdd, setActiveItemId } = useWorldBuilder();
 
   return (
     <div className="flex flex-col items-center justify-center h-full text-slate-600 space-y-4">

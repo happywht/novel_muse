@@ -41,9 +41,7 @@ export const PromptBadge: React.FC<PromptBadgeProps> = ({
       >
         <Settings2 size={14} className="text-purple-400 group-hover:text-purple-300" />
         <span className="text-xs font-bold text-white">{availableCount}</span>
-        {hasModifications && (
-          <Sparkles size={12} className="text-amber-400" />
-        )}
+        {hasModifications && <Sparkles size={12} className="text-amber-400" />}
       </button>
     );
   }
@@ -71,11 +69,13 @@ export const PromptBadge: React.FC<PromptBadgeProps> = ({
         </div>
 
         {/* 已修改状态 */}
-        <div className={`flex-1 rounded-lg p-2 text-center border transition-colors ${
-          hasModifications
-            ? 'bg-amber-500/10 border-amber-500/30'
-            : 'bg-slate-900/60 border-slate-700/30'
-        }`}>
+        <div
+          className={`flex-1 rounded-lg p-2 text-center border transition-colors ${
+            hasModifications
+              ? 'bg-amber-500/10 border-amber-500/30'
+              : 'bg-slate-900/60 border-slate-700/30'
+          }`}
+        >
           {hasModifications ? (
             <>
               <div className="flex items-center justify-center gap-1">

@@ -6,11 +6,7 @@
 
 // 主组件
 export { PromptPanel } from './PromptPanel';
-export type {
-  PromptPanelProps,
-  PromptPanelMode,
-  ModuleType,
-} from './PromptPanel';
+export type { PromptPanelProps, PromptPanelMode, ModuleType } from './PromptPanel';
 
 // 子组件
 export { PromptBadge } from './PromptBadge';
@@ -21,11 +17,7 @@ export { EffectBadge, getEffectLevel } from './EffectBadge';
 export type { EffectLevel } from './EffectBadge';
 
 export { ParameterControl } from './ParameterControl';
-export type {
-  ParameterConfig,
-  ParameterType,
-  SelectOption,
-} from './ParameterControl';
+export type { ParameterConfig, ParameterType, SelectOption } from './ParameterControl';
 
 // 工具函数和常量
 export { MODULE_PROMPT_MAP } from './PromptPanel';

@@ -39,15 +39,21 @@ export const FeatureFlagProvider: React.FC<{ children: React.ReactNode }> = ({ c
     initializeService();
   }, [service]);
 
-  const setTier = useCallback((newTier: UserTier) => {
-    service.setTier(newTier);
-    setTierState(newTier);
-    setFlags(TIER_FEATURES[newTier]);
-  }, [service]);
+  const setTier = useCallback(
+    (newTier: UserTier) => {
+      service.setTier(newTier);
+      setTierState(newTier);
+      setFlags(TIER_FEATURES[newTier]);
+    },
+    [service]
+  );
 
-  const isEnabled = useCallback((feature: keyof FeatureFlags): boolean => {
-    return flags[feature];
-  }, [flags]);
+  const isEnabled = useCallback(
+    (feature: keyof FeatureFlags): boolean => {
+      return flags[feature];
+    },
+    [flags]
+  );
 
   const value: FeatureFlagContextValue = {
     tier,
@@ -57,11 +63,7 @@ export const FeatureFlagProvider: React.FC<{ children: React.ReactNode }> = ({ c
     isLoading,
   };
 
-  return (
-    <FeatureFlagContext.Provider value={value}>
-      {children}
-    </FeatureFlagContext.Provider>
-  );
+  return <FeatureFlagContext.Provider value={value}>{children}</FeatureFlagContext.Provider>;
 };
 
 /**

@@ -77,14 +77,14 @@ const MyComponent: React.FC = () => {
 
 ### PromptPreviewDrawerProps
 
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `promptKey` | `string` | ✅ | 要预览的 Prompt key |
-| `moduleId` | `AppSection` | ✅ | 当前模块 ID |
-| `creativeSettings` | `CreativeSettings?` | ❌ | 创作设置 |
-| `projectContext` | `object` | ✅ | 项目上下文数据 |
-| `isOpen` | `boolean` | ✅ | 是否打开抽屉 |
-| `onClose` | `() => void` | ✅ | 关闭抽屉的回调 |
+| 参数               | 类型                | 必填 | 说明                |
+| ------------------ | ------------------- | ---- | ------------------- |
+| `promptKey`        | `string`            | ✅   | 要预览的 Prompt key |
+| `moduleId`         | `AppSection`        | ✅   | 当前模块 ID         |
+| `creativeSettings` | `CreativeSettings?` | ❌   | 创作设置            |
+| `projectContext`   | `object`            | ✅   | 项目上下文数据      |
+| `isOpen`           | `boolean`           | ✅   | 是否打开抽屉        |
+| `onClose`          | `() => void`        | ✅   | 关闭抽屉的回调      |
 
 ### projectContext 结构
 
@@ -227,6 +227,7 @@ PromptAssemblyService.assembleFullPromptText(
 ## 更新日志
 
 ### v1.0.0 (2026-03-26)
+
 - ✨ 初始版本发布
 - ✅ 实现基础功能
 - ✅ 支持 7 个上下文模块展示

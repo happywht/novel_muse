@@ -7,11 +7,13 @@
 ## 功能特性
 
 ### 1. 双格式支持
+
 - **新格式优先**: 自动检测并优先使用 `structuredRelations` 数组
 - **旧格式兼容**: 自动解析 `relationships` 字符串并转换展示
 - **无缝切换**: 无需手动处理格式转换
 
 ### 2. 视觉设计
+
 - **关系类型颜色编码**: 9种关系类型各有独特配色
   - 敌对 (ENEMY_OF) - 红色
   - 盟友 (ALLY_OF) - 绿色
@@ -28,11 +30,13 @@
 - **关系走向**: 显示关系趋势（上升/下降/稳定）
 
 ### 3. 交互功能
+
 - **点击跳转**: 点击关系卡片跳转到目标角色
 - **悬停提示**: 显示完整的关系描述
 - **编辑入口**: 可选的编辑回调按钮
 
 ### 4. 空状态处理
+
 - 优雅的空状态占位符
 - 可选的"添加关系"按钮
 
@@ -44,17 +48,17 @@
 import { CharacterRelations } from './components/CharacterRelations';
 import { Character } from './types';
 
-function CharacterProfile({ character, allCharacters }: {
+function CharacterProfile({
+  character,
+  allCharacters,
+}: {
   character: Character;
   allCharacters: Character[];
 }) {
   return (
     <div>
       <h2>{character.name}</h2>
-      <CharacterRelations
-        character={character}
-        allCharacters={allCharacters}
-      />
+      <CharacterRelations character={character} allCharacters={allCharacters} />
     </div>
   );
 }
@@ -97,7 +101,7 @@ import { CharacterRelations } from './components/CharacterRelations';
 
 function CharacterView() {
   const { project, setActiveCharacterId } = useProjectStore();
-  const activeCharacter = project.characters.find(c => c.id === activeCharId);
+  const activeCharacter = project.characters.find((c) => c.id === activeCharId);
 
   if (!activeCharacter) return null;
 

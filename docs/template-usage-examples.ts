@@ -43,11 +43,7 @@ async function example2_templateUsage() {
       time: '深夜',
       atmosphere: '紧张、压抑',
     },
-    recentEvents: [
-      '主角发现反派的真实身份',
-      '主角潜入太空站',
-      '主角发现关键证据',
-    ],
+    recentEvents: ['主角发现反派的真实身份', '主角潜入太空站', '主角发现关键证据'],
     hasForeshadowing: true,
     foreshadowing: '主角的武器卡壳了',
   };
@@ -290,10 +286,7 @@ async function example5_typeSafe() {
       time: '深夜',
       atmosphere: '紧张、压抑',
     },
-    recentEvents: [
-      '主角发现反派的真实身份',
-      '主角潜入太空站',
-    ],
+    recentEvents: ['主角发现反派的真实身份', '主角潜入太空站'],
     hasForeshadowing: true,
     foreshadowing: '主角的武器卡壳了',
   };

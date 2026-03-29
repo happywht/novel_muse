@@ -5,8 +5,24 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Send, Edit3, RotateCcw, Copy, ChevronDown, ChevronUp, Eye, FileText, Maximize2 } from 'lucide-react';
-import { AICallContext, confirmAICall, cancelAICall, AI_CONFIRMATION_EVENT } from '../../services/aiCallInterceptor';
+import {
+  X,
+  Send,
+  Edit3,
+  RotateCcw,
+  Copy,
+  ChevronDown,
+  ChevronUp,
+  Eye,
+  FileText,
+  Maximize2,
+} from 'lucide-react';
+import {
+  AICallContext,
+  confirmAICall,
+  cancelAICall,
+  AI_CONFIRMATION_EVENT,
+} from '../../services/aiCallInterceptor';
 
 /** 解析出的区块结构 */
 interface ParsedSection {
@@ -60,7 +76,8 @@ export const PromptConfirmDialog: React.FC = () => {
     };
 
     window.addEventListener(AI_CONFIRMATION_EVENT, handleConfirmRequired as EventListener);
-    return () => window.removeEventListener(AI_CONFIRMATION_EVENT, handleConfirmRequired as EventListener);
+    return () =>
+      window.removeEventListener(AI_CONFIRMATION_EVENT, handleConfirmRequired as EventListener);
   }, []);
 
   // 解析 userPrompt 中的区块
@@ -79,8 +96,8 @@ export const PromptConfirmDialog: React.FC = () => {
     const importantKeywords = ['角色', '上下文', '设定', '场景', '状态', '脉络', '逻辑'];
 
     const getTier = (title: string): 'critical' | 'important' | 'optional' => {
-      if (criticalKeywords.some(k => title.includes(k))) return 'critical';
-      if (importantKeywords.some(k => title.includes(k))) return 'important';
+      if (criticalKeywords.some((k) => title.includes(k))) return 'critical';
+      if (importantKeywords.some((k) => title.includes(k))) return 'important';
       return 'optional';
     };
 
@@ -113,7 +130,7 @@ export const PromptConfirmDialog: React.FC = () => {
           icon: getIcon(title),
           tier: getTier(title),
           tokenCount: 0,
-          isExpanded: false
+          isExpanded: false,
         };
         currentContent = [line];
       } else if (currentSection) {
@@ -121,7 +138,7 @@ export const PromptConfirmDialog: React.FC = () => {
       } else {
         // 没有区块标题的内容，归入"其他"
         if (line.trim()) {
-          let otherSection = sections.find(s => s.id === 'other');
+          let otherSection = sections.find((s) => s.id === 'other');
           if (!otherSection) {
             otherSection = {
               id: 'other',
@@ -130,7 +147,7 @@ export const PromptConfirmDialog: React.FC = () => {
               icon: '📄',
               tier: 'optional',
               tokenCount: 0,
-              isExpanded: false
+              isExpanded: false,
             };
             sections.push(otherSection);
           }
@@ -146,7 +163,7 @@ export const PromptConfirmDialog: React.FC = () => {
     }
 
     // 计算 token 并排序
-    sections.forEach(s => {
+    sections.forEach((s) => {
       s.tokenCount = estimateTokens(s.content);
     });
 
@@ -173,7 +190,7 @@ export const PromptConfirmDialog: React.FC = () => {
         preview: preview.length < section.content.length ? preview + '...' : preview,
         tokenCount: section.tokenCount,
         tier: section.tier,
-        source: 'project'
+        source: 'project',
       });
     }
 
@@ -218,7 +235,7 @@ export const PromptConfirmDialog: React.FC = () => {
 
   // 切换区块展开
   const toggleSection = (id: string) => {
-    setExpandedSections(prev => {
+    setExpandedSections((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -232,9 +249,27 @@ export const PromptConfirmDialog: React.FC = () => {
   // 获取区块重要性颜色
   const getTierColor = (tier: 'critical' | 'important' | 'optional') => {
     switch (tier) {
-      case 'critical': return { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400', badge: '🔴' };
-      case 'important': return { bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-400', badge: '🟡' };
-      case 'optional': return { bg: 'bg-slate-500/10', border: 'border-slate-500/30', text: 'text-slate-400', badge: '⚪' };
+      case 'critical':
+        return {
+          bg: 'bg-red-500/10',
+          border: 'border-red-500/30',
+          text: 'text-red-400',
+          badge: '🔴',
+        };
+      case 'important':
+        return {
+          bg: 'bg-amber-500/10',
+          border: 'border-amber-500/30',
+          text: 'text-amber-400',
+          badge: '🟡',
+        };
+      case 'optional':
+        return {
+          bg: 'bg-slate-500/10',
+          border: 'border-slate-500/30',
+          text: 'text-slate-400',
+          badge: '⚪',
+        };
     }
   };
 
@@ -252,7 +287,9 @@ export const PromptConfirmDialog: React.FC = () => {
               </div>
               <div>
                 <h2 className="text-lg font-bold text-white">AI调用确认</h2>
-                <p className="text-xs text-slate-400">任务: {context.taskType} | 模型: {context.model}</p>
+                <p className="text-xs text-slate-400">
+                  任务: {context.taskType} | 模型: {context.model}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -261,7 +298,9 @@ export const PromptConfirmDialog: React.FC = () => {
                 <button
                   onClick={() => setViewMode('template')}
                   className={`px-3 py-1 text-xs rounded-md flex items-center gap-1 transition-colors ${
-                    viewMode === 'template' ? 'bg-purple-500 text-white' : 'text-slate-400 hover:text-white'
+                    viewMode === 'template'
+                      ? 'bg-purple-500 text-white'
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   <Eye size={12} /> 模板
@@ -269,23 +308,39 @@ export const PromptConfirmDialog: React.FC = () => {
                 <button
                   onClick={() => setViewMode('full')}
                   className={`px-3 py-1 text-xs rounded-md flex items-center gap-1 transition-colors ${
-                    viewMode === 'full' ? 'bg-purple-500 text-white' : 'text-slate-400 hover:text-white'
+                    viewMode === 'full'
+                      ? 'bg-purple-500 text-white'
+                      : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   <FileText size={12} /> 完整
                 </button>
               </div>
-              <button onClick={handleCancel} className="text-slate-400 hover:text-white text-xl px-2">&times;</button>
+              <button
+                onClick={handleCancel}
+                className="text-slate-400 hover:text-white text-xl px-2"
+              >
+                &times;
+              </button>
             </div>
           </div>
         </div>
 
         {/* 参数栏 */}
         <div className="px-4 py-2 bg-slate-800/50 flex items-center gap-4 text-xs">
-          <span className="text-slate-400">温度: <span className="text-white">{editedTemp.toFixed(1)}</span></span>
-          <span className="text-slate-400">预估Tokens: <span className="text-cyan-400">{totalTokens.toLocaleString()}</span></span>
-          <span className="text-slate-400">区块: <span className="text-white">{parsedSections.length}</span></span>
-          <button onClick={handleCopy} className="ml-auto text-slate-400 hover:text-white flex items-center gap-1 transition-colors">
+          <span className="text-slate-400">
+            温度: <span className="text-white">{editedTemp.toFixed(1)}</span>
+          </span>
+          <span className="text-slate-400">
+            预估Tokens: <span className="text-cyan-400">{totalTokens.toLocaleString()}</span>
+          </span>
+          <span className="text-slate-400">
+            区块: <span className="text-white">{parsedSections.length}</span>
+          </span>
+          <button
+            onClick={handleCopy}
+            className="ml-auto text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
+          >
             <Copy size={12} /> 复制完整Prompt
           </button>
         </div>
@@ -298,8 +353,14 @@ export const PromptConfirmDialog: React.FC = () => {
               onClick={() => setShowSystem(!showSystem)}
               className="w-full flex items-center justify-between p-3 hover:bg-slate-700/50 transition-colors"
             >
-              <span className="text-sm font-medium text-slate-300">⚙️ 系统指令 ({estimateTokens(editedSystem)} tokens)</span>
-              {showSystem ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+              <span className="text-sm font-medium text-slate-300">
+                ⚙️ 系统指令 ({estimateTokens(editedSystem)} tokens)
+              </span>
+              {showSystem ? (
+                <ChevronUp size={16} className="text-slate-400" />
+              ) : (
+                <ChevronDown size={16} className="text-slate-400" />
+              )}
             </button>
             {showSystem && (
               <div className="p-3 border-t border-slate-700">
@@ -311,7 +372,9 @@ export const PromptConfirmDialog: React.FC = () => {
                     placeholder="系统指令..."
                   />
                 ) : (
-                  <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono max-h-32 overflow-y-auto">{editedSystem}</pre>
+                  <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono max-h-32 overflow-y-auto">
+                    {editedSystem}
+                  </pre>
                 )}
               </div>
             )}
@@ -328,7 +391,7 @@ export const PromptConfirmDialog: React.FC = () => {
               </div>
 
               {/* 区块卡片 */}
-              {parsedSections.map(section => {
+              {parsedSections.map((section) => {
                 const colors = getTierColor(section.tier);
                 const isExpanded = expandedSections.has(section.id);
 
@@ -343,8 +406,12 @@ export const PromptConfirmDialog: React.FC = () => {
                     >
                       <div className="flex items-center gap-2">
                         <span>{colors.badge}</span>
-                        <span className="text-sm font-medium text-white">{section.icon} {section.title}</span>
-                        <span className="text-xs text-slate-500">({section.tokenCount} tokens)</span>
+                        <span className="text-sm font-medium text-white">
+                          {section.icon} {section.title}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          ({section.tokenCount} tokens)
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
@@ -357,20 +424,26 @@ export const PromptConfirmDialog: React.FC = () => {
                               preview: section.content.slice(0, 100),
                               tokenCount: section.tokenCount,
                               tier: section.tier,
-                              source: 'project'
+                              source: 'project',
                             });
                           }}
                           className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-600/50 transition-colors"
                         >
                           <Maximize2 size={14} />
                         </button>
-                        {isExpanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+                        {isExpanded ? (
+                          <ChevronUp size={16} className="text-slate-400" />
+                        ) : (
+                          <ChevronDown size={16} className="text-slate-400" />
+                        )}
                       </div>
                     </button>
 
                     {isExpanded && (
                       <div className="px-3 pb-3 border-t border-slate-700/50 pt-2">
-                        <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">{section.content}</pre>
+                        <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">
+                          {section.content}
+                        </pre>
                       </div>
                     )}
                   </div>
@@ -383,7 +456,9 @@ export const PromptConfirmDialog: React.FC = () => {
           {(viewMode === 'full' || isEditing) && (
             <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
               <div className="p-3 border-b border-slate-700">
-                <span className="text-sm font-medium text-slate-300">📝 用户Prompt ({estimateTokens(editedPrompt)} tokens)</span>
+                <span className="text-sm font-medium text-slate-300">
+                  📝 用户Prompt ({estimateTokens(editedPrompt)} tokens)
+                </span>
               </div>
               <div className="p-3">
                 {isEditing ? (
@@ -394,7 +469,9 @@ export const PromptConfirmDialog: React.FC = () => {
                     placeholder="用户提示词..."
                   />
                 ) : (
-                  <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono max-h-64 overflow-y-auto">{editedPrompt}</pre>
+                  <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono max-h-64 overflow-y-auto">
+                    {editedPrompt}
+                  </pre>
                 )}
               </div>
             </div>
@@ -468,7 +545,7 @@ export const PromptConfirmDialog: React.FC = () => {
         >
           <div
             className="bg-slate-800 border border-slate-600 rounded-2xl w-full max-w-2xl max-h-[70vh] overflow-hidden flex flex-col shadow-2xl"
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 border-b border-slate-700 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -486,7 +563,9 @@ export const PromptConfirmDialog: React.FC = () => {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-4">
-              <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono">{selectedVariable.value}</pre>
+              <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono">
+                {selectedVariable.value}
+              </pre>
             </div>
             <div className="p-3 border-t border-slate-700 flex justify-end gap-2">
               <button

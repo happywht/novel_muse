@@ -19,7 +19,7 @@ async function testGenres() {
   console.log('\n=== Testing Genres Endpoint ===');
   try {
     const response = await fetch(`${BASE_URL}/genres`);
-    const data = await response.json() as any;
+    const data = (await response.json()) as any;
     console.log('Genres count:', data.count);
     console.log('First 3 genres:', data.genres.slice(0, 3));
   } catch (error) {
@@ -31,7 +31,7 @@ async function testDimensions() {
   console.log('\n=== Testing Dimensions Endpoint ===');
   try {
     const response = await fetch(`${BASE_URL}/dimensions`);
-    const data = await response.json() as any;
+    const data = (await response.json()) as any;
     console.log('Dimensions count:', data.count);
     console.log('Categories:', data.categories);
     console.log('First 3 dimensions:', data.dimensions.slice(0, 3));
@@ -121,15 +121,20 @@ async function pollTaskStatus(taskId: string) {
           'X-API-Key': 'test-key-123',
         },
       });
-      const task = await response.json() as any;
-      console.log(`Task status (attempt ${i + 1}):`, task.status, task.progress + '%', task.message);
+      const task = (await response.json()) as any;
+      console.log(
+        `Task status (attempt ${i + 1}):`,
+        task.status,
+        task.progress + '%',
+        task.message
+      );
 
       if (task.status === 'completed' || task.status === 'failed') {
         console.log('Task finished:', JSON.stringify(task, null, 2));
         break;
       }
 
-      await new Promise(resolve => setTimeout(resolve, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     } catch (error) {
       console.error('Status poll failed:', error);
       break;

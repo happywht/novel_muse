@@ -35,7 +35,7 @@ import { PROMPT_REGISTRY_LITERARY } from './config/prompts';
   onReset={(key, level) => {
     // 重置逻辑
   }}
-/>
+/>;
 ```
 
 ### 2. 折叠模式（Collapsed）
@@ -72,50 +72,52 @@ import { PROMPT_REGISTRY_LITERARY } from './config/prompts';
 ```tsx
 const [showTuner, setShowTuner] = useState(false);
 
-{showTuner && (
-  <PromptPanel
-    isModal
-    title="AI 调教台"
-    subtitle={`针对《${project.title}》自定义系统提示词`}
-    prompts={allPrompts}
-    projectOverrides={project.customPrompts}
-    onSave={handleSave}
-    onReset={handleReset}
-    onClose={() => setShowTuner(false)}
-  />
-)}
+{
+  showTuner && (
+    <PromptPanel
+      isModal
+      title="AI 调教台"
+      subtitle={`针对《${project.title}》自定义系统提示词`}
+      prompts={allPrompts}
+      projectOverrides={project.customPrompts}
+      onSave={handleSave}
+      onReset={handleReset}
+      onClose={() => setShowTuner(false)}
+    />
+  );
+}
 ```
 
 ## 组件 API
 
 ### PromptPanelProps
 
-| 属性 | 类型 | 默认值 | 描述 |
-|------|------|--------|------|
-| `mode` | `'compact' \| 'collapsed' \| 'expanded'` | `'collapsed'` | 显示模式 |
-| `moduleType` | `ModuleType` | `'global'` | 关联的模块类型 |
-| `prompts` | `PromptItem[]` | 必填 | prompt 列表 |
-| `projectOverrides` | `Record<string, string>` | `{}` | 项目级覆盖 |
-| `moduleOverrides` | `Record<string, string>` | `{}` | 模块级覆盖 |
-| `onSave` | `(key, content, level) => void` | 必填 | 保存回调 |
-| `onReset` | `(key, level) => void` | 必填 | 重置回调 |
-| `onResetAll` | `(level) => void` | - | 全部重置回调 |
-| `onClose` | `() => void` | - | 关闭回调 |
-| `isModal` | `boolean` | `false` | 是否模态框 |
-| `disabled` | `boolean` | `false` | 是否禁用 |
-| `title` | `string` | `'AI 调教台'` | 标题 |
-| `subtitle` | `string` | - | 副标题 |
+| 属性               | 类型                                     | 默认值        | 描述           |
+| ------------------ | ---------------------------------------- | ------------- | -------------- |
+| `mode`             | `'compact' \| 'collapsed' \| 'expanded'` | `'collapsed'` | 显示模式       |
+| `moduleType`       | `ModuleType`                             | `'global'`    | 关联的模块类型 |
+| `prompts`          | `PromptItem[]`                           | 必填          | prompt 列表    |
+| `projectOverrides` | `Record<string, string>`                 | `{}`          | 项目级覆盖     |
+| `moduleOverrides`  | `Record<string, string>`                 | `{}`          | 模块级覆盖     |
+| `onSave`           | `(key, content, level) => void`          | 必填          | 保存回调       |
+| `onReset`          | `(key, level) => void`                   | 必填          | 重置回调       |
+| `onResetAll`       | `(level) => void`                        | -             | 全部重置回调   |
+| `onClose`          | `() => void`                             | -             | 关闭回调       |
+| `isModal`          | `boolean`                                | `false`       | 是否模态框     |
+| `disabled`         | `boolean`                                | `false`       | 是否禁用       |
+| `title`            | `string`                                 | `'AI 调教台'` | 标题           |
+| `subtitle`         | `string`                                 | -             | 副标题         |
 
 ### ModuleType
 
 ```typescript
 type ModuleType =
-  | 'world'      // 世界观
-  | 'character'  // 角色创建
-  | 'plot'       // 情节编织
-  | 'drafting'   // 写作工坊
-  | 'echo'       // Echo 审查
-  | 'global';    // 全局设置
+  | 'world' // 世界观
+  | 'character' // 角色创建
+  | 'plot' // 情节编织
+  | 'drafting' // 写作工坊
+  | 'echo' // Echo 审查
+  | 'global'; // 全局设置
 ```
 
 ## 子组件
@@ -128,13 +130,14 @@ type ModuleType =
 import { EffectBadge, getEffectLevel } from './components/PromptPanel';
 
 // 使用
-<EffectBadge level="PROJECT" size="sm" />
+<EffectBadge level="PROJECT" size="sm" />;
 
 // 自动计算层级
 const level = getEffectLevel(hasModuleOverride, hasProjectOverride);
 ```
 
 层级说明：
+
 - 🟢 **DEFAULT** - 使用系统预设
 - 🟡 **PROJECT** - 项目级覆盖
 - 🔴 **MODULE** - 当前模块特化
@@ -151,7 +154,7 @@ import { PromptBadge } from './components/PromptPanel';
   modifiedCount={3}
   onClick={() => setShowPanel(true)}
   compact={true}
-/>
+/>;
 ```
 
 ### ParameterControl
@@ -172,10 +175,11 @@ const config: ParameterConfig = {
   onChange: (val) => setCreativity(val),
 };
 
-<ParameterControl config={config} />
+<ParameterControl config={config} />;
 ```
 
 支持的参数类型：
+
 - `slider` - 滑块控制
 - `select` - 下拉选择
 - `toggle` - 开关切换
@@ -188,37 +192,42 @@ const config: ParameterConfig = {
 // 旧代码
 import { PromptTuner } from './components/PromptTuner';
 
-{showTuner && <PromptTuner onClose={() => setShowTuner(false)} />}
+{
+  showTuner && <PromptTuner onClose={() => setShowTuner(false)} />;
+}
 
 // 新代码
 import { PromptPanel } from './components/PromptPanel';
 import { PROMPT_REGISTRY_LITERARY, PROMPT_REGISTRY_WEB_NOVEL } from './config/prompts';
 
-const activeRegistry = project.creativeSettings?.promptProfile === 'WEB_NOVEL'
-  ? PROMPT_REGISTRY_WEB_NOVEL
-  : PROMPT_REGISTRY_LITERARY;
+const activeRegistry =
+  project.creativeSettings?.promptProfile === 'WEB_NOVEL'
+    ? PROMPT_REGISTRY_WEB_NOVEL
+    : PROMPT_REGISTRY_LITERARY;
 
-{showTuner && (
-  <PromptPanel
-    isModal
-    prompts={Object.values(activeRegistry)}
-    projectOverrides={project.customPrompts}
-    onSave={(key, content) => {
-      updateProject({
-        customPrompts: { ...project.customPrompts, [key]: content }
-      });
-    }}
-    onReset={(key) => {
-      const updated = { ...project.customPrompts };
-      delete updated[key];
-      updateProject({ customPrompts: updated });
-    }}
-    onResetAll={() => {
-      updateProject({ customPrompts: {} });
-    }}
-    onClose={() => setShowTuner(false)}
-  />
-)}
+{
+  showTuner && (
+    <PromptPanel
+      isModal
+      prompts={Object.values(activeRegistry)}
+      projectOverrides={project.customPrompts}
+      onSave={(key, content) => {
+        updateProject({
+          customPrompts: { ...project.customPrompts, [key]: content },
+        });
+      }}
+      onReset={(key) => {
+        const updated = { ...project.customPrompts };
+        delete updated[key];
+        updateProject({ customPrompts: updated });
+      }}
+      onResetAll={() => {
+        updateProject({ customPrompts: {} });
+      }}
+      onClose={() => setShowTuner(false)}
+    />
+  );
+}
 ```
 
 ### 在模块中使用
@@ -227,8 +236,9 @@ const activeRegistry = project.creativeSettings?.promptProfile === 'WEB_NOVEL'
 import { PromptPanel, MODULE_PROMPT_MAP } from './components/PromptPanel';
 
 // 世界观模块
-const worldPrompts = Object.values(PROMPT_REGISTRY_LITERARY)
-  .filter(p => MODULE_PROMPT_MAP.world.includes(p.key));
+const worldPrompts = Object.values(PROMPT_REGISTRY_LITERARY).filter((p) =>
+  MODULE_PROMPT_MAP.world.includes(p.key)
+);
 
 <PromptPanel
   mode="collapsed"
@@ -237,7 +247,7 @@ const worldPrompts = Object.values(PROMPT_REGISTRY_LITERARY)
   projectOverrides={project.customPrompts}
   onSave={handleSave}
   onReset={handleReset}
-/>
+/>;
 ```
 
 ## 样式定制

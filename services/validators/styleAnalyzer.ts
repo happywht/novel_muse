@@ -60,9 +60,8 @@ export function analyzeStyle(text: string, sourceName?: string): StyleProfile {
 
   // Character-level TTR for Chinese text
   const cleanChars = text.replace(/[\s\n\r，。！？、：；""''（）【】《》\d]/g, '');
-  const vocabularyDiversity = cleanChars.length > 0
-    ? new Set(cleanChars).size / cleanChars.length
-    : 0;
+  const vocabularyDiversity =
+    cleanChars.length > 0 ? new Set(cleanChars).size / cleanChars.length : 0;
 
   // Top sentence-opening patterns (first 2 chars, min 3 occurrences)
   const openingCounts: Record<string, number> = {};
@@ -114,7 +113,9 @@ export function formatStyleProfile(profile: StyleProfile): string {
   lines.push('');
   lines.push(`【段落特征】`);
   lines.push(`  平均段长：${profile.avgParagraphLength} 字`);
-  lines.push(`  段长范围：${profile.paragraphLengthRange.min}–${profile.paragraphLengthRange.max} 字`);
+  lines.push(
+    `  段长范围：${profile.paragraphLengthRange.min}–${profile.paragraphLengthRange.max} 字`
+  );
   lines.push('');
   lines.push(`【词汇多样性】`);
   lines.push(`  TTR（类符比）：${(profile.vocabularyDiversity * 100).toFixed(1)}%`);

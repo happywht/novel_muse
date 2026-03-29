@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
-      }
+      },
     },
     build: {
       // 提高 chunk 大小警告阈值
@@ -36,9 +36,11 @@ export default defineConfig(({ mode }) => {
           // 手动分割 chunks
           manualChunks: (id) => {
             // 1. React 核心 - 保持稳定，不经常变化
-            if (id.includes('node_modules/react/') ||
-                id.includes('node_modules/react-dom/') ||
-                id.includes('node_modules/scheduler/')) {
+            if (
+              id.includes('node_modules/react/') ||
+              id.includes('node_modules/react-dom/') ||
+              id.includes('node_modules/scheduler/')
+            ) {
               return 'react-vendor';
             }
 
@@ -53,16 +55,20 @@ export default defineConfig(({ mode }) => {
             }
 
             // 4. 富文本编辑器 - TipTap 全家桶
-            if (id.includes('node_modules/@tiptap/') ||
-                id.includes('node_modules/prosemirror') ||
-                id.includes('node_modules/orderedmap')) {
+            if (
+              id.includes('node_modules/@tiptap/') ||
+              id.includes('node_modules/prosemirror') ||
+              id.includes('node_modules/orderedmap')
+            ) {
               return 'tiptap-editor';
             }
 
             // 5. 图表可视化 - Recharts
-            if (id.includes('node_modules/recharts/') ||
-                id.includes('node_modules/d3-') ||
-                id.includes('node_modules/victory-')) {
+            if (
+              id.includes('node_modules/recharts/') ||
+              id.includes('node_modules/d3-') ||
+              id.includes('node_modules/victory-')
+            ) {
               return 'charts';
             }
 
@@ -72,30 +78,35 @@ export default defineConfig(({ mode }) => {
             }
 
             // 7. Google AI SDK - AI 服务核心
-            if (id.includes('node_modules/@google/genai/') ||
-                id.includes('node_modules/google-gax') ||
-                id.includes('node_modules/google-auth-library')) {
+            if (
+              id.includes('node_modules/@google/genai/') ||
+              id.includes('node_modules/google-gax') ||
+              id.includes('node_modules/google-auth-library')
+            ) {
               return 'google-ai';
             }
 
             // 8. 状态管理 - Zustand
-            if (id.includes('node_modules/zustand/') ||
-                id.includes('node_modules/use-sync-external-store')) {
+            if (
+              id.includes('node_modules/zustand/') ||
+              id.includes('node_modules/use-sync-external-store')
+            ) {
               return 'state-management';
             }
 
             // 9. 工具库
-            if (id.includes('node_modules/zod/') ||
-                id.includes('node_modules/dompurify')) {
+            if (id.includes('node_modules/zod/') || id.includes('node_modules/dompurify')) {
               return 'utils';
             }
 
             // 10. AI 服务模块 - 项目内 AI 相关代码
-            if (id.includes('/services/gemini/') ||
-                id.includes('/services/llmRouter.ts') ||
-                id.includes('/services/promptService.ts') ||
-                id.includes('/services/cacheManager.ts') ||
-                id.includes('/services/apiService.ts')) {
+            if (
+              id.includes('/services/gemini/') ||
+              id.includes('/services/llmRouter.ts') ||
+              id.includes('/services/promptService.ts') ||
+              id.includes('/services/cacheManager.ts') ||
+              id.includes('/services/apiService.ts')
+            ) {
               return 'ai-services';
             }
 
@@ -105,8 +116,7 @@ export default defineConfig(({ mode }) => {
             }
 
             // 12. 业务模块 - WorldBuilder 相关
-            if (id.includes('/components/WorldBuilder/') ||
-                id.includes('/components/panels/')) {
+            if (id.includes('/components/WorldBuilder/') || id.includes('/components/panels/')) {
               return 'module-world';
             }
 
@@ -116,9 +126,11 @@ export default defineConfig(({ mode }) => {
             }
 
             // 14. 业务模块 - PlotWeaver 相关
-            if (id.includes('/components/PlotWeaver/') ||
-                id.includes('/components/ConflictVisualization') ||
-                id.includes('/components/ChapterBalanceAnalyzer')) {
+            if (
+              id.includes('/components/PlotWeaver/') ||
+              id.includes('/components/ConflictVisualization') ||
+              id.includes('/components/ChapterBalanceAnalyzer')
+            ) {
               return 'module-plot';
             }
 
@@ -133,8 +145,7 @@ export default defineConfig(({ mode }) => {
             }
 
             // 17. 业务模块 - EchoChamber 相关
-            if (id.includes('/components/Echo/') ||
-                id.includes('/components/EchoChamber')) {
+            if (id.includes('/components/Echo/') || id.includes('/components/EchoChamber')) {
               return 'module-echo';
             }
 
@@ -144,9 +155,11 @@ export default defineConfig(({ mode }) => {
             }
 
             // 19. Prompt 面板
-            if (id.includes('/components/PromptPanel/') ||
-                id.includes('/components/PromptTuner') ||
-                id.includes('/components/PromptPanel')) {
+            if (
+              id.includes('/components/PromptPanel/') ||
+              id.includes('/components/PromptTuner') ||
+              id.includes('/components/PromptPanel')
+            ) {
               return 'prompt-panel';
             }
 
@@ -166,8 +179,8 @@ export default defineConfig(({ mode }) => {
               }
             }
             return 'chunks/[name]-[hash].js';
-          }
-        }
+          },
+        },
       },
       // 启用 CSS 代码分割
       cssCodeSplit: true,
@@ -189,6 +202,6 @@ export default defineConfig(({ mode }) => {
         'p-retry',
       ],
       // 不再排除 @google/genai，让其依赖 p-retry 被正确预构建
-    }
+    },
   };
 });

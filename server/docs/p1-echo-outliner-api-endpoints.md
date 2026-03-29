@@ -9,15 +9,18 @@
 ### 1. Echo相关端点
 
 #### 1.1 获取角色关系演变时间线
+
 **端点**: `GET /api/graph/:projectId/relationships/timeline`
 
 **描述**: 查询两个角色之间的关系演变时间线,展示他们关系的历史变化。
 
 **查询参数**:
+
 - `character1Id` (必需): 第一个角色的ID
 - `character2Id` (必需): 第二个角色的ID
 
 **返回数据**:
+
 ```json
 [
   {
@@ -36,14 +39,17 @@
 ---
 
 #### 1.2 获取未回收的伏笔列表
+
 **端点**: `GET /api/graph/:projectId/echoes/foreshadowing`
 
 **描述**: 查询项目中所有未回收的伏笔,帮助作者追踪需要回收的情节线索。
 
 **查询参数**:
+
 - `branchId` (可选): 分支ID,默认为'main'
 
 **返回数据**:
+
 ```json
 [
   {
@@ -62,11 +68,13 @@
 ---
 
 #### 1.3 检测Echo矛盾
+
 **端点**: `GET /api/graph/:projectId/echoes/contradictions`
 
 **描述**: 自动检测Echo中存在的关系矛盾、状态不一致和时间错误。
 
 **返回数据**:
+
 ```json
 [
   {
@@ -84,14 +92,17 @@
 ---
 
 #### 1.4 获取实体的Echo历史
+
 **端点**: `GET /api/graph/:projectId/echoes/:targetId/history`
 
 **描述**: 获取特定实体(角色或世界设定)的所有Echo变更历史。
 
 **URL参数**:
+
 - `targetId`: 目标实体的ID
 
 **返回数据**:
+
 ```json
 [
   {
@@ -111,14 +122,17 @@
 ### 2. Outliner相关端点
 
 #### 2.1 获取章节依赖关系
+
 **端点**: `GET /api/graph/:projectId/chapters/:chapterId/dependencies`
 
 **描述**: 查询章节的所有依赖关系,包括涉及的角色、场景、情节节点和前后章节关系。
 
 **URL参数**:
+
 - `chapterId`: 章节ID
 
 **返回数据**:
+
 ```json
 {
   "chapter": {...},
@@ -136,14 +150,17 @@
 ---
 
 #### 2.2 获取章节角色网络
+
 **端点**: `GET /api/graph/:projectId/chapters/:chapterId/character-network`
 
 **描述**: 查询章节涉及的角色网络,包括角色列表和他们之间的关系。
 
 **URL参数**:
+
 - `chapterId`: 章节ID
 
 **返回数据**:
+
 ```json
 {
   "characters": [...],
@@ -163,17 +180,21 @@
 ---
 
 #### 2.3 追踪伏笔链
+
 **端点**: `GET /api/graph/:projectId/chapters/:chapterId/foreshadowing-chain`
 
 **描述**: 追踪伏笔从埋设到回收的完整链路。
 
 **URL参数**:
+
 - `chapterId`: 章节ID
 
 **查询参数**:
+
 - `foreshadowingId` (必需): 伏笔ID
 
 **返回数据**:
+
 ```json
 {
   "source": {...},
@@ -199,11 +220,13 @@
 ---
 
 #### 2.4 获取冲突热力图数据
+
 **端点**: `GET /api/graph/:projectId/conflicts/heatmap`
 
 **描述**: 查询所有章节的冲突强度数据,用于生成冲突热力图。
 
 **返回数据**:
+
 ```json
 [
   {
@@ -223,11 +246,14 @@
 ## 实现细节
 
 ### 文件位置
+
 - **路由文件**: `server/src/routes/graph.ts`
 - **查询函数**: `server/src/services/graph/queries.ts`
 
 ### 导入的函数
+
 所有新端点使用的查询函数都从 `../services/graph/queries` 导入:
+
 - `getRelationshipTimeline`
 - `getEchoForeshadowing`
 - `detectContradictions`
@@ -238,17 +264,21 @@
 - `getConflictHeatmapData`
 
 ### 错误处理
+
 所有端点都实现了统一的错误处理:
+
 - 参数验证失败返回 `400 Bad Request`
 - 查询错误返回 `500 Internal Server Error`
 - 所有错误都会记录到控制台
 
 ### 路由顺序注意事项
+
 由于Express的路由匹配机制,特定路由(如 `/echoes/foreshadowing`)必须在通用路由(如 `/echoes/:targetId`)之前定义,以避免路由冲突。
 
 ## 使用示例
 
 ### 示例1: 查询两个角色的关系演变
+
 ```javascript
 // 请求
 GET /api/graph/project-123/relationships/timeline?character1Id=char-1&character2Id=char-2
@@ -275,23 +305,26 @@ GET /api/graph/project-123/relationships/timeline?character1Id=char-1&character2
 ```
 
 ### 示例2: 检测矛盾
+
 ```javascript
 // 请求
-GET /api/graph/project-123/echoes/contradictions
-
-// 响应
-[
-  {
-    "type": "RELATIONSHIP_CONFLICT",
-    "description": "张三和李四同时存在敌对和盟友关系",
-    "entities": ["张三", "李四"],
-    "conflictingEchoes": ["echo-1", "echo-5"],
-    "severity": "HIGH"
-  }
-]
+GET / api / graph / project -
+  123 /
+    echoes /
+    contradictions[
+      // 响应
+      {
+        type: 'RELATIONSHIP_CONFLICT',
+        description: '张三和李四同时存在敌对和盟友关系',
+        entities: ['张三', '李四'],
+        conflictingEchoes: ['echo-1', 'echo-5'],
+        severity: 'HIGH',
+      }
+    ];
 ```
 
 ### 示例3: 获取章节依赖
+
 ```javascript
 // 请求
 GET /api/graph/project-123/chapters/chapter-5/dependencies

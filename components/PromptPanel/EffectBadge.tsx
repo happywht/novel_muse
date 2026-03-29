@@ -15,13 +15,16 @@ interface EffectBadgeProps {
   showLabel?: boolean;
 }
 
-const LEVEL_CONFIG: Record<EffectLevel, {
-  color: string;
-  bgColor: string;
-  borderColor: string;
-  label: string;
-  dotColor: string;
-}> = {
+const LEVEL_CONFIG: Record<
+  EffectLevel,
+  {
+    color: string;
+    bgColor: string;
+    borderColor: string;
+    label: string;
+    dotColor: string;
+  }
+> = {
   DEFAULT: {
     color: 'text-emerald-400',
     bgColor: 'bg-emerald-500/10',
@@ -62,10 +65,7 @@ export const EffectBadge: React.FC<EffectBadgeProps> = ({
         transition-all duration-200
       `}
     >
-      <Circle
-        size={isSmall ? 6 : 8}
-        className={config.dotColor}
-      />
+      <Circle size={isSmall ? 6 : 8} className={config.dotColor} />
       {showLabel && config.label}
     </span>
   );

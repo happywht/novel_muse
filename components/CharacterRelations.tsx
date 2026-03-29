@@ -9,14 +9,29 @@
  */
 
 import React, { useMemo } from 'react';
-import { Character, CharacterRelation, CharacterRelationType, RELATION_TYPE_LABELS } from '../types';
+import {
+  Character,
+  CharacterRelation,
+  CharacterRelationType,
+  RELATION_TYPE_LABELS,
+} from '../types';
 import {
   parseLegacyRelationships,
   getRelationType,
   getTargetName,
   convertLegacyToStructured,
 } from '../utils/characterRelations';
-import { Heart, Swords, Users, Sparkles, Target, Crown, Handshake, UserCircle, Link } from 'lucide-react';
+import {
+  Heart,
+  Swords,
+  Users,
+  Sparkles,
+  Target,
+  Crown,
+  Handshake,
+  UserCircle,
+  Link,
+} from 'lucide-react';
 
 interface CharacterRelationsProps {
   character: Character;
@@ -28,53 +43,54 @@ interface CharacterRelationsProps {
 /**
  * 关系类型对应的颜色配置
  */
-const RELATION_COLORS: Record<CharacterRelationType, { bg: string; text: string; border: string }> = {
-  ENEMY_OF: {
-    bg: 'bg-red-500/10',
-    text: 'text-red-400',
-    border: 'border-red-500/30',
-  },
-  ALLY_OF: {
-    bg: 'bg-green-500/10',
-    text: 'text-green-400',
-    border: 'border-green-500/30',
-  },
-  LOVES: {
-    bg: 'bg-pink-500/10',
-    text: 'text-pink-400',
-    border: 'border-pink-500/30',
-  },
-  KIN_OF: {
-    bg: 'bg-blue-500/10',
-    text: 'text-blue-400',
-    border: 'border-blue-500/30',
-  },
-  MENTORS: {
-    bg: 'bg-purple-500/10',
-    text: 'text-purple-400',
-    border: 'border-purple-500/30',
-  },
-  RIVAL_OF: {
-    bg: 'bg-orange-500/10',
-    text: 'text-orange-400',
-    border: 'border-orange-500/30',
-  },
-  SERVES: {
-    bg: 'bg-gray-500/10',
-    text: 'text-gray-400',
-    border: 'border-gray-500/30',
-  },
-  FRIEND_OF: {
-    bg: 'bg-cyan-500/10',
-    text: 'text-cyan-400',
-    border: 'border-cyan-500/30',
-  },
-  RELATED_TO: {
-    bg: 'bg-slate-500/10',
-    text: 'text-slate-400',
-    border: 'border-slate-500/30',
-  },
-};
+const RELATION_COLORS: Record<CharacterRelationType, { bg: string; text: string; border: string }> =
+  {
+    ENEMY_OF: {
+      bg: 'bg-red-500/10',
+      text: 'text-red-400',
+      border: 'border-red-500/30',
+    },
+    ALLY_OF: {
+      bg: 'bg-green-500/10',
+      text: 'text-green-400',
+      border: 'border-green-500/30',
+    },
+    LOVES: {
+      bg: 'bg-pink-500/10',
+      text: 'text-pink-400',
+      border: 'border-pink-500/30',
+    },
+    KIN_OF: {
+      bg: 'bg-blue-500/10',
+      text: 'text-blue-400',
+      border: 'border-blue-500/30',
+    },
+    MENTORS: {
+      bg: 'bg-purple-500/10',
+      text: 'text-purple-400',
+      border: 'border-purple-500/30',
+    },
+    RIVAL_OF: {
+      bg: 'bg-orange-500/10',
+      text: 'text-orange-400',
+      border: 'border-orange-500/30',
+    },
+    SERVES: {
+      bg: 'bg-gray-500/10',
+      text: 'text-gray-400',
+      border: 'border-gray-500/30',
+    },
+    FRIEND_OF: {
+      bg: 'bg-cyan-500/10',
+      text: 'text-cyan-400',
+      border: 'border-cyan-500/30',
+    },
+    RELATED_TO: {
+      bg: 'bg-slate-500/10',
+      text: 'text-slate-400',
+      border: 'border-slate-500/30',
+    },
+  };
 
 /**
  * 关系类型对应的图标
@@ -238,9 +254,7 @@ export const CharacterRelations: React.FC<CharacterRelationsProps> = ({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Users className="w-5 h-5 text-muse-400" />
-          <span className="text-sm text-slate-400">
-            共 {relations.length} 条关系
-          </span>
+          <span className="text-sm text-slate-400">共 {relations.length} 条关系</span>
         </div>
         {onEdit && (
           <button

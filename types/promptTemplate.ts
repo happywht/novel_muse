@@ -13,27 +13,27 @@ export type VariableType = 'string' | 'array' | 'object' | 'boolean' | 'number';
 
 /** 模板变量定义 */
 export interface PromptVariable {
-  name: string;                    // 变量名，如 plotBeat
-  type: VariableType;              // 变量类型
-  tier: VariableTier;              // 重要性分级
-  source: VariableSource;          // 数据来源
-  required: boolean;               // 是否必填
-  description: string;             // 描述说明
+  name: string; // 变量名，如 plotBeat
+  type: VariableType; // 变量类型
+  tier: VariableTier; // 重要性分级
+  source: VariableSource; // 数据来源
+  required: boolean; // 是否必填
+  description: string; // 描述说明
   display: {
-    collapsible: boolean;          // 是否可折叠
-    previewLength: number;         // 预览长度
-    badge?: string;                // 徽章文字，如 "3章摘要"
+    collapsible: boolean; // 是否可折叠
+    previewLength: number; // 预览长度
+    badge?: string; // 徽章文字，如 "3章摘要"
   };
-  defaultValue?: any;              // 默认值
+  defaultValue?: any; // 默认值
 }
 
 /** 模板块定义 */
 export interface TemplateSection {
-  id: string;                      // 区块ID
-  label: string;                   // 显示标签
-  condition?: string;              // 条件表达式
-  order: number;                   // 排序权重
-  icon?: string;                   // 图标emoji
+  id: string; // 区块ID
+  label: string; // 显示标签
+  condition?: string; // 条件表达式
+  order: number; // 排序权重
+  icon?: string; // 图标emoji
 }
 
 /** 模板分类 */
@@ -41,14 +41,14 @@ export type TemplateCategory = 'writing' | 'world' | 'character' | 'plot' | 'aud
 
 /** 模板定义 */
 export interface PromptTemplateDefinition {
-  id: string;                      // 模板ID，如 scene_generation
-  label: string;                   // 显示名称
-  description: string;             // 描述
-  category: TemplateCategory;      // 分类
+  id: string; // 模板ID，如 scene_generation
+  label: string; // 显示名称
+  description: string; // 描述
+  category: TemplateCategory; // 分类
 
   // 模板内容
-  systemTemplate: string;          // 系统指令模板
-  userTemplate: string;            // 用户提示模板
+  systemTemplate: string; // 系统指令模板
+  userTemplate: string; // 用户提示模板
 
   // 变量定义
   variables: PromptVariable[];

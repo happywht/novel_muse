@@ -5,3 +5,4 @@ export * from './plot';
 export * from './world';
 export * from './audit';
 export * from './shuraField';
+export * from './character';

@@ -62,7 +62,7 @@ class MockSession {
   beginTransaction = jest.fn(() => ({
     run: this.run,
     commit: jest.fn(),
-    rollback: jest.fn()
+    rollback: jest.fn(),
   }));
 
   // 获取调用次数
@@ -122,7 +122,7 @@ export const createMockRecord = (data: Record<string, any>) => ({
   forEach: (callback: (value: any, key: string) => void) => {
     Object.entries(data).forEach(([key, value]) => callback(value, key));
   },
-  toObject: () => data
+  toObject: () => data,
 });
 
 /**
@@ -131,7 +131,7 @@ export const createMockRecord = (data: Record<string, any>) => ({
 export const createMockNode = (properties: Record<string, any>) => ({
   properties,
   labels: [properties._label || 'Node'],
-  identity: { toString: () => properties.id || 'mock-id' }
+  identity: { toString: () => properties.id || 'mock-id' },
 });
 
 /**
@@ -142,7 +142,7 @@ export const createMockRelationship = (properties: Record<string, any>) => ({
   type: properties._type || 'RELATED_TO',
   identity: { toString: () => properties.id || 'mock-rel-id' },
   start: properties._startId,
-  end: properties._endId
+  end: properties._endId,
 });
 
 // 导出模块函数的模拟

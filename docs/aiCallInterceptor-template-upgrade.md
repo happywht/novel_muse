@@ -15,9 +15,10 @@ export interface AICallContext {
   // ... 现有字段
 
   // 新增模板相关字段
-  templateId?: string;                    // 模板ID
-  templateData?: Record<string, any>;     // 结构化变量数据
-  templateMeta?: {                        // 模板元信息（用于UI展示）
+  templateId?: string; // 模板ID
+  templateData?: Record<string, any>; // 结构化变量数据
+  templateMeta?: {
+    // 模板元信息（用于UI展示）
     label: string;
     description: string;
     variables: Array<{
@@ -137,8 +138,16 @@ const result = await interceptAICall(context);
 ### 1. 变量替换
 
 ```typescript
-{{variableName}}           // 简单变量
-{{object.property}}        // 嵌套属性
+{
+  {
+    variableName;
+  }
+} // 简单变量
+{
+  {
+    object.property;
+  }
+} // 嵌套属性
 ```
 
 ### 2. 条件渲染

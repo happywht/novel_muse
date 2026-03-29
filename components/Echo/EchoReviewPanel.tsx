@@ -1,15 +1,24 @@
 import React, { useState, useMemo } from 'react';
 import { Echo, Chapter, Character } from '../../types';
 import {
-  X, Check, CheckCircle2, XCircle, Filter, Zap,
-  ChevronDown, ChevronUp, FileText, AlertTriangle, Maximize2
+  X,
+  Check,
+  CheckCircle2,
+  XCircle,
+  Filter,
+  Zap,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  AlertTriangle,
+  Maximize2,
 } from 'lucide-react';
 import {
   categorizeEchoes,
   getConfidenceConfig,
   getConfidenceBarColor,
   formatConfidence,
-  CategorizedEchoes
+  CategorizedEchoes,
 } from './echoUtils';
 
 interface EchoReviewPanelProps {
@@ -39,7 +48,7 @@ export const EchoReviewPanel: React.FC<EchoReviewPanelProps> = ({
   onUpdate,
   onSimulate,
   onClose,
-  onOpenDeepReview
+  onOpenDeepReview,
 }) => {
   const [filterMode, setFilterMode] = useState<FilterMode>('MEDIUM');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -75,7 +84,7 @@ export const EchoReviewPanel: React.FC<EchoReviewPanelProps> = ({
 
   // 全选
   const selectAll = () => {
-    setSelectedIds(new Set(filteredEchoes.map(e => e.id)));
+    setSelectedIds(new Set(filteredEchoes.map((e) => e.id)));
   };
 
   // 清空选择
@@ -85,21 +94,21 @@ export const EchoReviewPanel: React.FC<EchoReviewPanelProps> = ({
 
   // 批量操作
   const handleBatchAccept = () => {
-    const selected = filteredEchoes.filter(e => selectedIds.has(e.id));
+    const selected = filteredEchoes.filter((e) => selectedIds.has(e.id));
     if (onBatchAccept) {
       onBatchAccept(selected);
     } else {
-      selected.forEach(e => onAccept(e));
+      selected.forEach((e) => onAccept(e));
     }
     setSelectedIds(new Set());
   };
 
   const handleBatchReject = () => {
-    const selected = filteredEchoes.filter(e => selectedIds.has(e.id));
+    const selected = filteredEchoes.filter((e) => selectedIds.has(e.id));
     if (onBatchReject) {
       onBatchReject(selected);
     } else {
-      selected.forEach(e => onReject(e));
+      selected.forEach((e) => onReject(e));
     }
     setSelectedIds(new Set());
   };
@@ -114,10 +123,7 @@ export const EchoReviewPanel: React.FC<EchoReviewPanelProps> = ({
             Echo审核面板
           </h3>
           {onClose && (
-            <button
-              onClick={onClose}
-              className="text-slate-500 hover:text-white transition-colors"
-            >
+            <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
               <X size={18} />
             </button>
           )}
@@ -197,7 +203,7 @@ export const EchoReviewPanel: React.FC<EchoReviewPanelProps> = ({
             <p className="text-xs">暂无需要审核的Echo</p>
           </div>
         ) : (
-          filteredEchoes.map(echo => {
+          filteredEchoes.map((echo) => {
             const confConfig = getConfidenceConfig(echo.confidence);
             const isSelected = selectedIds.has(echo.id);
 
@@ -213,22 +219,24 @@ export const EchoReviewPanel: React.FC<EchoReviewPanelProps> = ({
               >
                 {/* 选择指示器 */}
                 <div className="flex items-start gap-3">
-                  <div className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                    isSelected
-                      ? `${confConfig.border} ${confConfig.text}`
-                      : 'border-slate-600'
-                  }`}>
+                  <div
+                    className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                      isSelected ? `${confConfig.border} ${confConfig.text}` : 'border-slate-600'
+                    }`}
+                  >
                     {isSelected && <Check size={10} />}
                   </div>
 
                   <div className="flex-1 min-w-0">
                     {/* 标题行 */}
                     <div className="flex items-center gap-2 mb-2">
-                      <span className={`text-[8px] uppercase font-bold px-1.5 py-0.5 rounded-sm ${
-                        echo.type === 'CHARACTER'
-                          ? 'bg-indigo-900/50 text-indigo-300'
-                          : 'bg-emerald-900/50 text-emerald-300'
-                      }`}>
+                      <span
+                        className={`text-[8px] uppercase font-bold px-1.5 py-0.5 rounded-sm ${
+                          echo.type === 'CHARACTER'
+                            ? 'bg-indigo-900/50 text-indigo-300'
+                            : 'bg-emerald-900/50 text-emerald-300'
+                        }`}
+                      >
                         {echo.type === 'CHARACTER' ? '人物' : '世界'}
                       </span>
                       <span className="font-bold text-slate-200 text-xs truncate flex-1">
@@ -261,9 +269,7 @@ export const EchoReviewPanel: React.FC<EchoReviewPanelProps> = ({
 
                     {/* 原因 */}
                     {echo.reason && (
-                      <div className="mt-2 text-[10px] text-slate-600">
-                        原因: {echo.reason}
-                      </div>
+                      <div className="mt-2 text-[10px] text-slate-600">原因: {echo.reason}</div>
                     )}
                   </div>
                 </div>

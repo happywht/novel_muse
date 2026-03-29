@@ -33,8 +33,11 @@ export const WorldDetail: React.FC = () => {
       {/* Echo Proposals */}
       {activeItemEchoes.length > 0 && !isEditing && (
         <div className="mb-6 space-y-3">
-          {activeItemEchoes.map(echo => (
-            <div key={echo.id} className="bg-slate-900/80 border border-cyan-900/50 rounded-xl p-4 shadow-[0_0_20px_rgba(34,211,238,0.05)] relative overflow-hidden animate-fade-in">
+          {activeItemEchoes.map((echo) => (
+            <div
+              key={echo.id}
+              className="bg-slate-900/80 border border-cyan-900/50 rounded-xl p-4 shadow-[0_0_20px_rgba(34,211,238,0.05)] relative overflow-hidden animate-fade-in"
+            >
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500/0 via-cyan-400/50 to-cyan-500/0"></div>
               <div className="flex items-start gap-3">
                 <div className="mt-1 p-1.5 bg-cyan-950 rounded-lg text-cyan-400">
@@ -45,8 +48,11 @@ export const WorldDetail: React.FC = () => {
                     🌌 命运回响 (系统洞察)
                   </h4>
                   <p className="text-sm text-slate-300 mb-2 leading-relaxed">
-                    AI 观测到在最新剧情中，世界线发生了变动：<br />
-                    <span className="text-white font-medium">新增规则/状态：[{echo.description}]</span>
+                    AI 观测到在最新剧情中，世界线发生了变动：
+                    <br />
+                    <span className="text-white font-medium">
+                      新增规则/状态：[{echo.description}]
+                    </span>
                   </p>
                   <p className="text-xs text-slate-500 italic mb-4 border-l-2 border-slate-700 pl-2">
                     "{echo.reason}"
@@ -76,7 +82,7 @@ export const WorldDetail: React.FC = () => {
       <div className="flex items-center justify-between mb-6 border-b border-slate-800 pb-4">
         <div>
           <span className="text-xs font-bold tracking-wider text-muse-400 uppercase bg-muse-900/30 px-2 py-1 rounded">
-            {categories.find(c => c.id === activeItem.category)?.label}
+            {categories.find((c) => c.id === activeItem.category)?.label}
           </span>
           <h1 className="text-3xl font-serif font-bold text-white mt-2">{activeItem.title}</h1>
         </div>
@@ -109,7 +115,11 @@ export const WorldDetail: React.FC = () => {
                 disabled={isExpanding || isIterating}
                 className="text-sm bg-slate-800 hover:bg-muse-900 text-muse-300 hover:text-white px-3 py-2 rounded-lg border border-slate-700 hover:border-muse-500 transition-all flex items-center gap-2"
               >
-                {isExpanding ? <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full"></div> : <BookPlus size={16} />}
+                {isExpanding ? (
+                  <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full"></div>
+                ) : (
+                  <BookPlus size={16} />
+                )}
                 扩展历史与文化
               </button>
             </>

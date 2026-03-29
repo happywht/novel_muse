@@ -5,7 +5,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Shield, Zap, Info } from 'lucide-react';
-import { getUserTier, setUserTier, UserTier, FeatureFlags, DEFAULT_FEATURE_FLAGS } from '../../config/featureFlags';
+import {
+  getUserTier,
+  setUserTier,
+  UserTier,
+  FeatureFlags,
+  DEFAULT_FEATURE_FLAGS,
+} from '../../config/featureFlags';
 
 export const AdvancedModeTab: React.FC = () => {
   const [tier, setTier] = useState<UserTier>('FREE');
@@ -37,7 +43,9 @@ export const AdvancedModeTab: React.FC = () => {
           }`}
         >
           <div className="flex items-center gap-3 mb-3">
-            <div className={`p-2 rounded-lg ${tier === 'FREE' ? 'bg-green-500/20' : 'bg-slate-700'}`}>
+            <div
+              className={`p-2 rounded-lg ${tier === 'FREE' ? 'bg-green-500/20' : 'bg-slate-700'}`}
+            >
               <Shield size={20} className={tier === 'FREE' ? 'text-green-400' : 'text-slate-400'} />
             </div>
             <div className="text-left">
@@ -62,8 +70,13 @@ export const AdvancedModeTab: React.FC = () => {
           }`}
         >
           <div className="flex items-center gap-3 mb-3">
-            <div className={`p-2 rounded-lg ${tier === 'PREMIUM' ? 'bg-purple-500/20' : 'bg-slate-700'}`}>
-              <Sparkles size={20} className={tier === 'PREMIUM' ? 'text-purple-400' : 'text-slate-400'} />
+            <div
+              className={`p-2 rounded-lg ${tier === 'PREMIUM' ? 'bg-purple-500/20' : 'bg-slate-700'}`}
+            >
+              <Sparkles
+                size={20}
+                className={tier === 'PREMIUM' ? 'text-purple-400' : 'text-slate-400'}
+              />
             </div>
             <div className="text-left">
               <h3 className="font-bold text-white">高级版</h3>

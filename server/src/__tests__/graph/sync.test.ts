@@ -4,27 +4,23 @@
  */
 
 import { jest } from '@jest/globals';
-import {
-  getMockDriver,
-} from './__mocks__/client';
+import { getMockDriver } from './__mocks__/client';
 
 // 模拟 client 模块
 jest.mock('../../services/graph/client', () => ({
-  getDriver: () => getMockDriver()
+  getDriver: () => getMockDriver(),
 }));
 
 // 模拟 llm 模块
 jest.mock('../../services/graph/llm', () => ({
   graphLlm: {
     extractTriples: jest.fn(),
-    analyzeContent: jest.fn()
-  }
+    analyzeContent: jest.fn(),
+  },
 }));
 
 // 导入被测试的函数（需要在 mock 之后导入）
-import {
-  syncEchoToGraph,
-} from '../../services/graph/sync';
+import { syncEchoToGraph } from '../../services/graph/sync';
 
 describe('Graph Sync Service', () => {
   let mockSession: ReturnType<ReturnType<typeof getMockDriver>['getMockSession']>;
@@ -60,10 +56,10 @@ describe('Graph Sync Service', () => {
           object: '李四',
           weight: 80,
           trajectory: 'rising',
-          isForeshadowing: false
-        }
+          isForeshadowing: false,
+        },
       ],
-      confidence: 0.8
+      confidence: 0.8,
     };
 
     it('应该成功同步Echo节点到图谱', async () => {
@@ -74,8 +70,8 @@ describe('Graph Sync Service', () => {
       mockSession.setMockResult('MATCH (target:Character', [
         createMockRecord({
           id: 'char-1',
-          name: '张三'
-        })
+          name: '张三',
+        }),
       ]);
 
       // 模拟三元组关系创建成功
@@ -90,7 +86,7 @@ describe('Graph Sync Service', () => {
     it('应该处理空的triples数组', async () => {
       const echoWithoutTriples = {
         ...validEcho,
-        triples: []
+        triples: [],
       };
 
       mockSession.setMockResult('MERGE (e:Echo', [createMockRecord({})]);
@@ -113,7 +109,7 @@ describe('Graph Sync Service', () => {
         ...validEcho,
         type: 'WORLD' as const,
         targetId: 'world-1',
-        targetName: '神秘森林'
+        targetName: '神秘森林',
       };
 
       mockSession.setMockResult('MERGE (e:Echo', [createMockRecord({})]);
@@ -131,9 +127,9 @@ describe('Graph Sync Service', () => {
             relation: 'KNOWS',
             object: '秘密',
             weight: 50,
-            isForeshadowing: true
-          }
-        ]
+            isForeshadowing: true,
+          },
+        ],
       };
 
       mockSession.setMockResult('MERGE (e:Echo', [createMockRecord({})]);
@@ -154,6 +150,6 @@ function createMockRecord(data: Record<string, any>) {
     forEach: (callback: (value: any, key: string) => void) => {
       Object.entries(data).forEach(([key, value]) => callback(value, key));
     },
-    toObject: () => data
+    toObject: () => data,
   };
 }

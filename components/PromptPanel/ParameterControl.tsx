@@ -57,7 +57,8 @@ const SliderControl: React.FC<{
     <div className="space-y-2">
       <div className="flex justify-between items-center">
         <span className="text-xs font-mono text-orange-400 bg-orange-500/10 px-2 py-0.5 rounded">
-          {value.toFixed(step < 1 ? 1 : 0)}{unit}
+          {value.toFixed(step < 1 ? 1 : 0)}
+          {unit}
         </span>
       </div>
       <div className="relative">
@@ -76,8 +77,14 @@ const SliderControl: React.FC<{
         />
       </div>
       <div className="flex justify-between text-[10px] text-slate-500">
-        <span>{min}{unit}</span>
-        <span>{max}{unit}</span>
+        <span>
+          {min}
+          {unit}
+        </span>
+        <span>
+          {max}
+          {unit}
+        </span>
       </div>
     </div>
   );
@@ -148,10 +155,7 @@ const ToggleControl: React.FC<{
 /**
  * 参数控制主组件
  */
-export const ParameterControl: React.FC<ParameterControlProps> = ({
-  config,
-  disabled = false,
-}) => {
+export const ParameterControl: React.FC<ParameterControlProps> = ({ config, disabled = false }) => {
   const { type, label, description, value, onChange } = config;
 
   const renderControl = () => {
@@ -201,9 +205,7 @@ export const ParameterControl: React.FC<ParameterControlProps> = ({
         </label>
       )}
       {renderControl()}
-      {description && (
-        <p className="text-[10px] text-slate-500">{description}</p>
-      )}
+      {description && <p className="text-[10px] text-slate-500">{description}</p>}
     </div>
   );
 };

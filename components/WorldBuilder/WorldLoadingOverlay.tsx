@@ -19,9 +19,7 @@ export const WorldLoadingOverlay: React.FC = () => {
           <Loader text="正在推演万象世界..." />
         </div>
       )}
-      {isExpanding && (
-        <Loader text="正在挖掘历史..." />
-      )}
+      {isExpanding && <Loader text="正在挖掘历史..." />}
     </div>
   );
 };

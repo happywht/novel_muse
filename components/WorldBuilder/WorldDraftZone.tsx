@@ -34,7 +34,7 @@ export const WorldDraftZone: React.FC = () => {
   const handleAcceptDraft = () => {
     const finalDraft = isEditing ? { ...draftLore, content: editContent } : draftLore;
     updateProject({
-      worldSettings: [...project.worldSettings, finalDraft]
+      worldSettings: [...project.worldSettings, finalDraft],
     });
     setActiveItemId(finalDraft.id);
     setDraftLore(null);
@@ -97,7 +97,10 @@ export const WorldDraftZone: React.FC = () => {
             <MarkdownRenderer content={draftLore.content} />
             {draftLore.content && (
               <button
-                onClick={() => { setIsEditing(true); setEditContent(draftLore.content); }}
+                onClick={() => {
+                  setIsEditing(true);
+                  setEditContent(draftLore.content);
+                }}
                 className="mt-4 text-sm text-muse-400 hover:text-muse-300 flex items-center gap-1"
               >
                 <Edit2 size={14} /> 修改内容
@@ -109,7 +112,9 @@ export const WorldDraftZone: React.FC = () => {
         {/* 迭代优化区域 */}
         {!isEditing && (
           <div className="border-t border-slate-800 pt-6 mt-6">
-            <label className="text-xs text-slate-500 font-bold uppercase mb-2 block">觉得不满意？告诉 AI 如何完善：</label>
+            <label className="text-xs text-slate-500 font-bold uppercase mb-2 block">
+              觉得不满意？告诉 AI 如何完善：
+            </label>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -123,7 +128,11 @@ export const WorldDraftZone: React.FC = () => {
                 disabled={isIterating || !iterationFeedback.trim()}
                 className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-lg text-sm disabled:opacity-50 flex items-center gap-2"
               >
-                {isIterating ? <RefreshCw size={14} className="animate-spin" /> : <SparklesIcon size={14} />}
+                {isIterating ? (
+                  <RefreshCw size={14} className="animate-spin" />
+                ) : (
+                  <SparklesIcon size={14} />
+                )}
                 优化建议
               </button>
             </div>

@@ -21,23 +21,23 @@ export type VariableTier = 'critical' | 'important' | 'optional';
  * Variable source - where the data comes from
  */
 export type VariableSource =
-  | 'user_input'      // Direct user input
-  | 'project_state'   // From project store
-  | 'computed'        // Computed from other data
-  | 'derived'         // Derived from context analysis
-  | 'optional';       // May or may not be available
+  | 'user_input' // Direct user input
+  | 'project_state' // From project store
+  | 'computed' // Computed from other data
+  | 'derived' // Derived from context analysis
+  | 'optional'; // May or may not be available
 
 /**
  * Template variable definition
  */
 export interface TemplateVariable {
-  name: string;           // Variable identifier (e.g., {{genre}})
+  name: string; // Variable identifier (e.g., {{genre}})
   type: 'string' | 'string[]' | 'number' | 'boolean' | 'object';
-  tier: VariableTier;     // Importance level
+  tier: VariableTier; // Importance level
   source: VariableSource; // Data source
-  required: boolean;      // Whether this variable must be provided
-  description: string;    // Human-readable description
-  display?: string;       // Display name in UI (Chinese)
+  required: boolean; // Whether this variable must be provided
+  description: string; // Human-readable description
+  display?: string; // Display name in UI (Chinese)
   defaultValue?: unknown; // Default value if not provided
 }
 
@@ -46,10 +46,10 @@ export interface TemplateVariable {
  */
 export interface PromptBlock {
   id: string;
-  title: string;          // Block title shown in prompt
-  template: string;       // Template string with {{variable}} placeholders
-  condition?: string;     // JavaScript expression for conditional inclusion
-  order: number;          // Display order
+  title: string; // Block title shown in prompt
+  template: string; // Template string with {{variable}} placeholders
+  condition?: string; // JavaScript expression for conditional inclusion
+  order: number; // Display order
 }
 
 /**
@@ -334,7 +334,8 @@ Target word count: approximately {{targetWordCount}} characters.`,
       required: false,
       description: 'Pacing control instructions based on pacing mode and profile',
       display: 'Pacing Control',
-      defaultValue: '[Pacing Control: Balanced Progression] Maintain narrative flow, naturally interweaving dialogue, action, and psychological activity.',
+      defaultValue:
+        '[Pacing Control: Balanced Progression] Maintain narrative flow, naturally interweaving dialogue, action, and psychological activity.',
     },
     {
       name: 'povName',
@@ -1854,7 +1855,8 @@ const WRITING_BASE_TEMPLATE: PromptTemplate = {
 const ANALYZE_STATE_CHANGES_TEMPLATE: PromptTemplate = {
   id: 'analyze_state_changes',
   name: 'Analyze State Changes',
-  description: 'Extract state change recommendations for characters and world settings from scene content',
+  description:
+    'Extract state change recommendations for characters and world settings from scene content',
   category: 'analysis',
   systemInstruction: `You are a professional novel setting analyst. Your task is to analyze text fragments and identify **permanent or significant events** that affect [character states] or [world environment].
 
@@ -1990,7 +1992,8 @@ Output in JSON format. If no major events, return empty array [].`,
 const EXTRACT_ECHOES_TEMPLATE: PromptTemplate = {
   id: 'extract_echoes',
   name: 'Extract Echoes',
-  description: 'Automatically extract Echo events (state changes) from novel text with knowledge graph integration',
+  description:
+    'Automatically extract Echo events (state changes) from novel text with knowledge graph integration',
   category: 'analysis',
   systemInstruction: `You are an expert narrative analyst specializing in tracking story continuity and state changes. Your task is to:
 
@@ -2214,7 +2217,8 @@ Output the consolidated [New Archive Description] directly (plain text, no Markd
 const DEDUCE_WORLD_CONSEQUENCES_TEMPLATE: PromptTemplate = {
   id: 'deduce_world_consequences',
   name: 'Deduce World Consequences',
-  description: 'Predict chain reactions and consequences based on recent events using butterfly effect logic',
+  description:
+    'Predict chain reactions and consequences based on recent events using butterfly effect logic',
   category: 'analysis',
   systemInstruction: `You are an omniscient world simulator (World Engine). Your task is to deduce **chain reactions** (Consequences) based on [recent events] (Triggers) and [dynamic knowledge graph] (Knowledge Graph) for the [world] and [characters].
 
@@ -2341,7 +2345,8 @@ Output [Future Predictions] strictly in JSON format.`,
 const GENERATE_SINGLE_CHARACTER_TEMPLATE: PromptTemplate = {
   id: 'generate_single_character',
   name: 'Generate Single Character',
-  description: 'Generate a single detailed character with depth fields (desire, fear, signature, weakness, alignment)',
+  description:
+    'Generate a single detailed character with depth fields (desire, fear, signature, weakness, alignment)',
   category: 'generation',
   systemInstruction: `You are an expert character designer for novels. Your task is to create a single, multi-dimensional character with deep psychological profile:
 
@@ -2466,7 +2471,8 @@ Output character profile in structured format.`,
 const SHURA_FIELD_CONFLICT_TEMPLATE: PromptTemplate = {
   id: 'shura_field_conflict',
   name: 'Shura Field Conflict',
-  description: 'Generate high-density multi-character conflict scenarios with layered confrontations and reversals',
+  description:
+    'Generate high-density multi-character conflict scenarios with layered confrontations and reversals',
   category: 'generation',
   systemInstruction: `You are a master conflict scene designer specializing in multi-character confrontations, psychological warfare, and dramatic tension. Your task is to create compelling conflict scenes that:
 
@@ -2960,7 +2966,8 @@ Do not include any opening remarks or explanatory text.`,
 const EXTRACT_KNOWLEDGE_TRIPLES_TEMPLATE: PromptTemplate = {
   id: 'extract_knowledge_triples',
   name: 'Extract Knowledge Triples',
-  description: 'Extract knowledge triples (subject-relation-object) from content for knowledge graph',
+  description:
+    'Extract knowledge triples (subject-relation-object) from content for knowledge graph',
   category: 'analysis',
   systemInstruction: `You are a novel editor expert in logical analysis. Your task is to extract core character locations, character relationships, and major facts as triples from given content, and evaluate relationship strength and trends.
 
@@ -3020,7 +3027,8 @@ Must return a pure JSON array, format as follows:
       tier: 'critical',
       source: 'user_input',
       required: true,
-      description: 'The content text to extract knowledge triples from (will be truncated to 5000 chars)',
+      description:
+        'The content text to extract knowledge triples from (will be truncated to 5000 chars)',
       display: '正文内容',
     },
   ],
@@ -3748,10 +3756,7 @@ export function getTemplateIds(): string[] {
 /**
  * Get variables by tier for a template
  */
-export function getVariablesByTier(
-  templateId: string,
-  tier: VariableTier
-): TemplateVariable[] {
+export function getVariablesByTier(templateId: string, tier: VariableTier): TemplateVariable[] {
   const template = getTemplate(templateId);
   if (!template) return [];
   return template.variables.filter((v) => v.tier === tier);
@@ -3787,9 +3792,7 @@ export function validateTemplateVariables(
 /**
  * Get variable display names for UI
  */
-export function getVariableDisplayNames(
-  templateId: string
-): Record<string, string> {
+export function getVariableDisplayNames(templateId: string): Record<string, string> {
   const template = getTemplate(templateId);
   if (!template) return {};
 
@@ -3806,10 +3809,7 @@ export function getVariableDisplayNames(
  * @param variables Variables to render
  * @returns Rendered user prompt string
  */
-export function renderUserPromptBlocks(
-  templateId: string,
-  variables: Record<string, any>
-): string {
+export function renderUserPromptBlocks(templateId: string, variables: Record<string, any>): string {
   const template = getTemplate(templateId);
   if (!template) {
     throw new Error(`Template not found: ${templateId}`);
@@ -3847,82 +3847,110 @@ export function renderUserPromptBlocks(
       let result = template;
 
       // Process inner loops ({{#each this.xxx}})
-      result = result.replace(/\{\{#each\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g, (match, prop, content) => {
-        // This will be handled by the outer loop processor
-        // Just mark it for now
-        return `__NESTED_LOOP_${prop}__${content}__END_NESTED_LOOP__`;
-      });
+      result = result.replace(
+        /\{\{#each\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g,
+        (match, prop, content) => {
+          // This will be handled by the outer loop processor
+          // Just mark it for now
+          return `__NESTED_LOOP_${prop}__${content}__END_NESTED_LOOP__`;
+        }
+      );
 
       // Process outer loops ({{#each variable}})
-      result = result.replace(/\{\{#each\s+(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g, (match, varName, content) => {
-        const items = vars[varName];
-        if (!Array.isArray(items) || items.length === 0) {
-          return '';
-        }
-
-        return items.map((item, index) => {
-          let itemContent = content;
-
-          // Handle nested loops
-          itemContent = itemContent.replace(/__NESTED_LOOP_(\w+)__([\s\S]*?)__END_NESTED_LOOP__/g, (nestedMatch, prop, nestedContent) => {
-            const nestedItems = item[prop];
-            if (!Array.isArray(nestedItems) || nestedItems.length === 0) {
-              return '';
-            }
-
-            return nestedItems.map((nestedItem, nestedIndex) => {
-              let nestedItemContent = nestedContent;
-
-              // Replace {{this}} for nested items
-              if (typeof nestedItem === 'string' || typeof nestedItem === 'number') {
-                nestedItemContent = nestedItemContent.replace(/\{\{this\}\}/g, String(nestedItem));
-              } else if (typeof nestedItem === 'object' && nestedItem !== null) {
-                // Process nested conditionals
-                nestedItemContent = nestedItemContent.replace(/\{\{#if\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (condMatch, condProp, condContent) => {
-                  const value = nestedItem[condProp];
-                  return isTruthy(value) ? condContent : '';
-                });
-
-                // Replace nested object properties
-                Object.keys(nestedItem).forEach(key => {
-                  const thisPattern = new RegExp(`\\{\\{this\\.${key}\\}\\}`, 'g');
-                  nestedItemContent = nestedItemContent.replace(thisPattern, String(nestedItem[key] ?? ''));
-                });
-              }
-
-              // Replace {{@index}} with nested index
-              nestedItemContent = nestedItemContent.replace(/\{\{@index\}\}/g, String(nestedIndex));
-
-              return nestedItemContent;
-            }).join('');
-          });
-
-          // Replace {{this}} with string representation
-          if (typeof item === 'string' || typeof item === 'number') {
-            itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
-          } else if (typeof item === 'object' && item !== null) {
-            // First, process nested conditionals within the loop
-            itemContent = itemContent.replace(/\{\{#if\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (condMatch, prop, condContent) => {
-              const value = item[prop];
-              if (isTruthy(value)) {
-                return condContent;
-              }
-              return '';
-            });
-
-            // Replace object properties - handle {{this.key}} pattern
-            Object.keys(item).forEach(key => {
-              const thisPattern = new RegExp(`\\{\\{this\\.${key}\\}\\}`, 'g');
-              itemContent = itemContent.replace(thisPattern, String(item[key] ?? ''));
-            });
+      result = result.replace(
+        /\{\{#each\s+(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g,
+        (match, varName, content) => {
+          const items = vars[varName];
+          if (!Array.isArray(items) || items.length === 0) {
+            return '';
           }
 
-          // Replace {{@index}} with index
-          itemContent = itemContent.replace(/\{\{@index\}\}/g, String(index));
+          return items
+            .map((item, index) => {
+              let itemContent = content;
 
-          return itemContent;
-        }).join('');
-      });
+              // Handle nested loops
+              itemContent = itemContent.replace(
+                /__NESTED_LOOP_(\w+)__([\s\S]*?)__END_NESTED_LOOP__/g,
+                (nestedMatch, prop, nestedContent) => {
+                  const nestedItems = item[prop];
+                  if (!Array.isArray(nestedItems) || nestedItems.length === 0) {
+                    return '';
+                  }
+
+                  return nestedItems
+                    .map((nestedItem, nestedIndex) => {
+                      let nestedItemContent = nestedContent;
+
+                      // Replace {{this}} for nested items
+                      if (typeof nestedItem === 'string' || typeof nestedItem === 'number') {
+                        nestedItemContent = nestedItemContent.replace(
+                          /\{\{this\}\}/g,
+                          String(nestedItem)
+                        );
+                      } else if (typeof nestedItem === 'object' && nestedItem !== null) {
+                        // Process nested conditionals
+                        nestedItemContent = nestedItemContent.replace(
+                          /\{\{#if\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g,
+                          (condMatch, condProp, condContent) => {
+                            const value = nestedItem[condProp];
+                            return isTruthy(value) ? condContent : '';
+                          }
+                        );
+
+                        // Replace nested object properties
+                        Object.keys(nestedItem).forEach((key) => {
+                          const thisPattern = new RegExp(`\\{\\{this\\.${key}\\}\\}`, 'g');
+                          nestedItemContent = nestedItemContent.replace(
+                            thisPattern,
+                            String(nestedItem[key] ?? '')
+                          );
+                        });
+                      }
+
+                      // Replace {{@index}} with nested index
+                      nestedItemContent = nestedItemContent.replace(
+                        /\{\{@index\}\}/g,
+                        String(nestedIndex)
+                      );
+
+                      return nestedItemContent;
+                    })
+                    .join('');
+                }
+              );
+
+              // Replace {{this}} with string representation
+              if (typeof item === 'string' || typeof item === 'number') {
+                itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
+              } else if (typeof item === 'object' && item !== null) {
+                // First, process nested conditionals within the loop
+                itemContent = itemContent.replace(
+                  /\{\{#if\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g,
+                  (condMatch, prop, condContent) => {
+                    const value = item[prop];
+                    if (isTruthy(value)) {
+                      return condContent;
+                    }
+                    return '';
+                  }
+                );
+
+                // Replace object properties - handle {{this.key}} pattern
+                Object.keys(item).forEach((key) => {
+                  const thisPattern = new RegExp(`\\{\\{this\\.${key}\\}\\}`, 'g');
+                  itemContent = itemContent.replace(thisPattern, String(item[key] ?? ''));
+                });
+              }
+
+              // Replace {{@index}} with index
+              itemContent = itemContent.replace(/\{\{@index\}\}/g, String(index));
+
+              return itemContent;
+            })
+            .join('');
+        }
+      );
 
       return result;
     };
@@ -3930,13 +3958,16 @@ export function renderUserPromptBlocks(
     renderedBlock = processLoops(renderedBlock, variables);
 
     // Process conditionals {{#if variable}}...{{/if}}
-    renderedBlock = renderedBlock.replace(/\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (match, varName, content) => {
-      const value = variables[varName];
-      if (isTruthy(value)) {
-        return content;
+    renderedBlock = renderedBlock.replace(
+      /\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g,
+      (match, varName, content) => {
+        const value = variables[varName];
+        if (isTruthy(value)) {
+          return content;
+        }
+        return '';
       }
-      return '';
-    });
+    );
 
     // Replace simple variables {{variable}} - AFTER loops and conditionals
     renderedBlock = renderedBlock.replace(/\{\{([^#/][^}]*)\}\}/g, (match, varPath) => {
@@ -3948,41 +3979,49 @@ export function renderUserPromptBlocks(
       const value = getNestedValue(variables, trimmedPath);
       return value !== undefined && value !== null ? String(value) : '';
     });
-    renderedBlock = renderedBlock.replace(/\{\{#each\s+(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g, (match, varName, content) => {
-      const items = variables[varName];
-      if (!Array.isArray(items) || items.length === 0) {
-        return '';
-      }
-
-      return items.map((item, index) => {
-        let itemContent = content;
-
-        // Replace {{this}} with string representation
-        if (typeof item === 'string' || typeof item === 'number') {
-          itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
-        } else if (typeof item === 'object' && item !== null) {
-          // First, process nested conditionals within the loop
-          itemContent = itemContent.replace(/\{\{#if\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (condMatch, prop, condContent) => {
-            const value = item[prop];
-            if (isTruthy(value)) {
-              return condContent;
-            }
-            return '';
-          });
-
-          // Replace object properties - handle {{this.key}} pattern
-          Object.keys(item).forEach(key => {
-            const thisPattern = new RegExp(`\\{\\{this\\.${key}\\}\\}`, 'g');
-            itemContent = itemContent.replace(thisPattern, String(item[key] ?? ''));
-          });
+    renderedBlock = renderedBlock.replace(
+      /\{\{#each\s+(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g,
+      (match, varName, content) => {
+        const items = variables[varName];
+        if (!Array.isArray(items) || items.length === 0) {
+          return '';
         }
 
-        // Replace {{@index}} with index
-        itemContent = itemContent.replace(/\{\{@index\}\}/g, String(index));
+        return items
+          .map((item, index) => {
+            let itemContent = content;
 
-        return itemContent;
-      }).join('');
-    });
+            // Replace {{this}} with string representation
+            if (typeof item === 'string' || typeof item === 'number') {
+              itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
+            } else if (typeof item === 'object' && item !== null) {
+              // First, process nested conditionals within the loop
+              itemContent = itemContent.replace(
+                /\{\{#if\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g,
+                (condMatch, prop, condContent) => {
+                  const value = item[prop];
+                  if (isTruthy(value)) {
+                    return condContent;
+                  }
+                  return '';
+                }
+              );
+
+              // Replace object properties - handle {{this.key}} pattern
+              Object.keys(item).forEach((key) => {
+                const thisPattern = new RegExp(`\\{\\{this\\.${key}\\}\\}`, 'g');
+                itemContent = itemContent.replace(thisPattern, String(item[key] ?? ''));
+              });
+            }
+
+            // Replace {{@index}} with index
+            itemContent = itemContent.replace(/\{\{@index\}\}/g, String(index));
+
+            return itemContent;
+          })
+          .join('');
+      }
+    );
 
     // Only add non-empty blocks
     if (renderedBlock.trim()) {
@@ -4017,27 +4056,35 @@ function evaluateCondition(condition: string, variables: Record<string, any>): b
     }
 
     switch (operator) {
-      case '===': return varValue === compareValue;
-      case '!==': return varValue !== compareValue;
-      case '==': return varValue == compareValue;
-      case '!=': return varValue != compareValue;
-      case '>': return varValue > compareValue;
-      case '>=': return varValue >= compareValue;
-      case '<': return varValue < compareValue;
-      case '<=': return varValue <= compareValue;
+      case '===':
+        return varValue === compareValue;
+      case '!==':
+        return varValue !== compareValue;
+      case '==':
+        return varValue == compareValue;
+      case '!=':
+        return varValue != compareValue;
+      case '>':
+        return varValue > compareValue;
+      case '>=':
+        return varValue >= compareValue;
+      case '<':
+        return varValue < compareValue;
+      case '<=':
+        return varValue <= compareValue;
     }
   }
 
   // Handle '&&' (and)
   if (condition.includes('&&')) {
-    const parts = condition.split('&&').map(p => p.trim());
-    return parts.every(part => evaluateCondition(part, variables));
+    const parts = condition.split('&&').map((p) => p.trim());
+    return parts.every((part) => evaluateCondition(part, variables));
   }
 
   // Handle '||' (or)
   if (condition.includes('||')) {
-    const parts = condition.split('||').map(p => p.trim());
-    return parts.some(part => evaluateCondition(part, variables));
+    const parts = condition.split('||').map((p) => p.trim());
+    return parts.some((part) => evaluateCondition(part, variables));
   }
 
   // Handle simple truthy checks

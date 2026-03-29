@@ -1,6 +1,7 @@
 # InkOS CLI 与 Muse 主项目技术集成方案
 
 ## 文档信息
+
 - **版本**: 1.0
 - **日期**: 2026-03-28
 - **作者**: Backend Technical Lead
@@ -12,17 +13,18 @@
 
 ### 1.1 主项目 (Muse) 技术栈
 
-| 层级 | 技术 | 版本 |
-|------|------|------|
-| 前端框架 | React + Vite | 19.2.4 / 6.2.0 |
-| 后端框架 | Express | 4.21.0 |
-| 数据库 | Prisma + SQLite/PostgreSQL | 6.5.0 |
-| 图数据库 | Neo4j | 6.0.1 |
-| 包管理器 | npm | - |
-| TypeScript | 5.8.2 | - |
-| AI SDK | @google/genai | 1.41.0 |
+| 层级       | 技术                       | 版本           |
+| ---------- | -------------------------- | -------------- |
+| 前端框架   | React + Vite               | 19.2.4 / 6.2.0 |
+| 后端框架   | Express                    | 4.21.0         |
+| 数据库     | Prisma + SQLite/PostgreSQL | 6.5.0          |
+| 图数据库   | Neo4j                      | 6.0.1          |
+| 包管理器   | npm                        | -              |
+| TypeScript | 5.8.2                      | -              |
+| AI SDK     | @google/genai              | 1.41.0         |
 
 **主要功能**:
+
 - 可视化小说架构设计
 - 角色关系图谱 (Neo4j)
 - 项目管理 CRUD
@@ -30,15 +32,16 @@
 
 ### 1.2 InkOS CLI 技术栈
 
-| 层级 | 技术 | 版本 |
-|------|------|------|
-| CLI 框架 | Commander.js | 13.0.0 |
-| 核心引擎 | @actalk/inkos-core | 0.5.1 |
-| LLM 集成 | OpenAI / Anthropic | - |
-| 包管理器 | pnpm (monorepo) | >=9.0.0 |
-| TypeScript | 5.8.0 | - |
+| 层级       | 技术               | 版本    |
+| ---------- | ------------------ | ------- |
+| CLI 框架   | Commander.js       | 13.0.0  |
+| 核心引擎   | @actalk/inkos-core | 0.5.1   |
+| LLM 集成   | OpenAI / Anthropic | -       |
+| 包管理器   | pnpm (monorepo)    | >=9.0.0 |
+| TypeScript | 5.8.0              | -       |
 
 **主要功能**:
+
 - 多 Agent 协作写书 (Writer, Architect, Auditor, Reviser)
 - 章节生成与审核
 - 风格分析与 AI 检测
@@ -47,14 +50,15 @@
 
 ### 1.3 依赖冲突分析
 
-| 依赖包 | 主项目版本 | InkOS Core 版本 | 兼容性 |
-|--------|-----------|-----------------|--------|
-| `dotenv` | 17.3.1 | 16.4.0 | 兼容 (API 稳定) |
-| `zod` | 4.3.6 | 3.24.0 | 需升级 InkOS 或降级主项目 |
-| `typescript` | 5.8.2 | 5.8.0 | 兼容 |
-| `@anthropic-ai/sdk` | 0.78.0 (devDeps) | 0.78.0 | 兼容 |
+| 依赖包              | 主项目版本       | InkOS Core 版本 | 兼容性                    |
+| ------------------- | ---------------- | --------------- | ------------------------- |
+| `dotenv`            | 17.3.1           | 16.4.0          | 兼容 (API 稳定)           |
+| `zod`               | 4.3.6            | 3.24.0          | 需升级 InkOS 或降级主项目 |
+| `typescript`        | 5.8.2            | 5.8.0           | 兼容                      |
+| `@anthropic-ai/sdk` | 0.78.0 (devDeps) | 0.78.0          | 兼容                      |
 
 **关键发现**:
+
 - `zod` 版本差异较大 (v4 vs v3)，需要统一
 - 两个项目都使用 ESM 模块，无 CommonJS 冲突
 - 包管理器差异 (npm vs pnpm) 可通过配置解决
@@ -78,19 +82,24 @@
 ```
 
 **实现方式**:
+
 ```typescript
 // server/src/services/inkosService.ts
 import { spawn } from 'child_process';
 
 export async function callInkosWrite(bookId: string, chapter: number): Promise<string> {
   return new Promise((resolve, reject) => {
-    const process = spawn('npx', ['inkos', 'write', '--book', bookId, '--chapter', String(chapter)], {
-      cwd: projectRoot,
-      env: { ...process.env, ANTHROPIC_API_KEY: apiKey }
-    });
+    const process = spawn(
+      'npx',
+      ['inkos', 'write', '--book', bookId, '--chapter', String(chapter)],
+      {
+        cwd: projectRoot,
+        env: { ...process.env, ANTHROPIC_API_KEY: apiKey },
+      }
+    );
 
     let output = '';
-    process.stdout.on('data', (data) => output += data);
+    process.stdout.on('data', (data) => (output += data));
     process.stderr.on('data', (data) => console.error(data.toString()));
 
     process.on('close', (code) => {
@@ -101,12 +110,14 @@ export async function callInkosWrite(bookId: string, chapter: number): Promise<s
 ```
 
 **优点**:
+
 - 零代码侵入，无需修改 InkOS 源码
 - 进程隔离，崩溃不影响主服务
 - 可独立升级 CLI 版本
 - 适合快速验证和原型开发
 
 **缺点**:
+
 - 进程启动开销 (~500ms)
 - 数据通过文件系统传递，效率低
 - 实时进度流式输出复杂
@@ -135,6 +146,7 @@ export async function callInkosWrite(bookId: string, chapter: number): Promise<s
 ```
 
 **实现方式**:
+
 ```typescript
 // server/src/routes/inkos.ts
 import { Router } from 'express';
@@ -153,7 +165,7 @@ inkosRouter.post('/write', async (req, res) => {
   // 创建 LLM 客户端
   const client = createLLMClient({
     provider: 'anthropic',
-    apiKey: process.env.ANTHROPIC_API_KEY
+    apiKey: process.env.ANTHROPIC_API_KEY,
   });
 
   // 创建 Pipeline Runner
@@ -164,7 +176,7 @@ inkosRouter.post('/write', async (req, res) => {
     onStreamProgress: (progress) => {
       // 通过 SSE 推送进度
       req.app.locals.eventBus.emit(`write-progress:${bookId}`, progress);
-    }
+    },
   });
 
   try {
@@ -183,6 +195,7 @@ inkosRouter.get('/status/:bookId', async (req, res) => {
 ```
 
 **优点**:
+
 - 低延迟，内存调用
 - 支持实时进度流 (SSE/WebSocket)
 - 统一错误处理和日志
@@ -190,6 +203,7 @@ inkosRouter.get('/status/:bookId', async (req, res) => {
 - 易于添加认证、限流等中间件
 
 **缺点**:
+
 - 需要适配 InkOS Core API
 - 共享内存空间，崩溃可能影响主服务
 - 长时间运行的任务需异步处理
@@ -265,12 +279,14 @@ export class PrismaAdapter implements StorageAdapter {
 ```
 
 **优点**:
+
 - 最大化代码复用
 - 单一数据源，避免不一致
 - CLI 和 Web 功能一致
 - 便于单元测试 (mock adapter)
 
 **缺点**:
+
 - 架构改动最大
 - 需要设计 Adapter 接口
 - CLI 和 Web 共享依赖，版本耦合
@@ -285,14 +301,14 @@ export class PrismaAdapter implements StorageAdapter {
 ### 3.1 评分矩阵
 
 | 评估维度 | 模式 A (CLI) | 模式 B (API) | 模式 C (Core) |
-|---------|-------------|-------------|--------------|
-| 实施速度 | 9/10 | 7/10 | 4/10 |
-| 运行性能 | 5/10 | 9/10 | 9/10 |
-| 代码复用 | 3/10 | 7/10 | 10/10 |
-| 维护成本 | 8/10 | 6/10 | 5/10 |
-| 扩展性 | 6/10 | 8/10 | 10/10 |
-| 实时性 | 3/10 | 9/10 | 9/10 |
-| **总分** | **34** | **46** | **47** |
+| -------- | ------------ | ------------ | ------------- |
+| 实施速度 | 9/10         | 7/10         | 4/10          |
+| 运行性能 | 5/10         | 9/10         | 9/10          |
+| 代码复用 | 3/10         | 7/10         | 10/10         |
+| 维护成本 | 8/10         | 6/10         | 5/10          |
+| 扩展性   | 6/10         | 8/10         | 10/10         |
+| 实时性   | 3/10         | 9/10         | 9/10          |
+| **总分** | **34**       | **46**       | **47**        |
 
 ### 3.2 推荐方案: 混合模式 (B + C 渐进式)
 
@@ -313,6 +329,7 @@ export class PrismaAdapter implements StorageAdapter {
 **任务清单**:
 
 - [ ] 解决 zod 版本冲突
+
   ```bash
   # 方案 A: 升级 InkOS Core 到 zod v4
   cd inkos/packages/core && pnpm add zod@^4.3.6
@@ -322,6 +339,7 @@ export class PrismaAdapter implements StorageAdapter {
   ```
 
 - [ ] 添加 InkOS Core 依赖
+
   ```json
   // server/package.json
   {
@@ -332,6 +350,7 @@ export class PrismaAdapter implements StorageAdapter {
   ```
 
 - [ ] 创建 API 路由
+
   ```
   server/src/routes/inkos.ts
   server/src/services/inkosService.ts
@@ -339,6 +358,7 @@ export class PrismaAdapter implements StorageAdapter {
   ```
 
 - [ ] 实现流式响应 (SSE)
+
   ```typescript
   // GET /api/inkos/stream/:taskId
   inkosRouter.get('/stream/:taskId', (req, res) => {
@@ -371,6 +391,7 @@ export class PrismaAdapter implements StorageAdapter {
 **任务清单**:
 
 - [ ] 设计 StorageAdapter 接口
+
   ```typescript
   interface StorageAdapter {
     // Book 管理
@@ -609,39 +630,39 @@ export class PrismaAdapter implements StorageAdapter {
 
 ## 6. 工作量估算
 
-| 阶段 | 任务 | 工作量 | 优先级 |
-|------|------|--------|--------|
-| Phase 1 | zod 版本统一 | 2h | P0 |
-| Phase 1 | 添加 Core 依赖 | 1h | P0 |
-| Phase 1 | 创建 API 路由 | 4h | P0 |
-| Phase 1 | SSE 流式响应 | 3h | P1 |
-| Phase 1 | 前端调用集成 | 4h | P1 |
-| Phase 1 | 测试与调试 | 4h | P1 |
-| **Phase 1 小计** | | **18h (2-3天)** | |
-| Phase 2 | StorageAdapter 接口设计 | 4h | P1 |
-| Phase 2 | PrismaAdapter 实现 | 8h | P1 |
-| Phase 2 | InkOS Core 适配改造 | 8h | P2 |
-| Phase 2 | 数据迁移脚本 | 4h | P2 |
-| Phase 2 | 测试覆盖 | 6h | P2 |
-| **Phase 2 小计** | | **30h (4-5天)** | |
-| Phase 3 | 任务队列集成 | 8h | P2 |
-| Phase 3 | WebSocket 双向通信 | 6h | P2 |
-| Phase 3 | 前端工作台 UI | 16h | P3 |
-| Phase 3 | 错误恢复机制 | 6h | P3 |
-| **Phase 3 小计** | | **36h (5-7天)** | |
-| **总计** | | **84h (12-15天)** | |
+| 阶段             | 任务                    | 工作量            | 优先级 |
+| ---------------- | ----------------------- | ----------------- | ------ |
+| Phase 1          | zod 版本统一            | 2h                | P0     |
+| Phase 1          | 添加 Core 依赖          | 1h                | P0     |
+| Phase 1          | 创建 API 路由           | 4h                | P0     |
+| Phase 1          | SSE 流式响应            | 3h                | P1     |
+| Phase 1          | 前端调用集成            | 4h                | P1     |
+| Phase 1          | 测试与调试              | 4h                | P1     |
+| **Phase 1 小计** |                         | **18h (2-3天)**   |        |
+| Phase 2          | StorageAdapter 接口设计 | 4h                | P1     |
+| Phase 2          | PrismaAdapter 实现      | 8h                | P1     |
+| Phase 2          | InkOS Core 适配改造     | 8h                | P2     |
+| Phase 2          | 数据迁移脚本            | 4h                | P2     |
+| Phase 2          | 测试覆盖                | 6h                | P2     |
+| **Phase 2 小计** |                         | **30h (4-5天)**   |        |
+| Phase 3          | 任务队列集成            | 8h                | P2     |
+| Phase 3          | WebSocket 双向通信      | 6h                | P2     |
+| Phase 3          | 前端工作台 UI           | 16h               | P3     |
+| Phase 3          | 错误恢复机制            | 6h                | P3     |
+| **Phase 3 小计** |                         | **36h (5-7天)**   |        |
+| **总计**         |                         | **84h (12-15天)** |        |
 
 ---
 
 ## 7. 风险与缓解措施
 
-| 风险 | 概率 | 影响 | 缓解措施 |
-|------|------|------|----------|
-| zod 版本不兼容 | 高 | 中 | 使用 patch-package 或 fork InkOS Core |
-| LLM API 超时 | 中 | 高 | 实现超时重试 + 任务队列 |
-| 内存泄漏 (长任务) | 中 | 高 | 使用 worker_threads 或独立进程 |
-| Neo4j 与 InkOS 状态不一致 | 低 | 中 | 单一数据源原则 |
-| 前端 SSE 兼容性 | 低 | 低 | 降级到轮询 |
+| 风险                      | 概率 | 影响 | 缓解措施                              |
+| ------------------------- | ---- | ---- | ------------------------------------- |
+| zod 版本不兼容            | 高   | 中   | 使用 patch-package 或 fork InkOS Core |
+| LLM API 超时              | 中   | 高   | 实现超时重试 + 任务队列               |
+| 内存泄漏 (长任务)         | 中   | 高   | 使用 worker_threads 或独立进程        |
+| Neo4j 与 InkOS 状态不一致 | 低   | 中   | 单一数据源原则                        |
+| 前端 SSE 兼容性           | 低   | 低   | 降级到轮询                            |
 
 ---
 
@@ -662,11 +683,7 @@ export class PrismaAdapter implements StorageAdapter {
 
 ```typescript
 // server/src/services/inkosService.ts
-import {
-  PipelineRunner,
-  createLLMClient,
-  type OnStreamProgress
-} from '@actalk/inkos-core';
+import { PipelineRunner, createLLMClient, type OnStreamProgress } from '@actalk/inkos-core';
 import { prisma } from '../index';
 import { EventEmitter } from 'events';
 
@@ -681,7 +698,7 @@ export class InkosService {
     const taskId = `${bookId}-${chapterNumber}-${Date.now()}`;
 
     // 异步执行，立即返回
-    this.executeWrite(taskId, bookId, chapterNumber, options).catch(err => {
+    this.executeWrite(taskId, bookId, chapterNumber, options).catch((err) => {
       this.eventBus.emit(`error:${taskId}`, err);
     });
 
@@ -696,14 +713,14 @@ export class InkosService {
   ): Promise<void> {
     const book = await prisma.book.findUnique({
       where: { id: bookId },
-      include: { chapters: true }
+      include: { chapters: true },
     });
 
     if (!book) throw new Error('Book not found');
 
     const client = createLLMClient({
       provider: 'anthropic',
-      apiKey: process.env.ANTHROPIC_API_KEY!
+      apiKey: process.env.ANTHROPIC_API_KEY!,
     });
 
     const onProgress: OnStreamProgress = (progress) => {
@@ -714,7 +731,7 @@ export class InkosService {
       client,
       model: options.model || 'claude-sonnet-4-20250514',
       projectRoot: this.getProjectPath(bookId),
-      onStreamProgress
+      onStreamProgress,
     });
 
     const result = await runner.writeChapter(chapterNumber);
@@ -725,7 +742,7 @@ export class InkosService {
       update: {
         content: result.content,
         wordCount: result.wordCount,
-        status: 'ready-for-review'
+        status: 'ready-for-review',
       },
       create: {
         bookId,
@@ -733,8 +750,8 @@ export class InkosService {
         title: result.title,
         content: result.content,
         wordCount: result.wordCount,
-        status: 'ready-for-review'
-      }
+        status: 'ready-for-review',
+      },
     });
 
     this.eventBus.emit(`complete:${taskId}`, result);
@@ -778,7 +795,7 @@ export function useInkosWrite() {
     const response = await fetch('/api/inkos/write', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bookId, chapterNumber })
+      body: JSON.stringify({ bookId, chapterNumber }),
     });
 
     const { taskId } = await response.json();
@@ -826,4 +843,4 @@ export function useInkosWrite() {
 
 ---
 
-*文档结束*
+_文档结束_

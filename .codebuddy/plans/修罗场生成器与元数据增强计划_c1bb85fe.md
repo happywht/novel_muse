@@ -22,21 +22,21 @@ design:
       weight: 400
   colorSystem:
     primary:
-      - "#4C1D4C"
-      - "#7C2D4C"
-      - "#FF3D3D"
+      - '#4C1D4C'
+      - '#7C2D4C'
+      - '#FF3D3D'
     background:
-      - "#0F0F1A"
-      - "#1A1A2E"
-      - "#16213E"
+      - '#0F0F1A'
+      - '#1A1A2E'
+      - '#16213E'
     text:
-      - "#E0E0E0"
-      - "#FFFFFF"
-      - "#FF6B6B"
+      - '#E0E0E0'
+      - '#FFFFFF'
+      - '#FF6B6B'
     functional:
-      - "#00FF88"
-      - "#FFCC00"
-      - "#FF3D3D"
+      - '#00FF88'
+      - '#FFCC00'
+      - '#FF3D3D'
 todos:
   - id: explore-plotweaver-structure
     content: 使用 [subagent:code-explorer] 深度分析 PlotWeaver 模块结构，识别所有需要修改的文件和接口
@@ -175,7 +175,7 @@ graph TD
     G --> H[safeParseAiJson: 验证数据]
     H --> I[updateProject: 插入plotNode]
     I --> J[PlotCard: 显示新场景]
-    
+
     subgraph "知识图谱支持"
         K[Neo4j Graph] --> L[角色关系数据]
         L --> E
@@ -212,10 +212,10 @@ export interface PlotNode {
   content: string;
   order: number;
   beatTag?: BeatTag;
-  relatedCharacters?: string[];      // IDs
-  relatedLocations?: string[];       // IDs
-  sceneType?: 'NORMAL' | 'SHURA_FIELD';  // NEW: 标记修罗场场景
-  intensity?: number;                // NEW: 冲突强度 0-100
+  relatedCharacters?: string[]; // IDs
+  relatedLocations?: string[]; // IDs
+  sceneType?: 'NORMAL' | 'SHURA_FIELD'; // NEW: 标记修罗场场景
+  intensity?: number; // NEW: 冲突强度 0-100
   participatingCharacters?: string[]; // NEW: 参与角色IDs
 }
 ```
@@ -225,11 +225,11 @@ export interface PlotNode {
 ```typescript
 // services/gemini/shuraField.ts
 export const generateShuraFieldScene = async (
-    characters: Character[],
-    location: WorldSetting,
-    intensity: number,
-    context: ProjectState,
-    settings?: CreativeSettings
+  characters: Character[],
+  location: WorldSetting,
+  intensity: number,
+  context: ProjectState,
+  settings?: CreativeSettings
 ): Promise<PlotNode> => {
   // 构建角色冲突分析上下文
   // 调用 Gemini 生成场景

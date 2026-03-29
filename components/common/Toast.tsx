@@ -78,7 +78,10 @@ const ToastItem: React.FC<ToastProps> = ({ toast, onDismiss }) => {
 
   useEffect(() => {
     if (isHovered) {
-      remainingTimeRef.current = Math.max(0, remainingTimeRef.current - (Date.now() - startTimeRef.current));
+      remainingTimeRef.current = Math.max(
+        0,
+        remainingTimeRef.current - (Date.now() - startTimeRef.current)
+      );
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
@@ -124,9 +127,7 @@ const ToastItem: React.FC<ToastProps> = ({ toast, onDismiss }) => {
     >
       <div className="flex items-start gap-3 p-4">
         {/* Icon */}
-        <div className={`flex-shrink-0 ${config.iconColor}`}>
-          {config.icon}
-        </div>
+        <div className={`flex-shrink-0 ${config.iconColor}`}>{config.icon}</div>
 
         {/* Message */}
         <div className="flex-1 min-w-0">

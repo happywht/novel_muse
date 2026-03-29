@@ -63,5 +63,5 @@ export const graphLlm = {
       throw failureError;
     }
     return mockResponse?.content || '';
-  })
+  }),
 };

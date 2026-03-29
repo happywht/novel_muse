@@ -1,0 +1,508 @@
+{
+  "title": "Muse-inkos 存储格式统一方案",
+  "version": "1.0.0",
+  "issue": "#2",
+  "date": "2026-03-29",
+  "author": "database-specialist",
+
+  "problem_analysis": {
+    "summary": "inkos Truth Files 使用 Markdown 格式（YAML frontmatter + Markdown body），而 Muse 使用 JSON/IndexedDB 存储，需要实现双向无损转换。",
+    "challenges": [
+      "格式差异：Markdown 表格 vs JSON 对象",
+      "语义映射：Muse 字段与 inkos 字段不完全一一对应",
+      "数据完整性：双向转换不能丢失信息",
+      "版本兼容：旧数据格式需要支持迁移",
+      "性能要求：大文档转换效率"
+    ],
+    "existing_infrastructure": {
+      "converters": "services/inkos/types/converters.ts - 已有基础转换函数",
+      "mapping": "services/inkos/types/mapping.ts - 已有类型映射定义",
+      "storage": "services/inkos/storage/ - 已有混合存储适配器"
+    }
+  },
+
+  "solution": {
+    "approach": "方案 C：增强转换层",
+    "rationale": "无需修改 inkos 或 Muse 核心存储，通过增强转换层实现格式统一",
+    "benefits": [
+      "最小侵入性：不修改现有存储层",
+      "可扩展性：易于添加新的格式支持",
+      "可测试性：转换逻辑独立，易于单元测试",
+      "向后兼容：支持旧版本数据格式"
+    ],
+    "tradeoffs": [
+      "转换逻辑复杂度增加",
+      "需要维护双向映射表",
+      "转换性能开销"
+    ]
+  },
+
+  "architecture": {
+    "description": "三层架构：格式层、转换层、存储层",
+    "diagram": {
+      "layers": [
+        {
+          "name": "Format Layer (格式层)",
+          "components": [
+            "MarkdownParser - 解析 inkos Markdown 文件",
+            "MarkdownGenerator - 生成 inkos Markdown 文件",
+            "JSONSerializer - Muse JSON 序列化",
+            "FormatValidator - 格式验证"
+          ]
+        },
+        {
+          "name": "Conversion Layer (转换层)",
+          "components": [
+            "MuseToInkosConverter - Muse -> inkos 转换",
+            "InkosToMuseConverter - inkos -> Muse 转换",
+            "FieldMapper - 字段映射",
+            "TypeTransformer - 类型转换",
+            "ConflictResolver - 冲突解决"
+          ]
+        },
+        {
+          "name": "Storage Layer (存储层)",
+          "components": [
+            "HybridStorageAdapter - 混合存储",
+            "IndexedDBAdapter - IndexedDB 存储",
+            "FileStorageAdapter - 文件系统存储",
+            "SyncManager - 同步管理"
+          ]
+        }
+      ],
+      "data_flow": {
+        "muse_to_inkos": [
+          "1. 从 IndexedDB 读取 Muse ProjectState (JSON)",
+          "2. FormatValidator 验证 JSON 结构",
+          "3. MuseToInkosConverter 转换数据结构",
+          "4. FieldMapper 执行字段映射",
+          "5. TypeTransformer 执行类型转换",
+          "6. MarkdownGenerator 生成 Markdown 文件",
+          "7. FormatValidator 验证 Markdown 格式",
+          "8. FileStorageAdapter 写入文件系统"
+        ],
+        "inkos_to_muse": [
+          "1. FileStorageAdapter 读取 Markdown 文件",
+          "2. FormatValidator 验证 Markdown 格式",
+          "3. MarkdownParser 解析为结构化数据",
+          "4. InkosToMuseConverter 转换数据结构",
+          "5. FieldMapper 执行字段映射",
+          "6. TypeTransformer 执行类型转换",
+          "7. FormatValidator 验证 JSON 结构",
+          "8. IndexedDBAdapter 写入 IndexedDB"
+        ]
+      }
+    }
+  },
+
+  "conversion_flow": {
+    "muse_to_inkos": {
+      "description": "Muse ProjectState -> inkos Truth Files",
+      "steps": [
+        {
+          "step": 1,
+          "name": "Extract Project Metadata",
+          "source": "ProjectState",
+          "target": "book.json",
+          "mappings": [
+            { "source": "id", "target": "id", "transform": "direct" },
+            { "source": "title", "target": "title", "transform": "direct" },
+            { "source": "genre", "target": "genre", "transform": "mapGenreToInkos" },
+            { "source": "premise", "target": "synopsis", "transform": "direct" }
+          ]
+        },
+        {
+          "step": 2,
+          "name": "Convert World Settings",
+          "source": "worldSettings[]",
+          "target": ["current_state.md", "story_bible.md"],
+          "mappings": [
+            { "source": "Geography", "target": "currentLocation", "transform": "extractLocation" },
+            { "source": "History", "target": "worldBuilding", "transform": "formatMarkdown" },
+            { "source": "Magic/Tech", "target": "magicSystem", "transform": "formatMarkdown" },
+            { "source": "Society", "target": "socialStructure", "transform": "formatMarkdown" }
+          ]
+        },
+        {
+          "step": 3,
+          "name": "Convert Characters",
+          "source": "characters[]",
+          "target": "character_matrix.md",
+          "mappings": [
+            { "source": "name", "target": "profiles[].name", "transform": "direct" },
+            { "source": "archetype", "target": "profiles[].coreTags[0]", "transform": "direct" },
+            { "source": "desire", "target": "profiles[].coreMotivation", "transform": "direct" },
+            { "source": "structuredRelations", "target": "encounters[]", "transform": "convertRelations" }
+          ]
+        },
+        {
+          "step": 4,
+          "name": "Convert Plot Nodes",
+          "source": "plotNodes[]",
+          "target": ["pending_hooks.md", "subplot_board.md"],
+          "mappings": [
+            { "source": "id", "target": "hookId", "transform": "generateHookId" },
+            { "source": "order", "target": "startChapter", "transform": "direct" },
+            { "source": "beatTag", "target": "type", "transform": "mapBeatTagToHookType" },
+            { "source": "content", "target": "notes", "transform": "direct" }
+          ]
+        },
+        {
+          "step": 5,
+          "name": "Convert Chapters",
+          "source": "chapters[]",
+          "target": "chapter_summaries.md",
+          "mappings": [
+            { "source": "order", "target": "chapter", "transform": "direct" },
+            { "source": "title", "target": "title", "transform": "direct" },
+            { "source": "summary", "target": "events", "transform": "direct" },
+            { "source": "content", "target": "chapterFiles[]", "transform": "createChapterFile" }
+          ]
+        },
+        {
+          "step": 6,
+          "name": "Convert Echoes",
+          "source": "echoes[]",
+          "target": "pending_hooks.md",
+          "mappings": [
+            { "source": "id", "target": "hookId", "transform": "prefixEcho" },
+            { "source": "type", "target": "type", "transform": "mapEchoTypeToHookType" },
+            { "source": "description", "target": "notes", "transform": "appendReason" }
+          ]
+        },
+        {
+          "step": 7,
+          "name": "Convert Character Arcs",
+          "source": "characters[].arc",
+          "target": "emotional_arcs.md",
+          "mappings": [
+            { "source": "arcType", "target": "trajectory", "transform": "mapArcTypeToTrajectory" },
+            { "source": "currentPhase", "target": "emotionalState", "transform": "mapPhaseToEmotion" },
+            { "source": "phaseProgress", "target": "intensity", "transform": "normalizeToIntensity" }
+          ]
+        }
+      ]
+    },
+    "inkos_to_muse": {
+      "description": "inkos Truth Files -> Muse ProjectState",
+      "steps": [
+        {
+          "step": 1,
+          "name": "Parse Book Config",
+          "source": "book.json",
+          "target": "ProjectState",
+          "mappings": [
+            { "source": "id", "target": "id", "transform": "direct" },
+            { "source": "title", "target": "title", "transform": "direct" },
+            { "source": "genre", "target": "genre", "transform": "mapGenreToMuse" },
+            { "source": "synopsis", "target": "premise", "transform": "direct" }
+          ]
+        },
+        {
+          "step": 2,
+          "name": "Parse World State",
+          "source": ["current_state.md", "story_bible.md"],
+          "target": "worldSettings[]",
+          "mappings": [
+            { "source": "currentLocation", "target": "Geography", "transform": "createWorldSetting" },
+            { "source": "worldBuilding", "target": "History", "transform": "parseMarkdownToSetting" },
+            { "source": "magicSystem", "target": "Magic/Tech", "transform": "parseMarkdownToSetting" }
+          ]
+        },
+        {
+          "step": 3,
+          "name": "Parse Character Matrix",
+          "source": "character_matrix.md",
+          "target": "characters[]",
+          "mappings": [
+            { "source": "profiles[].name", "target": "name", "transform": "direct" },
+            { "source": "profiles[].coreTags", "target": "tags", "transform": "direct" },
+            { "source": "encounters[]", "target": "structuredRelations", "transform": "convertEncounters" }
+          ]
+        },
+        {
+          "step": 4,
+          "name": "Parse Pending Hooks",
+          "source": "pending_hooks.md",
+          "target": ["plotNodes[]", "echoes[]"],
+          "mappings": [
+            { "source": "hookId", "target": "id", "transform": "direct" },
+            { "source": "type", "target": "beatTag", "transform": "mapHookTypeToBeatTag" },
+            { "source": "status", "target": "status", "transform": "mapHookStatusToEcho" }
+          ]
+        },
+        {
+          "step": 5,
+          "name": "Parse Chapter Summaries",
+          "source": "chapter_summaries.md",
+          "target": "chapters[]",
+          "mappings": [
+            { "source": "chapter", "target": "order", "transform": "direct" },
+            { "source": "title", "target": "title", "transform": "direct" },
+            { "source": "events", "target": "summary", "transform": "direct" }
+          ]
+        },
+        {
+          "step": 6,
+          "name": "Parse Emotional Arcs",
+          "source": "emotional_arcs.md",
+          "target": "characters[].arc",
+          "mappings": [
+            { "source": "trajectory", "target": "arcType", "transform": "mapTrajectoryToArcType" },
+            { "source": "emotionalState", "target": "currentPhase", "transform": "mapEmotionToPhase" },
+            { "source": "intensity", "target": "phaseProgress", "transform": "denormalizeFromIntensity" }
+          ]
+        }
+      ]
+    }
+  },
+
+  "data_mapping_tables": {
+    "genre_mapping": {
+      "muse_to_inkos": {
+        "玄幻": "xuanhuan",
+        "仙侠": "xianxia",
+        "都市": "urban",
+        "科幻": "sci-fi",
+        "奇幻": "fantasy",
+        "历史": "historical",
+        "悬疑": "mystery",
+        "恐怖": "horror",
+        "言情": "romance"
+      },
+      "inkos_to_muse": {
+        "xuanhuan": "玄幻",
+        "xianxia": "仙侠",
+        "cultivation": "仙侠",
+        "urban": "都市",
+        "sci-fi": "科幻",
+        "fantasy": "奇幻",
+        "historical": "历史",
+        "mystery": "悬疑",
+        "horror": "恐怖",
+        "romance": "言情",
+        "litrpg": "玄幻",
+        "progression": "玄幻"
+      }
+    },
+    "relation_type_mapping": {
+      "muse_to_inkos": {
+        "ENEMY_OF": "敌对",
+        "ALLY_OF": "盟友",
+        "LOVES": "爱慕",
+        "KIN_OF": "亲属",
+        "MENTORS": "师徒",
+        "RIVAL_OF": "竞争",
+        "SERVES": "效忠",
+        "FRIEND_OF": "朋友",
+        "RELATED_TO": "关联"
+      },
+      "inkos_to_muse": {
+        "敌对": "ENEMY_OF",
+        "敌": "ENEMY_OF",
+        "仇恨": "ENEMY_OF",
+        "盟友": "ALLY_OF",
+        "盟": "ALLY_OF",
+        "战友": "ALLY_OF",
+        "爱慕": "LOVES",
+        "恋人": "LOVES",
+        "爱": "LOVES",
+        "亲属": "KIN_OF",
+        "家人": "KIN_OF",
+        "血亲": "KIN_OF",
+        "师徒": "MENTORS",
+        "师父": "MENTORS",
+        "徒弟": "MENTORS",
+        "竞争": "RIVAL_OF",
+        "对手": "RIVAL_OF",
+        "效忠": "SERVES",
+        "下属": "SERVES",
+        "朋友": "FRIEND_OF",
+        "好友": "FRIEND_OF",
+        "关联": "RELATED_TO"
+      }
+    },
+    "beat_tag_to_hook_type": {
+      "INCITING_INCIDENT": "plot",
+      "PLOT_POINT_1": "plot",
+      "MIDPOINT": "plot",
+      "PLOT_POINT_2": "plot",
+      "CLIMAX": "plot",
+      "RESOLUTION": "plot",
+      "OTHER": "other"
+    },
+    "hook_type_to_beat_tag": {
+      "plot": "OTHER",
+      "character": "OTHER",
+      "world": "OTHER",
+      "mystery": "OTHER",
+      "item": "OTHER",
+      "other": "OTHER"
+    },
+    "arc_type_to_trajectory": {
+      "redemption": "rising",
+      "corruption": "falling",
+      "steadfast": "stable",
+      "awakening": "rising"
+    },
+    "trajectory_to_arc_type": {
+      "rising": "awakening",
+      "falling": "corruption",
+      "stable": "steadfast"
+    }
+  },
+
+  "validation_rules": {
+    "muse_project_state": {
+      "required_fields": ["id", "title", "characters", "worldSettings", "chapters"],
+      "field_types": {
+        "id": "string",
+        "title": "string",
+        "characters": "array",
+        "worldSettings": "array",
+        "chapters": "array"
+      },
+      "constraints": {
+        "characters[].id": "unique",
+        "chapters[].order": "unique",
+        "worldSettings[].id": "unique"
+      }
+    },
+    "inkos_truth_files": {
+      "required_files": [
+        "current_state.md",
+        "pending_hooks.md",
+        "chapter_summaries.md",
+        "subplot_board.md",
+        "emotional_arcs.md",
+        "character_matrix.md"
+      ],
+      "optional_files": [
+        "particle_ledger.md",
+        "story_bible.md",
+        "volume_outline.md",
+        "book_rules.md"
+      ],
+      "format_rules": {
+        "markdown_tables": "Must have header row and separator",
+        "yaml_frontmatter": "Optional but must be valid YAML if present",
+        "encoding": "UTF-8"
+      }
+    },
+    "conversion_integrity": {
+      "roundtrip_test": "Muse -> inkos -> Muse should preserve all data",
+      "checksum_validation": "Calculate checksums for critical fields",
+      "field_coverage": "All required fields must be mapped"
+    }
+  },
+
+  "error_handling": {
+    "missing_fields": {
+      "strategy": "use_default",
+      "defaults": {
+        "genre": "玄幻",
+        "currentLocation": "未设定",
+        "protagonistStatus": "正常",
+        "currentGoal": "未设定",
+        "status": "OPEN"
+      }
+    },
+    "invalid_format": {
+      "strategy": "throw_with_context",
+      "context_fields": ["fileName", "lineNumber", "fieldPath"]
+    },
+    "conversion_failure": {
+      "strategy": "partial_conversion",
+      "behavior": "Continue with valid data, collect errors, report at end"
+    }
+  },
+
+  "performance_optimization": {
+    "large_projects": {
+      "chapter_threshold": 100,
+      "strategies": [
+        "streaming_conversion",
+        "batch_processing",
+        "lazy_loading"
+      ]
+    },
+    "caching": {
+      "mapping_tables": "Cache in memory",
+      "parsed_markdown": "Cache with LRU eviction"
+    }
+  },
+
+  "testing_strategy": {
+    "unit_tests": [
+      "Field mapping functions",
+      "Type transformation functions",
+      "Markdown parser/generator",
+      "Format validators"
+    ],
+    "integration_tests": [
+      "Full Muse -> inkos conversion",
+      "Full inkos -> Muse conversion",
+      "Roundtrip conversion",
+      "Sync operations"
+    ],
+    "edge_cases": [
+      "Empty fields",
+      "Special characters in Markdown",
+      "Circular references",
+      "Missing optional fields"
+    ]
+  },
+
+  "implementation_plan": {
+    "phase_1": {
+      "name": "Core Conversion Layer",
+      "tasks": [
+        "Implement FormatValidator",
+        "Implement enhanced FieldMapper",
+        "Implement TypeTransformer",
+        "Add roundtrip tests"
+      ],
+      "estimated_effort": "3 days"
+    },
+    "phase_2": {
+      "name": "Markdown Processing",
+      "tasks": [
+        "Enhance MarkdownParser with error recovery",
+        "Implement MarkdownGenerator with formatting",
+        "Add validation for Markdown tables",
+        "Handle YAML frontmatter"
+      ],
+      "estimated_effort": "2 days"
+    },
+    "phase_3": {
+      "name": "Integration & Testing",
+      "tasks": [
+        "Integrate with HybridStorageAdapter",
+        "Add sync progress reporting",
+        "Implement conflict resolution",
+        "Add comprehensive test coverage"
+      ],
+      "estimated_effort": "2 days"
+    }
+  },
+
+  "file_references": {
+    "existing_files": [
+      "services/inkos/types/converters.ts",
+      "services/inkos/types/mapping.ts",
+      "services/inkos/storage/interface.ts",
+      "services/inkos/storage/hybridAdapter.ts",
+      "services/inkos/storage/indexeddbAdapter.ts",
+      "services/inkos/storage/fileAdapter.ts"
+    ],
+    "new_files": [
+      "services/inkos/conversion/formatValidator.ts",
+      "services/inkos/conversion/markdownParser.ts",
+      "services/inkos/conversion/markdownGenerator.ts",
+      "services/inkos/conversion/fieldMapper.ts",
+      "services/inkos/conversion/typeTransformer.ts",
+      "services/inkos/conversion/conflictResolver.ts",
+      "services/inkos/conversion/index.ts"
+    ]
+  }
+}

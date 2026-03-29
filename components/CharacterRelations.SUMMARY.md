@@ -3,27 +3,35 @@
 ## 创建的文件
 
 ### 1. 核心组件
+
 **文件**: `components/CharacterRelations.tsx`
+
 - 主要的角色关系可视化组件
 - 240+ 行代码，完整的功能实现
 - TypeScript 类型安全
 - Tailwind CSS 样式
 
 ### 2. 使用文档
+
 **文件**: `components/CharacterRelations.README.md`
+
 - 完整的组件使用文档
 - Props 说明和示例
 - 数据格式示例
 - 集成指南
 
 ### 3. 集成示例
+
 **文件**: `components/CharacterRelations.integration.example.tsx`
+
 - 4 个实际使用场景示例
 - 与 Zustand Store 集成示例
 - 与现有 CharacterCreator 集成建议
 
 ### 4. 测试数据
+
 **文件**: `components/CharacterRelations.test.tsx`
+
 - 8 种测试场景覆盖
 - 完整的测试角色数据
 - 边界情况测试用例
@@ -31,6 +39,7 @@
 ## 功能特性
 
 ### 核心功能
+
 - ✅ 双格式支持（新格式优先，旧格式兼容）
 - ✅ 9 种关系类型的颜色编码
 - ✅ 关系类型图标标识
@@ -42,12 +51,14 @@
 - ✅ 分组展示关系
 
 ### 视觉设计
+
 - ✅ 暗色主题适配
 - ✅ 响应式布局（支持不同屏幕尺寸）
 - ✅ 动画过渡效果
 - ✅ 可访问性支持（title 属性）
 
 ### 技术实现
+
 - ✅ TypeScript 类型安全
 - ✅ React Hooks (useMemo 优化性能)
 - ✅ 组件复用（RelationCard 子组件）
@@ -56,21 +67,22 @@
 
 ## 关系类型配色方案
 
-| 关系类型 | 中文名 | 颜色 | 图标 |
-|---------|--------|------|------|
-| ENEMY_OF | 敌对 | 红色 | Swords ⚔️ |
-| ALLY_OF | 盟友 | 绿色 | Handshake 🤝 |
-| LOVES | 爱慕 | 粉色 | Heart ❤️ |
-| KIN_OF | 亲属 | 蓝色 | Users 👥 |
-| MENTORS | 师徒 | 紫色 | Sparkles ✨ |
-| RIVAL_OF | 竞争 | 橙色 | Target 🎯 |
-| SERVES | 效忠 | 灰色 | Crown 👑 |
-| FRIEND_OF | 朋友 | 青色 | UserCircle 👤 |
-| RELATED_TO | 关联 | 默认 | Link 🔗 |
+| 关系类型   | 中文名 | 颜色 | 图标          |
+| ---------- | ------ | ---- | ------------- |
+| ENEMY_OF   | 敌对   | 红色 | Swords ⚔️     |
+| ALLY_OF    | 盟友   | 绿色 | Handshake 🤝  |
+| LOVES      | 爱慕   | 粉色 | Heart ❤️      |
+| KIN_OF     | 亲属   | 蓝色 | Users 👥      |
+| MENTORS    | 师徒   | 紫色 | Sparkles ✨   |
+| RIVAL_OF   | 竞争   | 橙色 | Target 🎯     |
+| SERVES     | 效忠   | 灰色 | Crown 👑      |
+| FRIEND_OF  | 朋友   | 青色 | UserCircle 👤 |
+| RELATED_TO | 关联   | 默认 | Link 🔗       |
 
 ## 使用的工具函数
 
 从 `utils/characterRelations.ts` 导入：
+
 - `parseLegacyRelationships(str)` - 解析旧格式字符串
 - `getRelationType(rel)` - 获取关系类型（带默认值）
 - `getTargetName(rel)` - 获取目标名称（统一处理）
@@ -92,10 +104,7 @@
 import { CharacterRelations } from './components/CharacterRelations';
 
 // 在角色详情中使用
-<CharacterRelations
-  character={currentCharacter}
-  allCharacters={project.characters}
-/>
+<CharacterRelations character={currentCharacter} allCharacters={project.characters} />;
 ```
 
 ### 2. 带导航功能
@@ -127,6 +136,7 @@ import { CharacterRelations } from './components/CharacterRelations';
 ## 测试覆盖
 
 ### 测试场景
+
 1. ✅ 新格式结构化关系
 2. ✅ 旧格式字符串关系
 3. ✅ 混合格式（优先新格式）
@@ -137,6 +147,7 @@ import { CharacterRelations } from './components/CharacterRelations';
 8. ✅ 最小数据（只有必需字段）
 
 ### 边界情况处理
+
 - ✅ 目标角色不存在时优雅降级
 - ✅ 关系类型未指定时使用默认值
 - ✅ 旧格式字符串解析失败时返回空数组
@@ -229,6 +240,7 @@ import { CharacterRelations } from './components/CharacterRelations';
 CharacterRelations 组件是一个功能完整、类型安全、易于集成的角色关系可视化解决方案。它支持新旧两种数据格式，提供了丰富的视觉反馈和交互功能，并且已经准备好集成到现有项目中。
 
 组件设计遵循了以下原则：
+
 - 🎯 **单一职责**: 只负责关系展示
 - 🔌 **易于集成**: 提供清晰的 API
 - 🎨 **视觉一致性**: 符合项目设计风格

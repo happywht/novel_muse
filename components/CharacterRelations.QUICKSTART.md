@@ -17,10 +17,7 @@ function CharacterDetail({ character, allCharacters }) {
       <h2>{character.name}</h2>
 
       {/* 添加关系展示 */}
-      <CharacterRelations
-        character={character}
-        allCharacters={allCharacters}
-      />
+      <CharacterRelations character={character} allCharacters={allCharacters} />
     </div>
   );
 }
@@ -63,7 +60,7 @@ function CharacterProfile() {
   const { project } = useProjectStore();
   const [activeCharId, setActiveCharId] = React.useState(null);
 
-  const activeChar = project.characters.find(c => c.id === activeCharId);
+  const activeChar = project.characters.find((c) => c.id === activeCharId);
 
   if (!activeChar) {
     return <div>请选择一个角色</div>;
@@ -92,7 +89,7 @@ function CharacterProfile() {
 import {
   characterWithStructuredRelations,
   characterWithLegacyRelations,
-  allTestCharacters
+  allTestCharacters,
 } from './components/CharacterRelations.test';
 
 function TestComponent() {
@@ -123,15 +120,19 @@ function TestComponent() {
 ## 常见问题
 
 ### Q: 组件如何处理旧格式数据？
+
 A: 组件会自动检测并解析旧格式字符串，无需手动转换。
 
 ### Q: 如果目标角色不存在会怎样？
+
 A: 组件会显示警告提示，但不会报错，关系仍然会展示。
 
 ### Q: 可以自定义颜色吗？
+
 A: 可以，编辑组件中的 `RELATION_COLORS` 对象。
 
 ### Q: 支持哪些关系类型？
+
 A: 支持 9 种预定义类型：敌对、盟友、爱慕、亲属、师徒、竞争、效忠、朋友、关联。
 
 ## 下一步
@@ -144,6 +145,7 @@ A: 支持 9 种预定义类型：敌对、盟友、爱慕、亲属、师徒、�
 ## 支持
 
 如有问题，请检查：
+
 1. TypeScript 类型是否正确
 2. 所有必需的 props 是否提供
 3. allCharacters 数组是否包含所有相关角色

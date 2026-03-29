@@ -7,8 +7,9 @@
 ## 创建的文件
 
 ### 1. 核心组件
+
 - **文件**: `components/PromptPanel/PromptPreviewDrawer.tsx` (16KB)
-- **功能**: 
+- **功能**:
   - 抽屉式组件，从右侧滑入
   - 展示 7 个上下文模块
   - 支持折叠/展开每个模块
@@ -18,6 +19,7 @@
   - 平滑动画
 
 ### 2. 服务层
+
 - **文件**: `services/promptAssembly.ts` (11KB)
 - **功能**:
   - `assembleContext()` - 组装完整的 Prompt 上下文
@@ -26,6 +28,7 @@
   - Token 估算工具（中文 1.5 字/token，英文 4 字符/token）
 
 ### 3. 类型定义
+
 - **文件**: `types/advancedMode.ts` (更新，9.6KB)
 - **新增类型**:
   - `ContextSection` - 上下文模块定义
@@ -36,12 +39,14 @@
   - `TokenStats` - Token 统计信息
 
 ### 4. 导出配置
+
 - **文件**: `components/PromptPanel/index.ts` (更新)
 - **新增导出**:
   - `PromptPreviewDrawer` 组件
   - `PromptPreviewDrawerProps` 类型
 
 ### 5. 文档
+
 - **文件**: `docs/PromptPreviewDrawer-usage.md` (6.7KB)
 - **内容**:
   - 组件概述
@@ -82,6 +87,7 @@ PromptPreviewDrawer
 ## 技术实现
 
 ### 1. 状态管理
+
 ```typescript
 const [context, setContext] = useState<PromptAssemblyContext | null>(null);
 const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['instruction']));
@@ -90,29 +96,31 @@ const [copied, setCopied] = useState(false);
 ```
 
 ### 2. 上下文组装
+
 ```typescript
 useEffect(() => {
-    if (isOpen) {
-        setIsLoading(true);
-        const assembled = PromptAssemblyService.assembleContext(
-            promptKey,
-            creativeSettings,
-            projectContext,
-            moduleId
-        );
-        setContext(assembled);
-        setIsLoading(false);
-    }
+  if (isOpen) {
+    setIsLoading(true);
+    const assembled = PromptAssemblyService.assembleContext(
+      promptKey,
+      creativeSettings,
+      projectContext,
+      moduleId
+    );
+    setContext(assembled);
+    setIsLoading(false);
+  }
 }, [isOpen, promptKey, creativeSettings, projectContext, moduleId]);
 ```
 
 ### 3. Token 估算
+
 ```typescript
 const estimateTokens = (text: string): number => {
-    if (!text) return 0;
-    const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
-    const englishChars = text.length - chineseChars;
-    return Math.ceil(chineseChars / 1.5 + englishChars / 4);
+  if (!text) return 0;
+  const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+  const englishChars = text.length - chineseChars;
+  return Math.ceil(chineseChars / 1.5 + englishChars / 4);
 };
 ```
 

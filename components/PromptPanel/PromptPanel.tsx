@@ -1,5 +1,15 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { Settings2, X, Save, RotateCcw, ChevronDown, ChevronUp, Sparkles, AlertTriangle, Filter } from 'lucide-react';
+import {
+  Settings2,
+  X,
+  Save,
+  RotateCcw,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  AlertTriangle,
+  Filter,
+} from 'lucide-react';
 import { PromptBadge } from './PromptBadge';
 import { PromptEditor, PromptItem } from './PromptEditor';
 import { EffectBadge, EffectLevel, getEffectLevel } from './EffectBadge';
@@ -13,12 +23,12 @@ export type PromptPanelMode = 'compact' | 'collapsed' | 'expanded';
  * 模块类型定义
  */
 export type ModuleType =
-  | 'world'        // 世界观
-  | 'character'    // 角色创建
-  | 'plot'         // 情节编织
-  | 'drafting'     // 写作工坊
-  | 'echo'         // Echo 审查
-  | 'global';      // 全局设置
+  | 'world' // 世界观
+  | 'character' // 角色创建
+  | 'plot' // 情节编织
+  | 'drafting' // 写作工坊
+  | 'echo' // Echo 审查
+  | 'global'; // 全局设置
 
 /**
  * PromptPanel 属性
@@ -58,7 +68,14 @@ export interface PromptPanelProps {
 export const MODULE_PROMPT_MAP: Record<ModuleType, string[]> = {
   world: ['world_gen', 'world_echo_extraction'],
   character: ['character_gen'],
-  plot: ['plot_analysis', 'plot_weaving', 'plot_node_gen', 'plot_fission', 'plot_rewrite', 'audit_plot'],
+  plot: [
+    'plot_analysis',
+    'plot_weaving',
+    'plot_node_gen',
+    'plot_fission',
+    'plot_rewrite',
+    'audit_plot',
+  ],
   drafting: ['scene_expansion', 'scene_generation', 'polish_engine'],
   echo: ['world_echo_extraction', 'audit_plot'],
   global: ['writing_base'],
@@ -121,10 +138,7 @@ export const PromptPanel: React.FC<PromptPanelProps> = ({
 
       // 层级过滤
       if (filterLevel !== 'ALL') {
-        const level = getEffectLevel(
-          !!moduleOverrides[p.key],
-          !!projectOverrides[p.key]
-        );
+        const level = getEffectLevel(!!moduleOverrides[p.key], !!projectOverrides[p.key]);
         if (level !== filterLevel) return false;
       }
 
@@ -201,9 +215,7 @@ export const PromptPanel: React.FC<PromptPanelProps> = ({
             </div>
             <div>
               <h2 className="text-lg font-bold text-white">{title}</h2>
-              {subtitle && (
-                <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
-              )}
+              {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
             </div>
           </div>
           {onClose && (
@@ -252,7 +264,13 @@ export const PromptPanel: React.FC<PromptPanelProps> = ({
                   : 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:border-slate-500'
               }`}
             >
-              {level === 'ALL' ? '全部' : level === 'DEFAULT' ? '默认' : level === 'PROJECT' ? '项目自定义' : '模块专属'}
+              {level === 'ALL'
+                ? '全部'
+                : level === 'DEFAULT'
+                  ? '默认'
+                  : level === 'PROJECT'
+                    ? '项目自定义'
+                    : '模块专属'}
             </button>
           ))}
         </div>
@@ -261,9 +279,7 @@ export const PromptPanel: React.FC<PromptPanelProps> = ({
       {/* Prompt 列表 */}
       <div className="flex-1 overflow-y-auto p-5 space-y-3 custom-scrollbar">
         {promptsWithOverrides.length === 0 ? (
-          <div className="text-center py-8 text-slate-500 text-sm">
-            没有找到匹配的提示词
-          </div>
+          <div className="text-center py-8 text-slate-500 text-sm">没有找到匹配的提示词</div>
         ) : (
           promptsWithOverrides.map((item) => (
             <PromptEditor
