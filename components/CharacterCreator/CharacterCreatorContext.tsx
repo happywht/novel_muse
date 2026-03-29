@@ -1,7 +1,18 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from 'react';
 import { ProjectState, Character, Echo } from '../../types';
-import { generateText, generateCharacterImage, chatWithPersona } from '../../services/geminiService';
-import { generateSingleCharacter } from '../../services/gemini/world';
+import {
+  generateText,
+  generateCharacterImage,
+  chatWithPersona,
+  generateSingleCharacter,
+} from '../../services/geminiService';
 import { useProjectStore } from '../../store/useProjectStore';
 import { isStructuredFormat, parseLegacyRelationships } from '../../utils/characterRelations';
 import { RELATION_TYPE_LABELS } from '../../types';
@@ -58,7 +69,9 @@ interface CharacterCreatorState {
   chatInput: string;
   setChatInput: (value: string) => void;
   chatHistory: { role: 'user' | 'model'; content: string }[];
-  setChatHistory: React.Dispatch<React.SetStateAction<{ role: 'user' | 'model'; content: string }[]>>;
+  setChatHistory: React.Dispatch<
+    React.SetStateAction<{ role: 'user' | 'model'; content: string }[]>
+  >;
 
   // 草稿
   draftCharacter: Character | null;
@@ -127,7 +140,13 @@ export function CharacterCreatorProvider({
 }: CharacterCreatorProviderProps) {
   const { confirm } = useConfirm();
   const { toast } = useToast();
-  const { graphQuery, fetchCharacterTraits, fetchCharacterEvolution, fetchCharacterForeshadowing, useBackend } = useProjectStore();
+  const {
+    graphQuery,
+    fetchCharacterTraits,
+    fetchCharacterEvolution,
+    fetchCharacterForeshadowing,
+    useBackend,
+  } = useProjectStore();
 
   // 基本状态
   const [activeCharId, setActiveCharId] = useState<string | null>(null);
@@ -187,7 +206,13 @@ export function CharacterCreatorProvider({
       fetchCharacterEvolution(activeCharId);
       fetchCharacterForeshadowing(activeCharId);
     }
-  }, [activeCharId, useBackend, fetchCharacterTraits, fetchCharacterEvolution, fetchCharacterForeshadowing]);
+  }, [
+    activeCharId,
+    useBackend,
+    fetchCharacterTraits,
+    fetchCharacterEvolution,
+    fetchCharacterForeshadowing,
+  ]);
 
   // 生成角色 - 使用深度生成函数获取完整字段
   const handleGenerateChar = useCallback(async () => {
@@ -196,9 +221,8 @@ export function CharacterCreatorProvider({
       // 调用新的深度生成函数
       const charData = await generateSingleCharacter(
         nameInput || '新角色',
-        roleInput,
-        project.premise,
         project.genre,
+        roleInput,
         project.creativeSettings
       );
 
@@ -249,7 +273,11 @@ ${iterationFeedback}
 
 请结合反馈重写该角色的描述。`;
 
-      const newDescription = await generateText(prompt, 'iteration_refinement', project.creativeSettings);
+      const newDescription = await generateText(
+        prompt,
+        'iteration_refinement',
+        project.creativeSettings
+      );
       setDraftCharacter({ ...draftCharacter, description: newDescription });
       setIterationFeedback('');
       toast.success('角色已根据反馈重塑');
@@ -314,22 +342,37 @@ ${iterationFeedback}
   const handleSaveEdit = useCallback(() => {
     if (!activeChar) return;
     const updatedChars = project.characters.map((c) =>
-      c.id === activeChar.id ? {
-        ...c,
-        description: editDescription,
-        // 深度字段
-        desire: editDesire,
-        fear: editFear,
-        signature: editSignature,
-        contrast: editContrast,
-        weakness: editWeakness,
-      } : c
+      c.id === activeChar.id
+        ? {
+            ...c,
+            description: editDescription,
+            // 深度字段
+            desire: editDesire,
+            fear: editFear,
+            signature: editSignature,
+            contrast: editContrast,
+            weakness: editWeakness,
+          }
+        : c
     );
     updateProject({ characters: updatedChars });
     setIsEditing(false);
     toast.success('档案更新已保存');
-  }, [activeChar, editDescription, editDesire, editFear, editFear, editSignature, editSignature, editContrast, editContrast, editWeakness, project.characters, updateProject, toast]
-);
+  }, [
+    activeChar,
+    editDescription,
+    editDesire,
+    editFear,
+    editFear,
+    editSignature,
+    editSignature,
+    editContrast,
+    editContrast,
+    editWeakness,
+    project.characters,
+    updateProject,
+    toast,
+  ]);
 
   // 删除角色
   const deleteChar = useCallback(
@@ -369,7 +412,12 @@ ${iterationFeedback}
     setIsChatting(true);
 
     try {
-      const response = await chatWithPersona(activeChar, chatInput, chatHistory);
+      // 转换 chatHistory 格式：'model' -> 'assistant'
+      const formattedHistory = chatHistory.map(m => ({
+        role: (m.role === 'model' ? 'assistant' : m.role) as 'user' | 'assistant',
+        content: m.content
+      }));
+      const response = await chatWithPersona(activeChar, chatInput, formattedHistory);
       setChatHistory([...newHistory, { role: 'model' as const, content: response }]);
     } catch (e) {
       setChatHistory([...newHistory, { role: 'model' as const, content: '(对话连接中断...)' }]);

@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from 'react';
 import { ProjectState, WorldSetting, WorldGenConfig, Echo } from '../../types';
 import { generateText, expandWorldLore } from '../../services/geminiService';
 import { useDebouncedValue } from '../../hooks/useDebouncedConfig';
@@ -96,7 +103,18 @@ const WorldBuilderContext = createContext<WorldBuilderContextValue | null>(null)
 
 export function SparklesIcon(props: any) {
   return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
     </svg>
   );
@@ -158,7 +176,7 @@ export const WorldBuilderProvider: React.FC<WorldBuilderProviderProps> = ({
   const [toast, setToast] = useState<ToastState | null>(null);
 
   // 派生数据
-  const activeItem = project.worldSettings.find(w => w.id === activeItemId);
+  const activeItem = project.worldSettings.find((w) => w.id === activeItemId);
   const genConfig = project.worldGenConfig || { detailLevel: 'Standard', focus: 'Balanced' };
 
   // 同步编辑内容
@@ -176,19 +194,22 @@ export const WorldBuilderProvider: React.FC<WorldBuilderProviderProps> = ({
   }, []);
 
   // 更新配置
-  const updateConfig = useCallback((key: keyof WorldGenConfig, value: string) => {
-    updateProject({
-      worldGenConfig: {
-        ...genConfig,
-        [key]: value
-      }
-    });
-  }, [genConfig, updateProject]);
+  const updateConfig = useCallback(
+    (key: keyof WorldGenConfig, value: string) => {
+      updateProject({
+        worldGenConfig: {
+          ...genConfig,
+          [key]: value,
+        },
+      });
+    },
+    [genConfig, updateProject]
+  );
 
   // 生成设定
   const handleGenerateLore = useCallback(async () => {
     if (!project.premise) {
-      showToast("请先在「基础设定」页面完善小说核心梗概。", 'error');
+      showToast('请先在「基础设定」页面完善小说核心梗概。', 'error');
       return;
     }
 
@@ -196,9 +217,10 @@ export const WorldBuilderProvider: React.FC<WorldBuilderProviderProps> = ({
     setIsGenerating(true);
 
     try {
-      const configInstruction = generationConfig === 'Creative'
-        ? "注重独特性和奇观感，可以包含一些尚未被人类解释的自然现象或超自然规则。"
-        : "注重逻辑严密性和细节，描述其在世界观中的功能和角色。";
+      const configInstruction =
+        generationConfig === 'Creative'
+          ? '注重独特性和奇观感，可以包含一些尚未被人类解释的自然现象或超自然规则。'
+          : '注重逻辑严密性和细节，描述其在世界观中的功能和角色。';
 
       const prompt = `基于小说梗概: "${project.premise}" 和类型: "${project.genre}".
 请为一个小说创建一个详细的世界观设定条目，类别为: ${selectedCategory}.
@@ -215,17 +237,25 @@ ${configInstruction}
         id: `world-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         title: newItemTitle || `未命名的 ${selectedCategory}`,
         category: selectedCategory,
-        content: content
+        content: content,
       };
 
       setDraftLore(newItem);
     } catch (e) {
       console.error(e);
-      showToast("生成失败，请重试。", 'error');
+      showToast('生成失败，请重试。', 'error');
     } finally {
       setIsGenerating(false);
     }
-  }, [project.premise, project.genre, project.creativeSettings, genConfig.focus, selectedCategory, newItemTitle, showToast]);
+  }, [
+    project.premise,
+    project.genre,
+    project.creativeSettings,
+    genConfig.focus,
+    selectedCategory,
+    newItemTitle,
+    showToast,
+  ]);
 
   // 迭代优化
   const handleIterateLore = useCallback(async () => {
@@ -241,12 +271,16 @@ ${iterationFeedback}
 
 请结合反馈重写该设定条目的内容。`;
 
-      const newContent = await generateText(prompt, 'iteration_refinement', project.creativeSettings);
+      const newContent = await generateText(
+        prompt,
+        'iteration_refinement',
+        project.creativeSettings
+      );
       setDraftLore({ ...draftLore, content: newContent });
       setIterationFeedback('');
     } catch (e) {
       console.error(e);
-      showToast("迭代失败，请重试。", 'error');
+      showToast('迭代失败，请重试。', 'error');
     } finally {
       setIsIterating(false);
     }
@@ -256,7 +290,7 @@ ${iterationFeedback}
   const handleAcceptLore = useCallback(() => {
     if (!draftLore) return;
     updateProject({
-      worldSettings: [...project.worldSettings, draftLore]
+      worldSettings: [...project.worldSettings, draftLore],
     });
     setActiveItemId(draftLore.id);
     const titleToClear = draftLore.title;
@@ -270,11 +304,16 @@ ${iterationFeedback}
     if (!activeItem) return;
     setIsExpanding(true);
     try {
-      const addedContent = await expandWorldLore(activeItem.title, activeItem.content, project.genre, project.creativeSettings);
+      const addedContent = await expandWorldLore(
+        activeItem.title,
+        project.genre,
+        project.worldSettings || [],
+        project.creativeSettings
+      );
 
       const updatedContent = `${activeItem.content}\n\n---\n\n### 📜 历史渊源与文化影响\n\n${addedContent}`;
 
-      const updatedSettings = project.worldSettings.map(s =>
+      const updatedSettings = project.worldSettings.map((s) =>
         s.id === activeItem.id ? { ...s, content: updatedContent } : s
       );
 
@@ -282,54 +321,74 @@ ${iterationFeedback}
       setEditContent(updatedContent);
     } catch (e) {
       console.error(e);
-      showToast("扩展内容失败，请重试。", 'error');
+      showToast('扩展内容失败，请重试。', 'error');
     } finally {
       setIsExpanding(false);
     }
-  }, [activeItem, project.genre, project.worldSettings, project.creativeSettings, updateProject, showToast]);
+  }, [
+    activeItem,
+    project.genre,
+    project.worldSettings,
+    project.creativeSettings,
+    updateProject,
+    showToast,
+  ]);
 
   // 保存编辑
   const handleSaveEdit = useCallback(() => {
     if (!activeItem) return;
-    const updatedSettings = project.worldSettings.map(s =>
+    const updatedSettings = project.worldSettings.map((s) =>
       s.id === activeItem.id ? { ...s, content: editContent } : s
     );
     updateProject({ worldSettings: updatedSettings });
     setIsEditing(false);
-    showToast("设定已保存", 'success');
+    showToast('设定已保存', 'success');
   }, [activeItem, editContent, project.worldSettings, updateProject, showToast]);
 
   // 删除设定
-  const deleteLore = useCallback((id: string) => {
-    updateProject({
-      worldSettings: project.worldSettings.filter(w => w.id !== id)
-    });
-    if (activeItemId === id) setActiveItemId(null);
-    showToast("设定已删除", 'success');
-  }, [activeItemId, project.worldSettings, updateProject, showToast]);
+  const deleteLore = useCallback(
+    (id: string) => {
+      updateProject({
+        worldSettings: project.worldSettings.filter((w) => w.id !== id),
+      });
+      if (activeItemId === id) setActiveItemId(null);
+      showToast('设定已删除', 'success');
+    },
+    [activeItemId, project.worldSettings, updateProject, showToast]
+  );
 
   // 接受回响
-  const handleAcceptEcho = useCallback((echo: Echo) => {
-    if (!activeItem) return;
-    const updatedSettings = project.worldSettings.map(w => {
-      if (w.id === echo.targetId) {
-        const time = new Date(echo.timestamp).toLocaleDateString();
-        const newContent = `${w.content}\n\n> [命运回响 ${time}] ${echo.description}`;
-        return { ...w, content: newContent };
-      }
-      return w;
-    });
-    const updatedEchoes = (project.echoes || []).map(e => e.id === echo.id ? { ...e, status: 'ACCEPTED' as const } : e);
-    updateProject({ worldSettings: updatedSettings, echoes: updatedEchoes });
-    showToast("回响已铭刻！", 'success');
-  }, [activeItem, project.worldSettings, project.echoes, updateProject, showToast]);
+  const handleAcceptEcho = useCallback(
+    (echo: Echo) => {
+      if (!activeItem) return;
+      const updatedSettings = project.worldSettings.map((w) => {
+        if (w.id === echo.targetId) {
+          const time = new Date(echo.timestamp).toLocaleDateString();
+          const newContent = `${w.content}\n\n> [命运回响 ${time}] ${echo.description}`;
+          return { ...w, content: newContent };
+        }
+        return w;
+      });
+      const updatedEchoes = (project.echoes || []).map((e) =>
+        e.id === echo.id ? { ...e, status: 'ACCEPTED' as const } : e
+      );
+      updateProject({ worldSettings: updatedSettings, echoes: updatedEchoes });
+      showToast('回响已铭刻！', 'success');
+    },
+    [activeItem, project.worldSettings, project.echoes, updateProject, showToast]
+  );
 
   // 拒绝回响
-  const handleRejectEcho = useCallback((echo: Echo) => {
-    const updatedEchoes = (project.echoes || []).map(e => e.id === echo.id ? { ...e, status: 'REJECTED' as const } : e);
-    updateProject({ echoes: updatedEchoes });
-    showToast("回响已忽略。", 'success');
-  }, [project.echoes, updateProject, showToast]);
+  const handleRejectEcho = useCallback(
+    (echo: Echo) => {
+      const updatedEchoes = (project.echoes || []).map((e) =>
+        e.id === echo.id ? { ...e, status: 'REJECTED' as const } : e
+      );
+      updateProject({ echoes: updatedEchoes });
+      showToast('回响已忽略。', 'success');
+    },
+    [project.echoes, updateProject, showToast]
+  );
 
   // 手动添加
   const handleManualAdd = useCallback(() => {
@@ -337,7 +396,7 @@ ${iterationFeedback}
       id: `world-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
       title: newItemTitle || `未命名的 ${selectedCategory}`,
       category: selectedCategory,
-      content: ''
+      content: '',
     };
     setDraftLore(newItem);
     setIsEditing(true);
@@ -346,13 +405,16 @@ ${iterationFeedback}
   }, [newItemTitle, selectedCategory]);
 
   // 过滤设置
-  const filteredSettings = project.worldSettings.filter(w =>
-    w.category === selectedCategory &&
-    w.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+  const filteredSettings = project.worldSettings.filter(
+    (w) =>
+      w.category === selectedCategory &&
+      w.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
   );
 
   // 活跃条目的回响
-  const activeItemEchoes = (project.echoes || []).filter(e => e.targetId === activeItemId && e.status === 'PENDING');
+  const activeItemEchoes = (project.echoes || []).filter(
+    (e) => e.targetId === activeItemId && e.status === 'PENDING'
+  );
 
   const value: WorldBuilderContextValue = {
     project,
@@ -398,11 +460,7 @@ ${iterationFeedback}
     activeItemEchoes,
   };
 
-  return (
-    <WorldBuilderContext.Provider value={value}>
-      {children}
-    </WorldBuilderContext.Provider>
-  );
+  return <WorldBuilderContext.Provider value={value}>{children}</WorldBuilderContext.Provider>;
 };
 
 // ============================================================
