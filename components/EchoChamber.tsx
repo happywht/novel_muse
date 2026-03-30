@@ -9,7 +9,6 @@ import {
 } from '../services/apiService';
 import { EchoDeepReview } from './Echo/EchoDeepReview';
 import { EchoIntegrityReport } from './Echo/EchoIntegrityReport';
-import { PromptPanel } from './PromptPanel';
 import { useProjectStore } from '../store/useProjectStore';
 import { useToast } from '../hooks/useToast';
 import { useAdvancedMode } from '../hooks/useAdvancedMode';
@@ -421,10 +420,6 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                 onConsolidateMemory={handleConsolidateMemory}
             />
 
-            {/* Right Sidebar: Prompt Panel */}
-            <div className="w-72 flex-shrink-0">
-                <PromptPanel moduleId={AppSection.ECHOES} />
-            </div>
 
             {/* Deep Review Panel - Advanced Mode Only */}
             {isAdvanced && (

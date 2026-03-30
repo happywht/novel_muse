@@ -4,9 +4,8 @@ import {
     Loader2, Users, Plus, Eye, MapPin, Gauge, FileText,
     PenTool, Trash2, AlertTriangle, Network, Sliders
 } from 'lucide-react';
-import { ProjectState, Character, WorldSetting, Draft, KnowledgeTriple, NarrativeInsight, AppSection } from '../../types';
+import { ProjectState, Character, WorldSetting, Draft, KnowledgeTriple, NarrativeInsight } from '../../types';
 import { ContinuityBanner } from '../panels/ContinuityBanner';
-import { PromptPanel } from '../PromptPanel';
 
 interface ForgeSidebarProps {
     project: ProjectState;
@@ -506,12 +505,6 @@ export const ForgeSidebar: React.FC<ForgeSidebarProps> = ({
                         </div>
                     )}
 
-                    {/* Prompt Tab */}
-                    {activeTab === 'prompt' && (
-                        <div className="animate-fade-in">
-                            <PromptPanel moduleId={AppSection.DRAFTING} defaultCollapsed={false} />
-                        </div>
-                    )}
                 </div>
             </div>
 

@@ -4,9 +4,54 @@
  * 支持模板视图和完整视图切换
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { X, Send, Edit3, RotateCcw, Copy, ChevronDown, ChevronUp, Eye, FileText, Maximize2 } from 'lucide-react';
 import { AICallContext, confirmAICall, cancelAICall, AI_CONFIRMATION_EVENT } from '../../services/aiCallInterceptor';
+
+/** 区块分类类型 */
+type SectionTier = 'task' | 'context' | 'style' | 'constraint' | 'format' | 'other';
+
+/** 分类规则配置 */
+interface CategoryRule {
+  keywords: string[];
+  icon: string;
+  color: { bg: string; border: string; text: string; badge: string };
+}
+
+/** 分类规则定义 */
+const CATEGORY_RULES: Record<SectionTier, CategoryRule> = {
+  task: {
+    keywords: ['任务', '要求', '指令', '目标', '梗概', '必填', '核心', '情节', '生成', '输出'],
+    icon: '🎯',
+    color: { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400', badge: '🔴' }
+  },
+  context: {
+    keywords: ['角色', '人物', '设定', '场景', '状态', '脉络', '逻辑', '记忆', '世界观', '图谱',
+               'L1', 'L2', 'L3', '伏笔', '档案', '摘要', '背景', '前文', '变更', '动态', '实体'],
+    icon: '👤',
+    color: { bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-400', badge: '🟡' }
+  },
+  style: {
+    keywords: ['文风', '风格', '基调', '笔迹', '技法', '题材', '类型', '规范', '指纹'],
+    icon: '🎨',
+    color: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-400', badge: '🟣' }
+  },
+  constraint: {
+    keywords: ['禁令', '禁忌', '约束', '限制', '铁律', '规则', '不要', '禁止', '必须', '不可'],
+    icon: '🚫',
+    color: { bg: 'bg-orange-500/10', border: 'border-orange-500/30', text: 'text-orange-400', badge: '🟠' }
+  },
+  format: {
+    keywords: ['输出格式', '格式要求', 'JSON', '结构化', 'Schema', '格式'],
+    icon: '📋',
+    color: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-400', badge: '🔵' }
+  },
+  other: {
+    keywords: [],
+    icon: '📄',
+    color: { bg: 'bg-slate-500/10', border: 'border-slate-500/30', text: 'text-slate-400', badge: '⚪' }
+  }
+};
 
 /** 解析出的区块结构 */
 interface ParsedSection {
@@ -14,7 +59,7 @@ interface ParsedSection {
   title: string;
   content: string;
   icon: string;
-  tier: 'critical' | 'important' | 'optional';
+  tier: SectionTier;
   tokenCount: number;
   isExpanded: boolean;
 }
@@ -26,7 +71,7 @@ interface VariableCard {
   value: string;
   preview: string;
   tokenCount: number;
-  tier: 'critical' | 'important' | 'optional';
+  tier: SectionTier;
   source: string;
 }
 
@@ -41,10 +86,15 @@ export const PromptConfirmDialog: React.FC = () => {
 
   // 新增：视图模式
   const [viewMode, setViewMode] = useState<'template' | 'full'>('template');
+  // 新增：当前激活的分类标签
+  const [activeTier, setActiveTier] = useState<SectionTier | 'all'>('all');
   // 新增：展开的区块
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['critical']));
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['task']));
   // 新增：选中的变量详情
   const [selectedVariable, setSelectedVariable] = useState<VariableCard | null>(null);
+
+  // Token估算函数（必须在 useMemo 之前定义）
+  const estimateTokens = (text: string) => Math.ceil(text.length / 2);
 
   // 监听确认事件
   useEffect(() => {
@@ -56,7 +106,7 @@ export const PromptConfirmDialog: React.FC = () => {
       setIsOpen(true);
       setIsEditing(false);
       setViewMode('template'); // 默认模板视图
-      setExpandedSections(new Set(['critical'])); // 默认展开核心区块
+      setExpandedSections(new Set(['task'])); // 默认展开核心区块
     };
 
     window.addEventListener(AI_CONFIRMATION_EVENT, handleConfirmRequired as EventListener);
@@ -74,26 +124,49 @@ export const PromptConfirmDialog: React.FC = () => {
     let currentContent: string[] = [];
     let sectionIndex = 0;
 
-    // 定义区块重要性
-    const criticalKeywords = ['情节目标', '核心', '必填', '任务'];
-    const importantKeywords = ['角色', '上下文', '设定', '场景', '状态', '脉络', '逻辑'];
-
-    const getTier = (title: string): 'critical' | 'important' | 'optional' => {
-      if (criticalKeywords.some(k => title.includes(k))) return 'critical';
-      if (importantKeywords.some(k => title.includes(k))) return 'important';
-      return 'optional';
+    // 智能分类函数
+    const getTier = (title: string): SectionTier => {
+      const checkTitle = title.toLowerCase();
+      // 按优先级检查：任务 > 约束 > 格式 > 风格 > 上下文
+      for (const keyword of CATEGORY_RULES.task.keywords) {
+        if (checkTitle.includes(keyword)) return 'task';
+      }
+      for (const keyword of CATEGORY_RULES.constraint.keywords) {
+        if (checkTitle.includes(keyword)) return 'constraint';
+      }
+      for (const keyword of CATEGORY_RULES.format.keywords) {
+        if (checkTitle.includes(keyword)) return 'format';
+      }
+      for (const keyword of CATEGORY_RULES.style.keywords) {
+        if (checkTitle.includes(keyword)) return 'style';
+      }
+      for (const keyword of CATEGORY_RULES.context.keywords) {
+        if (checkTitle.includes(keyword)) return 'context';
+      }
+      return 'other';
     };
 
-    const getIcon = (title: string): string => {
+    // 智能图标函数
+    const getIcon = (title: string, tier: SectionTier): string => {
+      // 特殊映射
       if (title.includes('情节') || title.includes('目标')) return '🎯';
-      if (title.includes('角色') || title.includes('人物')) return '👤';
-      if (title.includes('场景') || title.includes('设定')) return '🌍';
-      if (title.includes('脉络') || title.includes('摘要')) return '📚';
-      if (title.includes('逻辑') || title.includes('状态')) return '🔒';
-      if (title.includes('伏笔')) return '🎭';
-      if (title.includes('限制') || title.includes('约束')) return '🚨';
+      if (title.includes('角色') || title.includes('人物') || title.includes('登场')) return '👤';
+      if (title.includes('场景') || title.includes('地点')) return '🌍';
+      if (title.includes('脉络') || title.includes('摘要') || title.includes('L2')) return '📚';
+      if (title.includes('逻辑') || title.includes('状态') || title.includes('L1')) return '🔒';
+      if (title.includes('伏笔') || title.includes('契诃夫')) return '🎭';
+      if (title.includes('L3') || title.includes('锚点') || title.includes('长期')) return '⚓';
+      if (title.includes('图谱') || title.includes('关系')) return '🔗';
+      if (title.includes('记忆') || title.includes('分层')) return '🧠';
+      if (title.includes('世界观') || title.includes('设定')) return '🌐';
+      if (title.includes('文风') || title.includes('风格') || title.includes('笔迹')) return '✒️';
+      if (title.includes('禁忌') || title.includes('禁令') || title.includes('铁律')) return '🚫';
+      if (title.includes('格式') || title.includes('JSON')) return '📄';
       if (title.includes('反转')) return '⚡';
-      return '📋';
+      if (title.includes('推演') || title.includes('预测')) return '🔮';
+      if (title.includes('要求') || title.includes('指令')) return '📋';
+      // 默认使用分类图标
+      return CATEGORY_RULES[tier].icon;
     };
 
     for (const line of lines) {
@@ -110,7 +183,7 @@ export const PromptConfirmDialog: React.FC = () => {
           id: `section-${sectionIndex++}`,
           title,
           content: '',
-          icon: getIcon(title),
+          icon: getIcon(title, getTier(title)),
           tier: getTier(title),
           tokenCount: 0,
           isExpanded: false
@@ -128,7 +201,7 @@ export const PromptConfirmDialog: React.FC = () => {
               title: '其他内容',
               content: '',
               icon: '📄',
-              tier: 'optional',
+              tier: 'other',
               tokenCount: 0,
               isExpanded: false
             };
@@ -150,8 +223,15 @@ export const PromptConfirmDialog: React.FC = () => {
       s.tokenCount = estimateTokens(s.content);
     });
 
-    // 按重要性排序
-    const tierOrder = { critical: 0, important: 1, optional: 2 };
+    // 按分类优先级排序
+    const tierOrder: Record<SectionTier, number> = {
+      task: 0,
+      context: 1,
+      style: 2,
+      constraint: 3,
+      format: 4,
+      other: 5
+    };
     sections.sort((a, b) => tierOrder[a.tier] - tierOrder[b.tier]);
 
     return sections;
@@ -212,8 +292,7 @@ export const PromptConfirmDialog: React.FC = () => {
     await navigator.clipboard.writeText(fullPrompt);
   };
 
-  // Token估算
-  const estimateTokens = (text: string) => Math.ceil(text.length / 2);
+  // 计算总 Token
   const totalTokens = estimateTokens(editedSystem) + estimateTokens(editedPrompt);
 
   // 切换区块展开
@@ -229,14 +308,33 @@ export const PromptConfirmDialog: React.FC = () => {
     });
   };
 
-  // 获取区块重要性颜色
-  const getTierColor = (tier: 'critical' | 'important' | 'optional') => {
-    switch (tier) {
-      case 'critical': return { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400', badge: '🔴' };
-      case 'important': return { bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-400', badge: '🟡' };
-      case 'optional': return { bg: 'bg-slate-500/10', border: 'border-slate-500/30', text: 'text-slate-400', badge: '⚪' };
-    }
+  // 获取区块分类颜色
+  const getTierColor = (tier: SectionTier) => {
+    return CATEGORY_RULES[tier].color;
   };
+
+  // 按分类分组统计
+  const tierStats = useMemo(() => {
+    const stats: Record<SectionTier, { count: number; tokens: number }> = {
+      task: { count: 0, tokens: 0 },
+      context: { count: 0, tokens: 0 },
+      style: { count: 0, tokens: 0 },
+      constraint: { count: 0, tokens: 0 },
+      format: { count: 0, tokens: 0 },
+      other: { count: 0, tokens: 0 }
+    };
+    parsedSections.forEach(s => {
+      stats[s.tier].count++;
+      stats[s.tier].tokens += s.tokenCount;
+    });
+    return stats;
+  }, [parsedSections]);
+
+  // 根据标签筛选区块
+  const filteredSections = useMemo(() => {
+    if (activeTier === 'all') return parsedSections;
+    return parsedSections.filter(s => s.tier === activeTier);
+  }, [parsedSections, activeTier]);
 
   if (!isOpen || !context) return null;
 
@@ -280,11 +378,46 @@ export const PromptConfirmDialog: React.FC = () => {
           </div>
         </div>
 
-        {/* 参数栏 */}
-        <div className="px-4 py-2 bg-slate-800/50 flex items-center gap-4 text-xs">
-          <span className="text-slate-400">温度: <span className="text-white">{editedTemp.toFixed(1)}</span></span>
-          <span className="text-slate-400">预估Tokens: <span className="text-cyan-400">{totalTokens.toLocaleString()}</span></span>
-          <span className="text-slate-400">区块: <span className="text-white">{parsedSections.length}</span></span>
+        {/* 参数栏 - 增强版 */}
+        <div className="px-4 py-2 bg-slate-800/50 flex items-center gap-4 text-xs flex-wrap">
+          {/* 模型信息 */}
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-slate-700/50 rounded-lg">
+            <span className="text-slate-500">模型:</span>
+            <span className="text-purple-400 font-medium">{context.model}</span>
+          </div>
+
+          {/* 温度 */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-500">温度:</span>
+            <span className="text-orange-400 font-mono">{editedTemp.toFixed(1)}</span>
+          </div>
+
+          {/* Token 统计 */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-500">Tokens:</span>
+            <span className="text-cyan-400 font-mono">{totalTokens.toLocaleString()}</span>
+          </div>
+
+          {/* 区块统计 */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-500">区块:</span>
+            <span className="text-white font-mono">{parsedSections.length}</span>
+          </div>
+
+          {/* 分类统计徽章 */}
+          <div className="flex items-center gap-1">
+            {(Object.keys(CATEGORY_RULES) as SectionTier[]).map(tier => {
+              const count = tierStats[tier].count;
+              if (count === 0) return null;
+              const rule = CATEGORY_RULES[tier];
+              return (
+                <span key={tier} className={`${rule.color.bg} ${rule.color.text} px-1.5 py-0.5 rounded text-[10px]`}>
+                  {rule.color.badge} {count}
+                </span>
+              );
+            })}
+          </div>
+
           <button onClick={handleCopy} className="ml-auto text-slate-400 hover:text-white flex items-center gap-1 transition-colors">
             <Copy size={12} /> 复制完整Prompt
           </button>
@@ -320,15 +453,56 @@ export const PromptConfirmDialog: React.FC = () => {
           {/* 模板视图 */}
           {viewMode === 'template' && !isEditing && (
             <div className="space-y-3">
+              {/* 分类筛选标签 */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => setActiveTier('all')}
+                  className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 transition-all ${
+                    activeTier === 'all'
+                      ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20'
+                      : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                  }`}
+                >
+                  📊 全部
+                  <span className="ml-1 px-1.5 py-0.5 bg-white/10 rounded text-[10px]">
+                    {parsedSections.length}
+                  </span>
+                </button>
+                {(Object.keys(CATEGORY_RULES) as SectionTier[]).map(tier => {
+                  const count = tierStats[tier].count;
+                  if (count === 0) return null;
+                  const rule = CATEGORY_RULES[tier];
+                  return (
+                    <button
+                      key={tier}
+                      onClick={() => setActiveTier(tier)}
+                      className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 transition-all ${
+                        activeTier === tier
+                          ? `${rule.color.bg} ${rule.color.text} border ${rule.color.border}`
+                          : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                      }`}
+                    >
+                      {rule.icon} {tier === 'task' ? '任务' : tier === 'context' ? '上下文' : tier === 'style' ? '风格' : tier === 'constraint' ? '约束' : tier === 'format' ? '格式' : '其他'}
+                      <span className="ml-1 px-1.5 py-0.5 bg-white/10 rounded text-[10px]">
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
               {/* 图例 */}
-              <div className="flex items-center gap-4 text-xs text-slate-500 px-1">
-                <span>🔴 核心</span>
-                <span>🟡 重要</span>
-                <span>⚪ 可选</span>
+              <div className="flex items-center gap-3 text-xs text-slate-500 px-1 flex-wrap">
+                <span>🎯 任务</span>
+                <span>👤 上下文</span>
+                <span>🎨 风格</span>
+                <span>🚫 约束</span>
+                <span>📋 格式</span>
+                <span>📄 其他</span>
               </div>
 
               {/* 区块卡片 */}
-              {parsedSections.map(section => {
+              {filteredSections.map(section => {
                 const colors = getTierColor(section.tier);
                 const isExpanded = expandedSections.has(section.id);
 
@@ -337,9 +511,9 @@ export const PromptConfirmDialog: React.FC = () => {
                     key={section.id}
                     className={`${colors.bg} ${colors.border} border rounded-xl overflow-hidden`}
                   >
-                    <button
+                    <div
                       onClick={() => toggleSection(section.id)}
-                      className="w-full flex items-center justify-between p-3 hover:bg-slate-700/30 transition-colors"
+                      className="w-full flex items-center justify-between p-3 hover:bg-slate-700/30 transition-colors cursor-pointer"
                     >
                       <div className="flex items-center gap-2">
                         <span>{colors.badge}</span>
@@ -366,7 +540,7 @@ export const PromptConfirmDialog: React.FC = () => {
                         </button>
                         {isExpanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
                       </div>
-                    </button>
+                    </div>
 
                     {isExpanded && (
                       <div className="px-3 pb-3 border-t border-slate-700/50 pt-2">

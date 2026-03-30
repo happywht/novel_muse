@@ -8,7 +8,6 @@ import { PlotStructureAssistant } from '../PlotWeaver/PlotStructureAssistant';
 import { Loader } from '../Loader';
 import { ConflictVisualization } from '../ConflictVisualization';
 import { useFeature } from '../../hooks/useFeature';
-import { PlotPromptPanel } from '../PromptPanel/PlotPromptPanel';
 
 interface AuxiliaryDrawerProps {
     showRightSidebar: boolean;
@@ -191,9 +190,6 @@ export const AuxiliaryDrawer: React.FC<AuxiliaryDrawerProps> = ({
                         </>
                     )}
 
-                {activeTab === 'PROMPT' && (
-                    <PlotPromptPanel />
-                )}
 
             {/* Global Loading Overlay for Right Panels */}
             {isAnalyzing && (
