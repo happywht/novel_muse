@@ -4,8 +4,8 @@
  * 支持模板视图和完整视图切换
  */
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { X, Send, Edit3, RotateCcw, Copy, ChevronDown, ChevronUp, Eye, FileText, Maximize2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { X, Send, Edit3, RotateCcw, Copy, ChevronDown, ChevronUp, Eye, FileText, Maximize2, Loader2 } from 'lucide-react';
 import { AICallContext, confirmAICall, cancelAICall, AI_CONFIRMATION_EVENT } from '../../services/aiCallInterceptor';
 
 /** 区块分类类型 */
@@ -19,6 +19,11 @@ interface CategoryRule {
 }
 
 /** 分类规则定义 */
+/** 获取区块分类颜色 */
+const getTierColor = (tier: SectionTier) => {
+  return CATEGORY_RULES[tier].color;
+};
+
 const CATEGORY_RULES: Record<SectionTier, CategoryRule> = {
   task: {
     keywords: ['任务', '要求', '指令', '目标', '梗概', '必填', '核心', '情节', '生成', '输出'],
@@ -29,10 +34,13 @@ const CATEGORY_RULES: Record<SectionTier, CategoryRule> = {
     keywords: ['角色', '人物', '设定', '场景', '状态', '脉络', '逻辑', '记忆', '世界观', '图谱',
                'L1', 'L2', 'L3', '伏笔', '档案', '摘要', '背景', '前文', '变更', '动态', '实体'],
     icon: '👤',
-    color: { bg: 'bg-amber-500/10', border: 'border-amber-500/30', text: 'text-amber-400', badge: '🟡' }
+    color: { bg: 'bg-amber-500/15', border: 'border-amber-400/50', text: 'text-amber-300', badge: '🟡' }
   },
   style: {
-    keywords: ['文风', '风格', '基调', '笔迹', '技法', '题材', '类型', '规范', '指纹'],
+    keywords: ['文风', '风格', '基调', '笔迹', '技法', '题材', '类型', '规范', '指纹',
+               '节奏', '句式', '段落', '词汇', '修辞', '特征', '多样性', '句首', '笔法',
+               '语调', '语气', '口吻', '叙事', '视角', '人称', '文体', '表达方式',
+               '特色', '调性', '氛围', '韵味'],
     icon: '🎨',
     color: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-400', badge: '🟣' }
   },
@@ -49,7 +57,7 @@ const CATEGORY_RULES: Record<SectionTier, CategoryRule> = {
   other: {
     keywords: [],
     icon: '📄',
-    color: { bg: 'bg-slate-500/10', border: 'border-slate-500/30', text: 'text-slate-400', badge: '⚪' }
+    color: { bg: 'bg-slate-400/15', border: 'border-slate-400/50', text: 'text-slate-300', badge: '⚪' }
   }
 };
 
@@ -92,6 +100,13 @@ export const PromptConfirmDialog: React.FC = () => {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['task']));
   // 新增：选中的变量详情
   const [selectedVariable, setSelectedVariable] = useState<VariableCard | null>(null);
+  // 新增：确认按钮 loading 状态
+  const [isConfirming, setIsConfirming] = useState(false);
+  // 新增：全部展开/折叠状态
+  const [allExpanded, setAllExpanded] = useState(false);
+
+  // 可访问性：确认按钮引用（用于焦点管理）
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
 
   // Token估算函数（必须在 useMemo 之前定义）
   const estimateTokens = (text: string) => Math.ceil(text.length / 2);
@@ -261,42 +276,47 @@ export const PromptConfirmDialog: React.FC = () => {
   }, [parsedSections, editedPrompt]);
 
   // 确认发送
-  const handleConfirm = () => {
-    confirmAICall({
-      approved: true,
-      modifiedSystemInstruction: isEditing ? editedSystem : undefined,
-      modifiedUserPrompt: isEditing ? editedPrompt : undefined,
-      modifiedTemperature: isEditing ? editedTemp : undefined,
-    });
-    setIsOpen(false);
-  };
+  const handleConfirm = useCallback(async () => {
+    setIsConfirming(true);
+    try {
+      confirmAICall({
+        approved: true,
+        modifiedSystemInstruction: isEditing ? editedSystem : undefined,
+        modifiedUserPrompt: isEditing ? editedPrompt : undefined,
+        modifiedTemperature: isEditing ? editedTemp : undefined,
+      });
+      setIsOpen(false);
+    } finally {
+      setIsConfirming(false);
+    }
+  }, [isEditing, editedSystem, editedPrompt, editedTemp]);
 
   // 取消
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     cancelAICall();
     setIsOpen(false);
-  };
+  }, []);
 
   // 恢复默认
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     if (context) {
       setEditedSystem(context.systemInstruction);
       setEditedPrompt(context.userPrompt);
       setEditedTemp(context.temperature);
     }
-  };
+  }, [context]);
 
   // 复制到剪贴板
-  const handleCopy = async () => {
+  const handleCopy = useCallback(async () => {
     const fullPrompt = `=== System Instruction ===\n${editedSystem}\n\n=== User Prompt ===\n${editedPrompt}`;
     await navigator.clipboard.writeText(fullPrompt);
-  };
+  }, [editedSystem, editedPrompt]);
 
   // 计算总 Token
   const totalTokens = estimateTokens(editedSystem) + estimateTokens(editedPrompt);
 
   // 切换区块展开
-  const toggleSection = (id: string) => {
+  const toggleSection = useCallback((id: string) => {
     setExpandedSections(prev => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -306,12 +326,8 @@ export const PromptConfirmDialog: React.FC = () => {
       }
       return next;
     });
-  };
+  }, []);
 
-  // 获取区块分类颜色
-  const getTierColor = (tier: SectionTier) => {
-    return CATEGORY_RULES[tier].color;
-  };
 
   // 按分类分组统计
   const tierStats = useMemo(() => {
@@ -336,11 +352,50 @@ export const PromptConfirmDialog: React.FC = () => {
     return parsedSections.filter(s => s.tier === activeTier);
   }, [parsedSections, activeTier]);
 
+  // 全部展开/折叠
+  const toggleAllSections = useCallback(() => {
+    if (allExpanded) {
+      setExpandedSections(new Set());
+    } else {
+      setExpandedSections(new Set(filteredSections.map(s => s.id)));
+    }
+    setAllExpanded(!allExpanded);
+  }, [allExpanded, filteredSections]);
+
+  // 键盘快捷键支持
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape 键取消
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleCancel();
+      }
+      // Ctrl/Cmd + Enter 确认发送
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        handleConfirm();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, handleCancel, handleConfirm]);
+
   if (!isOpen || !context) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl">
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in"
+      role="presentation"
+    >
+      <div
+        className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dialog-title"
+      >
         {/* Header */}
         <div className="p-4 border-b border-slate-700 bg-gradient-to-r from-purple-900/30 to-cyan-900/30">
           <div className="flex items-center justify-between">
@@ -349,7 +404,7 @@ export const PromptConfirmDialog: React.FC = () => {
                 <Send size={20} className="text-purple-400" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-white">AI调用确认</h2>
+                <h2 id="dialog-title" className="text-lg font-bold text-white">AI调用确认</h2>
                 <p className="text-xs text-slate-400">任务: {context.taskType} | 模型: {context.model}</p>
               </div>
             </div>
@@ -453,8 +508,9 @@ export const PromptConfirmDialog: React.FC = () => {
           {/* 模板视图 */}
           {viewMode === 'template' && !isEditing && (
             <div className="space-y-3">
-              {/* 分类筛选标签 */}
-              <div className="flex items-center gap-2 flex-wrap">
+              {/* 分类筛选标签和全部展开/折叠按钮 */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={() => setActiveTier('all')}
                   className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 transition-all ${
@@ -489,6 +545,14 @@ export const PromptConfirmDialog: React.FC = () => {
                     </button>
                   );
                 })}
+                </div>
+                <button
+                  onClick={toggleAllSections}
+                  className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
+                >
+                  {allExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  {allExpanded ? '全部折叠' : '全部展开'}
+                </button>
               </div>
 
               {/* 图例 */}
@@ -625,10 +689,24 @@ export const PromptConfirmDialog: React.FC = () => {
             </button>
             <button
               onClick={handleConfirm}
-              className="px-5 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold rounded-lg flex items-center gap-2 transition-colors shadow-lg shadow-purple-500/20"
+              disabled={isConfirming}
+              className={`px-5 py-2 text-white text-sm font-bold rounded-lg flex items-center gap-2 transition-colors shadow-lg ${
+                isConfirming
+                  ? 'bg-purple-700 cursor-not-allowed shadow-purple-500/10'
+                  : 'bg-purple-600 hover:bg-purple-500 shadow-purple-500/20'
+              }`}
             >
-              <Send size={14} />
-              确认发送
+              {isConfirming ? (
+                <>
+                  <Loader2 className="animate-spin" size={14} />
+                  发送中...
+                </>
+              ) : (
+                <>
+                  <Send size={14} />
+                  确认发送
+                </>
+              )}
             </button>
           </div>
         </div>
