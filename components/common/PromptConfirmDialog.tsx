@@ -5,8 +5,9 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { X, Send, Edit3, RotateCcw, Copy, ChevronDown, ChevronUp, Eye, FileText, Maximize2, Loader2 } from 'lucide-react';
+import { X, Send, Edit3, RotateCcw, Copy, ChevronDown, ChevronUp, Eye, FileText, Maximize2, Loader2, BarChart3, Zap } from 'lucide-react';
 import { AICallContext, confirmAICall, cancelAICall, AI_CONFIRMATION_EVENT } from '../../services/aiCallInterceptor';
+import { BlockMetadata } from '../../types/promptTemplate';
 
 /** 区块分类类型 */
 type SectionTier = 'task' | 'context' | 'style' | 'constraint' | 'format' | 'other';
@@ -70,6 +71,7 @@ interface ParsedSection {
   tier: SectionTier;
   tokenCount: number;
   isExpanded: boolean;
+  metadata?: BlockMetadata;  // 新增：模板元数据引用
 }
 
 /** 变量卡片数据 */
@@ -139,8 +141,11 @@ export const PromptConfirmDialog: React.FC = () => {
     let currentContent: string[] = [];
     let sectionIndex = 0;
 
-    // 智能分类函数
-    const getTier = (title: string): SectionTier => {
+    /**
+     * 基于关键词的分类（Fallback）
+     * 当模板元数据不可用时使用
+     */
+    const getTierFromKeywords = (title: string): SectionTier => {
       const checkTitle = title.toLowerCase();
       // 按优先级检查：任务 > 约束 > 格式 > 风格 > 上下文
       for (const keyword of CATEGORY_RULES.task.keywords) {
@@ -161,7 +166,46 @@ export const PromptConfirmDialog: React.FC = () => {
       return 'other';
     };
 
-    // 智能图标函数
+    /**
+     * 混合分类逻辑
+     * 优先使用模板元数据，Fallback到关键词匹配
+     */
+    const getTierFromClassification = (
+      title: string,
+      metadata?: BlockMetadata
+    ): SectionTier => {
+      // 优先使用模板元数据（先验分类）
+      if (metadata?.tier) {
+        return metadata.tier;
+      }
+
+      // Fallback: 关键词匹配（后验分类）
+      return getTierFromKeywords(title);
+    };
+
+    /**
+     * 从上下文中获取区块元数据
+     * 支持基于标题匹配或ID匹配
+     */
+    const getBlockMetadata = (title: string, blockId: string): BlockMetadata | undefined => {
+      if (!context?.templateMeta?.blocks) return undefined;
+
+      // 尝试通过ID精确匹配
+      const byId = context.templateMeta.blocks.find(b => b.id === blockId);
+      if (byId) return byId;
+
+      // 尝试通过标题模糊匹配
+      const byTitle = context.templateMeta.blocks.find(b =>
+        title.includes(b.id) || b.id.includes(title) ||
+        b.description?.includes(title)
+      );
+      return byTitle;
+    };
+
+    /**
+     * 智能图标函数
+     * 根据标题和分类返回合适的图标
+     */
     const getIcon = (title: string, tier: SectionTier): string => {
       // 特殊映射
       if (title.includes('情节') || title.includes('目标')) return '🎯';
@@ -194,14 +238,23 @@ export const PromptConfirmDialog: React.FC = () => {
         }
         // 开始新区块
         const title = match[1];
+        const blockId = `section-${sectionIndex++}`;
+
+        // 获取模板元数据（如果可用）
+        const metadata = getBlockMetadata(title, blockId);
+
+        // 使用混合分类逻辑
+        const tier = getTierFromClassification(title, metadata);
+
         currentSection = {
-          id: `section-${sectionIndex++}`,
+          id: blockId,
           title,
           content: '',
-          icon: getIcon(title, getTier(title)),
-          tier: getTier(title),
+          icon: getIcon(title, tier),
+          tier,
           tokenCount: 0,
-          isExpanded: false
+          isExpanded: false,
+          metadata // 保存元数据引用
         };
         currentContent = [line];
       } else if (currentSection) {
@@ -250,7 +303,7 @@ export const PromptConfirmDialog: React.FC = () => {
     sections.sort((a, b) => tierOrder[a.tier] - tierOrder[b.tier]);
 
     return sections;
-  }, [editedPrompt]);
+  }, [editedPrompt, context?.templateMeta?.blocks]);
 
   // 提取变量卡片（用于模板视图）
   const variableCards = useMemo((): VariableCard[] => {
@@ -391,7 +444,7 @@ export const PromptConfirmDialog: React.FC = () => {
       role="presentation"
     >
       <div
-        className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl"
+        className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-6xl max-h-[85vh] overflow-hidden flex flex-col shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="dialog-title"
@@ -478,187 +531,292 @@ export const PromptConfirmDialog: React.FC = () => {
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {/* 系统指令（可折叠） */}
-          <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
-            <button
-              onClick={() => setShowSystem(!showSystem)}
-              className="w-full flex items-center justify-between p-3 hover:bg-slate-700/50 transition-colors"
-            >
-              <span className="text-sm font-medium text-slate-300">⚙️ 系统指令 ({estimateTokens(editedSystem)} tokens)</span>
-              {showSystem ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
-            </button>
-            {showSystem && (
-              <div className="p-3 border-t border-slate-700">
-                {isEditing ? (
-                  <textarea
-                    value={editedSystem}
-                    onChange={(e) => setEditedSystem(e.target.value)}
-                    className="w-full h-32 bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-white font-mono resize-none focus:ring-1 focus:ring-purple-500 focus:outline-none"
-                    placeholder="系统指令..."
-                  />
-                ) : (
-                  <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono max-h-32 overflow-y-auto">{editedSystem}</pre>
-                )}
+        {/* Content - 双栏布局 */}
+        <div className="flex-1 overflow-hidden flex gap-4 p-4">
+          {/* 左侧：区块列表（占60%） */}
+          <div className="flex-1 overflow-y-auto space-y-3 min-w-0">
+            {/* 系统指令（可折叠） */}
+            <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+              <button
+                onClick={() => setShowSystem(!showSystem)}
+                className="w-full flex items-center justify-between p-3 hover:bg-slate-700/50 transition-colors"
+              >
+                <span className="text-sm font-medium text-slate-300">⚙️ 系统指令 ({estimateTokens(editedSystem)} tokens)</span>
+                {showSystem ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+              </button>
+              {showSystem && (
+                <div className="p-3 border-t border-slate-700">
+                  {isEditing ? (
+                    <textarea
+                      value={editedSystem}
+                      onChange={(e) => setEditedSystem(e.target.value)}
+                      className="w-full h-32 bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-white font-mono resize-none focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                      placeholder="系统指令..."
+                    />
+                  ) : (
+                    <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono max-h-32 overflow-y-auto">{editedSystem}</pre>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 模板视图 */}
+            {viewMode === 'template' && !isEditing && (
+              <div className="space-y-3">
+                {/* 分类筛选标签和全部展开/折叠按钮 */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => setActiveTier('all')}
+                    className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 transition-all ${
+                      activeTier === 'all'
+                        ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20'
+                        : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                    }`}
+                  >
+                    📊 全部
+                    <span className="ml-1 px-1.5 py-0.5 bg-white/10 rounded text-[10px]">
+                      {parsedSections.length}
+                    </span>
+                  </button>
+                  {(Object.keys(CATEGORY_RULES) as SectionTier[]).map(tier => {
+                    const count = tierStats[tier].count;
+                    if (count === 0) return null;
+                    const rule = CATEGORY_RULES[tier];
+                    return (
+                      <button
+                        key={tier}
+                        onClick={() => setActiveTier(tier)}
+                        className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 transition-all ${
+                          activeTier === tier
+                            ? `${rule.color.bg} ${rule.color.text} border ${rule.color.border}`
+                            : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                        }`}
+                      >
+                        {rule.icon} {tier === 'task' ? '任务' : tier === 'context' ? '上下文' : tier === 'style' ? '风格' : tier === 'constraint' ? '约束' : tier === 'format' ? '格式' : '其他'}
+                        <span className="ml-1 px-1.5 py-0.5 bg-white/10 rounded text-[10px]">
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                  </div>
+                  <button
+                    onClick={toggleAllSections}
+                    className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors shrink-0"
+                  >
+                    {allExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    {allExpanded ? '全部折叠' : '全部展开'}
+                  </button>
+                </div>
+
+                {/* 图例 */}
+                <div className="flex items-center gap-3 text-xs text-slate-500 px-1 flex-wrap">
+                  <span>🎯 任务</span>
+                  <span>👤 上下文</span>
+                  <span>🎨 风格</span>
+                  <span>🚫 约束</span>
+                  <span>📋 格式</span>
+                  <span>📄 其他</span>
+                </div>
+
+                {/* 区块卡片 */}
+                {filteredSections.map(section => {
+                  const colors = getTierColor(section.tier);
+                  const isExpanded = expandedSections.has(section.id);
+
+                  return (
+                    <div
+                      key={section.id}
+                      className={`${colors.bg} ${colors.border} border rounded-xl overflow-hidden`}
+                    >
+                      <div
+                        onClick={() => toggleSection(section.id)}
+                        className="w-full flex items-center justify-between p-3 hover:bg-slate-700/30 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>{colors.badge}</span>
+                          <span className="text-sm font-medium text-white">{section.icon} {section.title}</span>
+                          {/* 数据来源标识 */}
+                          {section.metadata && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                              section.metadata.isStatic
+                                ? 'bg-green-500/20 text-green-400'
+                                : 'bg-blue-500/20 text-blue-400'
+                            }`}>
+                              {section.metadata.isStatic ? '静态' : '动态'}
+                            </span>
+                          )}
+                          <span className="text-xs text-slate-500">({section.tokenCount} tokens)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedVariable({
+                                key: section.id,
+                                label: section.title,
+                                value: section.content,
+                                preview: section.content.slice(0, 100),
+                                tokenCount: section.tokenCount,
+                                tier: section.tier,
+                                source: 'project'
+                              });
+                            }}
+                            className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-600/50 transition-colors"
+                          >
+                            <Maximize2 size={14} />
+                          </button>
+                          {isExpanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+                        </div>
+                      </div>
+
+                      {isExpanded && (
+                        <div className="px-3 pb-3 border-t border-slate-700/50 pt-2">
+                          <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">{section.content}</pre>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* 完整视图 或 编辑模式 */}
+            {(viewMode === 'full' || isEditing) && (
+              <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
+                <div className="p-3 border-b border-slate-700">
+                  <span className="text-sm font-medium text-slate-300">📝 用户Prompt ({estimateTokens(editedPrompt)} tokens)</span>
+                </div>
+                <div className="p-3">
+                  {isEditing ? (
+                    <textarea
+                      value={editedPrompt}
+                      onChange={(e) => setEditedPrompt(e.target.value)}
+                      className="w-full h-64 bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-white font-mono resize-none focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                      placeholder="用户提示词..."
+                    />
+                  ) : (
+                    <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono max-h-64 overflow-y-auto">{editedPrompt}</pre>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 温度滑块（编辑模式） */}
+            {isEditing && (
+              <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-3">
+                <label className="text-sm font-medium text-slate-300 block mb-2">
+                  温度: {editedTemp.toFixed(1)}
+                </label>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={editedTemp}
+                  onChange={(e) => setEditedTemp(parseFloat(e.target.value))}
+                  className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                />
+                <div className="flex justify-between text-xs text-slate-500 mt-1">
+                  <span>精确 (0)</span>
+                  <span>创意 (1)</span>
+                </div>
               </div>
             )}
           </div>
 
-          {/* 模板视图 */}
-          {viewMode === 'template' && !isEditing && (
-            <div className="space-y-3">
-              {/* 分类筛选标签和全部展开/折叠按钮 */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={() => setActiveTier('all')}
-                  className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 transition-all ${
-                    activeTier === 'all'
-                      ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20'
-                      : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50 hover:text-white'
-                  }`}
-                >
-                  📊 全部
-                  <span className="ml-1 px-1.5 py-0.5 bg-white/10 rounded text-[10px]">
-                    {parsedSections.length}
-                  </span>
-                </button>
+          {/* 右侧：辅助信息面板（约320px） */}
+          <div className="w-80 flex flex-col gap-4 shrink-0 hidden lg:flex">
+            {/* Token分析面板 */}
+            <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+              <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                <BarChart3 size={16} className="text-cyan-400" />
+                Token 分布分析
+              </h3>
+              {/* 分类占比可视化 */}
+              <div className="space-y-2">
                 {(Object.keys(CATEGORY_RULES) as SectionTier[]).map(tier => {
-                  const count = tierStats[tier].count;
-                  if (count === 0) return null;
+                  const stat = tierStats[tier];
+                  if (stat.count === 0) return null;
+                  const percentage = totalTokens > 0 ? (stat.tokens / totalTokens * 100).toFixed(1) : '0';
                   const rule = CATEGORY_RULES[tier];
                   return (
-                    <button
-                      key={tier}
-                      onClick={() => setActiveTier(tier)}
-                      className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 transition-all ${
-                        activeTier === tier
-                          ? `${rule.color.bg} ${rule.color.text} border ${rule.color.border}`
-                          : 'bg-slate-800/50 text-slate-400 hover:bg-slate-700/50 hover:text-white'
-                      }`}
-                    >
-                      {rule.icon} {tier === 'task' ? '任务' : tier === 'context' ? '上下文' : tier === 'style' ? '风格' : tier === 'constraint' ? '约束' : tier === 'format' ? '格式' : '其他'}
-                      <span className="ml-1 px-1.5 py-0.5 bg-white/10 rounded text-[10px]">
-                        {count}
-                      </span>
-                    </button>
+                    <div key={tier} className="flex items-center gap-2">
+                      <span className="w-4">{rule.color.badge}</span>
+                      <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full transition-all"
+                          style={{ width: `${percentage}%`, backgroundColor: tier === 'task' ? '#ef4444' : tier === 'context' ? '#f59e0b' : tier === 'style' ? '#a855f7' : tier === 'constraint' ? '#f97316' : tier === 'format' ? '#3b82f6' : '#64748b' }}
+                        />
+                      </div>
+                      <span className="text-xs text-slate-400 w-12 text-right">{percentage}%</span>
+                    </div>
                   );
                 })}
+              </div>
+              {/* 总计 */}
+              <div className="mt-3 pt-3 border-t border-slate-700 flex justify-between text-xs">
+                <span className="text-slate-500">总计 Tokens</span>
+                <span className="text-cyan-400 font-mono">{totalTokens.toLocaleString()}</span>
+              </div>
+            </div>
+
+            {/* 选中区块详情预览 */}
+            {selectedVariable && (
+              <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4 flex-1 overflow-hidden flex flex-col min-h-0">
+                <h3 className="text-sm font-medium text-white mb-2 flex items-center gap-2 shrink-0">
+                  <FileText size={16} className="text-purple-400" />
+                  {selectedVariable.label}
+                </h3>
+                <div className="flex-1 overflow-y-auto min-h-0">
+                  <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono">
+                    {selectedVariable.value.slice(0, 500)}
+                    {selectedVariable.value.length > 500 && '...'}
+                  </pre>
                 </div>
+                <div className="mt-2 flex gap-2 shrink-0">
+                  <button
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(selectedVariable.value);
+                    }}
+                    className="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded flex items-center gap-1"
+                  >
+                    <Copy size={12} /> 复制
+                  </button>
+                  <button
+                    onClick={() => setSelectedVariable(null)}
+                    className="px-2 py-1 text-xs text-slate-400 hover:text-white"
+                  >
+                    关闭
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 快捷操作面板 */}
+            <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
+              <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
+                <Zap size={16} className="text-amber-400" />
+                快捷操作
+              </h3>
+              <div className="space-y-2">
                 <button
                   onClick={toggleAllSections}
-                  className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
+                  className="w-full px-3 py-2 text-xs bg-slate-700/50 hover:bg-slate-600/50 text-white rounded-lg flex items-center justify-center gap-2"
                 >
-                  {allExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  {allExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   {allExpanded ? '全部折叠' : '全部展开'}
                 </button>
-              </div>
-
-              {/* 图例 */}
-              <div className="flex items-center gap-3 text-xs text-slate-500 px-1 flex-wrap">
-                <span>🎯 任务</span>
-                <span>👤 上下文</span>
-                <span>🎨 风格</span>
-                <span>🚫 约束</span>
-                <span>📋 格式</span>
-                <span>📄 其他</span>
-              </div>
-
-              {/* 区块卡片 */}
-              {filteredSections.map(section => {
-                const colors = getTierColor(section.tier);
-                const isExpanded = expandedSections.has(section.id);
-
-                return (
-                  <div
-                    key={section.id}
-                    className={`${colors.bg} ${colors.border} border rounded-xl overflow-hidden`}
-                  >
-                    <div
-                      onClick={() => toggleSection(section.id)}
-                      className="w-full flex items-center justify-between p-3 hover:bg-slate-700/30 transition-colors cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{colors.badge}</span>
-                        <span className="text-sm font-medium text-white">{section.icon} {section.title}</span>
-                        <span className="text-xs text-slate-500">({section.tokenCount} tokens)</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedVariable({
-                              key: section.id,
-                              label: section.title,
-                              value: section.content,
-                              preview: section.content.slice(0, 100),
-                              tokenCount: section.tokenCount,
-                              tier: section.tier,
-                              source: 'project'
-                            });
-                          }}
-                          className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-600/50 transition-colors"
-                        >
-                          <Maximize2 size={14} />
-                        </button>
-                        {isExpanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
-                      </div>
-                    </div>
-
-                    {isExpanded && (
-                      <div className="px-3 pb-3 border-t border-slate-700/50 pt-2">
-                        <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">{section.content}</pre>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* 完整视图 或 编辑模式 */}
-          {(viewMode === 'full' || isEditing) && (
-            <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
-              <div className="p-3 border-b border-slate-700">
-                <span className="text-sm font-medium text-slate-300">📝 用户Prompt ({estimateTokens(editedPrompt)} tokens)</span>
-              </div>
-              <div className="p-3">
-                {isEditing ? (
-                  <textarea
-                    value={editedPrompt}
-                    onChange={(e) => setEditedPrompt(e.target.value)}
-                    className="w-full h-64 bg-slate-900 border border-slate-600 rounded-lg p-3 text-sm text-white font-mono resize-none focus:ring-1 focus:ring-purple-500 focus:outline-none"
-                    placeholder="用户提示词..."
-                  />
-                ) : (
-                  <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono max-h-64 overflow-y-auto">{editedPrompt}</pre>
-                )}
+                <button
+                  onClick={handleCopy}
+                  className="w-full px-3 py-2 text-xs bg-slate-700/50 hover:bg-slate-600/50 text-white rounded-lg flex items-center justify-center gap-2"
+                >
+                  <Copy size={14} /> 复制完整Prompt
+                </button>
               </div>
             </div>
-          )}
-
-          {/* 温度滑块（编辑模式） */}
-          {isEditing && (
-            <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-3">
-              <label className="text-sm font-medium text-slate-300 block mb-2">
-                温度: {editedTemp.toFixed(1)}
-              </label>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={editedTemp}
-                onChange={(e) => setEditedTemp(parseFloat(e.target.value))}
-                className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
-              />
-              <div className="flex justify-between text-xs text-slate-500 mt-1">
-                <span>精确 (0)</span>
-                <span>创意 (1)</span>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
 
         {/* Footer */}

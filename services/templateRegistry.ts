@@ -171,6 +171,7 @@ export class TemplateRegistry {
       label: block.title,
       condition: block.condition,
       order: block.order,
+      metadata: block.metadata, // 传递元数据
     }));
   }
 

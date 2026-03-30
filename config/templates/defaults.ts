@@ -28,6 +28,26 @@ export type VariableSource =
   | 'optional';       // May or may not be available
 
 /**
+ * Block data source type for metadata
+ */
+export type BlockDataSource = 'static' | 'user_input' | 'computed' | 'derived';
+
+/**
+ * Block tier classification
+ */
+export type BlockTier = 'task' | 'context' | 'style' | 'constraint' | 'format' | 'other';
+
+/**
+ * Block metadata for template classification
+ */
+export interface BlockMetadata {
+  tier: BlockTier;           // Classification tier
+  isStatic: boolean;         // Whether content is static
+  dataSource: BlockDataSource; // Data source type
+  description?: string;      // Description
+}
+
+/**
  * Template variable definition
  */
 export interface TemplateVariable {
@@ -50,6 +70,7 @@ export interface PromptBlock {
   template: string;       // Template string with {{variable}} placeholders
   condition?: string;     // JavaScript expression for conditional inclusion
   order: number;          // Display order
+  metadata?: BlockMetadata; // Block metadata for classification
 }
 
 /**
@@ -106,6 +127,12 @@ Write with confidence and artistry. Trust the reader's intelligence.`,
       template: `Novel Genre: {{genre}}
 
 {{genreContext}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Genre-specific rules and guidelines'
+      }
     },
 
     // Block 2: Global Story Context
@@ -117,6 +144,12 @@ Write with confidence and artistry. Trust the reader's intelligence.`,
 (The following is a summary of the entire novel so far. Ensure the current creation aligns with the overall direction and maintains continuity.)
 {{rollingSummary}}`,
       condition: 'rollingSummary != null && rollingSummary !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Global story arc summary for continuity'
+      }
     },
 
     // Block 3: Tiered Memory Context
@@ -125,6 +158,12 @@ Write with confidence and artistry. Trust the reader's intelligence.`,
       title: 'Tiered Memory Context',
       order: 3,
       template: `{{tieredContext}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Layered memory context from chapters, characters, and echoes'
+      }
     },
 
     // Block 4: Logic Anchors
@@ -138,6 +177,12 @@ IMPORTANT: The following facts are enforced by the system knowledge graph. If th
 - [{{this.name}}]: Currently at [{{this.location}}], physical/mental state: [{{this.state}}]{{#if this.isDead}} (DECEASED){{/if}}
 {{/each}}`,
       condition: 'physicalStatus != null && physicalStatus.length > 0',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Character physical states and locations for logic anchoring'
+      }
     },
 
     // Block 5: Chekhov's Gun
@@ -151,6 +196,12 @@ NOTE: The following are suspense hooks or narrative threads from previous chapte
 - [{{this.subject}}] {{this.relation}} [{{this.object}}]
 {{/each}}`,
       condition: 'unresolvedForeshadowing != null && unresolvedForeshadowing.length > 0',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Unresolved narrative hooks from previous chapters'
+      }
     },
 
     // Block 6: Active World Settings
@@ -166,6 +217,12 @@ NOTE: The following are suspense hooks or narrative threads from previous chapte
 {{/if}}
 {{/each}}`,
       condition: 'activeSettings != null && activeSettings.length > 0',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'World settings currently active in this scene'
+      }
     },
 
     // Block 7: Relevant World Context
@@ -182,6 +239,12 @@ NOTE: The following are suspense hooks or narrative threads from previous chapte
 {{/each}}
 {{/each}}`,
       condition: 'relevantSettings != null && relevantSettings.length > 0',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'RAG-filtered world settings relevant to current context'
+      }
     },
 
     // Block 8: Core Constraints
@@ -196,6 +259,12 @@ NOTE: The following are suspense hooks or narrative threads from previous chapte
   * Forbidden to use omniscient POV or switch to other characters' inner thoughts.
 {{/if}}
 {{pacingInstruction}}`,
+      metadata: {
+        tier: 'constraint',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'POV lock and pacing control constraints'
+      }
     },
 
     // Block 9: Twist Hook
@@ -206,6 +275,12 @@ NOTE: The following are suspense hooks or narrative threads from previous chapte
       template: `[Plot Twist Instruction (Twist Hook)]
 {{twistHook}}`,
       condition: 'twistHook != null && twistHook !== ""',
+      metadata: {
+        tier: 'task',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'Optional plot twist instruction to inject'
+      }
     },
 
     // Block 10: Plot Beat
@@ -215,6 +290,12 @@ NOTE: The following are suspense hooks or narrative threads from previous chapte
       order: 10,
       template: `[Scene Plot Beat]
 {{plotBeat}}`,
+      metadata: {
+        tier: 'task',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'Core plot beat/goal for this scene'
+      }
     },
 
     // Block 11: Quality Constraints
@@ -238,6 +319,12 @@ NOTE: The following are suspense hooks or narrative threads from previous chapte
 Please expand genuine interaction details and actions to support the framework, ensuring real plot density justifies the word count requirement. Start directly with the prose. Do not output any titles, summaries, or explanatory text.
 
 Target word count: approximately {{targetWordCount}} characters.`,
+      metadata: {
+        tier: 'constraint',
+        isStatic: true,
+        dataSource: 'static',
+        description: 'Static quality constraints and anti-cliche rules'
+      }
     },
   ],
 
@@ -487,6 +574,12 @@ Create characters that readers will remember and care about.`,
 
 [World Setting]
 {{settingText}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'Story premise, genre and world setting context'
+      }
     },
 
     // Block 2: Character Configuration Requirements
@@ -506,6 +599,12 @@ Please generate a diverse cast of characters based on the story context above. E
 7. **Character Arc**: Potential growth trajectory
 
 Ensure characters complement each other and create interesting dynamics.`,
+      metadata: {
+        tier: 'task',
+        isStatic: true,
+        dataSource: 'static',
+        description: 'Character generation requirements and structure'
+      }
     },
 
     // Block 3: Core Requirements
@@ -522,6 +621,12 @@ Ensure characters complement each other and create interesting dynamics.`,
 - Characters should serve the story while feeling independent
 
 Output each character in a structured format that can be easily parsed and integrated into the story management system.`,
+      metadata: {
+        tier: 'constraint',
+        isStatic: true,
+        dataSource: 'static',
+        description: 'Quality constraints for character generation'
+      }
     },
   ],
 

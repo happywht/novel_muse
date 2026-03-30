@@ -90,3 +90,15 @@ export interface TemplateRenderResult {
     total: number;
   };
 }
+
+/** 区块数据来源 */
+export type BlockDataSource = 'static' | 'user_input' | 'computed' | 'derived';
+
+/** 区块元数据（用于先验分类） */
+export interface BlockMetadata {
+  id: string;                      // 区块ID
+  tier: 'task' | 'context' | 'style' | 'constraint' | 'format' | 'other';  // 分类层级
+  isStatic: boolean;               // 是否静态内容
+  dataSource: BlockDataSource;     // 数据来源
+  description?: string;            // 描述说明
+}
