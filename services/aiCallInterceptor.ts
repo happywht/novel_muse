@@ -2,7 +2,7 @@
 
 import { isFeatureEnabled } from '../config/featureFlags';
 import { templateEngine } from './templateEngine';
-import { BlockMetadata } from '../types/promptTemplate';
+import { BlockMetadata, TemplateSection } from '../types/promptTemplate';
 
 // 从 config/templates/defaults.ts 导入 VariableTier 类型
 export type VariableTier = 'critical' | 'important' | 'optional';
@@ -28,7 +28,7 @@ export interface AICallContext {
       tier: VariableTier;
       tokenCount: number;
     }>;
-    blocks?: BlockMetadata[];             // 区块元数据（用于先验分类）
+    blocks?: TemplateSection[];           // 区块元数据（包含id和metadata）
   };
 }
 

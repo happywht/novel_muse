@@ -10,9 +10,16 @@ import {
   PromptVariable,
   VariableTier,
   TemplateCategory,
+  TemplateSection,
+  VariableSource,
+  BlockMetadata,
+  PromptBlock,
 } from '../types/promptTemplate';
 
-import { DEFAULT_TEMPLATES } from '../config/templates/defaults';
+import {
+  DEFAULT_TEMPLATES,
+  TemplateVariable,
+} from '../config/templates/defaults';
 
 /**
  * 验证结果
@@ -105,7 +112,7 @@ export class TemplateRegistry {
   /**
    * 构建 User Template 字符串
    */
-  private buildUserTemplate(blocks: any[]): string {
+  private buildUserTemplate(blocks: PromptBlock[]): string {
     return blocks
       .sort((a, b) => a.order - b.order)
       .map((block) => block.template)
@@ -115,7 +122,7 @@ export class TemplateRegistry {
   /**
    * 映射变量定义
    */
-  private mapVariables(variables: any[]): PromptVariable[] {
+  private mapVariables(variables: TemplateVariable[]): PromptVariable[] {
     return variables.map((v) => ({
       name: v.name,
       type: this.mapVariableType(v.type),
@@ -149,29 +156,25 @@ export class TemplateRegistry {
   /**
    * 映射变量来源
    */
-  private mapVariableSource(
-    source: string
-  ): 'user' | 'project' | 'computed' | 'system' {
-    const sourceMap: Record<string, 'user' | 'project' | 'computed' | 'system'> = {
-      user_input: 'user',
-      project_state: 'project',
-      computed: 'computed',
-      derived: 'computed',
-      optional: 'system',
-    };
-    return sourceMap[source] || 'system';
+  private mapVariableSource(source: string): VariableSource {
+    const validSources: VariableSource[] = ['user_input', 'project_state', 'computed', 'derived', 'optional'];
+    if (validSources.includes(source as VariableSource)) {
+      return source as VariableSource;
+    }
+    return 'optional'; // 默认值
   }
 
   /**
    * 映射模板块为 sections
+   * 扩展 TemplateSection 以包含 metadata
    */
-  private mapSections(blocks: any[]): any[] {
+  private mapSections(blocks: PromptBlock[]): (TemplateSection & { metadata?: BlockMetadata })[] {
     return blocks.map((block) => ({
       id: block.id,
       label: block.title,
       condition: block.condition,
       order: block.order,
-      metadata: block.metadata, // 传递元数据
+      metadata: block.metadata,
     }));
   }
 

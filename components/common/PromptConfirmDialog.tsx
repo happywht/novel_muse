@@ -8,59 +8,14 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { X, Send, Edit3, RotateCcw, Copy, ChevronDown, ChevronUp, Eye, FileText, Maximize2, Loader2, BarChart3, Zap } from 'lucide-react';
 import { AICallContext, confirmAICall, cancelAICall, AI_CONFIRMATION_EVENT } from '../../services/aiCallInterceptor';
 import { BlockMetadata } from '../../types/promptTemplate';
-
-/** 区块分类类型 */
-type SectionTier = 'task' | 'context' | 'style' | 'constraint' | 'format' | 'other';
-
-/** 分类规则配置 */
-interface CategoryRule {
-  keywords: string[];
-  icon: string;
-  color: { bg: string; border: string; text: string; badge: string };
-}
-
-/** 分类规则定义 */
-/** 获取区块分类颜色 */
-const getTierColor = (tier: SectionTier) => {
-  return CATEGORY_RULES[tier].color;
-};
-
-const CATEGORY_RULES: Record<SectionTier, CategoryRule> = {
-  task: {
-    keywords: ['任务', '要求', '指令', '目标', '梗概', '必填', '核心', '情节', '生成', '输出'],
-    icon: '🎯',
-    color: { bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400', badge: '🔴' }
-  },
-  context: {
-    keywords: ['角色', '人物', '设定', '场景', '状态', '脉络', '逻辑', '记忆', '世界观', '图谱',
-               'L1', 'L2', 'L3', '伏笔', '档案', '摘要', '背景', '前文', '变更', '动态', '实体'],
-    icon: '👤',
-    color: { bg: 'bg-amber-500/15', border: 'border-amber-400/50', text: 'text-amber-300', badge: '🟡' }
-  },
-  style: {
-    keywords: ['文风', '风格', '基调', '笔迹', '技法', '题材', '类型', '规范', '指纹',
-               '节奏', '句式', '段落', '词汇', '修辞', '特征', '多样性', '句首', '笔法',
-               '语调', '语气', '口吻', '叙事', '视角', '人称', '文体', '表达方式',
-               '特色', '调性', '氛围', '韵味'],
-    icon: '🎨',
-    color: { bg: 'bg-purple-500/10', border: 'border-purple-500/30', text: 'text-purple-400', badge: '🟣' }
-  },
-  constraint: {
-    keywords: ['禁令', '禁忌', '约束', '限制', '铁律', '规则', '不要', '禁止', '必须', '不可'],
-    icon: '🚫',
-    color: { bg: 'bg-orange-500/10', border: 'border-orange-500/30', text: 'text-orange-400', badge: '🟠' }
-  },
-  format: {
-    keywords: ['输出格式', '格式要求', 'JSON', '结构化', 'Schema', '格式'],
-    icon: '📋',
-    color: { bg: 'bg-blue-500/10', border: 'border-blue-500/30', text: 'text-blue-400', badge: '🔵' }
-  },
-  other: {
-    keywords: [],
-    icon: '📄',
-    color: { bg: 'bg-slate-400/15', border: 'border-slate-400/50', text: 'text-slate-300', badge: '⚪' }
-  }
-};
+import {
+  SectionTier,
+  CATEGORY_RULES,
+  getTierColor,
+  getTierFromKeywords,
+  getTierFromClassification,
+  getAllTiers,
+} from '../../config/templates/categoryRules';
 
 /** 解析出的区块结构 */
 interface ParsedSection {
@@ -106,6 +61,8 @@ export const PromptConfirmDialog: React.FC = () => {
   const [isConfirming, setIsConfirming] = useState(false);
   // 新增：全部展开/折叠状态
   const [allExpanded, setAllExpanded] = useState(false);
+  // 新增：中等屏幕侧边面板显示状态
+  const [showSidePanel, setShowSidePanel] = useState(false);
 
   // 可访问性：确认按钮引用（用于焦点管理）
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
@@ -142,48 +99,6 @@ export const PromptConfirmDialog: React.FC = () => {
     let sectionIndex = 0;
 
     /**
-     * 基于关键词的分类（Fallback）
-     * 当模板元数据不可用时使用
-     */
-    const getTierFromKeywords = (title: string): SectionTier => {
-      const checkTitle = title.toLowerCase();
-      // 按优先级检查：任务 > 约束 > 格式 > 风格 > 上下文
-      for (const keyword of CATEGORY_RULES.task.keywords) {
-        if (checkTitle.includes(keyword)) return 'task';
-      }
-      for (const keyword of CATEGORY_RULES.constraint.keywords) {
-        if (checkTitle.includes(keyword)) return 'constraint';
-      }
-      for (const keyword of CATEGORY_RULES.format.keywords) {
-        if (checkTitle.includes(keyword)) return 'format';
-      }
-      for (const keyword of CATEGORY_RULES.style.keywords) {
-        if (checkTitle.includes(keyword)) return 'style';
-      }
-      for (const keyword of CATEGORY_RULES.context.keywords) {
-        if (checkTitle.includes(keyword)) return 'context';
-      }
-      return 'other';
-    };
-
-    /**
-     * 混合分类逻辑
-     * 优先使用模板元数据，Fallback到关键词匹配
-     */
-    const getTierFromClassification = (
-      title: string,
-      metadata?: BlockMetadata
-    ): SectionTier => {
-      // 优先使用模板元数据（先验分类）
-      if (metadata?.tier) {
-        return metadata.tier;
-      }
-
-      // Fallback: 关键词匹配（后验分类）
-      return getTierFromKeywords(title);
-    };
-
-    /**
      * 从上下文中获取区块元数据
      * 支持基于标题匹配或ID匹配
      */
@@ -192,14 +107,15 @@ export const PromptConfirmDialog: React.FC = () => {
 
       // 尝试通过ID精确匹配
       const byId = context.templateMeta.blocks.find(b => b.id === blockId);
-      if (byId) return byId;
+      if (byId?.metadata) return byId.metadata;
 
       // 尝试通过标题模糊匹配
       const byTitle = context.templateMeta.blocks.find(b =>
         title.includes(b.id) || b.id.includes(title) ||
-        b.description?.includes(title)
+        (b.label && title.includes(b.label)) ||
+        (b.metadata?.description && b.metadata.description.includes(title))
       );
-      return byTitle;
+      return byTitle?.metadata;
     };
 
     /**
@@ -514,7 +430,7 @@ export const PromptConfirmDialog: React.FC = () => {
 
           {/* 分类统计徽章 */}
           <div className="flex items-center gap-1">
-            {(Object.keys(CATEGORY_RULES) as SectionTier[]).map(tier => {
+            {getAllTiers().map(tier => {
               const count = tierStats[tier].count;
               if (count === 0) return null;
               const rule = CATEGORY_RULES[tier];
@@ -534,7 +450,21 @@ export const PromptConfirmDialog: React.FC = () => {
         {/* Content - 双栏布局 */}
         <div className="flex-1 overflow-hidden flex gap-4 p-4">
           {/* 左侧：区块列表（占60%） */}
-          <div className="flex-1 overflow-y-auto space-y-3 min-w-0">
+          <div className="basis-[60%] overflow-y-auto space-y-3 min-w-0">
+            {/* 中等屏幕(md断点)Token分析切换按钮 */}
+            <div className="lg:hidden mb-3">
+              <button
+                onClick={() => setShowSidePanel(!showSidePanel)}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800/50 rounded-lg text-sm text-slate-300 hover:bg-slate-700/50 transition-colors w-full justify-center"
+                aria-expanded={showSidePanel}
+                aria-label="Toggle token analysis panel"
+              >
+                <BarChart3 className="w-4 h-4" />
+                Token 分析
+                {showSidePanel ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+            </div>
+
             {/* 系统指令（可折叠） */}
             <div className="bg-slate-800/50 rounded-xl border border-slate-700 overflow-hidden">
               <button
@@ -565,9 +495,12 @@ export const PromptConfirmDialog: React.FC = () => {
               <div className="space-y-3">
                 {/* 分类筛选标签和全部展开/折叠按钮 */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex items-center gap-2 flex-wrap" role="tablist" aria-label="Section category filter">
                   <button
                     onClick={() => setActiveTier('all')}
+                    role="tab"
+                    aria-selected={activeTier === 'all'}
+                    aria-pressed={activeTier === 'all'}
                     className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 transition-all ${
                       activeTier === 'all'
                         ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20'
@@ -579,7 +512,7 @@ export const PromptConfirmDialog: React.FC = () => {
                       {parsedSections.length}
                     </span>
                   </button>
-                  {(Object.keys(CATEGORY_RULES) as SectionTier[]).map(tier => {
+                  {getAllTiers().map(tier => {
                     const count = tierStats[tier].count;
                     if (count === 0) return null;
                     const rule = CATEGORY_RULES[tier];
@@ -587,6 +520,9 @@ export const PromptConfirmDialog: React.FC = () => {
                       <button
                         key={tier}
                         onClick={() => setActiveTier(tier)}
+                        role="tab"
+                        aria-selected={activeTier === tier}
+                        aria-pressed={activeTier === tier}
                         className={`px-3 py-1.5 text-xs rounded-lg flex items-center gap-1.5 transition-all ${
                           activeTier === tier
                             ? `${rule.color.bg} ${rule.color.text} border ${rule.color.border}`
@@ -630,9 +566,11 @@ export const PromptConfirmDialog: React.FC = () => {
                       key={section.id}
                       className={`${colors.bg} ${colors.border} border rounded-xl overflow-hidden`}
                     >
-                      <div
+                      <button
                         onClick={() => toggleSection(section.id)}
-                        className="w-full flex items-center justify-between p-3 hover:bg-slate-700/30 transition-colors cursor-pointer"
+                        aria-expanded={isExpanded}
+                        aria-controls={`section-content-${section.id}`}
+                        className="w-full flex items-center justify-between p-3 hover:bg-slate-700/30 transition-colors cursor-pointer text-left"
                       >
                         <div className="flex items-center gap-2">
                           <span>{colors.badge}</span>
@@ -640,17 +578,29 @@ export const PromptConfirmDialog: React.FC = () => {
                           {/* 数据来源标识 */}
                           {section.metadata && (
                             <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-                              section.metadata.isStatic
+                              section.metadata.dataSource === 'static'
+                                ? 'bg-green-500/20 text-green-400'
+                                : section.metadata.dataSource === 'user_input'
+                                ? 'bg-blue-500/20 text-blue-400'
+                                : section.metadata.dataSource === 'computed'
+                                ? 'bg-amber-500/20 text-amber-400'
+                                : section.metadata.dataSource === 'derived'
+                                ? 'bg-purple-500/20 text-purple-400'
+                                : section.metadata.isStatic
                                 ? 'bg-green-500/20 text-green-400'
                                 : 'bg-blue-500/20 text-blue-400'
                             }`}>
-                              {section.metadata.isStatic ? '静态' : '动态'}
+                              {section.metadata.dataSource === 'static' ? '📌 静态' :
+                               section.metadata.dataSource === 'user_input' ? '✏️ 用户' :
+                               section.metadata.dataSource === 'computed' ? '⚙️ 计算' :
+                               section.metadata.dataSource === 'derived' ? '📊 派生' :
+                               section.metadata.isStatic ? '静态' : '动态'}
                             </span>
                           )}
                           <span className="text-xs text-slate-500">({section.tokenCount} tokens)</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <button
+                          <span
                             onClick={(e) => {
                               e.stopPropagation();
                               setSelectedVariable({
@@ -664,15 +614,32 @@ export const PromptConfirmDialog: React.FC = () => {
                               });
                             }}
                             className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-600/50 transition-colors"
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.stopPropagation();
+                                setSelectedVariable({
+                                  key: section.id,
+                                  label: section.title,
+                                  value: section.content,
+                                  preview: section.content.slice(0, 100),
+                                  tokenCount: section.tokenCount,
+                                  tier: section.tier,
+                                  source: 'project'
+                                });
+                              }
+                            }}
+                            aria-label={`View details of ${section.title}`}
                           >
                             <Maximize2 size={14} />
-                          </button>
+                          </span>
                           {isExpanded ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
                         </div>
-                      </div>
+                      </button>
 
                       {isExpanded && (
-                        <div className="px-3 pb-3 border-t border-slate-700/50 pt-2">
+                        <div id={`section-content-${section.id}`} className="px-3 pb-3 border-t border-slate-700/50 pt-2">
                           <pre className="text-xs text-slate-300 whitespace-pre-wrap font-mono max-h-48 overflow-y-auto">{section.content}</pre>
                         </div>
                       )}
@@ -726,8 +693,8 @@ export const PromptConfirmDialog: React.FC = () => {
             )}
           </div>
 
-          {/* 右侧：辅助信息面板（约320px） */}
-          <div className="w-80 flex flex-col gap-4 shrink-0 hidden lg:flex">
+          {/* 右侧：辅助信息面板（占40%） */}
+          <div className="basis-[40%] flex flex-col gap-4 shrink-0 hidden lg:flex">
             {/* Token分析面板 */}
             <div className="bg-slate-800/50 rounded-xl border border-slate-700 p-4">
               <h3 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
@@ -736,15 +703,23 @@ export const PromptConfirmDialog: React.FC = () => {
               </h3>
               {/* 分类占比可视化 */}
               <div className="space-y-2">
-                {(Object.keys(CATEGORY_RULES) as SectionTier[]).map(tier => {
+                {getAllTiers().map(tier => {
                   const stat = tierStats[tier];
                   if (stat.count === 0) return null;
                   const percentage = totalTokens > 0 ? (stat.tokens / totalTokens * 100).toFixed(1) : '0';
                   const rule = CATEGORY_RULES[tier];
+                  const tierLabel = tier === 'task' ? 'Task' : tier === 'context' ? 'Context' : tier === 'style' ? 'Style' : tier === 'constraint' ? 'Constraint' : tier === 'format' ? 'Format' : 'Other';
                   return (
                     <div key={tier} className="flex items-center gap-2">
                       <span className="w-4">{rule.color.badge}</span>
-                      <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                      <div
+                        className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden"
+                        role="progressbar"
+                        aria-valuenow={parseFloat(percentage)}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${tierLabel} token percentage`}
+                      >
                         <div
                           className="h-full transition-all"
                           style={{ width: `${percentage}%`, backgroundColor: tier === 'task' ? '#ef4444' : tier === 'context' ? '#f59e0b' : tier === 'style' ? '#a855f7' : tier === 'constraint' ? '#f97316' : tier === 'format' ? '#3b82f6' : '#64748b' }}
@@ -869,6 +844,62 @@ export const PromptConfirmDialog: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* 中等屏幕(md断点)底部Token分析面板 */}
+      {showSidePanel && (
+        <div
+          className="lg:hidden fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-700 p-4 max-h-[50vh] overflow-y-auto z-[105]"
+          role="region"
+          aria-label="Token analysis panel for medium screens"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-white flex items-center gap-2">
+              <BarChart3 size={16} className="text-cyan-400" />
+              Token 分布分析
+            </h3>
+            <button
+              onClick={() => setShowSidePanel(false)}
+              className="text-slate-400 hover:text-white"
+              aria-label="Close token analysis panel"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          {/* 分类占比可视化 */}
+          <div className="space-y-2">
+            {getAllTiers().map(tier => {
+              const stat = tierStats[tier];
+              if (stat.count === 0) return null;
+              const percentage = totalTokens > 0 ? (stat.tokens / totalTokens * 100).toFixed(1) : '0';
+              const rule = CATEGORY_RULES[tier];
+              return (
+                <div key={tier} className="flex items-center gap-2">
+                  <span className="w-4">{rule.color.badge}</span>
+                  <div
+                    className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden"
+                    role="progressbar"
+                    aria-valuenow={parseFloat(percentage)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`${rule.icon} ${tier} token percentage`}
+                  >
+                    <div
+                      className="h-full transition-all"
+                      style={{ width: `${percentage}%`, backgroundColor: tier === 'task' ? '#ef4444' : tier === 'context' ? '#f59e0b' : tier === 'style' ? '#a855f7' : tier === 'constraint' ? '#f97316' : tier === 'format' ? '#3b82f6' : '#64748b' }}
+                    />
+                  </div>
+                  <span className="text-xs text-slate-400 w-12 text-right">{percentage}%</span>
+                </div>
+              );
+            })}
+          </div>
+          {/* 总计 */}
+          <div className="mt-3 pt-3 border-t border-slate-700 flex justify-between text-xs">
+            <span className="text-slate-500">总计 Tokens</span>
+            <span className="text-cyan-400 font-mono">{totalTokens.toLocaleString()}</span>
+          </div>
+        </div>
+      )}
 
       {/* 变量详情弹窗 */}
       {selectedVariable && (

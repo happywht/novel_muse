@@ -3,49 +3,32 @@
  *
  * This file defines the default templates for various AI generation tasks.
  * Templates are structured with variable definitions and importance tiers.
+ *
+ * @see types/promptTemplate.ts for unified type definitions
  */
+
+// Import unified types from central location
+import {
+  VariableTier,
+  VariableSource,
+  BlockTier,
+  BlockDataSource,
+  BlockMetadata,
+  PromptBlock,
+} from '../../types/promptTemplate';
+
+// Re-export for backward compatibility
+export type {
+  VariableTier,
+  VariableSource,
+  BlockTier,
+  BlockDataSource,
+  BlockMetadata,
+};
 
 // ============================================================
-// Type Definitions
+// Local Type Definitions (specific to this file)
 // ============================================================
-
-/**
- * Variable importance tier
- * - critical: Core variables required for generation (missing will cause failure)
- * - important: Significant variables that greatly affect output quality
- * - optional: Nice-to-have variables for enhanced context
- */
-export type VariableTier = 'critical' | 'important' | 'optional';
-
-/**
- * Variable source - where the data comes from
- */
-export type VariableSource =
-  | 'user_input'      // Direct user input
-  | 'project_state'   // From project store
-  | 'computed'        // Computed from other data
-  | 'derived'         // Derived from context analysis
-  | 'optional';       // May or may not be available
-
-/**
- * Block data source type for metadata
- */
-export type BlockDataSource = 'static' | 'user_input' | 'computed' | 'derived';
-
-/**
- * Block tier classification
- */
-export type BlockTier = 'task' | 'context' | 'style' | 'constraint' | 'format' | 'other';
-
-/**
- * Block metadata for template classification
- */
-export interface BlockMetadata {
-  tier: BlockTier;           // Classification tier
-  isStatic: boolean;         // Whether content is static
-  dataSource: BlockDataSource; // Data source type
-  description?: string;      // Description
-}
 
 /**
  * Template variable definition
@@ -59,18 +42,6 @@ export interface TemplateVariable {
   description: string;    // Human-readable description
   display?: string;       // Display name in UI (Chinese)
   defaultValue?: unknown; // Default value if not provided
-}
-
-/**
- * Prompt block definition - a logical section of the prompt
- */
-export interface PromptBlock {
-  id: string;
-  title: string;          // Block title shown in prompt
-  template: string;       // Template string with {{variable}} placeholders
-  condition?: string;     // JavaScript expression for conditional inclusion
-  order: number;          // Display order
-  metadata?: BlockMetadata; // Block metadata for classification
 }
 
 /**
@@ -710,6 +681,12 @@ Build worlds that readers will want to explore and understand.`,
 
 [Number of Entries to Generate]
 {{count}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'Story premise, genre and category for world-building'
+      }
     },
 
     // Block 2: Category Guidance
@@ -720,6 +697,12 @@ Build worlds that readers will want to explore and understand.`,
       template: `[Category-Specific Guidance]
 {{categoryGuidance}}`,
       condition: 'categoryGuidance != null && categoryGuidance !== ""',
+      metadata: {
+        tier: 'constraint',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'Category-specific guidance for setting generation'
+      }
     },
 
     // Block 3: General Requirements
@@ -744,6 +727,12 @@ Requirements:
 - Maintain consistency with the established genre and tone
 
 Output {{count}} distinct setting entries in the specified category.`,
+      metadata: {
+        tier: 'task',
+        isStatic: true,
+        dataSource: 'static',
+        description: 'Static task requirements and output format for world settings'
+      }
     },
   ],
 
@@ -841,6 +830,12 @@ Expand while maintaining consistency with the existing content.`,
 
 [Setting Title]
 {{title}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'Genre and setting title for context'
+      }
     },
 
     // Block 2: Current Setting Content
@@ -850,6 +845,12 @@ Expand while maintaining consistency with the existing content.`,
       order: 2,
       template: `[Current Setting Content]
 {{currentContent}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'Current world setting content to expand'
+      }
     },
 
     // Block 3: Task Requirements
@@ -874,6 +875,12 @@ Requirements:
 - Keep the genre and tone in mind
 
 Output the expanded setting in a clear, organized format.`,
+      metadata: {
+        tier: 'task',
+        isStatic: true,
+        dataSource: 'static',
+        description: 'Static expansion requirements and guidelines'
+      }
     },
   ],
 
@@ -952,6 +959,12 @@ Create plots that are both structurally sound and emotionally resonant.`,
 
 [Genre]
 {{genre}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'Story premise and genre for plot context'
+      }
     },
 
     // Block 2: Character Information
@@ -962,6 +975,12 @@ Create plots that are both structurally sound and emotionally resonant.`,
       template: `[Character Context]
 {{contextStr}}`,
       condition: 'contextStr != null && contextStr !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Character context and relationships for plot coherence'
+      }
     },
 
     // Block 3: World Settings
@@ -972,6 +991,12 @@ Create plots that are both structurally sound and emotionally resonant.`,
       template: `[Relevant World Settings]
 {{relevantSettings}}`,
       condition: 'relevantSettings != null && relevantSettings !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Relevant world settings for plot generation'
+      }
     },
 
     // Block 4: Graph Context
@@ -982,6 +1007,12 @@ Create plots that are both structurally sound and emotionally resonant.`,
       template: `[Knowledge Graph Context]
 {{graphContext}}`,
       condition: 'graphContext != null && graphContext !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Knowledge graph context for plot coherence'
+      }
     },
 
     // Block 5: Lookup Table
@@ -992,6 +1023,12 @@ Create plots that are both structurally sound and emotionally resonant.`,
       template: `[Reference Information]
 {{lookupTable}}`,
       condition: 'lookupTable != null && lookupTable !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Reference lookup table for consistency checking'
+      }
     },
 
     // Block 6: Task Requirements
@@ -1013,6 +1050,12 @@ Requirements:
 - Utilize the world settings and character relationships provided
 
 Output the plot outline in a clear, structured format.`,
+      metadata: {
+        tier: 'task',
+        isStatic: true,
+        dataSource: 'static',
+        description: 'Static plot generation requirements and format specification'
+      }
     },
   ],
 
@@ -1125,6 +1168,12 @@ Rewrite plots to better serve the story's goals while respecting established ele
       order: 1,
       template: `[Genre]
 {{genre}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Novel genre for tone and style guidance'
+      }
     },
 
     // Block 2: Character Context
@@ -1135,6 +1184,12 @@ Rewrite plots to better serve the story's goals while respecting established ele
       template: `[Character Context]
 {{contextStr}}`,
       condition: 'contextStr != null && contextStr !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Character context for plot consistency'
+      }
     },
 
     // Block 3: Reference Information
@@ -1145,6 +1200,12 @@ Rewrite plots to better serve the story's goals while respecting established ele
       template: `[Reference Information]
 {{lookupTable}}`,
       condition: 'lookupTable != null && lookupTable !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Reference lookup table for consistency checking'
+      }
     },
 
     // Block 4: Current Plot
@@ -1154,6 +1215,12 @@ Rewrite plots to better serve the story's goals while respecting established ele
       order: 4,
       template: `[Current Plot Outline]
 {{currentPlot}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'Current plot outline to be rewritten'
+      }
     },
 
     // Block 5: Modification Directive
@@ -1171,6 +1238,12 @@ Please rewrite the plot outline according to the above directive while:
 - Improving overall narrative flow where possible
 
 Output the revised plot outline in a clear, structured format.`,
+      metadata: {
+        tier: 'task',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'User modification directive and rewrite instructions'
+      }
     },
   ],
 
@@ -1267,6 +1340,12 @@ Polish while preserving the unique voice and vision of the original work.`,
 {{modeInstruction}}
 
 Apply the above instructions to improve the following draft content.`,
+      metadata: {
+        tier: 'task',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '润色模式和具体指令要求',
+      },
     },
 
     // Block 2: Content to Polish
@@ -1285,6 +1364,12 @@ Please polish the above content according to the instructions. Focus on:
 - Clarity and impact
 
 Output the polished version while preserving the core meaning and style of the original.`,
+      metadata: {
+        tier: 'task',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '待润色的草稿内容',
+      },
     },
   ],
 
@@ -1357,6 +1442,12 @@ Role: {{characterRole}}
 
 [Character Relationships]
 {{characterRelationships}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'derived',
+        description: '角色档案信息，包括名称、角色、描述和人物关系',
+      },
     },
 
     // Block 2: Conversation History
@@ -1367,6 +1458,12 @@ Role: {{characterRole}}
       template: `[Previous Conversation]
 {{historyText}}`,
       condition: 'historyText != null && historyText !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '对话历史记录，用于保持对话连续性',
+      },
     },
 
     // Block 3: Current Message
@@ -1378,6 +1475,12 @@ Role: {{characterRole}}
 {{message}}
 
 Respond as {{characterName}} would. Stay true to their personality, knowledge, and emotional state. Express their unique voice and perspective in your response.`,
+      metadata: {
+        tier: 'task',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '用户当前发送的消息，角色需要对此做出回应',
+      },
     },
   ],
 
@@ -1484,6 +1587,12 @@ Write compelling scenes that honor the source material while adding depth and te
 
 [Core Premise]
 {{premise}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'derived',
+        description: '故事背景上下文，包括小说类型和核心前提',
+      },
     },
 
     // Block 2: Character and World Context
@@ -1493,6 +1602,12 @@ Write compelling scenes that honor the source material while adding depth and te
       order: 2,
       template: `{{contextStr}}`,
       condition: 'contextStr != null && contextStr !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '角色和世界观上下文信息',
+      },
     },
 
     // Block 3: Plot Outline
@@ -1502,6 +1617,12 @@ Write compelling scenes that honor the source material while adding depth and te
       order: 3,
       template: `[Current Plot Outline Context]
 {{plotOutline}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '当前情节大纲上下文',
+      },
     },
 
     // Block 4: Writing Task
@@ -1518,6 +1639,12 @@ Write compelling scenes that honor the source material while adding depth and te
 - Start directly with the prose, no introductory remarks
 - Maintain consistency with established characters and settings
 - Create vivid, engaging prose`,
+      metadata: {
+        tier: 'task',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '具体的写作任务和输出要求',
+      },
     },
   ],
 
@@ -1610,6 +1737,12 @@ You must output clean, ready-to-insert text with no markdown formatting or meta-
       title: 'Genre Context',
       order: 1,
       template: `You are a professional novel editing assistant (Genre: {{genre}}).`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '小说类型上下文'
+      }
     },
 
     // Block 2: User Instructions
@@ -1619,6 +1752,12 @@ You must output clean, ready-to-insert text with no markdown formatting or meta-
       order: 2,
       template: `[User Instructions]
 {{instruction}}`,
+      metadata: {
+        tier: 'task',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '用户重写指令'
+      }
     },
 
     // Block 3: Context
@@ -1630,6 +1769,12 @@ You must output clean, ready-to-insert text with no markdown formatting or meta-
 To ensure your rewrite maintains coherence, here is the context before and after the selected text (for reference only - DO NOT repeat this in your output):
 [Before]: "...{{contextBefore}}"
 [After]: "{{contextAfter}}..."`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '前后文上下文用于保持连贯性'
+      }
     },
 
     // Block 4: Text to Rewrite
@@ -1644,6 +1789,12 @@ To ensure your rewrite maintains coherence, here is the context before and after
 1. Follow the user's instructions EXACTLY - rewrite/polish/expand/condense ONLY the "Original Text to Rewrite"
 2. The result must seamlessly connect with [Before] and [After] context
 3. CRITICAL: Output ONLY the rewritten plain text! No markdown formatting (no \`\`\` or **), no introductory remarks like "Here is the rewritten text:" or "Below is...". Your output will be directly inserted into the original text.`,
+      metadata: {
+        tier: 'constraint',
+        isStatic: true,
+        dataSource: 'static',
+        description: '待重写文本和输出格式约束'
+      }
     },
   ],
 
@@ -1740,6 +1891,12 @@ Create summaries that capture the essence without unnecessary detail.`,
 
 [Chapter Content]
 {{content}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '章节标题和内容'
+      }
     },
 
     // Block 2: Summary Requirements
@@ -1754,6 +1911,12 @@ Create summaries that capture the essence without unnecessary detail.`,
 4. Use objective, efficient language as "medium-term memory" reference for future writing
 
 Output a concise summary (100-200 characters).`,
+      metadata: {
+        tier: 'constraint',
+        isStatic: true,
+        dataSource: 'static',
+        description: '摘要生成的约束条件和输出格式要求'
+      }
     },
   ],
 
@@ -1819,6 +1982,12 @@ Provide professional analysis that helps authors improve their work.`,
       order: 1,
       template: `[Chapter Data]
 {{chapterInfo}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '章节信息数据，包含章节标题、字数等元数据',
+      },
     },
 
     // Block 2: Character and Plot Context
@@ -1831,6 +2000,12 @@ Provide professional analysis that helps authors improve their work.`,
 
 [Plot Node Count]
 {{plotBeatCount}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '角色列表和情节点数量等上下文信息',
+      },
     },
 
     // Block 3: Analysis Requirements
@@ -1859,6 +2034,12 @@ Please output analysis in a clear structure, including:
 - Expected improvement effects
 
 Output the analysis results directly, without any additional explanations or notes.`,
+      metadata: {
+        tier: 'task',
+        isStatic: true,
+        dataSource: 'static',
+        description: '分析任务要求，包含5个维度的评估标准和输出格式规范',
+      },
     },
   ],
 
@@ -1923,6 +2104,12 @@ const WRITING_BASE_TEMPLATE: PromptTemplate = {
       title: 'User Prompt',
       order: 1,
       template: `{{prompt}}`,
+      metadata: {
+        tier: 'task',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '用户输入的写作提示内容',
+      },
     },
   ],
 
@@ -1981,6 +2168,12 @@ Do NOT extract ordinary conversations, temporary states, or common items.`,
       template: `{{contextSection}}
 {{foreshadowingSection}}`,
       condition: 'contextSection != null || foreshadowingSection != null',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '前文背景和待回收伏笔等上下文信息',
+      },
     },
 
     // Block 2: Entity Lookup Table
@@ -1990,6 +2183,12 @@ Do NOT extract ordinary conversations, temporary states, or common items.`,
       order: 2,
       template: `[Available Entities for Matching]:
 {{lookupTable}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '实体映射表，用于ID匹配和实体名称验证',
+      },
     },
 
     // Block 3: Scene Content
@@ -1999,6 +2198,12 @@ Do NOT extract ordinary conversations, temporary states, or common items.`,
       order: 3,
       template: `[Text to Analyze]:
 {{sceneContent}}`,
+      metadata: {
+        tier: 'task',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '待分析的场景文本内容',
+      },
     },
 
     // Block 4: Task Requirements
@@ -2030,6 +2235,12 @@ Do NOT extract ordinary conversations, temporary states, or common items.`,
 4. extractionEvidence: Specific sentences from text supporting this extraction, must quote original text
 
 Output in JSON format. If no major events, return empty array [].`,
+      metadata: {
+        tier: 'constraint',
+        isStatic: true,
+        dataSource: 'static',
+        description: '提取规则定义，包含重大事件判定标准和输出格式要求',
+      },
     },
   ],
 
@@ -2114,6 +2325,12 @@ Focus on events that have lasting impact on the story world.`,
       order: 1,
       template: `[Available Entities for Matching]:
 {{lookupTable}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '实体映射表，用于ID匹配和实体名称验证',
+      },
     },
 
     // Block 2: Text to Analyze
@@ -2123,6 +2340,12 @@ Focus on events that have lasting impact on the story world.`,
       order: 2,
       template: `[Novel Text Fragment]:
 {{text}}`,
+      metadata: {
+        tier: 'task',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '待提取Echo的小说文本片段',
+      },
     },
 
     // Block 3: Recent Changes Context
@@ -2133,6 +2356,12 @@ Focus on events that have lasting impact on the story world.`,
       template: `[Recent Confirmed State Changes]:
 {{recentChangesSummary}}`,
       condition: 'recentChangesSummary != null && recentChangesSummary !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '最近已确认的状态变化摘要，用于避免重复提取',
+      },
     },
 
     // Block 4: Extraction Requirements
@@ -2150,6 +2379,12 @@ Focus on events that have lasting impact on the story world.`,
 7. triples: Array of knowledge graph triples (subject, relation, object)
 
 Output in JSON format. If no significant events, return empty array [].`,
+      metadata: {
+        tier: 'constraint',
+        isStatic: true,
+        dataSource: 'static',
+        description: '提取指南，包含字段定义、置信度评分标准和知识图谱三元组格式',
+      },
     },
   ],
 
@@ -2223,6 +2458,12 @@ Consolidation rules:
       title: 'Entity Information',
       order: 1,
       template: `[Entity Name]: {{targetName}} ({{targetType}})`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '目标实体名称和类型'
+      }
     },
 
     // Block 2: Current Description
@@ -2232,6 +2473,12 @@ Consolidation rules:
       order: 2,
       template: `[Current Archive Description]:
 {{currentDescription}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '实体当前的归档描述'
+      }
     },
 
     // Block 3: New Memories
@@ -2241,6 +2488,12 @@ Consolidation rules:
       order: 3,
       template: `[New Memories to Consolidate (Recent Events)]:
 {{echoText}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '待整合的新记忆事件'
+      }
     },
 
     // Block 4: Task Requirements
@@ -2255,6 +2508,12 @@ Consolidation rules:
 4. **Simplify**: Remove no-longer-important details, keep core traits and key changes
 
 Output the consolidated [New Archive Description] directly (plain text, no Markdown format).`,
+      metadata: {
+        tier: 'constraint',
+        isStatic: true,
+        dataSource: 'static',
+        description: '记忆整合规则和输出格式要求'
+      }
     },
   ],
 
@@ -2337,6 +2596,12 @@ Deduction rules:
       title: 'Genre Context',
       order: 1,
       template: `[Novel Genre]: {{genre}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '小说类型用于推理上下文'
+      }
     },
 
     // Block 2: Trigger Events
@@ -2346,6 +2611,12 @@ Deduction rules:
       order: 2,
       template: `[Recent Events (Triggers)]:
 {{triggers}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '触发链式反应的最近事件列表'
+      }
     },
 
     // Block 3: Entity Lookup
@@ -2355,6 +2626,12 @@ Deduction rules:
       order: 3,
       template: `[Available Entities to Find Affected Targets]:
 {{lookupTable}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '实体映射表用于查找受影响目标'
+      }
     },
 
     // Block 4: Graph Context
@@ -2365,6 +2642,12 @@ Deduction rules:
       template: `[Dynamic Knowledge Graph]:
 {{graphContext}}`,
       condition: 'graphContext != null && graphContext !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '知识图谱上下文用于关系推理'
+      }
     },
 
     // Block 5: Deduction Requirements
@@ -2381,6 +2664,12 @@ Deduction rules:
 6. **Mandatory Chinese Output**: All content in JSON result must use proper Chinese
 
 Output [Future Predictions] strictly in JSON format.`,
+      metadata: {
+        tier: 'constraint',
+        isStatic: true,
+        dataSource: 'static',
+        description: '推理规则和输出格式要求'
+      }
     },
   ],
 
@@ -2467,6 +2756,12 @@ Create characters that readers will remember and care about.`,
       template: `[Story Premise]: {{premise}}
 [Genre]: {{genre}}
 {{settingText}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '故事前提、类型和风格设定'
+      }
     },
 
     // Block 2: Character Basics
@@ -2476,6 +2771,12 @@ Create characters that readers will remember and care about.`,
       order: 2,
       template: `[Character Name]: {{name}}
 [Character Role]: {{role}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '角色名称和定位'
+      }
     },
 
     // Block 3: Generation Requirements
@@ -2497,6 +2798,12 @@ Create characters that readers will remember and care about.`,
 - **Memorability**: Signature traits should make character stand out
 
 Output character profile in structured format.`,
+      metadata: {
+        tier: 'task',
+        isStatic: true,
+        dataSource: 'static',
+        description: '角色生成要求和输出格式'
+      }
     },
   ],
 
@@ -2592,6 +2899,12 @@ Create conflict scenes that readers cannot look away from.`,
       order: 1,
       template: `[Shura Field Participants]
 {{characterContext}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '格式化的角色档案包含关系和潜在冲突点'
+      }
     },
 
     // Block 2: Location Context
@@ -2602,6 +2915,12 @@ Create conflict scenes that readers cannot look away from.`,
       template: `[Scene Location]
 {{locationContext}}`,
       condition: 'locationContext != null && locationContext !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '冲突场景的具体位置细节'
+      }
     },
 
     // Block 3: World Context
@@ -2612,6 +2931,12 @@ Create conflict scenes that readers cannot look away from.`,
       template: `[World Constraints]
 {{worldContext}}`,
       condition: 'worldContext != null && worldContext !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '相关的世界设定约束'
+      }
     },
 
     // Block 4: Plot Background
@@ -2621,6 +2946,12 @@ Create conflict scenes that readers cannot look away from.`,
       order: 4,
       template: `[Plot Background]
 {{plotContext}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '冲突场景的剧情背景和上下文'
+      }
     },
 
     // Block 5: Generation Requirements
@@ -2658,6 +2989,12 @@ Please output a single plot node in the following JSON format:
 }
 
 IMPORTANT: Output ONLY the JSON. No opening remarks, no explanations, no markdown code blocks.`,
+      metadata: {
+        tier: 'constraint',
+        isStatic: false,
+        dataSource: 'derived',
+        description: '任务要求和输出格式，包含动态参数（参与者数量、强度等级）'
+      }
     },
   ],
 
@@ -2835,6 +3172,12 @@ Be thorough, critical, and constructive. Focus on issues that impact reader imme
       order: 1,
       template: `[Core Premise]
 {{premise}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'Story core premise for audit context'
+      }
     },
 
     // Block 2: Context
@@ -2844,6 +3187,12 @@ Be thorough, critical, and constructive. Focus on issues that impact reader imme
       order: 2,
       template: `{{contextStr}}`,
       condition: 'contextStr != null && contextStr !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Character and world context for plot audit'
+      }
     },
 
     // Block 3: Current Plot
@@ -2853,6 +3202,12 @@ Be thorough, critical, and constructive. Focus on issues that impact reader imme
       order: 3,
       template: `[Current Plot Outline]
 {{currentPlot}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'Current plot outline to be audited'
+      }
     },
 
     // Block 4: Audit Instructions
@@ -2869,6 +3224,12 @@ Be thorough, critical, and constructive. Focus on issues that impact reader imme
 5. **Narrative Structure**: Are plot beats properly connected with clear cause-and-effect?
 
 Please output your analysis in Markdown format. Ensure the report includes a clear "Actionable Suggestions List" at the end for automated fix procedures.`,
+      metadata: {
+        tier: 'task',
+        isStatic: true,
+        dataSource: 'static',
+        description: 'Static audit task instructions and output format requirements'
+      }
     },
   ],
 
@@ -2943,6 +3304,12 @@ Output must be a valid JSON object with no additional text.`,
       order: 1,
       template: `[Novel Genre]
 {{genre}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '小说类型用于审核上下文'
+      }
     },
 
     // Block 2: Context
@@ -2952,6 +3319,12 @@ Output must be a valid JSON object with no additional text.`,
       order: 2,
       template: `{{contextStr}}`,
       condition: 'contextStr != null && contextStr !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: '角色和世界上下文用于章节计划审核'
+      }
     },
 
     // Block 3: Target Node
@@ -2962,6 +3335,12 @@ Output must be a valid JSON object with no additional text.`,
       template: `[Target Plot Node Goals]
 Title: {{targetNode.title}}
 Core Content: {{targetNode.content}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '目标情节节点用于审核对照'
+      }
     },
 
     // Block 4: Chapters
@@ -2979,6 +3358,12 @@ Beats:
 {{/each}}
 
 {{/each}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '待审核的章节计划列表'
+      }
     },
 
     // Block 5: Audit Task
@@ -3001,6 +3386,12 @@ You must return a JSON object:
   ]
 }
 Do not include any opening remarks or explanatory text.`,
+      metadata: {
+        tier: 'constraint',
+        isStatic: true,
+        dataSource: 'static',
+        description: '审核任务指令和JSON输出格式要求'
+      }
     },
   ],
 
@@ -3092,6 +3483,12 @@ Output must be a valid JSON array with no additional text.`,
    - **trajectory**: Trend analysis, values: ["rising", "falling", "stable"]
    - **isForeshadowing**: Boolean. If this fact/relationship is a **foreshadowing** or unresolved suspense (e.g., obtained mysterious item, heard strange noise, made unfulfilled contract), set to true
    - **status**: Foreshadowing initial status, values: ["OPEN", "RESOLVED", "ABANDONED"]. Default is "OPEN"`,
+      metadata: {
+        tier: 'task',
+        isStatic: true,
+        dataSource: 'static',
+        description: '提取规则和定量评估标准'
+      }
     },
 
     // Block 2: Content
@@ -3101,6 +3498,12 @@ Output must be a valid JSON array with no additional text.`,
       order: 2,
       template: `[Content]
 {{content}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: '待提取知识三元的内容文本'
+      }
     },
 
     // Block 3: Format Requirements
@@ -3114,6 +3517,12 @@ Must return a pure JSON array, format as follows:
   {"subject": "CharacterA", "relation": "located at", "object": "LocationB", "weight": 100, "trajectory": "stable", "isForeshadowing": false, "status": "OPEN"},
   {"subject": "Ember", "relation": "possesses", "object": "rusty copper key", "weight": 70, "trajectory": "stable", "isForeshadowing": true, "status": "OPEN"}
 ]`,
+      metadata: {
+        tier: 'format',
+        isStatic: true,
+        dataSource: 'static',
+        description: 'JSON输出格式要求和示例'
+      }
     },
   ],
 
@@ -3178,6 +3587,12 @@ Output must be a valid JSON object with no additional text.`,
 {{genre}}
 
 {{contextStr}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Novel genre and formatted context with characters and world settings'
+      }
     },
 
     // Block 2: Genre Rules
@@ -3187,6 +3602,12 @@ Output must be a valid JSON object with no additional text.`,
       order: 2,
       template: `{{genreContext}}`,
       condition: 'genreContext != null && genreContext !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Genre-specific rules and guidelines for auditing'
+      }
     },
 
     // Block 3: Previous Context
@@ -3197,6 +3618,12 @@ Output must be a valid JSON object with no additional text.`,
       template: `[Previous Chapters Summary]
 {{prevContext}}`,
       condition: 'prevContext != null && prevContext !== ""',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Summary of previous chapters for continuity checking'
+      }
     },
 
     // Block 4: Current Chapter
@@ -3206,6 +3633,12 @@ Output must be a valid JSON object with no additional text.`,
       order: 4,
       template: `[Chapter to Audit]: Chapter {{chapterNumber}} - {{chapterTitle}}
 {{chapterContent}}`,
+      metadata: {
+        tier: 'task',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'The chapter content to be audited'
+      }
     },
 
     // Block 5: Audit Instructions
@@ -3237,6 +3670,12 @@ Output format must be pure JSON:
 }
 
 Only when there are critical-level issues should "passed" be false. Do not include any other text.`,
+      metadata: {
+        tier: 'constraint',
+        isStatic: true,
+        dataSource: 'static',
+        description: 'Static audit instructions with 10-dimension checklist and output format'
+      }
     },
   ],
 
@@ -3354,6 +3793,12 @@ Break down into key beats and evaluate tension level for each.
 41-60: Conflict escalation, obstacles appear
 61-80: Major twists, crisis, battles
 81-100: Ultimate climax, life-or-death, core reveals`,
+      metadata: {
+        tier: 'task',
+        isStatic: true,
+        dataSource: 'static',
+        description: 'Analysis task description with tension rating scale'
+      }
     },
     {
       id: 'plot_content',
@@ -3361,6 +3806,12 @@ Break down into key beats and evaluate tension level for each.
       order: 2,
       template: `[Plot Outline]:
 {{plotOutline}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'The complete plot outline to analyze'
+      }
     },
     {
       id: 'output_format',
@@ -3374,6 +3825,12 @@ Break down into key beats and evaluate tension level for each.
     "description": "Brief description of this beat"
   }
 ]`,
+      metadata: {
+        tier: 'format',
+        isStatic: true,
+        dataSource: 'static',
+        description: 'JSON output format specification for rhythm analysis'
+      }
     },
   ],
 
@@ -3427,6 +3884,12 @@ Ensure logical flow and dramatic tension across chapters.`,
       title: 'Genre Information',
       order: 1,
       template: `Novel Genre: {{genre}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Novel genre information'
+      }
     },
     {
       id: 'global_context',
@@ -3434,12 +3897,24 @@ Ensure logical flow and dramatic tension across chapters.`,
       order: 2,
       template: `[Global Plot Overview]:
 {{fullPlotSummary}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Global plot summary for story continuity'
+      }
     },
     {
       id: 'character_context',
       title: 'Character & World Context',
       order: 3,
       template: `{{contextStr}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Formatted character and world context'
+      }
     },
     {
       id: 'target_node',
@@ -3448,6 +3923,12 @@ Ensure logical flow and dramatic tension across chapters.`,
       template: `[Current Plot Beat to Split]:
 Title: {{targetNode.title}}
 Content: {{targetNode.content}}`,
+      metadata: {
+        tier: 'task',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'The plot node to be split into chapters'
+      }
     },
     {
       id: 'task_requirements',
@@ -3468,6 +3949,12 @@ Requirements:
 - TWIST: Turns/suspense
 
 Output JSON array format. No preamble.`,
+      metadata: {
+        tier: 'constraint',
+        isStatic: true,
+        dataSource: 'static',
+        description: 'Task requirements with beat types and output format'
+      }
     },
   ],
 
@@ -3566,6 +4053,12 @@ Output only the revised chapter in JSON array format.`,
       title: 'Genre Information',
       order: 1,
       template: `Novel Genre: {{genre}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Novel genre information'
+      }
     },
     {
       id: 'global_context',
@@ -3573,12 +4066,24 @@ Output only the revised chapter in JSON array format.`,
       order: 2,
       template: `[Global Plot Overview]:
 {{fullPlotSummary}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Global plot summary for story continuity'
+      }
     },
     {
       id: 'character_context',
       title: 'Character & World Context',
       order: 3,
       template: `{{contextStr}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Formatted character and world context'
+      }
     },
     {
       id: 'parent_node',
@@ -3587,6 +4092,12 @@ Output only the revised chapter in JSON array format.`,
       template: `[Parent Plot Beat]:
 Title: {{targetNode.title}}
 Content: {{targetNode.content}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'Parent plot beat that contains this chapter'
+      }
     },
     {
       id: 'previous_chapter',
@@ -3596,6 +4107,12 @@ Content: {{targetNode.content}}`,
 Title: {{previousChapter.title}}
 Content: {{previousChapter.summary}}`,
       condition: 'previousChapter != null',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Previous chapter outline for continuity'
+      }
     },
     {
       id: 'next_chapter',
@@ -3605,6 +4122,12 @@ Content: {{previousChapter.summary}}`,
 Title: {{nextChapter.title}}
 Content: {{nextChapter.summary}}`,
       condition: 'nextChapter != null',
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Next chapter outline for continuity'
+      }
     },
     {
       id: 'current_chapter',
@@ -3614,6 +4137,12 @@ Content: {{nextChapter.summary}}`,
 Title: {{chapterToRewrite.title}}
 Original Content: {{chapterToRewrite.summary}}
 Original POV: {{chapterToRewrite.expectedPOV}}`,
+      metadata: {
+        tier: 'task',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'The chapter to be rewritten'
+      }
     },
     {
       id: 'task_requirements',
@@ -3628,6 +4157,12 @@ Requirements:
 4. Keep or optimize title and POV
 
 Output JSON array with single chapter. No preamble.`,
+      metadata: {
+        tier: 'constraint',
+        isStatic: true,
+        dataSource: 'static',
+        description: 'Task requirements and output format for chapter rewrite'
+      }
     },
   ],
 
@@ -3738,6 +4273,12 @@ Output 3 numbered ideas directly. No preamble.`,
 1. Logical: Unexpected but reasonable within story logic
 2. Dramatic: Instantly elevates tension or shifts character dynamics
 3. Style-matched: Adapt to genre (fantasy/urban/mystery/etc.)`,
+      metadata: {
+        tier: 'constraint',
+        isStatic: true,
+        dataSource: 'static',
+        description: 'Static twist generation requirements'
+      }
     },
     {
       id: 'story_context',
@@ -3745,6 +4286,12 @@ Output 3 numbered ideas directly. No preamble.`,
       order: 2,
       template: `[Story Background/Memory]:
 {{context}}`,
+      metadata: {
+        tier: 'context',
+        isStatic: false,
+        dataSource: 'computed',
+        description: 'Story background and memory context for twist generation'
+      }
     },
     {
       id: 'plot_target',
@@ -3752,12 +4299,24 @@ Output 3 numbered ideas directly. No preamble.`,
       order: 3,
       template: `[Plot Goal]:
 {{plotBeat}}`,
+      metadata: {
+        tier: 'task',
+        isStatic: false,
+        dataSource: 'user_input',
+        description: 'Target plot beat for twist generation'
+      }
     },
     {
       id: 'output_format',
       title: 'Output Format',
       order: 4,
       template: `Output 3 ideas, one per line, numbered (e.g., "1. ..."). No extra commentary.`,
+      metadata: {
+        tier: 'format',
+        isStatic: true,
+        dataSource: 'static',
+        description: 'Output format specification for twist ideas'
+      }
     },
   ],
 
