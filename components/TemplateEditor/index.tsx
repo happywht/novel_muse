@@ -14,6 +14,7 @@ import {
   Download, Upload, CheckCircle, XCircle, AlertCircle
 } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
+import { API_BASE } from '../../services/apiService';
 import { TemplateListPanel } from './TemplateListPanel';
 import { BlockEditorPanel } from './BlockEditorPanel';
 import { VariableManagerPanel } from './VariableManagerPanel';
@@ -175,7 +176,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
     setError(null);
 
     try {
-      const response = await fetch(`/api/projects/${project.id}/templates`);
+      const response = await fetch(`${API_BASE}/projects/${project.id}/templates`);
       if (!response.ok) {
         throw new Error('获取模板列表失败');
       }
@@ -197,7 +198,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
     setError(null);
 
     try {
-      const response = await fetch(`/api/projects/${project.id}/templates/${templateId}`);
+      const response = await fetch(`${API_BASE}/projects/${project.id}/templates/${templateId}`);
       if (!response.ok) {
         throw new Error('获取模板详情失败');
       }
@@ -220,7 +221,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
     setError(null);
 
     try {
-      const response = await fetch(`/api/projects/${project.id}/templates/${selectedTemplateId}`, {
+      const response = await fetch(`${API_BASE}/projects/${project.id}/templates/${selectedTemplateId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(currentOverride),
@@ -257,7 +258,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
     setError(null);
 
     try {
-      const response = await fetch(`/api/projects/${project.id}/templates/${selectedTemplateId}`, {
+      const response = await fetch(`${API_BASE}/projects/${project.id}/templates/${selectedTemplateId}`, {
         method: 'DELETE',
       });
 
@@ -303,7 +304,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
     setError(null);
 
     try {
-      const response = await fetch(`/api/projects/${project.id}/templates/export`);
+      const response = await fetch(`${API_BASE}/projects/${project.id}/templates/export`);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -410,7 +411,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
     setImportResult(null);
 
     try {
-      const response = await fetch(`/api/projects/${project.id}/templates/import?mode=${mode}`, {
+      const response = await fetch(`${API_BASE}/projects/${project.id}/templates/import?mode=${mode}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(importConfirm.data),
