@@ -27,8 +27,11 @@ export type VariableTier = 'critical' | 'important' | 'optional';
  */
 export type VariableSource = 'user_input' | 'project_state' | 'computed' | 'derived' | 'optional';
 
-/** 变量类型 */
+/** 变量类型 - PromptVariable 使用的类型 */
 export type VariableType = 'string' | 'array' | 'object' | 'boolean' | 'number';
+
+/** 变量类型 - TemplateVariable 使用的类型 (带数组语法) */
+export type TemplateVariableType = 'string' | 'string[]' | 'number' | 'boolean' | 'object';
 
 /**
  * 模板变量定义
@@ -54,7 +57,7 @@ export interface PromptVariable {
  */
 export interface TemplateVariable {
   name: string;                    // 变量标识符 (e.g., {{genre}})
-  type: 'string' | 'string[]' | 'number' | 'boolean' | 'object';
+  type: TemplateVariableType;      // 变量类型（支持 string[] 语法）
   tier: VariableTier;              // 重要性级别
   source: VariableSource;          // 数据来源
   required: boolean;               // 是否必须提供
@@ -115,6 +118,7 @@ export interface BlockMetadata {
  * {
  *   id: 'genre_info',
  *   title: 'Genre Information',
+ *   label: 'Genre Information',
  *   template: '[Novel Genre]: {{genre}}',
  *   order: 1,
  *   metadata: { tier: 'context', isStatic: false, dataSource: 'computed' }
@@ -124,6 +128,7 @@ export interface BlockMetadata {
 export interface PromptBlock {
   id: string;
   title: string;                   // 区块标题
+  label?: string;                  // 显示标签（可选，默认使用 title）
   template: string;                // 模板字符串，含 {{variable}} 占位符
   condition?: string;              // 条件表达式（JavaScript）
   order: number;                   // 显示顺序
@@ -131,11 +136,12 @@ export interface PromptBlock {
 }
 
 /**
- * 模板块定义（用于前端显示）
+ * 模板块定义（用于前端显示和 API 响应）
  */
 export interface TemplateSection {
   id: string;                      // 区块ID
   label: string;                   // 显示标签
+  template?: string;             // 模板内容（可选）
   condition?: string;              // 条件表达式
   order: number;                   // 排序权重
   icon?: string;                   // 图标emoji

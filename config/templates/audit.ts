@@ -153,9 +153,10 @@ Please output your analysis in Markdown format. Ensure the report includes a cle
         version: '1.0.0',
         author: 'Muse System',
         lastUpdated: '2026-03-28',
-        tags: ['audit', 'plot', 'analysis', 'logic'],
- 'pacing'],
+        tags: ['audit', 'plot', 'analysis', 'logic', 'pacing'],
     },
+};
+
 // ============================================================
 // Audit chapter plan template
 // ============================================================
@@ -281,6 +282,8 @@ Do not include any opening remarks or explanatory text.`,
         lastUpdated: '2026-03-28',
         tags: ['audit', 'chapter', 'plan', 'alignment', 'drift', 'logic'],
     },
+};
+
 // ============================================================
 // Extract Knowledge triples template
 // ============================================================
@@ -375,6 +378,8 @@ const EXTRACT_KNOWLED_TRIPLES_TEMPLATE: PromptTemplate = {
         lastUpdated: '2026-03-28',
         tags: ['knowledge', 'triple', 'extraction', 'graph', 'rdf'],
     },
+};
+
 // ============================================================
 // Audit chapter content template
 // ============================================================
@@ -539,7 +544,7 @@ Provide actionable feedback with specific examples.`,
             tier: 'optional',
             source: 'project_state',
             required: false,
-            href: 'Additional context for character consistency',
+            description: 'Additional context for character consistency',
             display: '角色信息',
         },
     ],
@@ -549,6 +554,8 @@ Provide actionable feedback with specific examples.`,
         lastUpdated: '2026-03-28',
         tags: ['audit', 'chapter', 'content', 'quality', 'analysis', 'editor'],
     },
+};
+
 // Export all audit templates
 export const AUDIT_TEMPLATES = {
     audit_plot: AUDIT_PLOT_TEMPLATE,

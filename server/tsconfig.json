@@ -6,20 +6,28 @@
             "ES2022"
         ],
         "outDir": "./dist",
-        "rootDir": "./src",
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
         "forceConsistentCasingInFileNames": true,
         "resolveJsonModule": true,
         "declaration": true,
-        "typeRoots": ["./node_modules/@types", "./src/types"]
+        "typeRoots": ["./node_modules/@types", "./src/types"],
+        "baseUrl": ".",
+        "paths": {
+            "@/*": ["./src/*"]
+        }
     },
     "include": [
-        "src/**/*"
+        "src/**/*",
+        "../types/**/*",
+        "../services/templateMerge.ts",
+        "../config/templates/defaults.ts"
     ],
     "exclude": [
         "node_modules",
-        "dist"
+        "dist",
+        "../**/node_modules/**",
+        "../**/__tests__/**"
     ]
 }

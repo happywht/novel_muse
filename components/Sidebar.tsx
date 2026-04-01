@@ -3,7 +3,8 @@ import { AppSection } from '../types';
 import {
     Feather, Globe, Users, BookOpen, PenTool, Activity,
     GitBranch, BarChart3, Settings, Wand2, HelpCircle,
-    ChevronLeft, ChevronRight, Sparkles, Home, LayoutGrid
+    ChevronLeft, ChevronRight, Sparkles, Home, LayoutGrid,
+    FileCode // NEW: template editor icon
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -108,6 +109,16 @@ const NAV_ITEMS: NavItem[] = [
         color: 'text-indigo-400',
         bgColor: 'bg-indigo-500/15',
         activeGlow: 'shadow-indigo-500/20',
+    },
+    // NEW: 模板编辑器导航项
+    {
+        id: AppSection.TEMPLATE_EDITOR,
+        label: '模板编辑器 Template',
+        shortLabel: '模板',
+        icon: FileCode,
+        color: 'text-teal-400',
+        bgColor: 'bg-teal-500/15',
+        activeGlow: 'shadow-teal-500/20',
     }
 ];
 

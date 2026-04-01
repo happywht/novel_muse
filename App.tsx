@@ -27,6 +27,7 @@ const KnowledgeGraph = lazy(() => import('./components/KnowledgeGraph').then(m =
 const PromptTuner = lazy(() => import('./components/PromptTuner').then(m => ({ default: m.PromptTuner })));
 const CreativeCompassView = lazy(() => import('./components/CreativeCompassView').then(m => ({ default: m.CreativeCompassView })));
 const ProjectLobby = lazy(() => import('./components/ProjectLobby').then(m => ({ default: m.ProjectLobby })));
+const TemplateEditor = lazy(() => import('./components/TemplateEditor').then(m => ({ default: m.TemplateEditor })));
 
 // 加载状态组件
 const LoadingFallback = () => (
@@ -292,6 +293,9 @@ const App: React.FC = () => {
             )}
             {activeSection === AppSection.CREATIVE_COMPASS && (
               <CreativeCompassView project={project} updateProject={updateProject} />
+            )}
+            {activeSection === AppSection.TEMPLATE_EDITOR && (
+              <TemplateEditor project={project} updateProject={updateProject} />
             )}
           </Suspense>
         </main>

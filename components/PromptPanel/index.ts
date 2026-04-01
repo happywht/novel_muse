@@ -27,5 +27,9 @@ export type {
   SelectOption,
 } from './ParameterControl';
 
+// 变量管理面板
+export { VariableManagerPanel } from './VariableManagerPanel';
+export type { VariableManagerPanelProps } from './VariableManagerPanel';
+
 // 工具函数和常量
 export { MODULE_PROMPT_MAP } from './PromptPanel';

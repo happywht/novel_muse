@@ -8,198 +8,201 @@ datasource db {
 }
 
 model Project {
-  id               String    @id @default(cuid())
-  title            String    @default("未命名项目")
-  genre            String    @default("")
-  premise          String    @db.LongText
-  plotOutline       String?   @db.LongText
-  currentWorldDate String    @default("元年")
-  customPrompts    String?   @db.LongText // JSON blob
+  id               String  @id @default(cuid())
+  title            String  @default("未命名项目")
+  genre            String  @default("")
+  premise          String  @db.LongText
+  plotOutline      String? @db.LongText
+  currentWorldDate String  @default("元年")
+  customPrompts    String? @db.LongText // JSON blob
 
   // Creative Settings (embedded, not separate table)
-  tone             String    @default("平衡")
-  style            String    @default("")
-  creativity       Float     @default(0.7)
-  targetAudience   String    @default("")
-  promptProfile    String?   @default("WEB_NOVEL") // NEW: Choice of prompt pack
-  styleTags        String?   @db.LongText        // JSON array of style tags
-  referenceText    String?   @db.LongText        // Few-Shot reference text
+  tone           String  @default("平衡")
+  style          String  @default("")
+  creativity     Float   @default(0.7)
+  targetAudience String  @default("")
+  promptProfile  String? @default("WEB_NOVEL") // NEW: Choice of prompt pack
+  styleTags      String? @db.LongText // JSON array of style tags
+  referenceText  String? @db.LongText // Few-Shot reference text
 
   // World Gen Config
-  detailLevel      String    @default("Standard")
-  focus            String    @default("Balanced")
+  detailLevel String @default("Standard")
+  focus       String @default("Balanced")
 
   // Sandbox Branches
-  activeBranchId   String?   // NEW Task 2.2: Track current active sandbox branch
-  availableBranches String?  @db.LongText // NEW Task 2.2: JSON array of branches
+  activeBranchId    String? // NEW Task 2.2: Track current active sandbox branch
+  availableBranches String? @db.LongText // NEW Task 2.2: JSON array of branches
 
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  // Template Overrides
+  customTemplates String? @db.LongText // JSON blob for template override config
 
-  characters       Character[]
-  worldSettings    WorldSetting[]
-  plotVersions     PlotVersion[]
-  drafts           Draft[]
-  chapters         Chapter[]
-  plotNodes        PlotNode[]
-  echoes           Echo[]
-  timeline         TimelineEvent[]
-  batchOperations  BatchOperation[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  characters      Character[]
+  worldSettings   WorldSetting[]
+  plotVersions    PlotVersion[]
+  drafts          Draft[]
+  chapters        Chapter[]
+  plotNodes       PlotNode[]
+  echoes          Echo[]
+  timeline        TimelineEvent[]
+  batchOperations BatchOperation[]
 }
 
 model Character {
-  id                   String   @id @default(cuid())
-  name                 String
-  role                 String
-  archetype            String   @default("")
-  description          String   @db.LongText
-  relationships        String?  @db.Text          // 保留用于向后兼容和迁移
-  structuredRelations  String?  @db.LongText      // 新增: 结构化关系 JSON 存储
-  imageUrl             String?  @db.Text
+  id                  String  @id @default(cuid())
+  name                String
+  role                String
+  archetype           String  @default("")
+  description         String  @db.LongText
+  relationships       String? @db.Text // 保留用于向后兼容和迁移
+  structuredRelations String? @db.LongText // 新增: 结构化关系 JSON 存储
+  imageUrl            String? @db.Text
 
   // 角色深度字段
-  alignment            String?
-  tags                 String?  // JSON array
-  desire               String?  @db.Text
-  fear                 String?  @db.Text
-  signature            String?  @db.Text
-  contrast             String?  @db.Text
-  weakness             String?  @db.Text
+  alignment String?
+  tags      String? // JSON array
+  desire    String? @db.Text
+  fear      String? @db.Text
+  signature String? @db.Text
+  contrast  String? @db.Text
+  weakness  String? @db.Text
 
   // 角色弧线
-  arc                  String?  @db.Text // JSON object
+  arc String? @db.Text // JSON object
 
   // 世界设定关联
-  originLocation       String?
-  residence            String?
+  originLocation        String?
+  residence             String?
   controlledTerritories String? @db.Text // JSON array
-  exiledFrom           String?  @db.Text // JSON array
+  exiledFrom            String? @db.Text // JSON array
 
   // 系统字段
-  physicalStatus       String?  @db.Text
-  foreshadowingHooks   String?  @db.Text // JSON array
-  lastModified         BigInt?
+  physicalStatus     String? @db.Text
+  foreshadowingHooks String? @db.Text // JSON array
+  lastModified       BigInt?
 
-  projectId            String
-  project              Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-}
-
-model WorldSetting {
-  id        String  @id @default(cuid())
-  category  String
-  title     String
-  content   String  @db.LongText
-  parentId  String?
-  importance Int?
-  tags      String? // JSON array
   projectId String
   project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }
 
+model WorldSetting {
+  id         String  @id @default(cuid())
+  category   String
+  title      String
+  content    String  @db.LongText
+  parentId   String?
+  importance Int?
+  tags       String? // JSON array
+  projectId  String
+  project    Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
 model PlotVersion {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   timestamp BigInt
-  content   String   @db.LongText
+  content   String  @db.LongText
   note      String
   projectId String
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }
 
 model Draft {
-  id               String   @id @default(cuid())
+  id               String  @id @default(cuid())
   title            String
-  content          String   @db.LongText
-  relatedPlotPoint String?  @db.LongText
+  content          String  @db.LongText
+  relatedPlotPoint String? @db.LongText
   lastModified     BigInt
-  branchId         String?  // NEW Task 2.2: Identify which branch this draft belongs to
+  branchId         String? // NEW Task 2.2: Identify which branch this draft belongs to
   projectId        String
-  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project          Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }
 
 model Chapter {
-  id           String   @id @default(cuid())
-  title        String
-  content      String   @db.LongText
-  summary      String?  @db.LongText
-  expectedPOV  String?  @db.Text
-  beats        String?  @db.LongText // JSON blob for scene beats
-  metadata     String?  @db.Text // JSON array
+  id              String  @id @default(cuid())
+  title           String
+  content         String  @db.LongText
+  summary         String? @db.LongText
+  expectedPOV     String? @db.Text
+  beats           String? @db.LongText // JSON blob for scene beats
+  metadata        String? @db.Text // JSON array
   targetWordCount Int?
-  plotNodeId   String?
-  order        Int
-  lastModified BigInt
-  projectId    String
-  project      Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  plotNodeId      String?
+  order           Int
+  lastModified    BigInt
+  projectId       String
+  project         Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }
 
 model Echo {
-  id          String   @id @default(cuid())
-  type        String
-  targetId    String
-  targetName  String
-  description String   @db.LongText
-  reason      String   @db.LongText
-  status      String   @default("PENDING")
-  triples     String?  @db.LongText // NEW: JSON blob for associated triples
-  confidence  Float?
+  id                 String  @id @default(cuid())
+  type               String
+  targetId           String
+  targetName         String
+  description        String  @db.LongText
+  reason             String  @db.LongText
+  status             String  @default("PENDING")
+  triples            String? @db.LongText // NEW: JSON blob for associated triples
+  confidence         Float?
   extractionEvidence String? @db.Text
-  timestamp   BigInt
-  branchId    String?  // NEW Task 2.2
-  projectId   String
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  timestamp          BigInt
+  branchId           String? // NEW Task 2.2
+  projectId          String
+  project            Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }
 
 model TimelineEvent {
-  id                String   @id @default(cuid())
-  timestamp         BigInt
-  worldDate         String
-  title             String
-  description       String   @db.LongText
-  involvedEntities  String   @db.Text
-  type              String   
-  projectId         String
-  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id               String  @id @default(cuid())
+  timestamp        BigInt
+  worldDate        String
+  title            String
+  description      String  @db.LongText
+  involvedEntities String  @db.Text
+  type             String
+  projectId        String
+  project          Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }
 
 model PlotNode {
-  id               String   @id @default(cuid())
-  title            String
-  content          String   @db.LongText
-  order            Int
-  beatTag          String?
+  id                String  @id @default(cuid())
+  title             String
+  content           String  @db.LongText
+  order             Int
+  beatTag           String?
   relatedCharacters String? @db.Text // JSON string of IDs
   relatedLocations  String? @db.Text // JSON string of IDs
-  conflictScenario String?  @db.Text // JSON object
-  relatedChapters  String?  @db.Text // JSON array
-  projectId        String
-  project          Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  conflictScenario  String? @db.Text // JSON object
+  relatedChapters   String? @db.Text // JSON array
+  projectId         String
+  project           Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }
 
 model BatchOperation {
-  id          String   @id @default(cuid())
-  projectId   String
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  operation   String   // BATCH_ACCEPT, BATCH_REJECT
-  echoIds     String   @db.Text // JSON array
-  previousStates String @db.Text // JSON object: { echoId: previousStatus }
-  timestamp   BigInt
-  expiresAt   BigInt?  // 过期时间，用于清理
+  id             String  @id @default(cuid())
+  projectId      String
+  project        Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  operation      String // BATCH_ACCEPT, BATCH_REJECT
+  echoIds        String  @db.Text // JSON array
+  previousStates String  @db.Text // JSON object: { echoId: previousStatus }
+  timestamp      BigInt
+  expiresAt      BigInt? // 过期时间，用于清理
 
   @@index([projectId])
   @@index([expiresAt])

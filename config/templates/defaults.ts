@@ -24,6 +24,7 @@ export type {
   BlockTier,
   BlockDataSource,
   BlockMetadata,
+  PromptBlock,
 };
 
 // ============================================================
@@ -4528,7 +4529,7 @@ export function renderUserPromptBlocks(
           let itemContent = content;
 
           // Handle nested loops
-          itemContent = itemContent.replace(/__NESTED_LOOP_(\w+)__([\s\S]*?)__END_NESTED_LOOP__/g, (nestedMatch, prop, nestedContent) => {
+          itemContent = itemContent.replace(/__NESTED_LOOP_(\w+)__([\s\S]*?)__END_NESTED_LOOP__/g, (nestedMatch: string, prop: string, nestedContent: string) => {
             const nestedItems = item[prop];
             if (!Array.isArray(nestedItems) || nestedItems.length === 0) {
               return '';
@@ -4542,7 +4543,7 @@ export function renderUserPromptBlocks(
                 nestedItemContent = nestedItemContent.replace(/\{\{this\}\}/g, String(nestedItem));
               } else if (typeof nestedItem === 'object' && nestedItem !== null) {
                 // Process nested conditionals
-                nestedItemContent = nestedItemContent.replace(/\{\{#if\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (condMatch, condProp, condContent) => {
+                nestedItemContent = nestedItemContent.replace(/\{\{#if\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (condMatch: string, condProp: string, condContent: string) => {
                   const value = nestedItem[condProp];
                   return isTruthy(value) ? condContent : '';
                 });
@@ -4566,7 +4567,7 @@ export function renderUserPromptBlocks(
             itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
           } else if (typeof item === 'object' && item !== null) {
             // First, process nested conditionals within the loop
-            itemContent = itemContent.replace(/\{\{#if\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (condMatch, prop, condContent) => {
+            itemContent = itemContent.replace(/\{\{#if\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (condMatch: string, prop: string, condContent: string) => {
               const value = item[prop];
               if (isTruthy(value)) {
                 return condContent;
@@ -4626,7 +4627,7 @@ export function renderUserPromptBlocks(
           itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
         } else if (typeof item === 'object' && item !== null) {
           // First, process nested conditionals within the loop
-          itemContent = itemContent.replace(/\{\{#if\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (condMatch, prop, condContent) => {
+          itemContent = itemContent.replace(/\{\{#if\s+this\.(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g, (condMatch: string, prop: string, condContent: string) => {
             const value = item[prop];
             if (isTruthy(value)) {
               return condContent;

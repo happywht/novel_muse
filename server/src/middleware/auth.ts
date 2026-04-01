@@ -21,7 +21,7 @@ export const apiKeyAuth = (req: Request, res: Response, next: NextFunction) => {
 
   // 开发环境可配置跳过认证
   if (process.env.NODE_ENV === 'development' && process.env.SKIP_AUTH === 'true') {
-    req.user = { id: 'dev-user', role: 'admin' };
+    req.user = { id: 'dev-user', role: 'admin', authMethod: 'local' };
     return next();
   }
 
@@ -42,7 +42,7 @@ export const apiKeyAuth = (req: Request, res: Response, next: NextFunction) => {
     }
     // 开发环境允许通过（但记录警告）
     console.warn('WARNING: No API_KEYS configured. Authentication is disabled.');
-    req.user = { id: 'unauthenticated', role: 'user' };
+    req.user = { id: 'unauthenticated', role: 'user', authMethod: 'local' };
     return next();
   }
 
@@ -64,7 +64,7 @@ export const apiKeyAuth = (req: Request, res: Response, next: NextFunction) => {
   }
 
   // 认证成功
-  req.user = { id: 'api-user', role: 'admin' };
+  req.user = { id: 'api-user', role: 'admin', authMethod: 'api-key' };
   next();
 };
 

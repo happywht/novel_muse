@@ -21,6 +21,16 @@ import {
   TemplateVariable,
 } from '../config/templates/defaults';
 
+import {
+  TemplateOverride,
+  TemplateOverrideConfig,
+  UserTemplatePreferences,
+  MergedTemplateResult,
+  TemplateFieldSources,
+} from '../types/templateOverride';
+
+import { mergeTemplateConfig } from './templateMerge';
+
 /**
  * 验证结果
  */
@@ -42,6 +52,24 @@ interface TemplateRegistryConfig {
 }
 
 /**
+ * 缓存条目
+ */
+interface CacheEntry {
+  template: MergedTemplateResult;
+  timestamp: number;
+  ttl: number; // 默认 5 * 60 * 1000 (5分钟)
+}
+
+/**
+ * 模板加载选项
+ */
+interface TemplateLoadOptions {
+  projectId?: string;
+  userId?: string;
+  skipCache?: boolean;
+}
+
+/**
  * 模板注册表类
  *
  * 负责管理所有模板的注册、检索和验证
@@ -59,6 +87,15 @@ export class TemplateRegistry {
   /** 配置 */
   private config: TemplateRegistryConfig;
 
+  /** 模板缓存 (L1 内存缓存) */
+  private templateCache: Map<string, CacheEntry> = new Map();
+
+  /** 默认缓存 TTL (5分钟) */
+  private readonly DEFAULT_TTL = 5 * 60 * 1000;
+
+  /** 项目级覆盖配置缓存 (projectId -> TemplateOverrideConfig) */
+  private projectOverridesCache: Map<string, TemplateOverrideConfig> = new Map();
+
   constructor(config: TemplateRegistryConfig = {}) {
     this.config = {
       enableProjectTemplates: true,
@@ -68,6 +105,190 @@ export class TemplateRegistry {
 
     // 加载默认模板
     this.loadDefaultTemplates();
+  }
+
+  // ============================================================
+  // 缓存管理
+  // ============================================================
+
+  /**
+   * 生成缓存键
+   */
+  private getCacheKey(templateId: string, projectId?: string): string {
+    return `${templateId}:${projectId || 'default'}`;
+  }
+
+  /**
+   * 清除缓存
+   * @param templateId 模板ID
+   * @param projectId 项目ID (可选,如果不提供则清除该模板的所有缓存)
+   */
+  invalidateCache(templateId: string, projectId?: string): void {
+    if (projectId) {
+      // 清除特定项目+模板的缓存
+      const key = this.getCacheKey(templateId, projectId);
+      this.templateCache.delete(key);
+    } else {
+      // 清除该模板的所有缓存
+      for (const key of this.templateCache.keys()) {
+        if (key.startsWith(`${templateId}:`)) {
+          this.templateCache.delete(key);
+        }
+      }
+    }
+  }
+
+  /**
+   * 清除项目级缓存
+   * @param projectId 项目ID
+   */
+  invalidateProjectCache(projectId: string): void {
+    for (const key of this.templateCache.keys()) {
+      if (key.includes(`:${projectId}:`) || key.endsWith(`:${projectId}`)) {
+        this.templateCache.delete(key);
+      }
+    }
+    // 同时清除项目覆盖配置缓存
+    this.projectOverridesCache.delete(projectId);
+  }
+
+  /**
+   * 清除所有缓存
+   */
+  clearAllCache(): void {
+    this.templateCache.clear();
+    this.projectOverridesCache.clear();
+  }
+
+  /**
+   * 获取缓存统计信息
+   */
+  getCacheStats(): {
+    templateCacheSize: number;
+    projectOverridesCacheSize: number;
+  } {
+    return {
+      templateCacheSize: this.templateCache.size,
+      projectOverridesCacheSize: this.projectOverridesCache.size,
+    };
+  }
+
+  // ============================================================
+  // 异步加载方法
+  // ============================================================
+
+  /**
+   * 加载项目级模板覆盖配置
+   * @param projectId 项目ID
+   * @returns Promise<void>
+   */
+  async loadProjectOverrides(projectId: string): Promise<void> {
+    // 检查缓存
+    if (this.projectOverridesCache.has(projectId)) {
+      return;
+    }
+
+    try {
+      // 检查是否在服务器环境
+      if (typeof window !== 'undefined') {
+        // 在浏览器环境中，跳过数据库加载
+        return;
+      }
+
+      // 动态导入 prisma 客户端(避免在浏览器端报错)
+      // 使用类型断言避免 TypeScript 检查不存在的模块
+      const { PrismaClient } = await import('@prisma/client' as any) as { PrismaClient: any };
+      const prisma = new PrismaClient();
+
+      // 从数据库加载项目的自定义模板配置
+      const project = await prisma.project.findUnique({
+        where: { id: projectId },
+        select: { customPrompts: true },
+      });
+
+      if (project?.customPrompts) {
+        try {
+          const config: TemplateOverrideConfig = JSON.parse(project.customPrompts);
+          this.projectOverridesCache.set(projectId, config);
+        } catch (error) {
+          console.error(`Failed to parse custom templates for project ${projectId}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to load project overrides for project ${projectId}:`, error);
+    }
+  }
+
+  /**
+   * 获取合并后的模板
+   * @param templateId 模板ID
+   * @param options 加载选项 (projectId, userId, skipCache)
+   * @returns 合并后的模板结果
+   */
+  async getMergedTemplate(
+    templateId: string,
+    options?: TemplateLoadOptions
+  ): Promise<MergedTemplateResult | null> {
+    const { projectId, userId, skipCache = false } = options || {};
+
+    // 生成缓存键
+    const cacheKey = this.getCacheKey(templateId, projectId);
+
+    // 检查缓存
+    if (!skipCache) {
+      const cached = this.templateCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < cached.ttl) {
+        return cached.template;
+      }
+    }
+
+    // 加载项目级覆盖
+    let projectOverride: TemplateOverride | undefined;
+    if (projectId) {
+      await this.loadProjectOverrides(projectId);
+      const config = this.projectOverridesCache.get(projectId);
+      if (config?.templates?.[templateId]) {
+        projectOverride = config.templates[templateId];
+      }
+    }
+
+    // TODO: 加载用户级偏好 (未来扩展)
+    let userPreference: UserTemplatePreferences | undefined;
+    if (userId) {
+      // 暂时未实现用户级偏好
+      // userPreference = await this.loadUserPreferences(userId);
+    }
+
+    try {
+      // 使用合并逻辑
+      const mergedResult = mergeTemplateConfig(templateId, projectOverride, userPreference);
+
+      // 更新缓存
+      this.templateCache.set(cacheKey, {
+        template: mergedResult,
+        timestamp: Date.now(),
+        ttl: this.DEFAULT_TTL,
+      });
+
+      return mergedResult;
+    } catch (error) {
+      console.error(`Failed to merge template ${templateId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * 获取模板(异步版本,支持覆盖)
+   * @param id 模板ID
+   * @param options 加载选项
+   * @returns 模板定义
+   */
+  async getTemplateAsync(
+    id: string,
+    options?: TemplateLoadOptions
+  ): Promise<PromptTemplateDefinition | null> {
+    const merged = await this.getMergedTemplate(id, options);
+    return merged?.template || null;
   }
 
   /**
@@ -232,19 +453,15 @@ export class TemplateRegistry {
         allTemplates.set(id, template);
       });
 
-      // 项目级模板(覆盖默认)
-      if (this.config.enableProjectTemplates) {
-        this.projectTemplates.forEach((template, id) => {
-          allTemplates.set(id, template);
-        });
-      }
+      // 项目级模板(覆盖默认) - 保持向后兼容
+      this.projectTemplates.forEach((template, id) => {
+        allTemplates.set(id, template);
+      });
 
-      // 用户级模板(覆盖所有)
-      if (this.config.enableUserTemplates) {
-        this.userTemplates.forEach((template, id) => {
-          allTemplates.set(id, template);
-        });
-      }
+      // 用户级模板(覆盖所有) - 保持向后兼容
+      this.userTemplates.forEach((template, id) => {
+        allTemplates.set(id, template);
+      });
 
       return Array.from(allTemplates.values());
     }
@@ -492,4 +709,62 @@ export function registerTemplate(
   level?: 'default' | 'project' | 'user'
 ): void {
   templateRegistry.registerTemplate(template, level);
+}
+
+// ============================================================
+// 异步便捷函数
+// ============================================================
+
+/**
+ * 加载项目级模板覆盖
+ */
+export async function loadProjectOverrides(projectId: string): Promise<void> {
+  return templateRegistry.loadProjectOverrides(projectId);
+}
+
+/**
+ * 获取合并后的模板
+ */
+export async function getMergedTemplate(
+  templateId: string,
+  options?: TemplateLoadOptions
+): Promise<MergedTemplateResult | null> {
+  return templateRegistry.getMergedTemplate(templateId, options);
+}
+
+/**
+ * 获取模板(异步版本)
+ */
+export async function getTemplateAsync(
+  id: string,
+  options?: TemplateLoadOptions
+): Promise<PromptTemplateDefinition | null> {
+  return templateRegistry.getTemplateAsync(id, options);
+}
+
+/**
+ * 清除模板缓存
+ */
+export function invalidateTemplateCache(templateId: string, projectId?: string): void {
+  templateRegistry.invalidateCache(templateId, projectId);
+}
+
+/**
+ * @deprecated 使用 invalidateTemplateCache 代替
+ * 向后兼容的别名
+ */
+export const invalidateCache = invalidateTemplateCache;
+
+/**
+ * 清除项目缓存
+ */
+export function invalidateProjectCache(projectId: string): void {
+  templateRegistry.invalidateProjectCache(projectId);
+}
+
+/**
+ * 清除所有缓存
+ */
+export function clearAllTemplateCache(): void {
+  templateRegistry.clearAllCache();
 }

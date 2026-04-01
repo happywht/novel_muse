@@ -250,7 +250,8 @@ export enum AppSection {
   OUTLINER = 'OUTLINER',
   DRAFTING = 'DRAFTING',
   ECHOES = 'ECHOES',
-  GRAPH = 'GRAPH'
+  GRAPH = 'GRAPH',
+  TEMPLATE_EDITOR = 'TEMPLATE_EDITOR' // NEW: 模板编辑器
 }
 
 /**
