@@ -13,6 +13,7 @@ import {
     ProjectStatistics, GraphData
 } from '../services/apiService';
 import { useToast } from '../hooks/useToast';
+import { useProjectStore } from '../store/useProjectStore';
 
 interface DashboardProps {
     project: ProjectState;
@@ -22,8 +23,13 @@ interface DashboardProps {
 
 const WORLD_CATEGORIES: WorldSetting['category'][] = ['Geography', 'Magic/Tech', 'Society', 'History', 'Other'];
 
-export const Dashboard: React.FC<DashboardProps> = ({ project, updateProject, onImportProject }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ project: propProject, updateProject, onImportProject }) => {
     const { toast } = useToast();
+
+    // 直接从 store 获取最新的 project 数据，确保统计数据实时更新
+    const storeProject = useProjectStore(state => state.project);
+    // 使用 store 中的最新数据用于显示，props 中的数据用于操作
+    const project = storeProject;
     const [brainstormInput, setBrainstormInput] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [suggestion, setSuggestion] = useState('');
