@@ -1,33 +1,37 @@
 import React, { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
 import { AppSection, ProjectState, WorldGenConfig } from './types';
 // 懒加载主要业务模块以优化首屏性能
-import { Sidebar } from './components/Sidebar';
+import { Sidebar } from '@/components/layout/Sidebar';
 import { FolderOpen, Plus, Trash2, Save, X, Check, Download, Upload, Database, HardDrive, RefreshCw, BookOpen, AlertCircle } from 'lucide-react';
-import { useProjectStore, INITIAL_PROJECT } from './store/useProjectStore';
-import { storageService, STORAGE_KEYS } from './services/storageService';
-import { ErrorBoundary } from './components/ErrorBoundary';
-import { useFeature } from './hooks/useFeature';
-import { ConfirmDialogProvider } from './hooks/useConfirm';
-import { FeatureFlagProvider } from './contexts/FeatureFlagContext';
-import { PromptConfirmDialog } from './components/common/PromptConfirmDialog';
-import { Loader } from './components/Loader';
+import { useProjectStore, INITIAL_PROJECT } from '@/store';
+import { storageService, STORAGE_KEYS } from '@/services/storageService';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
+import { useFeature } from '@/hooks/useFeature';
+import { ConfirmDialogProvider } from '@/hooks/useConfirm';
+import { FeatureFlagProvider } from '@/contexts/FeatureFlagContext';
+import { PromptConfirmDialog } from '@/components/modules/shared/common/PromptConfirmDialog';
+import { Loader } from '@/components/ui/Loader';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { LoadingSkeleton } from '@/components/ui/LoadingSkeleton';
+import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { DataSourceIndicator } from '@/components/ui/DataSourceIndicator';
 
 // ==================== 懒加载组件 ====================
 // 主要业务模块 - 按需加载，减少首屏 bundle 大小
-const Dashboard = lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
-const WorldBuilder = lazy(() => import('./components/WorldBuilder').then(m => ({ default: m.WorldBuilder })));
-const CharacterCreator = lazy(() => import('./components/CharacterCreator').then(m => ({ default: m.CharacterCreator })));
-const PlotWeaver = lazy(() => import('./components/PlotWeaver').then(m => ({ default: m.PlotWeaver })));
-const ChapterOutliner = lazy(() => import('./components/ChapterOutliner/ChapterOutliner').then(m => ({ default: m.ChapterOutliner })));
-const DraftingRoom = lazy(() => import('./components/DraftingRoom').then(m => ({ default: m.DraftingRoom })));
-const EchoChamber = lazy(() => import('./components/EchoChamber').then(m => ({ default: m.EchoChamber })));
-const UserGuide = lazy(() => import('./components/UserGuide').then(m => ({ default: m.UserGuide })));
-const SettingsPanel = lazy(() => import('./components/SettingsPanel/index').then(m => ({ default: m.SettingsPanel })));
-const KnowledgeGraph = lazy(() => import('./components/KnowledgeGraph').then(m => ({ default: m.KnowledgeGraph })));
-const PromptTuner = lazy(() => import('./components/PromptTuner').then(m => ({ default: m.PromptTuner })));
-const CreativeCompassView = lazy(() => import('./components/CreativeCompassView').then(m => ({ default: m.CreativeCompassView })));
-const ProjectLobby = lazy(() => import('./components/ProjectLobby').then(m => ({ default: m.ProjectLobby })));
-const TemplateEditor = lazy(() => import('./components/TemplateEditor').then(m => ({ default: m.TemplateEditor })));
+const Dashboard = lazy(() => import('@/components/Dashboard').then(m => ({ default: m.Dashboard })));
+const WorldBuilder = lazy(() => import('@/components/modules/world'));
+const CharacterCreator = lazy(() => import('@/components/modules/character'));
+const PlotWeaver = lazy(() => import('@/components/modules/plot'));
+const ChapterOutliner = lazy(() => import('@/components/modules/plot/chapters/ChapterOutliner').then(m => ({ default: m.ChapterOutliner })));
+const DraftingRoom = lazy(() => import('@/components/modules/drafting'));
+const EchoChamber = lazy(() => import('@/components/modules/echo'));
+const UserGuide = lazy(() => import('@/components/UserGuide').then(m => ({ default: m.UserGuide })));
+const SettingsPanel = lazy(() => import('@/components/modules/shared/SettingsPanel/index').then(m => ({ default: m.SettingsPanel })));
+const KnowledgeGraph = lazy(() => import('@/components/KnowledgeGraph').then(m => ({ default: m.KnowledgeGraph })));
+const PromptTuner = lazy(() => import('@/components/modules/shared/PromptTuner'));
+const CreativeCompassView = lazy(() => import('@/components/modules/drafting').then(m => ({ default: m.CreativeCompassView })));
+const ProjectLobby = lazy(() => import('@/components/layout/ProjectLobby'));
+const TemplateEditor = lazy(() => import('@/components/modules/shared/TemplateEditor').then(m => ({ default: m.TemplateEditor })));
 
 // 加载状态组件
 const LoadingFallback = () => (
@@ -49,7 +53,7 @@ const App: React.FC = () => {
   const showGuide = useProjectStore(state => state.showGuide);
   const showSettings = useProjectStore(state => state.showSettings);
   const showPromptTuner = useProjectStore(state => state.showPromptTuner);
-  
+
   const setActiveSection = useProjectStore(state => state.setActiveSection);
   const setShowGuide = useProjectStore(state => state.setShowGuide);
   const setShowSettings = useProjectStore(state => state.setShowSettings);
@@ -66,11 +70,29 @@ const App: React.FC = () => {
   const enableEchoSystem = useFeature('enableEchoSystem');
   const enableKnowledgeGraph = useFeature('enableKnowledgeGraph');
 
+  // 性能优化：网络状态监控
+  const isOnline = useNetworkStatus();
+
   const importFileRef = React.useRef<HTMLInputElement>(null);
+
+  // 模态框焦点管理refs
+  const settingsPanelRef = React.useRef<HTMLDivElement>(null);
+  const promptTunerRef = React.useRef<HTMLDivElement>(null);
+  const userGuideRef = React.useRef<HTMLDivElement>(null);
+
+  // 为模态框应用焦点陷阱
+  useFocusTrap(showSettings, settingsPanelRef);
+  useFocusTrap(showPromptTuner, promptTunerRef);
+  useFocusTrap(showGuide, userGuideRef);
 
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  // 🚀 优化：在初始化期间显示骨架屏而不是白屏
+  if (isLoading && activeSection === AppSection.LOBBY) {
+    return <LoadingSkeleton />;
+  }
 
   const handleCreateProject = () => {
     createProject();
@@ -196,6 +218,8 @@ const App: React.FC = () => {
         onOpenGuide={() => setShowGuide(true)}
         hasCharEchoes={project.echoes?.some(e => e.type === 'CHARACTER' && e.status === 'PENDING')}
         hasWorldEchoes={project.echoes?.some(e => e.type === 'WORLD' && e.status === 'PENDING')}
+        useBackend={useBackend}
+        isOnline={isOnline}
       />
 
       {/* Main wrapper (offset by sidebar) */}
@@ -211,6 +235,9 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* 数据来源指示器 - 性能优化版 */}
+            <DataSourceIndicator useBackend={useBackend} isOnline={isOnline} />
+
             {/* Sync Hub */}
             <div className="flex items-center bg-slate-950/50 rounded-2xl border border-slate-800/50 p-1 pr-3 gap-3">
               <div className={`flex items-center gap-1.5 text-[10px] uppercase font-bold px-3 py-1.5 rounded-xl border ${useBackend ? 'text-emerald-400 border-emerald-500/20 bg-emerald-500/5' : 'text-amber-400 border-amber-500/20 bg-amber-500/5'}`}>
@@ -247,7 +274,7 @@ const App: React.FC = () => {
         </header>
 
         {/* Main Content Area */}
-        <main className="flex-1 p-6 overflow-auto">
+        <main id="main-content" className="flex-1 p-6 overflow-auto" tabIndex={-1}>
           <Suspense fallback={<LoadingFallback />}>
             {activeSection === AppSection.DASHBOARD && (
               <Dashboard project={project} updateProject={updateProject} onImportProject={() => importFileRef.current?.click()} />
@@ -304,21 +331,27 @@ const App: React.FC = () => {
       {/* User Guide Modal */}
       {showGuide && (
         <Suspense fallback={<LoadingFallback />}>
-          <UserGuide onClose={() => setShowGuide(false)} />
+          <div ref={userGuideRef} role="dialog" aria-modal="true" aria-labelledby="user-guide-title">
+            <UserGuide onClose={() => setShowGuide(false)} />
+          </div>
         </Suspense>
       )}
 
       {/* Settings Panel Modal */}
       {showSettings && (
         <Suspense fallback={<LoadingFallback />}>
-          <SettingsPanel onClose={() => setShowSettings(false)} />
+          <div ref={settingsPanelRef} role="dialog" aria-modal="true" aria-labelledby="settings-panel-title">
+            <SettingsPanel onClose={() => setShowSettings(false)} />
+          </div>
         </Suspense>
       )}
 
       {/* Prompt Tuner Modal */}
       {showPromptTuner && (
         <Suspense fallback={<LoadingFallback />}>
-          <PromptTuner onClose={() => setShowPromptTuner(false)} />
+          <div ref={promptTunerRef} role="dialog" aria-modal="true" aria-labelledby="prompt-tuner-title">
+            <PromptTuner onClose={() => setShowPromptTuner(false)} />
+          </div>
         </Suspense>
       )}
 

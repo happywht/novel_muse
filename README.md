@@ -45,10 +45,46 @@
    ```
 
 3. **配置环境变量**
-   在项目根目录找到或创建 `.env.local` 文件，并将其中的 `GEMINI_API_KEY` 替换为您自己的 API 密钥：
+   在项目根目录找到或创建 `.env.local` 文件，并将其中的配置项替换为您自己的配置：
+
    ```env
-   GEMINI_API_KEY="your_api_key_here"
+   # API 配置
+   VITE_API_BASE=http://localhost:3001/api
+
+   # Neo4j 配置
+   VITE_NEO4J_URI=bolt://localhost:7687
+   NEO4J_USER=neo4j
+   NEO4J_PASSWORD=password
+
+   # AI 模型配置
+   GEMINI_API_KEY=your-gemini-key
+   GLM_API_KEY=your-glm-key
+
+   # Base URLs
+   GLM_BASE_URL=https://open.bigmodel.cn/api/anthropic
+
+   # Model Configuration
+   GLM_MODEL_NAME=glm-5
+   GEMINI_FLASH_MODEL=gemini-3-flash-preview
+   GEMINI_PRO_MODEL=gemini-3-pro-preview
    ```
+
+   **环境变量说明：**
+   - `VITE_API_BASE`: 后端API服务器地址
+   - `VITE_NEO4J_URI`: Neo4j数据库连接地址
+   - `NEO4J_USER`: Neo4j用户名
+   - `NEO4J_PASSWORD`: Neo4j密码
+   - `GEMINI_API_KEY`: Google Gemini API密钥
+   - `GLM_API_KEY`: 智谱AI API密钥
+   - `GLM_BASE_URL`: 智谱AI基础URL
+   - `GLM_MODEL_NAME`: 默认使用的GLM模型名称
+   - `GEMINI_FLASH_MODEL`: Gemini快速模型
+   - `GEMINI_PRO_MODEL`: Gemini专业模型
+
+   > 💡 **提示**: 您可以复制 `.env.example` 文件作为模板创建 `.env.local` 文件：
+   > ```bash
+   > cp .env.example .env.local
+   > ```
 
 4. **启动开发服务器**
    ```bash

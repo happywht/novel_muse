@@ -1,15 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GitBranch, RefreshCw, ZoomIn, ZoomOut, Maximize2, Loader, AlertCircle } from 'lucide-react';
-import { fetchGraph, GraphNode, GraphEdge } from '../services/apiService';
-import { useToast } from '../hooks/useToast';
-import { useAdvancedMode } from '../hooks/useAdvancedMode';
+import { fetchGraph, GraphNode, GraphEdge } from '@/services/apiService';
+import { useToast } from '@/hooks/useToast';
+import { useAdvancedMode } from '@/hooks/useAdvancedMode';
 import {
     GRAPH_CONFIG,
     GRAPH_NODE_COLORS,
     GRAPH_NEW_EDGE_COLOR,
     GRAPH_LAYER_LABELS,
     GRAPH_RELATIONSHIP_LABELS
-} from '../config/constants';
+} from '@/config/constants';
 
 interface KnowledgeGraphProps {
     projectId: string;

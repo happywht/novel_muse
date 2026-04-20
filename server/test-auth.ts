@@ -3,7 +3,7 @@
  * 用于验证 API Key 认证是否正常工作
  */
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = process.env.API_BASE || 'http://localhost:3001/api';
 const TEST_API_KEY = 'test-api-key-12345';
 
 interface TestResult {

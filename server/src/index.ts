@@ -13,6 +13,7 @@ dotenv.config();
 
 const app = express();
 const prisma = new PrismaClient();
+const SERVER_URL = process.env.SERVER_URL || `http://localhost:${process.env.PORT || 3001}`;
 const PORT = process.env.PORT || 3001;
 
 // Initialize Neo4j
@@ -68,8 +69,8 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 // Start server
 app.listen(PORT, async () => {
-    console.log(`🚀 Muse Backend Server running at http://localhost:${PORT}`);
-    console.log(`📦 API Base: http://localhost:${PORT}/api`);
+    console.log(`🚀 Muse Backend Server running at ${SERVER_URL}`);
+    console.log(`📦 API Base: ${SERVER_URL}/api`);
 
     // 先启动 HTTP 服务，再初始化 Neo4j（带重试）
     await initializeNeo4j();

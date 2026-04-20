@@ -1,7 +1,7 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { CreativeSettings } from "../../types";
 import { buildPromptContent } from "../../config/prompts";
-import { useProjectStore } from "../../store/useProjectStore";
+import { useProjectStore } from "@/store";
 import { fetchOpenAICompatible } from "../openAiAdapter";
 import { getProviderForTask, LLMTaskType, Provider } from "../llmRouter";
 import { storageService, STORAGE_KEYS } from "../storageService";

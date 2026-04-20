@@ -215,9 +215,9 @@ export const DEFAULT_CONFIG: GlobalConfig = {
     },
     graph: {
         neo4j: {
-            uri: 'bolt://localhost:7687',
-            user: 'neo4j',
-            password: 'password',
+            uri: import.meta.env.VITE_NEO4J_URI || 'bolt://localhost:7687',
+            user: import.meta.env.NEO4J_USER || 'neo4j',
+            password: import.meta.env.NEO4J_PASSWORD || 'password',
         },
         autoSync: true,
         syncDebounce: 2000,

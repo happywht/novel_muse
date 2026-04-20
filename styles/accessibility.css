@@ -1,0 +1,256 @@
+/**
+ * 可访问性增强样式
+ * Accessibility Enhancement Styles
+ *
+ * 为应用提供完整的键盘导航和屏幕阅读器支持
+ * Provides comprehensive keyboard navigation and screen reader support
+ */
+
+/* ============================================
+   焦点可见指示器
+   Focus Visible Indicators
+   ============================================ */
+
+/* 为所有元素提供统一的焦点样式 */
+*:focus-visible {
+  outline: 2px solid #8b5cf6 !important;
+  outline-offset: 2px !important;
+  border-radius: 4px !important;
+}
+
+/* 移除默认的outline，使用focus-visible代替 */
+*:focus {
+  outline: none;
+}
+
+/* 为按钮提供更强的焦点指示 */
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline-width: 3px !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.2);
+}
+
+/* 为输入元素提供焦点指示 */
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-width: 2px !important;
+  outline-offset: 2px !important;
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+/* ============================================
+   屏幕阅读器专用类
+   Screen Reader Only Classes
+   ============================================ */
+
+/* 完全隐藏内容，但对屏幕阅读器可见 */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* 当元素获得焦点时可见（用于skip links） */
+.sr-only-focusable:focus {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  padding: inherit !important;
+  margin: inherit !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
+}
+
+/* ============================================
+   Skip Links
+   跳过导航链接
+   ============================================ */
+
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 16px;
+  padding: 12px 24px;
+  background-color: #8b5cf6;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  z-index: 9999;
+  font-weight: 600;
+  font-size: 14px;
+  transition: top 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.skip-link:hover {
+  background-color: #7c3aed;
+  top: 16px;
+}
+
+.skip-link:focus {
+  top: 16px;
+  outline: 3px solid white;
+  outline-offset: 2px;
+}
+
+/* ============================================
+   高对比度模式支持
+   High Contrast Mode Support
+   ============================================ */
+
+@media (prefers-contrast: high) {
+  *:focus-visible {
+    outline-width: 3px !important;
+    outline-color: #ffff00 !important;
+  }
+
+  button:focus-visible,
+  a:focus-visible {
+    background-color: #ffff00;
+    color: #000000 !important;
+  }
+}
+
+/* ============================================
+   减少动画模式支持
+   Reduced Motion Support
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .skip-link {
+    transition: none;
+  }
+}
+
+/* ============================================
+   键盘导航增强
+   Keyboard Navigation Enhancement
+   ============================================ */
+
+/* 为交互元素提供最小点击区域（符合WCAG 2.5.5） */
+button,
+a,
+[role="button"],
+[tabindex="0"] {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 对于图标按钮，确保有足够的点击区域 */
+button:has(> svg),
+[role="button"]:has(> svg) {
+  padding: 8px;
+}
+
+/* ============================================
+   ARIA状态指示器
+   ARIA State Indicators
+   ============================================ */
+
+/* [aria-expanded="true"] 的元素 */
+[aria-expanded="true"] {
+  /* 可以添加展开状态的视觉指示 */
+}
+
+/* [aria-pressed="true"] 的元素 */
+[aria-pressed="true"] {
+  /* 可以添加按下状态的视觉指示 */
+}
+
+/* [aria-selected="true"] 的元素 */
+[aria-selected="true"] {
+  /* 可以添加选中状态的视觉指示 */
+}
+
+/* [aria-disabled="true"] 的元素 */
+[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ============================================
+   模态框和对话框
+   Modals and Dialogs
+   ============================================ */
+
+[role="dialog"] {
+  z-index: 1000;
+}
+
+[role="dialog"] *:focus-visible {
+  outline-color: #8b5cf6 !important;
+}
+
+/* ============================================
+   加载状态可访问性
+   Loading States Accessibility
+   ============================================ */
+
+/* 为加载指示器添加ARIA属性 */
+[role="status"],
+[aria-live="polite"],
+[aria-live="assertive"] {
+  /* 确保屏幕阅读器能正确读取状态更新 */
+}
+
+/* ============================================
+   表单可访问性
+   Form Accessibility
+   ============================================ */
+
+/* 确保表单标签与输入框正确关联 */
+label + input,
+label + select,
+label + textarea {
+  margin-top: 4px;
+}
+
+/* 错误状态 */
+[aria-invalid="true"] {
+  border-color: #ef4444 !important;
+  outline-color: #ef4444 !important;
+}
+
+[aria-invalid="true"]:focus-visible {
+  outline-width: 3px !important;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.2);
+}
+
+/* ============================================
+   打印样式优化
+   Print Styles
+   ============================================ */
+
+@media print {
+  .skip-link,
+  [role="navigation"] {
+    display: none;
+  }
+
+  *:focus-visible {
+    outline: 1px solid #000 !important;
+  }
+}

@@ -4,16 +4,16 @@ import {
     X, Zap, Target, Download, Copy, Check, ArrowRight, GitBranch,
     Clock, Users, Globe, FileText, Lightbulb, TrendingUp
 } from 'lucide-react';
-import { ProjectState, WorldSetting, NarrativeInsight } from '../types';
-import { generateText, batchGenerateCharacters, batchGenerateWorldSettingsByCategory, generatePlotFromContext } from '../services/geminiService';
-import { MarkdownRenderer } from './MarkdownRenderer';
-import { Loader } from './Loader';
+import { ProjectState, WorldSetting, NarrativeInsight } from '@/types';
+import { generateText, batchGenerateCharacters, batchGenerateWorldSettingsByCategory, generatePlotFromContext } from '@/services/geminiService';
+import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
+import { Loader } from '@/components/ui/Loader';
 import {
     fetchGraph, fetchNarrativeInsights, fetchProjectStatistics,
     ProjectStatistics, GraphData
-} from '../services/apiService';
-import { useToast } from '../hooks/useToast';
-import { useProjectStore } from '../store/useProjectStore';
+} from '@/services/apiService';
+import { useToast } from '@/hooks/useToast';
+import { useProjectStore } from '@/store';
 
 interface DashboardProps {
     project: ProjectState;
@@ -363,7 +363,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ project: propProject, upda
 
             // 修复: 使用最新状态生成剧情
             // 从 useProjectStore 获取最新状态，而非闭包中的旧 project
-            const { useProjectStore } = await import('../store/useProjectStore');
+            const { useProjectStore } = await import('@/store');
             const latestProject = useProjectStore.getState().project;
 
             console.log('【创世纪】使用最新状态生成剧情');

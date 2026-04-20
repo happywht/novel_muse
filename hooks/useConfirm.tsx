@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
-import { ConfirmDialog } from '../components/common/ConfirmDialog';
-import type { ConfirmOptions } from '../components/common/ConfirmDialog';
+import { ConfirmDialog } from '@/components/modules/shared/common/ConfirmDialog';
+import type { ConfirmOptions } from '@/components/modules/shared/common/ConfirmDialog';
 
 /**
  * 确认对话框状态

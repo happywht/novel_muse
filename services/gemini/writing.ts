@@ -3,7 +3,7 @@ import {
     Character, WorldSetting, CreativeSettings, Echo, Chapter,
     PhysicalStatus, KnowledgeTriple, PolishMode, PlotNode
 } from "../../types";
-import { useProjectStore } from "../../store/useProjectStore";
+import { useProjectStore } from "@/store";
 import {
     executeModelTask,
     getInstructionWithSettings, getModelName, TemplateOptions

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "services/api/index.ts"
+  ],
+  "out": "docs/api",
+  "name": "Muse API Documentation",
+  "readme": "none",
+  "excludePrivate": true,
+  "excludeProtected": false,
+  "excludeInternal": true,
+  "hideGenerator": true,
+  "skipErrorChecking": true,
+  "theme": "default"
+}
