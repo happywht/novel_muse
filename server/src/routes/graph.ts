@@ -26,9 +26,15 @@ import {
     getCharacterLocationContext,
     getLocationCharacters,
     getTerritoryControl,
-    getForgeContext
+    getForgeContext,
+    // P0 Character Enhancement query functions
+    getCharacterWithDepth,
+    searchCharactersByTags,
+    getCharactersByAlignment,
+    getCharacterMotivationNetwork,
+    getCharactersAtLocation
 } from '../services/graph/queries';
-import { syncEchoToGraph, syncChapterToGraph, syncForgeResult } from '../services/graph/sync';
+import { syncEchoToGraph, syncChapterToGraph, syncForgeResult, syncSingleCharacter } from '../services/graph/sync';
 
 const prisma = new PrismaClient();
 
@@ -841,6 +847,122 @@ router.post('/:projectId/forge-sync', async (req: Request, res: Response) => {
         res.json(result);
     } catch (err: any) {
         console.error('Forge sync error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================================================
+// P0 Character Enhancement API Endpoints
+// ============================================================================
+
+// GET /api/graph/:projectId/characters/:characterId/depth - Get character with full depth information
+router.get('/:projectId/characters/:characterId/depth', async (req: Request, res: Response) => {
+    try {
+        const data = await getCharacterWithDepth(
+            req.params.projectId as string,
+            req.params.characterId as string
+        );
+        res.json(data);
+    } catch (err: any) {
+        console.error('Character depth fetch error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/graph/:projectId/characters/search/tags - Search characters by tags
+router.post('/:projectId/characters/search/tags', async (req: Request, res: Response) => {
+    try {
+        const { tags, matchAll } = req.body;
+
+        if (!tags || !Array.isArray(tags) || tags.length === 0) {
+            res.status(400).json({ error: 'Missing or empty tags array' });
+            return;
+        }
+
+        const characters = await searchCharactersByTags(
+            req.params.projectId as string,
+            tags,
+            matchAll ?? false
+        );
+        res.json(characters);
+    } catch (err: any) {
+        console.error('Character tag search error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/graph/:projectId/characters/search/alignment - Search characters by alignment
+router.get('/:projectId/characters/search/alignment', async (req: Request, res: Response) => {
+    try {
+        const { pattern } = req.query;
+
+        if (!pattern || typeof pattern !== 'string') {
+            res.status(400).json({ error: 'Missing or invalid pattern query parameter' });
+            return;
+        }
+
+        const characters = await getCharactersByAlignment(
+            req.params.projectId as string,
+            pattern as string
+        );
+        res.json(characters);
+    } catch (err: any) {
+        console.error('Character alignment search error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/graph/:projectId/characters/motivation-network - Get character motivation network
+router.get('/:projectId/characters/motivation-network', async (req: Request, res: Response) => {
+    try {
+        const data = await getCharacterMotivationNetwork(req.params.projectId as string);
+        res.json(data);
+    } catch (err: any) {
+        console.error('Motivation network fetch error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/graph/:projectId/world-settings/:locationId/characters-enhanced - Get characters at location (enhanced version)
+router.get('/:projectId/world-settings/:locationId/characters-enhanced', async (req: Request, res: Response) => {
+    try {
+        const { includeVisitors } = req.query;
+
+        const characters = await getCharactersAtLocation(
+            req.params.projectId as string,
+            req.params.locationId as string,
+            includeVisitors === 'true'
+        );
+        res.json(characters);
+    } catch (err: any) {
+        console.error('Location characters fetch error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/graph/:projectId/characters/sync - Incremental sync single character
+router.post('/:projectId/characters/sync', async (req: Request, res: Response) => {
+    try {
+        const { character, allCharacters } = req.body;
+
+        if (!character || !character.id || !character.name) {
+            res.status(400).json({ error: 'Missing required character fields: id, name' });
+            return;
+        }
+
+        await syncSingleCharacter(
+            character,
+            req.params.projectId as string,
+            allCharacters
+        );
+
+        res.json({
+            success: true,
+            message: `Character ${character.name} synced to graph`,
+            characterId: character.id
+        });
+    } catch (err: any) {
+        console.error('Character sync error:', err);
         res.status(500).json({ error: err.message });
     }
 });

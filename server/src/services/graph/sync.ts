@@ -1363,3 +1363,309 @@ export const syncForgeResult = async (
         errors
     };
 };
+
+// ============================================================
+// Incremental Sync Functions for Character Enhancement (P0)
+// ============================================================
+
+/**
+ * 同步角色深度属性到图谱
+ *
+ * 此函数只更新Character节点的深度属性字段，不涉及关系边，性能高效。
+ * 适用于角色属性编辑后的快速同步。
+ *
+ * @param character - 角色对象（包含深度属性）
+ * @param projectId - 项目ID
+ */
+export const syncCharacterDepthAttributes = async (
+    character: {
+        id: string;
+        name?: string;
+        alignment?: string;
+        tags?: string[];
+        desire?: string;
+        fear?: string;
+        signature?: string;
+        contrast?: string;
+        weakness?: string;
+    },
+    projectId: string
+): Promise<void> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        await session.run(
+            `MATCH (c:Character {id: $charId, projectId: $projectId})
+             SET c.alignment = $alignment,
+                 c.tags = $tags,
+                 c.desire = $desire,
+                 c.fear = $fear,
+                 c.signature = $signature,
+                 c.contrast = $contrast,
+                 c.weakness = $weakness,
+                 c.lastModified = timestamp()`,
+            {
+                charId: character.id,
+                projectId,
+                alignment: character.alignment || null,
+                tags: character.tags || [],
+                desire: character.desire || null,
+                fear: character.fear || null,
+                signature: character.signature || null,
+                contrast: character.contrast || null,
+                weakness: character.weakness || null,
+            }
+        );
+        console.log(`🔗 Synced depth attributes for character ${character.name || character.id}`);
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * 同步角色-世界设定关系
+ *
+ * 此函数处理角色与地理位置的关系边：
+ * - ORIGINATED_FROM (起源地)
+ * - RESIDES_IN (居住地)
+ * - CONTROLS_TERRITORY (控制领地)
+ * - EXILED_FROM (流放地)
+ *
+ * @param character - 角色对象（包含地理关联字段）
+ * @param projectId - 项目ID
+ */
+export const syncCharacterWorldRelations = async (
+    character: {
+        id: string;
+        name?: string;
+        originLocation?: string;
+        residence?: string;
+        controlledTerritories?: string[];
+        exiledFrom?: string[];
+    },
+    projectId: string
+): Promise<void> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        const charId = character.id;
+
+        // 1. 删除现有的角色-世界设定关系（避免孤立边）
+        await session.run(
+            `MATCH (c:Character {id: $charId, projectId: $projectId})
+             -[r:ORIGINATED_FROM|RESIDES_IN|CONTROLS_TERRITORY|EXILED_FROM]->
+             (:WorldSetting)
+             DELETE r`,
+            { charId, projectId }
+        );
+
+        // 2. 创建起源地关系 (ORIGINATED_FROM)
+        if (character.originLocation) {
+            try {
+                await session.run(
+                    `MATCH (c:Character {id: $charId, projectId: $projectId})
+                     MATCH (w:WorldSetting {id: $worldId, projectId: $projectId})
+                     MERGE (c)-[r:ORIGINATED_FROM]->(w)
+                     SET r.since = date()`,
+                    { charId, worldId: character.originLocation, projectId }
+                );
+                console.log(`  └─ ORIGINATED_FROM: ${character.name || charId} -> ${character.originLocation}`);
+            } catch (err) {
+                console.warn(`Failed to create ORIGINATED_FROM for ${character.name || charId}:`, err);
+            }
+        }
+
+        // 3. 创建居住地关系 (RESIDES_IN)
+        if (character.residence) {
+            try {
+                await session.run(
+                    `MATCH (c:Character {id: $charId, projectId: $projectId})
+                     MATCH (w:WorldSetting {id: $worldId, projectId: $projectId})
+                     MERGE (c)-[r:RESIDES_IN]->(w)
+                     SET r.since = date()`,
+                    { charId, worldId: character.residence, projectId }
+                );
+                console.log(`  └─ RESIDES_IN: ${character.name || charId} -> ${character.residence}`);
+            } catch (err) {
+                console.warn(`Failed to create RESIDES_IN for ${character.name || charId}:`, err);
+            }
+        }
+
+        // 4. 创建控制领地关系 (CONTROLS_TERRITORY) - 支持多个领地
+        if (character.controlledTerritories && Array.isArray(character.controlledTerritories) && character.controlledTerritories.length > 0) {
+            for (const territoryId of character.controlledTerritories) {
+                try {
+                    await session.run(
+                        `MATCH (c:Character {id: $charId, projectId: $projectId})
+                         MATCH (w:WorldSetting {id: $worldId, projectId: $projectId})
+                         MERGE (c)-[r:CONTROLS_TERRITORY]->(w)
+                         SET r.authority = 'ruler'`,
+                        { charId, worldId: territoryId, projectId }
+                    );
+                    console.log(`  └─ CONTROLS_TERRITORY: ${character.name || charId} -> ${territoryId}`);
+                } catch (err) {
+                    console.warn(`Failed to create CONTROLS_TERRITORY for ${character.name || charId} -> ${territoryId}:`, err);
+                }
+            }
+        }
+
+        // 5. 创建流放地关系 (EXILED_FROM) - 支持多个流放地
+        if (character.exiledFrom && Array.isArray(character.exiledFrom) && character.exiledFrom.length > 0) {
+            for (const exiledLocationId of character.exiledFrom) {
+                try {
+                    await session.run(
+                        `MATCH (c:Character {id: $charId, projectId: $projectId})
+                         MATCH (w:WorldSetting {id: $worldId, projectId: $projectId})
+                         MERGE (c)-[r:EXILED_FROM]->(w)`,
+                        { charId, worldId: exiledLocationId, projectId }
+                    );
+                    console.log(`  └─ EXILED_FROM: ${character.name || charId} -> ${exiledLocationId}`);
+                } catch (err) {
+                    console.warn(`Failed to create EXILED_FROM for ${character.name || charId} -> ${exiledLocationId}:`, err);
+                }
+            }
+        }
+
+        console.log(`🔗 Synced world relations for character ${character.name || character.id}`);
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * 增量同步单个角色（完整同步）
+ *
+ * 此函数用于实时更新单个角色到图谱，包括：
+ * - 节点属性（基本信息 + 深度属性）
+ * - 角色间关系边（structuredRelations）
+ * - 角色-世界设定关系边
+ *
+ * 性能优化：只更新指定的角色，不触及其他数据。
+ * 适用场景：角色创建/编辑/Echo接受后的快速同步。
+ *
+ * @param character - 完整的角色对象
+ * @param projectId - 项目ID
+ * @param allCharacters - 项目中的所有角色（用于关系边解析）
+ */
+export const syncSingleCharacter = async (
+    character: {
+        id: string;
+        name: string;
+        role?: string;
+        archetype?: string;
+        description?: string;
+        alignment?: string;
+        tags?: string[];
+        desire?: string;
+        fear?: string;
+        signature?: string;
+        contrast?: string;
+        weakness?: string;
+        structuredRelations?: Array<{
+            targetName?: string;
+            targetCharacterName?: string;
+            targetCharacterId?: string;
+            type?: string;
+            weight?: number;
+            description?: string;
+        }>;
+        originLocation?: string;
+        residence?: string;
+        controlledTerritories?: string[];
+        exiledFrom?: string[];
+    },
+    projectId: string,
+    allCharacters?: Array<{ id: string; name: string }>
+): Promise<void> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        // 1. 创建或更新Character节点（包含所有属性）
+        await session.run(
+            `MERGE (c:Character {id: $id, projectId: $projectId})
+             SET c.name = $name,
+                 c.role = $role,
+                 c.archetype = $archetype,
+                 c.description = $description,
+                 c.alignment = $alignment,
+                 c.tags = $tags,
+                 c.desire = $desire,
+                 c.fear = $fear,
+                 c.signature = $signature,
+                 c.contrast = $contrast,
+                 c.weakness = $weakness,
+                 c.lastModified = timestamp()`,
+            {
+                id: character.id,
+                projectId,
+                name: character.name,
+                role: character.role || '',
+                archetype: character.archetype || '',
+                description: (character.description || '').substring(0, 500),
+                alignment: character.alignment || null,
+                tags: character.tags || [],
+                desire: character.desire || null,
+                fear: character.fear || null,
+                signature: character.signature || null,
+                contrast: character.contrast || null,
+                weakness: character.weakness || null,
+            }
+        );
+
+        console.log(`🔗 Character node synced: ${character.name} (${character.id})`);
+
+        // 2. 同步角色间关系边（如果提供了structuredRelations）
+        if (character.structuredRelations && Array.isArray(character.structuredRelations) && character.structuredRelations.length > 0) {
+            // 先删除现有关系（避免孤立边）
+            await session.run(
+                `MATCH (c:Character {id: $charId, projectId: $projectId})
+                 -[r:ENEMY_OF|ALLY_OF|LOVES|KIN_OF|MENTORS|RIVAL_OF|SERVES|FRIEND_OF|RELATED_TO]->
+                 (:Character)
+                 DELETE r`,
+                { charId: character.id, projectId }
+            );
+
+            // 创建新的关系边
+            for (const rel of character.structuredRelations) {
+                const targetName = rel.targetName || rel.targetCharacterName;
+                if (!targetName) continue;
+
+                // Security: Use whitelist validation
+                const relType = sanitizeRelationType(rel.type || 'RELATED_TO');
+
+                try {
+                    await session.run(
+                        `MATCH (s:Character {id: $charId, projectId: $projectId})
+                         MATCH (o:Character {projectId: $projectId})
+                         WHERE o.name = $targetName OR o.id = $targetId
+                         MERGE (s)-[r:${relType}]->(o)
+                         ON CREATE SET r.weight = $weight, r.description = $description, r.createdAt = timestamp()
+                         ON MATCH SET r.weight = $weight, r.description = $description, r.updatedAt = timestamp()`,
+                        {
+                            charId: character.id,
+                            projectId,
+                            targetName,
+                            targetId: rel.targetCharacterId || targetName,
+                            weight: rel.weight || 50,
+                            description: rel.description || '',
+                        }
+                    );
+                } catch (err) {
+                    console.warn(`Failed to sync relation ${character.name}-[:${relType}]->${targetName}:`, err);
+                }
+            }
+
+            console.log(`  └─ Synced ${character.structuredRelations.length} character relationships`);
+        }
+
+        // 3. 同步角色-世界设定关系（调用专门的函数）
+        await syncCharacterWorldRelations(character, projectId);
+
+        console.log(`✅ Incremental sync completed for character ${character.name}`);
+    } finally {
+        await session.close();
+    }
+};

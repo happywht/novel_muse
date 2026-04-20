@@ -2752,3 +2752,273 @@ export const getForgeContext = async (
         await session.close();
     }
 };
+
+// ============================================================
+// Character Enhancement Queries (P0)
+// ============================================================
+
+/**
+ * 获取角色的完整深度信息（包含属性、关系、冲突）
+ *
+ * 此函数返回单个角色的全方位图谱数据，包括：
+ * - 节点属性（基本信息 + 深度属性）
+ * - 角色间关系（双向）
+ * - 角色-世界设定关系
+ * - 参与的冲突场景
+ *
+ * @param projectId - 项目ID
+ * @param characterId - 角色ID
+ */
+export const getCharacterWithDepth = async (
+    projectId: string,
+    characterId: string
+): Promise<{
+    character: any;
+    relationships: any[];
+    worldRelations: any[];
+    conflicts: any[];
+}> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        // 1. 获取角色节点（包含深度属性）
+        const charResult = await session.run(
+            `MATCH (c:Character {id: $charId, projectId: $projectId})
+             RETURN c`,
+            { charId: characterId, projectId }
+        );
+
+        if (charResult.records.length === 0) {
+            return { character: null, relationships: [], worldRelations: [], conflicts: [] };
+        }
+
+        const character = charResult.records[0].get('c').properties;
+
+        // 2. 获取角色间关系（双向）
+        const relsResult = await session.run(
+            `MATCH (c:Character {id: $charId, projectId: $projectId})-[r]-(other:Character {projectId: $projectId})
+             WHERE type(r) IN ['ENEMY_OF', 'ALLY_OF', 'LOVES', 'KIN_OF', 'MENTORS', 'RIVAL_OF', 'SERVES', 'FRIEND_OF', 'RELATED_TO']
+             RETURN other.id as targetId,
+                    other.name as targetName,
+                    type(r) as relationType,
+                    r.weight as weight,
+                    r.description as description,
+                    r.trajectory as trajectory,
+                    CASE WHEN startNode(r) = c THEN 'OUT' ELSE 'IN' END as direction`,
+            { charId: characterId, projectId }
+        );
+
+        const relationships = relsResult.records.map(r => ({
+            targetId: r.get('targetId'),
+            targetName: r.get('targetName'),
+            relationType: r.get('relationType'),
+            weight: r.get('weight')?.toNumber?.() || 50,
+            description: r.get('description') || '',
+            trajectory: r.get('trajectory') || 'stable',
+            direction: r.get('direction'),
+        }));
+
+        // 3. 获取角色-世界设定关系
+        const worldRelsResult = await session.run(
+            `MATCH (c:Character {id: $charId, projectId: $projectId})-[r:ORIGINATED_FROM|RESIDES_IN|CONTROLS_TERRITORY|EXILED_FROM]->(w:WorldSetting)
+             RETURN w.id as settingId,
+                    w.title as settingName,
+                    w.category as category,
+                    type(r) as relationType,
+                    properties(r) as props`,
+            { charId: characterId, projectId }
+        );
+
+        const worldRelations = worldRelsResult.records.map(r => ({
+            settingId: r.get('settingId'),
+            settingName: r.get('settingName'),
+            category: r.get('category'),
+            relationType: r.get('relationType'),
+            properties: r.get('props') || {},
+        }));
+
+        // 4. 获取角色参与的冲突场景
+        const conflictsResult = await session.run(
+            `MATCH (c:Character {id: $charId, projectId: $projectId})<-[:HAS_CONFLICT_PARTICIPANT]-(pn:PlotNode)
+             RETURN pn.id as plotNodeId,
+                    pn.title as plotNodeTitle,
+                    pn.content as content,
+                    r.conflictType as conflictType,
+                    r.stakes as stakes,
+                    r.intensity as intensity`,
+            { charId: characterId, projectId }
+        );
+
+        const conflicts = conflictsResult.records.map(r => ({
+            plotNodeId: r.get('plotNodeId'),
+            plotNodeTitle: r.get('plotNodeTitle'),
+            content: r.get('content') || '',
+            conflictType: r.get('conflictType'),
+            stakes: r.get('stakes'),
+            intensity: r.get('intensity')?.toNumber?.() || 5,
+        }));
+
+        return { character, relationships, worldRelations, conflicts };
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * 按标签搜索角色
+ *
+ * 支持两种匹配模式：
+ * - matchAll=false: 匹配任意标签（OR逻辑）
+ * - matchAll=true: 匹配所有标签（AND逻辑）
+ *
+ * @param projectId - 项目ID
+ * @param tags - 标签数组
+ * @param matchAll - 是否匹配所有标签（默认任意匹配）
+ */
+export const searchCharactersByTags = async (
+    projectId: string,
+    tags: string[],
+    matchAll: boolean = false
+): Promise<any[]> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        const query = matchAll
+            ? `MATCH (c:Character {projectId: $projectId})
+               WHERE ALL(tag IN $tags WHERE tag IN c.tags)
+               RETURN c`
+            : `MATCH (c:Character {projectId: $projectId})
+               WHERE ANY(tag IN $tags WHERE tag IN c.tags)
+               RETURN c`;
+
+        const result = await session.run(query, { projectId, tags });
+        return result.records.map(r => r.get('c').properties);
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * 按道德阵营查询角色
+ *
+ * 支持模糊匹配（CONTAINS），可以搜索阵营关键词。
+ * 例如：搜索"守序"可以匹配"守序善良"、"守序中立"、"守序邪恶"。
+ *
+ * @param projectId - 项目ID
+ * @param alignmentPattern - 阵营模式（支持模糊匹配）
+ */
+export const getCharactersByAlignment = async (
+    projectId: string,
+    alignmentPattern: string
+): Promise<any[]> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        const result = await session.run(
+            `MATCH (c:Character {projectId: $projectId})
+             WHERE toLower(c.alignment) CONTAINS toLower($pattern)
+             RETURN c
+             ORDER BY c.name`,
+            { projectId, pattern: alignmentPattern }
+        );
+        return result.records.map(r => r.get('c').properties);
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * 获取角色动机网络（欲望和恐惧的关系图）
+ *
+ * 返回项目中所有定义了欲望或恐惧的角色，用于可视化展示：
+ * - 角色列表（含desire和fear字段）
+ * - 去重的欲望列表
+ * - 去重的恐惧列表
+ *
+ * @param projectId - 项目ID
+ */
+export const getCharacterMotivationNetwork = async (
+    projectId: string
+): Promise<{
+    characters: Array<{
+        id: string;
+        name: string;
+        desire?: string;
+        fear?: string;
+    }>;
+    desires: string[];
+    fears: string[];
+}> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        const result = await session.run(
+            `MATCH (c:Character {projectId: $projectId})
+             WHERE c.desire IS NOT NULL OR c.fear IS NOT NULL
+             RETURN c.id as id, c.name as name, c.desire as desire, c.fear as fear`,
+            { projectId }
+        );
+
+        const characters = result.records.map(r => ({
+            id: r.get('id'),
+            name: r.get('name'),
+            desire: r.get('desire'),
+            fear: r.get('fear'),
+        }));
+
+        const desires = [...new Set(characters.filter(c => c.desire).map(c => c.desire!))];
+        const fears = [...new Set(characters.filter(c => c.fear).map(c => c.fear!))];
+
+        return { characters, desires, fears };
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * 获取指定地点的所有角色
+ *
+ * 支持两种查询模式：
+ * - includeVisitors=true: 包含所有关联角色（起源地、居住地、控制领地）
+ * - includeVisitors=false: 仅包含居住者（RESIDES_IN关系）
+ *
+ * @param projectId - 项目ID
+ * @param locationId - 世界设定ID
+ * @param includeVisitors - 是否包含访客（默认仅居住者）
+ */
+export const getCharactersAtLocation = async (
+    projectId: string,
+    locationId: string,
+    includeVisitors: boolean = false
+): Promise<Array<{
+    character: any;
+    relationType: string;
+    since?: any;
+}>> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        const relTypes = includeVisitors
+            ? 'ORIGINATED_FROM|RESIDES_IN|CONTROLS_TERRITORY'
+            : 'RESIDES_IN';
+
+        const result = await session.run(
+            `MATCH (c:Character {projectId: $projectId})-[r:${relTypes}]->(w:WorldSetting {id: $locationId})
+             RETURN c, type(r) as relationType, r.since as since`,
+            { projectId, locationId }
+        );
+
+        return result.records.map(r => ({
+            character: r.get('c').properties,
+            relationType: r.get('relationType'),
+            since: r.get('since'),
+        }));
+    } finally {
+        await session.close();
+    }
+};
