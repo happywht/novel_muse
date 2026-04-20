@@ -1,13 +1,16 @@
-import React from 'react';
-import { Edit2, Save, X, BookPlus, Check, GitCommit } from 'lucide-react';
+import React, { useState } from 'react';
+import { Edit2, Save, X, BookPlus, Check, GitCommit, Network } from 'lucide-react';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { useWorldBuilder } from './WorldBuilderContext';
+import { WorldCharacterGraph } from '../WorldCharacterGraph';
 
 /**
  * 世界观详情展示与编辑组件
  * 包含：条目详情展示、编辑模式、回响处理、扩展功能
  */
 export const WorldDetail: React.FC = () => {
+  const [showCharacterGraph, setShowCharacterGraph] = useState(false);
+
   const {
     activeItem,
     activeItemEchoes,
@@ -22,6 +25,7 @@ export const WorldDetail: React.FC = () => {
     handleSaveEdit,
     handleAcceptEcho,
     handleRejectEcho,
+    project,
   } = useWorldBuilder();
 
   if (!activeItem) {
@@ -112,6 +116,12 @@ export const WorldDetail: React.FC = () => {
                 {isExpanding ? <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full"></div> : <BookPlus size={16} />}
                 扩展历史与文化
               </button>
+              <button
+                onClick={() => setShowCharacterGraph(true)}
+                className="text-sm bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white px-4 py-2 rounded-lg border border-violet-500/30 transition-all flex items-center gap-2 shadow-lg shadow-violet-900/20"
+              >
+                <Network size={16} /> B3角色关系联动
+              </button>
             </>
           )}
         </div>
@@ -127,6 +137,41 @@ export const WorldDetail: React.FC = () => {
       ) : (
         <div className="prose prose-invert prose-slate max-w-none pb-20">
           <MarkdownRenderer content={activeItem.content} />
+        </div>
+      )}
+
+      {/* B3 角色关系联动模态框 */}
+      {showCharacterGraph && project && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 rounded-2xl border border-violet-500/30 shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
+            {/* 模态框头部 */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-gradient-to-r from-violet-950 to-purple-950">
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Network size={20} className="text-violet-400" />
+                  B3 世界观与角色关系联动
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  分析世界观条目与角色网络的多维度关联
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCharacterGraph(false)}
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* 组件内容 */}
+            <div className="p-4 overflow-y-auto max-h-[calc(90vh-80px)]">
+              <WorldCharacterGraph
+                worldSettings={project.worldSettings || []}
+                characters={project.characters || []}
+                activeWorldItem={activeItem}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>

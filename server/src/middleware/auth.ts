@@ -1,5 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 
+// Extend Express Request type to include user property
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        role: string;
+        authMethod: string;
+      };
+    }
+  }
+}
+
 // 公开路由白名单（不需要认证的路由）
 // 注意：由于中间件挂载在 /api 上，req.path 不包含 /api 前缀
 export const PUBLIC_ROUTES = [

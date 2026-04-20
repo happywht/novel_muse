@@ -13,7 +13,9 @@ import {
   Plus,
   Lightbulb,
   TrendingUp,
-  Clock,
+  Clock as ClockIcon,
+  Users,
+  Brain,
 } from 'lucide-react';
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer';
 import { CharacterArcSelector } from '../CharacterArcSelector';
@@ -21,6 +23,14 @@ import { Loader } from '@/components/ui/Loader';
 import { useCharacterCreator } from './CharacterCreatorContext';
 import { isStructuredFormat, getRelationType, getTargetName } from '@/utils/characterRelations';
 import { RELATION_TYPE_LABELS } from '@/types';
+import { CharacterDepthPanel } from '../CharacterDepthPanel';
+import { CharacterWorldRelationSelector } from '../CharacterWorldRelationSelector';
+import { CharacterTagCloud } from '../CharacterTagCloud';
+import { CharacterRelationshipGraph } from '../CharacterRelationshipGraph';
+import { RelationshipTimeline } from '../RelationshipTimeline';
+import { CharacterRelationshipBatchEditor } from '../CharacterRelationshipBatchEditor';
+import { CharacterArcVisualization } from '../CharacterArcVisualization';
+import { CharacterArcVisualization } from '../CharacterArcVisualization';
 
 /**
  * Echo 提案区域
@@ -471,6 +481,323 @@ function RelationshipsSection() {
 }
 
 /**
+ * P1 增强：关系图谱展示区域
+ */
+function RelationshipGraphSection() {
+  const { activeChar, project, setActiveCharId } = useCharacterCreator();
+  const [networkData, setNetworkData] = React.useState<{
+    nodes: any[];
+    edges: any[];
+  } | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // 获取关系网络数据
+  React.useEffect(() => {
+    if (!activeChar || !project.id) return;
+
+    const fetchNetworkData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // 使用 graphApi 获取角色关系网络
+        const { graphApi } = await import('@/services/api');
+        const data = await graphApi.getCharacterNetwork(project.id, {
+          includeCharacterIds: [activeChar.id, ...getRelatedCharacterIds(activeChar)]
+        });
+
+        setNetworkData(data);
+      } catch (err: any) {
+        console.error('Failed to fetch character network:', err);
+        setError(err.message || '加载关系网络失败');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchNetworkData();
+  }, [activeChar, project.id]);
+
+  // 获取相关角色ID
+  const getRelatedCharacterIds = (char: any): string[] => {
+    const relatedIds: string[] = [];
+
+    if (char.structuredRelations) {
+      char.structuredRelations.forEach((rel: any) => {
+        if (rel.targetCharacterId && !relatedIds.includes(rel.targetCharacterId)) {
+          relatedIds.push(rel.targetCharacterId);
+        }
+      });
+    }
+
+    return relatedIds;
+  };
+
+  // 处理节点点击
+  const handleNodeClick = (node: any) => {
+    if (node.id !== activeChar?.id) {
+      setActiveCharId(node.id);
+    }
+  };
+
+  if (!activeChar) return null;
+
+  return (
+    <div className="bg-slate-800/40 rounded-2xl border border-slate-700/50 p-6 shadow-inner">
+      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+        <HeartHandshake size={14} className="text-rose-500" /> 关系网络图谱 (Relationship Network)
+      </h3>
+
+      {loading && (
+        <div className="flex items-center justify-center h-64">
+          <Loader text="正在加载关系网络..." />
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-950/30 border border-red-500/30 rounded-lg p-4 text-red-400 text-sm">
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && networkData && (
+        <CharacterRelationshipGraph
+          projectId={project.id}
+          nodes={networkData.nodes}
+          edges={networkData.edges}
+          onNodeClick={handleNodeClick}
+          width={700}
+          height={500}
+        />
+      )}
+
+      {!loading && !error && !networkData && (
+        <div className="text-center py-8 text-slate-500">
+          <p className="text-sm">暂无关系网络数据</p>
+          <p className="text-xs mt-2">为角色添加关系后将在此处显示关系图谱</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * P2 增强：关系时间线展示区域
+ */
+function RelationshipTimelineSection() {
+  const { activeChar, project, setActiveCharId } = useCharacterCreator();
+  const [timelineData, setTimelineData] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  // 获取关系时间线数据
+  React.useEffect(() => {
+    if (!activeChar || !project.id) return;
+
+    const fetchTimelineData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // 直接调用后端API
+        const response = await fetch(`/api/graph/${project.id}/characters/${activeChar.id}/relationship-timeline`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch relationship timeline');
+        }
+
+        const data = await response.json();
+        setTimelineData(data);
+      } catch (err: any) {
+        console.error('Failed to fetch relationship timeline:', err);
+        setError(err.message || '加载关系时间线失败');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTimelineData();
+  }, [activeChar, project.id]);
+
+  // 处理角色点击
+  const handleCharacterClick = (characterId: string) => {
+    setActiveCharId(characterId);
+  };
+
+  if (!activeChar) return null;
+
+  return (
+    <div className="bg-slate-800/40 rounded-2xl border border-slate-700/50 p-6 shadow-inner">
+      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+        <ClockIcon size={14} className="text-cyan-400" /> 关系演化历史 (Relationship Timeline)
+      </h3>
+
+      {loading && (
+        <div className="flex items-center justify-center h-64">
+          <Loader text="正在加载关系时间线..." />
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-950/30 border border-red-500/30 rounded-lg p-4 text-red-400 text-sm">
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && timelineData.length > 0 && (
+        <RelationshipTimeline
+          timeline={timelineData}
+          onCharacterClick={handleCharacterClick}
+          showFullDetails={false}
+        />
+      )}
+
+      {!loading && !error && timelineData.length === 0 && (
+        <div className="text-center py-8 text-slate-500">
+          <ClockIcon className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+          <p className="text-sm">暂无关系演化历史</p>
+          <p className="text-xs mt-2">当角色关系发生变化时将在此处显示时间线</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * B2 增强：角色成长弧线可视化
+ */
+function CharacterArcVisualizationSection() {
+  const { activeChar, project, updateProject } = useCharacterCreator();
+
+  if (!activeChar) return null;
+
+  const handlePhaseUpdate = (phase: any, progress: number) => {
+    if (!activeChar.arc) return;
+
+    updateProject({
+      characters: project.characters.map((c) =>
+        c.id === activeChar.id
+          ? {
+              ...c,
+              arc: {
+                ...c.arc!,
+                currentPhase: phase,
+                phaseProgress: progress,
+                lastUpdated: Date.now(),
+              },
+            }
+          : c
+      ),
+    });
+  };
+
+  return (
+    <div className="bg-slate-800/40 rounded-2xl border border-slate-700/50 p-6 shadow-inner">
+      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+        <Brain size={14} className="text-purple-400" />
+        成长弧线可视化 (Character Arc Visualization)
+      </h3>
+
+      <CharacterArcVisualization
+        character={activeChar}
+        relationships={activeChar.structuredRelations || []}
+        onPhaseUpdate={handlePhaseUpdate}
+      />
+    </div>
+  );
+}
+
+/**
+ * P3 增强：批量关系管理对话框
+ */
+function BatchRelationshipDialog() {
+  const { project, updateProject } = useCharacterCreator();
+  const [isOpen, setIsOpen] = React.useState(false);
+
+  if (!project.characters || project.characters.length === 0) {
+    return null;
+  }
+
+  const handleBatchUpdate = (updates: Array<{
+    characterId: string;
+    relationships: any[];
+  }>) => {
+    // 更新所有角色的关系数据
+    const updatedCharacters = project.characters.map((char: any) => {
+      const update = updates.find((u) => u.characterId === char.id);
+      if (update) {
+        return {
+          ...char,
+          structuredRelations: update.relationships,
+        };
+      }
+      return char;
+    });
+
+    updateProject({
+      characters: updatedCharacters,
+    });
+  };
+
+  const handleExport = (format: 'json' | 'csv') => {
+    console.log(`Exporting relationships as ${format}`);
+  };
+
+  const handleImport = (data: any[]) => {
+    console.log('Importing relationship data:', data);
+  };
+
+  return (
+    <>
+      {/* 触发按钮 */}
+      <button
+        onClick={() => setIsOpen(true)}
+        className="fixed bottom-6 right-6 px-6 py-3 bg-muse-600 hover:bg-muse-500 text-white rounded-xl shadow-2xl shadow-muse-900/50 text-sm font-bold flex items-center gap-2 transition-all hover:scale-105 z-40"
+      >
+        <Users size={18} />
+        批量管理关系
+      </button>
+
+      {/* 对话框 */}
+      {isOpen && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 rounded-2xl border border-slate-700 max-w-6xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+            {/* 头部 */}
+            <div className="p-6 border-b border-slate-700 flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                  <Users className="text-muse-400" />
+                  批量关系管理器
+                </h2>
+                <p className="text-slate-400 text-sm mt-1">
+                  对多个角色的关系进行批量操作、导出和导入
+                </p>
+              </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* 内容 */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <CharacterRelationshipBatchEditor
+                characters={project.characters}
+                onBatchUpdate={handleBatchUpdate}
+                onExport={handleExport}
+                onImport={handleImport}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
  * 角色详情组件
  * 展示选中角色的详细信息、编辑功能和图谱数据
  */
@@ -650,6 +977,58 @@ export function CharacterDetail() {
               />
             </div>
 
+            {/* P0 增强: 角色深度属性面板 */}
+            {isEditing ? (
+              <div className="mt-4">
+                <CharacterDepthPanel
+                  character={activeChar}
+                  onUpdate={(updates) => {
+                    updateProject({
+                      characters: project.characters.map((c) =>
+                        c.id === activeChar.id ? { ...c, ...updates } : c
+                      ),
+                    });
+                  }}
+                  readonly={false}
+                />
+              </div>
+            ) : (
+              <div className="mt-4">
+                <CharacterDepthPanel
+                  character={activeChar}
+                  onUpdate={() => {}}
+                  readonly={true}
+                />
+              </div>
+            )}
+
+            {/* P0 增强: 角色地理关联 */}
+            {isEditing ? (
+              <div className="mt-4">
+                <CharacterWorldRelationSelector
+                  character={activeChar}
+                  worldSettings={project.worldSettings || []}
+                  onUpdate={(updates) => {
+                    updateProject({
+                      characters: project.characters.map((c) =>
+                        c.id === activeChar.id ? { ...c, ...updates } : c
+                      ),
+                    });
+                  }}
+                  readonly={false}
+                />
+              </div>
+            ) : (
+              <div className="mt-4">
+                <CharacterWorldRelationSelector
+                  character={activeChar}
+                  worldSettings={project.worldSettings || []}
+                  onUpdate={() => {}}
+                  readonly={true}
+                />
+              </div>
+            )}
+
             {/* 图谱洞察 */}
             <GraphInsights />
 
@@ -674,6 +1053,15 @@ export function CharacterDetail() {
 
               {/* 人际关系 */}
               <RelationshipsSection />
+
+              {/* P1 增强：关系网络图谱 */}
+              <RelationshipGraphSection />
+
+              {/* P2 增强：关系演化时间线 */}
+              <RelationshipTimelineSection />
+
+              {/* B2 增强：角色成长弧线可视化 */}
+              <CharacterArcVisualizationSection />
             </div>
           </div>
         </div>
@@ -685,6 +1073,9 @@ export function CharacterDetail() {
           <Loader text="正在向星辰借火 (雕琢灵魂)..." />
         </div>
       )}
+
+      {/* P3 增强：批量关系管理器 */}
+      <BatchRelationshipDialog />
     </div>
   );
 }

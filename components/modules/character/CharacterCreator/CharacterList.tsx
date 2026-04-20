@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { User, Plus, Trash2, Sparkles, Search } from 'lucide-react';
 import { VirtualList } from '@/components/ui/VirtualList';
 import { useCharacterCreator } from './CharacterCreatorContext';
 import { useDebouncedValue } from '@/hooks/useDebouncedConfig';
 import { UI_CONFIG } from '@/config/constants';
+import { CharacterTagCloud } from '../CharacterTagCloud';
 
 /**
  * 角色列表组件
@@ -29,16 +30,42 @@ export function CharacterList() {
 
   const debouncedSearchQuery = useDebouncedValue(searchQuery, 'search');
 
+  // P0 增强: 标签过滤状态
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+
   // 过滤后的角色列表
   const filteredCharacters = useMemo(() => {
-    return project.characters.filter(
-      (c) => c.name.includes(debouncedSearchQuery) || c.role.includes(debouncedSearchQuery)
-    );
-  }, [project.characters, debouncedSearchQuery]);
+    return project.characters.filter((c) => {
+      // 搜索过滤
+      const matchesSearch =
+        c.name.includes(debouncedSearchQuery) || c.role.includes(debouncedSearchQuery);
+
+      // 标签过滤 (AND 逻辑: 所有选中的标签都必须匹配)
+      const matchesTags =
+        selectedTags.length === 0 ||
+        selectedTags.every((tag) => (c.tags || []).includes(tag));
+
+      return matchesSearch && matchesTags;
+    });
+  }, [project.characters, debouncedSearchQuery, selectedTags]);
 
   // 检查角色是否有待处理的 Echo
   const hasPendingEcho = (charId: string) => {
     return (project.echoes || []).some((e) => e.targetId === charId && e.status === 'PENDING');
+  };
+
+  // P0 增强: 处理标签选择
+  const handleTagSelect = (tag: string) => {
+    setSelectedTags((prev) => [...prev, tag]);
+  };
+
+  const handleTagDeselect = (tag: string) => {
+    setSelectedTags((prev) => prev.filter((t) => t !== tag));
+  };
+
+  const handleCharacterSelect = (characterId: string) => {
+    setActiveCharId(characterId);
+    setDraftCharacter(null);
   };
 
   // 渲染单个角色项
@@ -111,7 +138,7 @@ export function CharacterList() {
         <h2 className="font-serif font-bold text-lg text-white mb-4">角色名录</h2>
 
         {/* 搜索 */}
-        <div className="relative mb-4">
+        <div className="relative mb-3">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
           <input
             type="text"
@@ -119,6 +146,18 @@ export function CharacterList() {
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="搜索角色..."
             className="w-full bg-slate-900 border border-slate-700 rounded-md pl-9 pr-3 py-2 text-xs text-white focus:border-muse-500 outline-none"
+          />
+        </div>
+
+        {/* P0 增强: 角色标签云过滤 */}
+        <div className="mb-3">
+          <CharacterTagCloud
+            characters={project.characters}
+            selectedTags={selectedTags}
+            onTagSelect={handleTagSelect}
+            onTagDeselect={handleTagDeselect}
+            onCharacterSelect={handleCharacterSelect}
+            maxTags={15}
           />
         </div>
 

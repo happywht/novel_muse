@@ -8,12 +8,18 @@ import {
     getCharacterConflicts, getHighIntensityConflicts
 } from '../services/neo4jService';
 import {
+    cacheMiddleware,
+    invalidateOnWrite,
+    CachePresets,
+    getGlobalCache
+} from '../middleware/cacheMiddleware';
+import {
     getCharacterTraits,
     getCharacterEvolution,
     getCharacterForeshadowing,
     getCharacterPhysicalStatus,
     // P1 Echo and Outliner graph query functions
-    getRelationshipTimeline,
+    getRelationshipTimelineBetweenCharacters,
     getEchoForeshadowing,
     detectContradictions,
     getEchoHistory,
@@ -32,7 +38,13 @@ import {
     searchCharactersByTags,
     getCharactersByAlignment,
     getCharacterMotivationNetwork,
-    getCharactersAtLocation
+    getCharactersAtLocation,
+    // P1 Character Relationship Network
+    getCharacterNetwork,
+    // P2 Character Relationship Timeline
+    getRelationshipTimeline,
+    // P2 Character Relationship History
+    getRelationshipHistory
 } from '../services/graph/queries';
 import { syncEchoToGraph, syncChapterToGraph, syncForgeResult, syncSingleCharacter } from '../services/graph/sync';
 
@@ -76,6 +88,151 @@ interface ChapterRequest {
 
 const router = Router();
 
+// ============================================================
+// API Performance Monitoring Middleware
+// ============================================================
+
+interface PerformanceMetrics {
+  endpoint: string;
+  timestamp: number;
+  duration: number;
+  status: number;
+  projectId?: string;
+}
+
+const performanceMetrics: PerformanceMetrics[] = [];
+const MAX_METRICS = 1000; // Keep last 1000 requests
+
+const performanceMiddleware = (req: Request, res: Response, next: () => void) => {
+  const startTime = Date.now();
+
+  // Capture original res.json
+  const originalJson = res.json.bind(res);
+
+  res.json = function(data: any) {
+    const duration = Date.now() - startTime;
+    const metric: PerformanceMetrics = {
+      endpoint: req.route?.path || req.path,
+      timestamp: Date.now(),
+      duration,
+      status: res.statusCode,
+      projectId: typeof req.params.projectId === 'string' ? req.params.projectId : undefined
+    };
+
+    performanceMetrics.push(metric);
+
+    // Keep only last MAX_METRICS
+    if (performanceMetrics.length > MAX_METRICS) {
+      performanceMetrics.shift();
+    }
+
+    return originalJson(data);
+  };
+
+  next();
+};
+
+// Apply performance middleware to all graph routes
+router.use(performanceMiddleware);
+
+// GET /api/graph/:projectId/performance - Get API performance metrics
+router.get('/:projectId/performance', async (req: Request, res: Response) => {
+  try {
+    const { limit = 50 } = req.query;
+
+    // Filter metrics for this project
+    const projectMetrics = performanceMetrics
+      .filter(m => m.projectId === req.params.projectId)
+      .slice(-parseInt(limit as string, 10));
+
+    // Calculate statistics
+    const stats = {
+      totalRequests: projectMetrics.length,
+      averageDuration: projectMetrics.length > 0
+        ? Math.round(projectMetrics.reduce((sum, m) => sum + m.duration, 0) / projectMetrics.length)
+        : 0,
+      minDuration: projectMetrics.length > 0
+        ? Math.min(...projectMetrics.map(m => m.duration))
+        : 0,
+      maxDuration: projectMetrics.length > 0
+        ? Math.max(...projectMetrics.map(m => m.duration))
+        : 0,
+      errorCount: projectMetrics.filter(m => m.status >= 400).length,
+      successCount: projectMetrics.filter(m => m.status < 400).length
+    };
+
+    // Group by endpoint
+    const byEndpoint: Record<string, { count: number; avgDuration: number; errorRate: number }> = {};
+    projectMetrics.forEach(m => {
+      if (!byEndpoint[m.endpoint]) {
+        byEndpoint[m.endpoint] = { count: 0, avgDuration: 0, errorRate: 0 };
+      }
+      byEndpoint[m.endpoint].count++;
+      byEndpoint[m.endpoint].avgDuration += m.duration;
+      if (m.status >= 400) byEndpoint[m.endpoint].errorRate++;
+    });
+
+    Object.keys(byEndpoint).forEach(endpoint => {
+      byEndpoint[endpoint].avgDuration = Math.round(byEndpoint[endpoint].avgDuration / byEndpoint[endpoint].count);
+      byEndpoint[endpoint].errorRate = Math.round((byEndpoint[endpoint].errorRate / byEndpoint[endpoint].count) * 100);
+    });
+
+    res.json({
+      stats,
+      byEndpoint,
+      recentRequests: projectMetrics.slice(-10)
+    });
+  } catch (err: any) {
+    console.error('Performance metrics error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/graph/:projectId/cache/stats - Get cache statistics
+router.get('/:projectId/cache/stats', async (req: Request, res: Response) => {
+  try {
+    const cache = getGlobalCache();
+    const stats = cache.getStats();
+
+    res.json({
+      success: true,
+      data: {
+        ...stats,
+        hitRate: `${((stats.hitRate || 0) * 100).toFixed(2)}%`,
+        efficiency: stats.hits > 0
+          ? `${((stats.hits / (stats.hits + stats.misses)) * 100).toFixed(2)}%`
+          : '0%',
+        currentSizeInMB: (stats.currentSize / (1024 * 1024)).toFixed(2),
+        maxEntriesReached: stats.currentEntries >= 1000
+      }
+    });
+  } catch (err: any) {
+    console.error('Cache stats error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/graph/:projectId/cache/clear - Clear all cache
+router.post('/:projectId/cache/clear', async (req: Request, res: Response) => {
+  try {
+    const cache = getGlobalCache();
+    const beforeStats = cache.getStats();
+    cache.clear();
+
+    res.json({
+      success: true,
+      message: 'All cache cleared',
+      data: {
+        clearedEntries: beforeStats.currentEntries,
+        freedMemoryInMB: (beforeStats.currentSize / (1024 * 1024)).toFixed(2)
+      }
+    });
+  } catch (err: any) {
+    console.error('Cache clear error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/graph/verify-logic - Audit triples against ground truth (MUST BE BEFORE /:projectId routes)
 router.post('/verify-logic', async (req: Request, res: Response) => {
     const { projectId, triples } = req.body;
@@ -104,7 +261,8 @@ router.get('/:projectId/insights', async (req: Request, res: Response) => {
 });
 
 // GET /api/graph/:projectId - Get full graph for a project with optional filtering
-router.get('/:projectId', async (req: Request, res: Response) => {
+// Applied MEDIUM cache (5 min) - graph data changes infrequently
+router.get('/:projectId', cacheMiddleware({ ...CachePresets.MEDIUM }), async (req: Request, res: Response) => {
     try {
         const { types } = req.query;
         let includeTypes: string[] | undefined = undefined;
@@ -196,18 +354,28 @@ router.post('/:projectId/edge', async (req: Request, res: Response) => {
 });
 
 // POST /api/graph/:projectId/sync - Manually trigger graph sync
+// Invalidate all project-related cache on sync
 router.post('/:projectId/sync', async (req: Request, res: Response) => {
     try {
         await syncProjectToGraph(req.body);
-        res.json({ success: true });
-    } catch (err: any) {
-        console.error('Graph sync error:', err);
-        res.status(500).json({ error: err.message });
+
+        // Clear all cache for this project
+        const cache = getGlobalCache();
+        const projectKeys = cache.keys(new RegExp(`:${req.params.projectId}:`));
+        cache.deleteMany(projectKeys);
+        console.log(`🗑️ Cleared ${projectKeys.length} cache entries for project ${req.params.projectId}`);
+
+            res.json({ success: true });
+        } catch (err: any) {
+            console.error('Graph sync error:', err);
+            res.status(500).json({ error: err.message });
+        }
     }
-});
+);
 
 // Task 2.1 & 2.2: Get unresolved foreshadowing
-router.get('/:projectId/foreshadowing', async (req, res) => {
+// Applied SHORT cache (1 min) - foreshadowing status changes frequently
+router.get('/:projectId/foreshadowing', cacheMiddleware({ ...CachePresets.SHORT }), async (req, res) => {
     try {
         const branchId = req.query.branchId as string;
         const foreshadowing = await getUnresolvedForeshadowing(req.params.projectId as string, branchId);
@@ -287,7 +455,8 @@ router.get('/:projectId/conflicts/high-intensity', async (req: Request, res: Res
 });
 
 // GET /api/graph/:projectId/characters/:characterId/traits - Get character traits
-router.get('/:projectId/characters/:characterId/traits', async (req: Request, res: Response) => {
+// Applied MEDIUM cache (5 min) - character traits change infrequently
+router.get('/:projectId/characters/:characterId/traits', cacheMiddleware({ ...CachePresets.MEDIUM }), async (req: Request, res: Response) => {
     try {
         const traits = await getCharacterTraits(
             req.params.projectId as string,
@@ -301,7 +470,8 @@ router.get('/:projectId/characters/:characterId/traits', async (req: Request, re
 });
 
 // GET /api/graph/:projectId/characters/:characterId/evolution - Get character evolution
-router.get('/:projectId/characters/:characterId/evolution', async (req: Request, res: Response) => {
+// Applied LONG cache (30 min) - evolution data is historical and rarely changes
+router.get('/:projectId/characters/:characterId/evolution', cacheMiddleware({ ...CachePresets.LONG }), async (req: Request, res: Response) => {
     try {
         const evolution = await getCharacterEvolution(
             req.params.projectId as string,
@@ -348,7 +518,8 @@ router.get('/:projectId/characters/:characterId/physical-status', async (req: Re
 
 // POST /api/graph/:projectId/echoes/:echoId/accept - Accept an Echo and sync to graph
 // 从数据库获取 Echo 数据并同步到图谱
-router.post('/:projectId/echoes/:echoId/accept', async (req: Request, res: Response) => {
+// Invalidate project cache on echo accept (data changes)
+router.post('/:projectId/echoes/:echoId/accept', invalidateOnWrite(/:.+:/), async (req: Request, res: Response) => {
     try {
         const projectId = req.params.projectId as string;
         const echoId = req.params.echoId as string;
@@ -574,7 +745,8 @@ router.post('/:projectId/echoes/batch-sync', async (req: Request, res: Response)
 });
 
 // POST /api/graph/:projectId/chapters/sync - Sync chapter to graph
-router.post('/:projectId/chapters/sync', async (req: Request, res: Response) => {
+// Invalidate project cache on chapter sync (data changes)
+router.post('/:projectId/chapters/sync', invalidateOnWrite(/:.+:/), async (req: Request, res: Response) => {
     try {
         const projectId = req.params.projectId as string;
         const chapterData = req.body as ChapterRequest;
@@ -628,7 +800,7 @@ router.get('/:projectId/relationships/timeline', async (req: Request, res: Respo
         return;
     }
     try {
-        const timeline = await getRelationshipTimeline(
+        const timeline = await getRelationshipTimelineBetweenCharacters(
             req.params.projectId as string,
             character1Id as string,
             character2Id as string
@@ -681,7 +853,8 @@ router.get('/:projectId/echoes/:targetId/history', async (req: Request, res: Res
 });
 
 // GET /api/graph/:projectId/chapters/:chapterId/dependencies - Get chapter dependencies
-router.get('/:projectId/chapters/:chapterId/dependencies', async (req: Request, res: Response) => {
+// Applied MEDIUM cache (5 min) - chapter dependencies change infrequently
+router.get('/:projectId/chapters/:chapterId/dependencies', cacheMiddleware({ ...CachePresets.MEDIUM }), async (req: Request, res: Response) => {
     try {
         const dependencies = await getChapterDependencies(
             req.params.projectId as string,
@@ -965,6 +1138,409 @@ router.post('/:projectId/characters/sync', async (req: Request, res: Response) =
         console.error('Character sync error:', err);
         res.status(500).json({ error: err.message });
     }
+});
+
+// ============================================
+// P1 增强：角色关系网络 API
+// ============================================
+
+// GET /api/graph/:projectId/character-network - Get character relationship network
+router.get('/:projectId/character-network', async (req: Request, res: Response) => {
+    try {
+        const { relationTypes, minWeight, alignments, includeCharacterIds } = req.query;
+
+        // 构建过滤参数
+        const filters: any = {};
+
+        if (relationTypes) {
+            filters.relationTypes = Array.isArray(relationTypes)
+                ? relationTypes
+                : (relationTypes as string).split(',');
+        }
+
+        if (minWeight) {
+            filters.minWeight = parseInt(minWeight as string, 10);
+        }
+
+        if (alignments) {
+            filters.alignments = Array.isArray(alignments)
+                ? alignments
+                : (alignments as string).split(',');
+        }
+
+        if (includeCharacterIds) {
+            filters.includeCharacterIds = Array.isArray(includeCharacterIds)
+                ? includeCharacterIds
+                : (includeCharacterIds as string).split(',');
+        }
+
+        const network = await getCharacterNetwork(
+            req.params.projectId as string,
+            Object.keys(filters).length > 0 ? filters : undefined
+        );
+
+        res.json(network);
+    } catch (err: any) {
+        console.error('Character network fetch error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// P2 增强：角色关系时间线 API
+// ============================================
+
+// GET /api/graph/:projectId/characters/:characterId/relationship-timeline - Get relationship timeline
+router.get('/:projectId/characters/:characterId/relationship-timeline', async (req: Request, res: Response) => {
+    try {
+        const timeline = await getRelationshipTimeline(
+            req.params.projectId as string,
+            req.params.characterId as string
+        );
+
+        res.json(timeline);
+    } catch (err: any) {
+        console.error('Relationship timeline fetch error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/graph/:projectId/characters/:characterId/relationships/:targetCharacterId/history - Get relationship history
+router.get('/:projectId/characters/:characterId/relationships/:targetCharacterId/history', async (req: Request, res: Response) => {
+    try {
+        const history = await getRelationshipHistory(
+            req.params.projectId as string,
+            req.params.characterId as string,
+            req.params.targetCharacterId as string
+        );
+
+        res.json(history);
+    } catch (err: any) {
+        console.error('Relationship history fetch error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================================
+// Global Search Endpoints
+// ============================================================
+
+// GET /api/graph/:projectId/search - Global search across all entities
+router.get('/:projectId/search', async (req: Request, res: Response) => {
+  try {
+    const { q, types, limit = 20 } = req.query;
+
+    if (!q || typeof q !== 'string') {
+      res.status(400).json({ error: 'Missing search query parameter "q"' });
+      return;
+    }
+
+    const searchTypes = types
+      ? (types as string).split(',')
+      : ['characters', 'chapters', 'worldSettings', 'plotNodes', 'echoes'];
+
+    const results: any = {
+      characters: [],
+      chapters: [],
+      worldSettings: [],
+      plotNodes: [],
+      echoes: []
+    };
+
+    const searchTerm = q.toLowerCase();
+    const limitNum = parseInt(limit as string, 10);
+
+    // Search Characters
+    if (searchTypes.includes('characters')) {
+      const characters = await prisma.character.findMany({
+        where: {
+          projectId: req.params.projectId as string,
+          OR: [
+            { name: { contains: searchTerm } },
+            { description: { contains: searchTerm } },
+            { role: { contains: searchTerm } }
+          ]
+        },
+        take: limitNum
+      });
+      results.characters = characters.map(c => ({
+        id: c.id,
+        type: 'character',
+        name: c.name,
+        role: c.role,
+        description: c.description?.substring(0, 200)
+      }));
+    }
+
+    // Search Chapters
+    if (searchTypes.includes('chapters')) {
+      const chapters = await prisma.chapter.findMany({
+        where: {
+          projectId: req.params.projectId as string,
+          OR: [
+            { title: { contains: searchTerm } },
+            { summary: { contains: searchTerm } },
+            { content: { contains: searchTerm } }
+          ]
+        },
+        take: limitNum
+      });
+      results.chapters = chapters.map(ch => ({
+        id: ch.id,
+        type: 'chapter',
+        title: ch.title,
+        summary: ch.summary?.substring(0, 200),
+        order: ch.order
+      }));
+    }
+
+    // Search World Settings
+    if (searchTypes.includes('worldSettings')) {
+      const worldSettings = await prisma.worldSetting.findMany({
+        where: {
+          projectId: req.params.projectId as string,
+          OR: [
+            { title: { contains: searchTerm } },
+            { content: { contains: searchTerm } },
+            { category: { contains: searchTerm } }
+          ]
+        },
+        take: limitNum
+      });
+      results.worldSettings = worldSettings.map(ws => ({
+        id: ws.id,
+        type: 'worldSetting',
+        title: ws.title,
+        category: ws.category,
+        content: ws.content?.substring(0, 200)
+      }));
+    }
+
+    // Search Plot Nodes
+    if (searchTypes.includes('plotNodes')) {
+      const plotNodes = await prisma.plotNode.findMany({
+        where: {
+          projectId: req.params.projectId as string,
+          OR: [
+            { title: { contains: searchTerm } },
+            { content: { contains: searchTerm } }
+          ]
+        },
+        take: limitNum,
+        orderBy: { order: 'asc' }
+      });
+      results.plotNodes = plotNodes.map(pn => ({
+        id: pn.id,
+        type: 'plotNode',
+        title: pn.title,
+        content: pn.content?.substring(0, 200),
+        order: pn.order
+      }));
+    }
+
+    // Search Echoes
+    if (searchTypes.includes('echoes')) {
+      const echoes = await prisma.echo.findMany({
+        where: {
+          projectId: req.params.projectId as string,
+          OR: [
+            { description: { contains: searchTerm } },
+            { targetName: { contains: searchTerm } },
+            { reason: { contains: searchTerm } }
+          ]
+        },
+        take: limitNum,
+        orderBy: { timestamp: 'desc' }
+      });
+      results.echoes = echoes.map(e => ({
+        id: e.id,
+        type: 'echo',
+        targetName: e.targetName,
+        description: e.description?.substring(0, 200),
+        status: e.status
+      }));
+    }
+
+    // Flatten results for easier frontend handling
+    const flatResults = [
+      ...results.characters,
+      ...results.chapters,
+      ...results.worldSettings,
+      ...results.plotNodes,
+      ...results.echoes
+    ];
+
+    res.json({
+      query: q,
+      total: flatResults.length,
+      results: flatResults,
+      byType: results
+    });
+  } catch (err: any) {
+    console.error('Search error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/graph/:projectId/filter-advanced - Advanced filtering with multiple criteria
+router.get('/:projectId/filter-advanced', async (req: Request, res: Response) => {
+  try {
+    const {
+      characterRoles,
+      characterAlignments,
+      chapterOrderMin,
+      chapterOrderMax,
+      echoStatuses,
+      worldCategories
+    } = req.query;
+
+    const filters: any = {};
+
+    // Build character filters
+    const characterFilters: any = { projectId: req.params.projectId as string };
+    if (characterRoles) {
+      const roles = Array.isArray(characterRoles) ? characterRoles : (characterRoles as string).split(',');
+      characterFilters.role = { in: roles };
+    }
+    if (characterAlignments) {
+      const alignments = Array.isArray(characterAlignments) ? characterAlignments : (characterAlignments as string).split(',');
+      characterFilters.alignment = { in: alignments };
+    }
+
+    // Build chapter filters
+    const chapterFilters: any = { projectId: req.params.projectId as string };
+    if (chapterOrderMin) chapterFilters.order = { ...chapterFilters.order, gte: parseInt(chapterOrderMin as string, 10) };
+    if (chapterOrderMax) chapterFilters.order = { ...chapterFilters.order, lte: parseInt(chapterOrderMax as string, 10) };
+
+    // Build echo filters
+    const echoFilters: any = { projectId: req.params.projectId as string };
+    if (echoStatuses) {
+      const statuses = Array.isArray(echoStatuses) ? echoStatuses : (echoStatuses as string).split(',');
+      echoFilters.status = { in: statuses };
+    }
+
+    // Build world setting filters
+    const worldFilters: any = { projectId: req.params.projectId as string };
+    if (worldCategories) {
+      const categories = Array.isArray(worldCategories) ? worldCategories : (worldCategories as string).split(',');
+      worldFilters.category = { in: categories };
+    }
+
+    // Execute all filters in parallel
+    const [characters, chapters, echoes, worldSettings] = await Promise.all([
+      Object.keys(characterFilters).length > 1
+        ? prisma.character.findMany({
+            where: characterFilters,
+            select: { id: true, name: true, role: true, alignment: true }
+          })
+        : [],
+      Object.keys(chapterFilters).length > 1
+        ? prisma.chapter.findMany({
+            where: chapterFilters,
+            select: { id: true, title: true, order: true },
+            orderBy: { order: 'asc' }
+          })
+        : [],
+      Object.keys(echoFilters).length > 1
+        ? prisma.echo.findMany({
+            where: echoFilters,
+            select: { id: true, targetName: true, status: true, timestamp: true },
+            orderBy: { timestamp: 'desc' }
+          })
+        : [],
+      Object.keys(worldFilters).length > 1
+        ? prisma.worldSetting.findMany({
+            where: worldFilters,
+            select: { id: true, title: true, category: true }
+          })
+        : []
+    ]);
+
+    res.json({
+      characters: characters.map(c => ({ ...c, type: 'character' })),
+      chapters: chapters.map(ch => ({ ...ch, type: 'chapter' })),
+      echoes: echoes.map(e => ({ ...e, type: 'echo', timestamp: Number(e.timestamp) })),
+      worldSettings: worldSettings.map(ws => ({ ...ws, type: 'worldSetting' }))
+    });
+  } catch (err: any) {
+    console.error('Advanced filter error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/graph/:projectId/characters/batch-update - Batch update character properties
+router.post('/:projectId/characters/batch-update', async (req: Request, res: Response) => {
+  try {
+    const { characterIds, updates } = req.body;
+
+    if (!characterIds || !Array.isArray(characterIds) || characterIds.length === 0) {
+      res.status(400).json({ error: 'Missing or empty characterIds array' });
+      return;
+    }
+
+    if (!updates || typeof updates !== 'object') {
+      res.status(400).json({ error: 'Missing updates object' });
+      return;
+    }
+
+    // Build Prisma update data object
+    const updateData: any = {};
+    const allowedFields = [
+      'alignment', 'tags', 'desire', 'fear', 'signature', 'contrast',
+      'weakness', 'arc', 'originLocation', 'residence', 'physicalStatus',
+      'foreshadowingHooks'
+    ];
+
+    allowedFields.forEach(field => {
+      if (updates[field] !== undefined) {
+        if (field === 'tags' || field === 'arc' || field === 'controlledTerritories' || field === 'exiledFrom' || field === 'foreshadowingHooks') {
+          updateData[field] = JSON.stringify(updates[field]);
+        } else {
+          updateData[field] = updates[field];
+        }
+      }
+    });
+
+    if (Object.keys(updateData).length === 0) {
+      res.status(400).json({ error: 'No valid fields to update' });
+      return;
+    }
+
+    // Batch update
+    const result = await prisma.character.updateMany({
+      where: {
+        id: { in: characterIds },
+        projectId: req.params.projectId as string
+      },
+      data: updateData
+    });
+
+    // Fetch updated characters for response
+    const updatedCharacters = await prisma.character.findMany({
+      where: { id: { in: characterIds } },
+      select: {
+        id: true,
+        name: true,
+        alignment: true,
+        tags: true,
+        desire: true,
+        fear: true,
+        weakness: true
+      }
+    });
+
+    res.json({
+      success: true,
+      affectedCount: result.count,
+      characters: updatedCharacters.map(c => ({
+        ...c,
+        tags: c.tags ? JSON.parse(c.tags) : undefined
+      }))
+    });
+  } catch (err: any) {
+    console.error('Batch character update error:', err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export { router as graphRouter };

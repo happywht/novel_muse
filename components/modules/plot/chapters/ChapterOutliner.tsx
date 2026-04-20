@@ -32,6 +32,7 @@ import { ChapterBalanceAnalyzer } from '../ChapterBalanceAnalyzer';
 import { useFeature } from '@/hooks/useFeature';
 import { ChapterGraphVisualization } from './ChapterGraphVisualization';
 import { ForeshadowingChainPanel } from './ForeshadowingChainPanel';
+import { ChapterCharacterRelationshipEvolution } from './ChapterCharacterRelationshipEvolution';
 import {
     countWords,
     formatWordCount,
@@ -67,6 +68,7 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
     const [showBalanceAnalyzer, setShowBalanceAnalyzer] = useState(false);
     const [graphChapterId, setGraphChapterId] = useState<string | null>(null);
     const [showForeshadowingPanel, setShowForeshadowingPanel] = useState(false);
+    const [showCharacterRelationshipEvolution, setShowCharacterRelationshipEvolution] = useState(false);
 
     // 检查后端是否可用
     const { useBackend } = useProjectStore();
@@ -456,6 +458,15 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                                     <Link2 size={16} className="text-cyan-400" />
                                     伏笔追踪
                                 </button>
+                                <button
+                                    onClick={() => setShowCharacterRelationshipEvolution(true)}
+                                    disabled={project.chapters.length === 0 || (project.characters || []).length === 0}
+                                    title="B1增强：章节角色关系演化"
+                                    className={`bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-all border border-cyan-400/30 ${(project.chapters.length === 0 || (project.characters || []).length === 0) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    <Network size={16} className="text-white" />
+                                    B1角色关系演化
+                                </button>
                                 </div>
                             </div>
 
@@ -774,6 +785,41 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                     projectId={project.id}
                     onClose={() => setShowForeshadowingPanel(false)}
                 />
+            )}
+
+            {/* B1 Enhancement: Chapter Character Relationship Evolution */}
+            {showCharacterRelationshipEvolution && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden">
+                        {/* Header */}
+                        <div className="p-4 border-b border-slate-800 bg-slate-900/80 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                    <Network className="w-5 h-5 text-cyan-400" />
+                                    B1增强：章节角色关系演化
+                                </h2>
+                                <p className="text-sm text-slate-400 mt-1">
+                                    追踪角色关系在章节时间轴上的动态变化
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowCharacterRelationshipEvolution(false)}
+                                className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-4 overflow-y-auto max-h-[calc(90vh-80px)]">
+                            <ChapterCharacterRelationshipEvolution
+                                chapters={project.chapters}
+                                characters={project.characters || []}
+                                foreshadowingConnections={[]}
+                            />
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );

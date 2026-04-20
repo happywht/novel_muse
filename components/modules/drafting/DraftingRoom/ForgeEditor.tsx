@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     FileText, Cloud, Loader2, Wand2, Eye, Clapperboard,
     Brain, Feather, Zap, Clipboard, Save, Check, ScanSearch,
-    Sparkles, RefreshCw, X, Sidebar
+    Sparkles, RefreshCw, X, Sidebar, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { Echo, PolishMode, ProjectState } from '@/types';
 import { DraftEditor } from './DraftEditor';
 import { Loader } from '@/components/ui/Loader';
 import { EchoSummaryCard } from '@/components/modules/echo/components/EchoSummaryCard';
+import { CharacterReminder } from './CharacterReminder';
+import { DraftingAssistantPanel } from './DraftingAssistantPanel';
 
 interface ForgeEditorProps {
     project: ProjectState;
@@ -18,6 +20,8 @@ export const ForgeEditor: React.FC<ForgeEditorProps> = ({
     project,
     actions
 }) => {
+    const [showAssistantPanels, setShowAssistantPanels] = useState(true);
+
     const {
         generatedContent,
         setGeneratedContent,
@@ -156,6 +160,36 @@ export const ForgeEditor: React.FC<ForgeEditorProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* Assistant Panels */}
+            {generatedContent && showAssistantPanels && (
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                    {/* Character Reminder */}
+                    <CharacterReminder
+                        text={generatedContent}
+                        characters={project.characters || []}
+                    />
+
+                    {/* Drafting Assistant Panel */}
+                    <DraftingAssistantPanel
+                        text={generatedContent}
+                        wordCount={generatedContent.replace(/<[^>]*>/g, '').length}
+                    />
+                </div>
+            )}
+
+            {/* Toggle Assistant Panels Button */}
+            {generatedContent && (
+                <div className="mt-2 flex justify-center">
+                    <button
+                        onClick={() => setShowAssistantPanels(!showAssistantPanels)}
+                        className="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1 px-3 py-1.5 rounded-lg hover:bg-slate-800 transition-all"
+                    >
+                        {showAssistantPanels ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        {showAssistantPanels ? '隐藏助手面板' : '显示助手面板'}
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

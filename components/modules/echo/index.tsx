@@ -9,6 +9,7 @@ import {
 } from '@/services/apiService';
 import { EchoDeepReview } from './components/EchoDeepReview';
 import { EchoIntegrityReport } from './components/EchoIntegrityReport';
+import { EchoNetworkGraph } from './components/EchoNetworkGraph';
 import { useProjectStore } from '@/store';
 import { useToast } from '@/hooks/useToast';
 import { useAdvancedMode } from '@/hooks/useAdvancedMode';
@@ -82,6 +83,7 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
     const [showDeepReview, setShowDeepReview] = useState(false);
     const [showIntegrityReport, setShowIntegrityReport] = useState(false);
     const [showBatchHistory, setShowBatchHistory] = useState(false);
+    const [showNetworkGraph, setShowNetworkGraph] = useState(false);
     const [undoingOperationId, setUndoingOperationId] = useState<string | null>(null);
 
     // Store
@@ -377,6 +379,7 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                     onOpenDeepReview={() => setShowDeepReview(true)}
                     onOpenIntegrityReport={() => setShowIntegrityReport(true)}
                     onOpenBatchHistory={handleOpenBatchHistory}
+                    onShowNetworkGraph={() => setShowNetworkGraph(true)}
                     pendingEchoCount={pendingEchoCount}
                     batchOperationHistoryCount={batchOperationHistory.length}
                 />
@@ -457,6 +460,39 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
                 undoingOperationId={undoingOperationId}
                 onUndo={handleUndoBatchOperation}
             />
+
+            {/* Network Graph Modal */}
+            {showNetworkGraph && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-slate-900 rounded-2xl border border-violet-500/30 shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-gradient-to-r from-violet-950 to-purple-950">
+                            <div>
+                                <h2 className="text-lg font-bold text-white">回响网络图谱</h2>
+                                <p className="text-xs text-slate-400 mt-1">
+                                    可视化回响传播与影响力分析
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowNetworkGraph(false)}
+                                className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="p-4 overflow-y-auto max-h-[calc(90vh-80px)]">
+                            <EchoNetworkGraph
+                                echoes={project.echoes}
+                                chapters={project.chapters}
+                                characters={project.characters}
+                                worldSettings={project.worldSettings}
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

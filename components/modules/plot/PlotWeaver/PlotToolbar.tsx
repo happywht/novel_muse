@@ -1,5 +1,5 @@
 import React from 'react';
-import { GitBranch, Activity, TrendingUp, Lightbulb, Info, Save, History } from 'lucide-react';
+import { GitBranch, Activity, TrendingUp, Lightbulb, Info, Save, History, Film } from 'lucide-react';
 import { TabMode } from '../PlotWeaver';
 import { TemplateSelector } from './TemplateSelector';
 import { STRUCTURE_TEMPLATES } from './constants';
@@ -14,6 +14,7 @@ interface PlotToolbarProps {
     onShowSaveModal: () => void;
     onToggleHistory: () => void;
     onGeneratePlot: (template: typeof STRUCTURE_TEMPLATES[0] | null) => void;
+    onShowStructureGraph?: () => void;
 }
 
 export const PlotToolbar: React.FC<PlotToolbarProps> = ({
@@ -25,7 +26,8 @@ export const PlotToolbar: React.FC<PlotToolbarProps> = ({
     toggleSidebarTab,
     onShowSaveModal,
     onToggleHistory,
-    onGeneratePlot
+    onGeneratePlot,
+    onShowStructureGraph
 }) => {
     return (
         <div className="flex items-center justify-between mb-6">
@@ -61,6 +63,16 @@ export const PlotToolbar: React.FC<PlotToolbarProps> = ({
                 ><History size={16} /></button>
 
                 <div className="h-8 w-[1px] bg-slate-800 mx-1" />
+
+                {onShowStructureGraph && (
+                    <button
+                        onClick={onShowStructureGraph}
+                        className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 border border-violet-500/30 shadow-lg shadow-violet-900/20"
+                        title="剧情结构图谱"
+                    >
+                        <Film size={16} /> <span className="hidden lg:inline">结构图谱</span>
+                    </button>
+                )}
 
                 <TemplateSelector
                     onSelect={onGeneratePlot}

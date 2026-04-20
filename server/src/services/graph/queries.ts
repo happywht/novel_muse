@@ -7,6 +7,32 @@ export interface PhysicalStatus {
     isDead: boolean;
 }
 
+export interface CharacterNetworkFilter {
+    relationTypes?: string[];
+    minWeight?: number;
+    alignments?: string[];
+    includeCharacterIds?: string[];
+}
+
+export interface RelationshipTimelineEntry {
+    timestamp: number;
+    echoId?: string;
+    targetCharacterId: string;
+    targetCharacterName: string;
+    before?: {
+        type: string;
+        weight?: number;
+        description?: string;
+    };
+    after?: {
+        type: string;
+        weight?: number;
+        description?: string;
+    };
+    reason?: string;
+    changeType: 'created' | 'updated' | 'deleted';
+}
+
 /**
  * Get the full graph for a project
  * @param projectId Project ID
@@ -1115,7 +1141,7 @@ export const getConflictResolutionSuggestions = async (
  * @param character1Id 角色1 ID
  * @param character2Id 角色2 ID
  */
-export const getRelationshipTimeline = async (
+export const getRelationshipTimelineBetweenCharacters = async (
     projectId: string,
     character1Id: string,
     character2Id: string
@@ -3018,6 +3044,287 @@ export const getCharactersAtLocation = async (
             relationType: r.get('relationType'),
             since: r.get('since'),
         }));
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * P1 增强：获取角色关系网络
+ *
+ * 返回完整的角色关系图谱数据，支持多维过滤
+ * 用于D3.js或react-force-graph可视化
+ *
+ * @param projectId - 项目ID
+ * @param filters - 可选过滤条件
+ *   - relationTypes: 关系类型数组（如 ['ALLY_OF', 'ENEMY_OF']）
+ *   - minWeight: 最小关系权重（0-100）
+ *   - alignments: 道德阵营数组（如 ['守序善良', '混乱邪恶']）
+ *   - includeCharacterIds: 仅包含指定角色ID
+ */
+export const getCharacterNetwork = async (
+    projectId: string,
+    filters?: CharacterNetworkFilter
+): Promise<{
+    nodes: Array<{
+        id: string;
+        name: string;
+        role: string;
+        alignment?: string;
+        archetype?: string;
+        tags?: string[];
+        desire?: string;
+        fear?: string;
+        [key: string]: any;
+    }>;
+    edges: Array<{
+        source: string;
+        target: string;
+        type: string;
+        weight?: number;
+        trajectory?: string;
+        isBidirectional?: boolean;
+        description?: string;
+    }>;
+}> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        // 构建过滤条件
+        const characterFilters: string[] = [];
+        const params: any = { projectId };
+
+        if (filters?.alignments && filters.alignments.length > 0) {
+            characterFilters.push('c.alignment IN $alignments');
+            params.alignments = filters.alignments;
+        }
+
+        if (filters?.includeCharacterIds && filters.includeCharacterIds.length > 0) {
+            characterFilters.push('c.id IN $includeCharacterIds');
+            params.includeCharacterIds = filters.includeCharacterIds;
+        }
+
+        const characterWhere = characterFilters.length > 0
+            ? `AND ${characterFilters.join(' AND ')}`
+            : '';
+
+        // 构建关系类型过滤
+        let relTypeFilter = '';
+        if (filters?.relationTypes && filters.relationTypes.length > 0) {
+            const relTypes = filters.relationTypes.join('|');
+            relTypeFilter = `:[${relTypes}]`;
+        }
+
+        // 构建权重过滤
+        const weightFilter = filters?.minWeight
+            ? `WHERE r.weight >= $minWeight`
+            : '';
+        if (filters?.minWeight) {
+            params.minWeight = filters.minWeight;
+        }
+
+        // 获取所有符合条件的角色节点
+        const nodesResult = await session.run(
+            `MATCH (c:Character {projectId: $projectId})
+             WHERE 1=1 ${characterWhere}
+             RETURN c`,
+            params
+        );
+
+        const nodes = nodesResult.records.map(record => {
+            const char = record.get('c').properties;
+            return {
+                id: char.id,
+                name: char.name || '未知角色',
+                role: char.role || '未设定',
+                alignment: char.alignment,
+                archetype: char.archetype,
+                tags: char.tags || [],
+                desire: char.desire,
+                fear: char.fear,
+                ...char,
+            };
+        });
+
+        // 如果没有节点，返回空结果
+        if (nodes.length === 0) {
+            return { nodes: [], edges: [] };
+        }
+
+        // 获取角色之间的关系
+        const edgesResult = await session.run(
+            `MATCH (c1:Character {projectId: $projectId})-[r${relTypeFilter}]->(c2:Character {projectId: $projectId})
+             WHERE c1.id IN $nodeIds AND c2.id IN $nodeIds
+             ${weightFilter}
+             RETURN c1.id as source, c2.id as target, type(r) as type,
+                    r.weight as weight, r.trajectory as trajectory,
+                    r.isBidirectional as isBidirectional,
+                    r.description as description`,
+            {
+                ...params,
+                nodeIds: nodes.map(n => n.id),
+            }
+        );
+
+        const edges = edgesResult.records.map(record => ({
+            source: record.get('source'),
+            target: record.get('target'),
+            type: record.get('type'),
+            weight: record.get('weight') || 50,
+            trajectory: record.get('trajectory'),
+            isBidirectional: record.get('isBidirectional') || false,
+            description: record.get('description'),
+        }));
+
+        return { nodes, edges };
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * P2 增强：获取角色关系时间线
+ *
+ * 返回指定角色的关系演化历史，追踪所有关系变化
+ * 包括关系创建、更新、删除，以及触发变化的Echo
+ *
+ * @param projectId - 项目ID
+ * @param characterId - 角色ID
+ */
+export const getRelationshipTimeline = async (
+    projectId: string,
+    characterId: string
+): Promise<RelationshipTimelineEntry[]> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        // 查询角色的所有关系（双向）
+        const relationshipsResult = await session.run(
+            `MATCH (c:Character {projectId: $projectId, id: $characterId})-[r]->(other:Character)
+             RETURN c.id as sourceId, other.id as targetCharacterId, other.name as targetCharacterName,
+                    type(r) as type, r.weight as weight, r.description as description, r
+             UNION ALL
+             MATCH (other:Character)-[r]->(c:Character {projectId: $projectId, id: $characterId})
+             RETURN other.id as sourceId, c.id as targetCharacterId, other.name as targetCharacterName,
+                    type(r) as type, r.weight as weight, r.description as description, r`,
+            { projectId, characterId }
+        );
+
+        const timelineEntries: RelationshipTimelineEntry[] = [];
+
+        // 处理每个关系，提取时间线信息
+        for (const record of relationshipsResult.records) {
+            const relation = record.get('r');
+            const props = relation.properties;
+
+            // 检查是否有创建时间或更新时间
+            const createdAt = props.createdAt || props.timestamp;
+            const updatedAt = props.updatedAt;
+
+            if (createdAt) {
+                timelineEntries.push({
+                    timestamp: createdAt,
+                    targetCharacterId: record.get('targetCharacterId'),
+                    targetCharacterName: record.get('targetCharacterName'),
+                    after: {
+                        type: record.get('type'),
+                        weight: record.get('weight'),
+                        description: record.get('description'),
+                    },
+                    changeType: 'created',
+                });
+            }
+
+            if (updatedAt && updatedAt !== createdAt) {
+                timelineEntries.push({
+                    timestamp: updatedAt,
+                    targetCharacterId: record.get('targetCharacterId'),
+                    targetCharacterName: record.get('targetCharacterName'),
+                    after: {
+                        type: record.get('type'),
+                        weight: record.get('weight'),
+                        description: record.get('description'),
+                    },
+                    changeType: 'updated',
+                });
+            }
+        }
+
+        // 按时间排序（最新的在前）
+        timelineEntries.sort((a, b) => b.timestamp - a.timestamp);
+
+        return timelineEntries;
+    } finally {
+        await session.close();
+    }
+};
+
+/**
+ * P2 增强：获取角色与特定目标的关系历史
+ *
+ * 返回指定角色与特定目标角色之间的完整关系演化历史
+ *
+ * @param projectId - 项目ID
+ * @param characterId - 主角色ID
+ * @param targetCharacterId - 目标角色ID
+ */
+export const getRelationshipHistory = async (
+    projectId: string,
+    characterId: string,
+    targetCharacterId: string
+): Promise<{
+    timeline: RelationshipTimelineEntry[];
+    currentRelationship?: {
+        type: string;
+        weight?: number;
+        description?: string;
+        isBidirectional?: boolean;
+        trajectory?: string;
+    };
+}> => {
+    const d = getDriver();
+    const session = d.session();
+
+    try {
+        // 查询当前关系状态
+        const currentResult = await session.run(
+            `MATCH (c:Character {projectId: $projectId, id: $characterId})-[r]->(target:Character {id: $targetCharacterId})
+             RETURN type(r) as type, r.weight as weight, r.description as description,
+                    r.isBidirectional as isBidirectional, r.trajectory as trajectory
+             UNION ALL
+             MATCH (target:Character {id: $targetCharacterId})-[r]->(c:Character {projectId: $projectId, id: $characterId})
+             RETURN type(r) as type, r.weight as weight, r.description as description,
+                    r.isBidirectional as isBidirectional, r.trajectory as trajectory`,
+            { projectId, characterId, targetCharacterId }
+        );
+
+        let currentRelationship: any = null;
+
+        if (currentResult.records.length > 0) {
+            const record = currentResult.records[0];
+            currentRelationship = {
+                type: record.get('type'),
+                weight: record.get('weight'),
+                description: record.get('description'),
+                isBidirectional: record.get('isBidirectional'),
+                trajectory: record.get('trajectory'),
+            };
+        }
+
+        // 获取完整时间线
+        const timeline = await getRelationshipTimeline(projectId, characterId);
+
+        // 过滤出与特定目标相关的时间线条目
+        const filteredTimeline = timeline.filter(
+            entry => entry.targetCharacterId === targetCharacterId
+        );
+
+        return {
+            timeline: filteredTimeline,
+            currentRelationship,
+        };
     } finally {
         await session.close();
     }

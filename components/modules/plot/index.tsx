@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { LayoutGrid, Plus, Info, CheckCircle, AlertCircle } from 'lucide-react';
+import { LayoutGrid, Plus, Info, CheckCircle, AlertCircle, Film } from 'lucide-react';
 import { ProjectState, PlotNode, AppSection } from '@/types';
 import { useProjectStore } from '@/store';
 import { PlotHistorySidebar } from './PlotWeaver/PlotHistorySidebar';
@@ -7,6 +7,7 @@ import { STRUCTURE_TEMPLATES } from './PlotWeaver/constants';
 import { PlotToolbar } from './PlotWeaver/PlotToolbar';
 import { PlotCard } from './PlotWeaver/PlotCard';
 import { AuxiliaryDrawer } from './PlotWeaver/AuxiliaryDrawer';
+import { PlotStructureGraph } from './PlotStructureGraph';
 import { usePlotWeaverAI } from '@/hooks/usePlotWeaverAI';
 import { VirtualList } from '@/components/ui/VirtualList';
 import { UI_CONFIG, PLOT_CONFIG } from '@/config/constants';
@@ -24,6 +25,7 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
     const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
     const [showHistory, setShowHistory] = useState(false);
     const [showSaveModal, setShowSaveModal] = useState(false);
+    const [showStructureGraph, setShowStructureGraph] = useState(false);
     const [saveNote, setSaveNote] = useState('');
     const [showRightSidebar, setShowRightSidebar] = useState(false);
     const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null);
@@ -215,6 +217,7 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                     onShowSaveModal={() => setShowSaveModal(true)}
                     onToggleHistory={() => setShowHistory(!showHistory)}
                     onGeneratePlot={() => handleGeneratePlotSelect(null)}
+                    onShowStructureGraph={() => setShowStructureGraph(true)}
                 />
 
                 <div className="flex-1 relative overflow-hidden bg-slate-900/30 rounded-3xl border border-slate-800/50 p-6 shadow-inner">
@@ -370,6 +373,41 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
                 <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-50 transition-all animate-fade-in font-medium text-sm flex items-center gap-2 border ${toast.type === 'error' ? 'bg-red-500/10 border-red-500/50 text-red-200' : 'bg-emerald-500/10 border-emerald-500/50 text-emerald-200'}`}>
                     {toast.type === 'error' ? <AlertCircle size={16} /> : <CheckCircle size={16} />}
                     <span>{toast.msg}</span>
+                </div>
+            )}
+
+            {/* PlotStructureGraph Modal */}
+            {showStructureGraph && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-slate-900 rounded-2xl border border-violet-500/30 shadow-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-gradient-to-r from-violet-950 to-purple-950">
+                            <div>
+                                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                                    <Film size={20} className="text-violet-400" />
+                                    剧情结构图谱
+                                </h2>
+                                <p className="text-xs text-slate-400 mt-1">
+                                    三幕式结构 • 节点网络 • 节奏曲线 • 高潮分析
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowStructureGraph(false)}
+                                className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+                            >
+                                <AlertCircle size={20} />
+                            </button>
+                        </div>
+
+                        {/* Component Content */}
+                        <div className="p-4 overflow-y-auto max-h-[calc(90vh-80px)]">
+                            <PlotStructureGraph
+                                chapters={project.chapters || []}
+                                plotNodes={project.plotNodes || []}
+                                characters={project.characters || []}
+                            />
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-    Activity, Inbox, History, Sparkles, Network, Search, FileText, List, Loader2
+    Activity, Inbox, History, Sparkles, Network, Search, FileText, List, Loader2, GitBranch
 } from 'lucide-react';
 
 interface EchoChamberHeaderProps {
@@ -14,6 +14,7 @@ interface EchoChamberHeaderProps {
     onOpenDeepReview: () => void;
     onOpenIntegrityReport: () => void;
     onOpenBatchHistory: () => void;
+    onShowNetworkGraph?: () => void;
     pendingEchoCount: number;
     batchOperationHistoryCount: number;
 }
@@ -29,6 +30,7 @@ export const EchoChamberHeader: React.FC<EchoChamberHeaderProps> = ({
     onOpenDeepReview,
     onOpenIntegrityReport,
     onOpenBatchHistory,
+    onShowNetworkGraph,
     pendingEchoCount,
     batchOperationHistoryCount
 }) => {
@@ -77,6 +79,14 @@ export const EchoChamberHeader: React.FC<EchoChamberHeaderProps> = ({
                 >
                     <Network size={16} />
                     <span className="text-xs font-bold">图谱查询</span>
+                </button>
+
+                <button
+                    onClick={onShowNetworkGraph}
+                    className="bg-gradient-to-r from-violet-900 to-purple-900 hover:from-violet-800 hover:to-purple-800 text-violet-200 border border-violet-500/30 px-3 py-1.5 rounded-lg flex items-center gap-2 transition-all shadow-lg active:scale-95"
+                >
+                    <GitBranch size={16} />
+                    <span className="text-xs font-bold">网络图谱</span>
                 </button>
 
                 {isAdvanced && (

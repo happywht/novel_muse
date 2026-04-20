@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import { PrismaClient } from '@prisma/client';
 import { projectsRouter } from './routes/projects';
 import { graphRouter } from './routes/graph';
@@ -41,6 +42,23 @@ const initializeNeo4j = async (retries = 3, delay = 3000): Promise<void> => {
 
 // Middleware
 app.use(cors());
+
+// Response Compression Middleware
+// Compress all responses > 1KB (configurable threshold)
+// Level: 6 (balanced between speed and compression ratio)
+app.use(compression({
+  threshold: 1024, // Only compress responses larger than 1KB
+  level: 6, // Compression level (0-9, 6 is default)
+  filter: (req, res) => {
+    // Don't compress if client doesn't accept encoding
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    // Only compress successful responses
+    return compression.filter(req, res);
+  }
+}));
+
 app.use(express.json({ limit: '50mb' }));
 
 // Authentication Middleware (applied before routes)
