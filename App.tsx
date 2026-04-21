@@ -158,16 +158,44 @@ const App: React.FC = () => {
           return;
         }
 
-        console.log('✅ Import: Validation passed');
+        // P1: Validate file version
+        const SUPPORTED_VERSIONS = ['1.0'];
+        if (!parsed._museFileVersion) {
+          console.warn('⚠️ Import: No version specified, assuming 1.0');
+        } else if (!SUPPORTED_VERSIONS.includes(parsed._museFileVersion)) {
+          console.error('❌ Import: Unsupported version', parsed._museFileVersion);
+          alert(`不支持的文件版本: ${parsed._museFileVersion}\n当前支持的版本: ${SUPPORTED_VERSIONS.join(', ')}`);
+          return;
+        }
 
+        // P3: Deep validation of required arrays
+        const requiredArrays = ['characters', 'plots', 'worlds', 'drafts', 'templates'];
+        const validationWarnings: string[] = [];
+
+        requiredArrays.forEach((field) => {
+          if (parsed.project[field] !== undefined && !Array.isArray(parsed.project[field])) {
+            validationWarnings.push(`${field} 字段不是有效的数组`);
+          }
+        });
+
+        if (validationWarnings.length > 0) {
+          console.warn('⚠️ Import: Validation warnings:', validationWarnings);
+        }
+
+        console.log('✅ Import: All validations passed');
+
+        // P2: Import project with timestamp tracking
         const importedProject: ProjectState = {
           ...INITIAL_PROJECT, // Ensure all fields exist (schema safety)
           ...parsed.project,
           id: Date.now().toString(), // Assign new unique ID to avoid collisions
           lastModified: Date.now(),
+          _importedAt: Date.now(), // Record when this project was imported
+          _originalExportedAt: parsed._exportedAt || null, // Preserve original export timestamp
         };
 
         console.log('🆕 Import: Created project:', importedProject);
+        console.log('📅 Import: Original exported at:', parsed._exportedAt);
 
         const { setSavedProjects, setProject, setActiveSection, savedProjects } = useProjectStore.getState();
         const newList = [...savedProjects, importedProject];
@@ -181,38 +209,15 @@ const App: React.FC = () => {
 
         setProject(importedProject);
         setActiveSection(AppSection.DASHBOARD);
-        alert(`成功导入项目「${importedProject.title}」！`);
+
+        // Enhanced success message with version and timestamp info
+        const versionInfo = parsed._museFileVersion ? ` (v${parsed._museFileVersion})` : '';
+        const exportTime = parsed._exportedAt
+          ? `\n导出时间: ${new Date(parsed._exportedAt).toLocaleString('zh-CN')}`
+          : '';
+        alert(`✅ 成功导入项目「${importedProject.title}」${versionInfo}！${exportTime}`);
       } catch (err) {
         console.error('❌ Import failed:', err);
-        alert('导入失败：文件内容不是有效的 JSON 格式。');
-      }
-    };
-    reader.readAsText(file);
-
-    // Reset file input so the same file can be imported again
-    if (importFileRef.current) {
-      importFileRef.current.value = '';
-    }
-  };
-
-        const importedProject: ProjectState = {
-          ...INITIAL_PROJECT, // Ensure all fields exist (schema safety)
-          ...parsed.project,
-          id: Date.now().toString(), // Assign new unique ID to avoid collisions
-          lastModified: Date.now(),
-        };
-
-        const { setSavedProjects, setProject, setActiveSection, savedProjects } = useProjectStore.getState();
-        const newList = [...savedProjects, importedProject];
-
-        await storageService.setItem(STORAGE_KEYS.PROJECTS, newList);
-        setSavedProjects(newList);
-
-        setProject(importedProject);
-        setActiveSection(AppSection.DASHBOARD);
-        alert(`成功导入项目「${importedProject.title}」！`);
-      } catch (err) {
-        console.error('Import failed:', err);
         alert('导入失败：文件内容不是有效的 JSON 格式。');
       }
     };

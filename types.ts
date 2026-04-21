@@ -385,6 +385,10 @@ export interface ProjectState {
   currentWorldDate: string; // NEW: Current in-world date
   activeBranchId?: string; // NEW Task 2.2: Track current active sandbox branch
   availableBranches?: string[]; // NEW Task 2.2: List of all sandbox branches
+
+  // Import/Export metadata (optional)
+  _importedAt?: number; // Timestamp when project was imported
+  _originalExportedAt?: string | null; // Original export timestamp from file
 }
 
 export interface NarrativeInsight {
