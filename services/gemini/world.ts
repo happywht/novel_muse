@@ -54,7 +54,7 @@ export const generateCharacterImage = async (description: string): Promise<strin
  * 升级: 支持结构化关系数据，实现双写兼容
  */
 export const batchGenerateCharacters = async (premise: string, genre: string, settings?: CreativeSettings): Promise<Omit<Character, 'id'>[]> => {
-    // 升级: Schema中添加结构化关系字段
+    // Phase 1 修复: 简化 Schema，减少 AI 输出长度，避免 JSON 截断
     const characterSchema = {
         type: Type.ARRAY,
         items: {
@@ -64,28 +64,13 @@ export const batchGenerateCharacters = async (premise: string, genre: string, se
                 role: { type: Type.STRING, description: "One of: 主角, 反派, 导师, 伙伴, 守护者, 变形者, 捣蛋鬼, 信使" },
                 archetype: { type: Type.STRING, description: "角色原型，如：英雄、智者、捣蛋鬼、变形者、守护者、信使" },
                 description: { type: Type.STRING, description: "详细的人物小传。必须包含：外貌、性格、明确的欲望和恐惧、秘密、标志性特征(Signature)、道德阵营(Alignment)。" },
-                // 新增: 角色深度字段
+                // 核心深度字段 (保留)
                 alignment: { type: Type.STRING, description: "道德阵营（如：守序善良、混乱邪恶、中立善良等）" },
                 desire: { type: Type.STRING, description: "核心欲望：角色最想得到什么？" },
                 fear: { type: Type.STRING, description: "核心恐惧：角色最害怕什么？" },
                 signature: { type: Type.STRING, description: "标志性特征：让读者记住这个角色的特点" },
-                contrast: { type: Type.STRING, description: "反差萌点：角色表里不一的地方" },
-                weakness: { type: Type.STRING, description: "弱点/缺陷：角色的致命缺陷" },
-                // 关系字段 - 双格式
-                relationships: { type: Type.STRING, description: "与其他角色的关系概述（简短描述）" },
-                structuredRelations: {
-                    type: Type.ARRAY,
-                    description: "结构化关系列表",
-                    items: {
-                        type: Type.OBJECT,
-                        properties: {
-                            targetName: { type: Type.STRING, description: "目标角色名称（必须是本次生成的其他角色之一）" },
-                            type: { type: Type.STRING, description: "关系类型: ENEMY_OF(敌对), ALLY_OF(盟友), LOVES(爱慕), KIN_OF(亲属), MENTORS(师徒), RIVAL_OF(竞争), SERVES(效忠), FRIEND_OF(朋友)" },
-                            description: { type: Type.STRING, description: "关系详细描述" }
-                        },
-                        required: ["targetName", "type"]
-                    }
-                }
+                // Phase 1: 暂时移除复杂字段以减少输出长度
+                // contrast, weakness, relationships, structuredRelations
             },
             required: ["name", "role", "archetype", "description"]
         }
@@ -95,16 +80,16 @@ export const batchGenerateCharacters = async (premise: string, genre: string, se
     const instruction = getInstructionWithSettings('character_gen', settings);
     const settingText = settings ? `风格要求：基调 ${settings.tone}，风格 ${settings.style}。` : "";
 
-    const prompt = `基于小说梗概："${premise}" (类型: ${genre})，请设计 **7位** 核心角色。${settingText}
+    const prompt = `基于小说梗概："${premise}" (类型: ${genre})，请设计 **5位** 核心角色。${settingText}
 
 请严格按照以下角色配置，构建一个功能完整的角色阵容：
-1. **1位 主角 (Protagonist)**：故事的核心驱动者，必须有明确的欲望和恐惧。
-2. **1位 反派 (Antagonist)**：与主角对立的主要力量，动机必须合理且令人信服。
-3. **1位 导师 (Mentor)** 或 **伙伴 (Ally)**：提供指导或支持的关键人物。
-4. **4位 功能性角色**：从 [守护者(Guardian), 变形者(Shapeshifter), 捣蛋鬼(Trickster), 信使(Herald)] 中选择，确保角色类型的多样性。
+1. **1位 主角**：故事的核心驱动者，必须有明确的欲望和恐惧。
+2. **1位 反派**：与主角对立的主要力量，动机必须合理且令人信服。
+3. **1位 导师** 或 **伙伴**：提供指导或支持的关键人物。
+4. **2位 功能性角色**：从 [守护者(Guardian), 变形者(Shapeshifter), 捣蛋鬼(Trickster), 信使(Herald)] 中选择，确保角色类型的多样性。
 
 【核心要求】：
-- **角色关联**: 确保这七个人物之间存在复杂的人际纠葛。每个角色至少与2个其他角色有关系。
+- **角色关联**: 确保这五个人物之间存在基本的人际关系。每个角色至少与1个其他角色有关系。
 - **深度刻画**: 每个人物都必须有：
   - 明确的欲望 (desire)
   - 核心恐惧 (fear)
@@ -146,8 +131,8 @@ export const batchGenerateCharacters = async (premise: string, genre: string, se
         } else if (parsed.length === 0) {
             console.warn('【batchGenerateCharacters】警告：解析成功但返回空数组');
             throw new Error('AI未返回任何角色，请重试');
-        } else if (parsed.length < 5) {
-            console.warn(`【batchGenerateCharacters】警告：期望7个角色，实际只生成${parsed.length}个`);
+        } else if (parsed.length < 3) {
+            console.warn(`【batchGenerateCharacters】警告：期望5个角色，实际只生成${parsed.length}个`);
         }
 
         console.log('【batchGenerateCharacters】成功：解析到', parsed.length, '个角色');

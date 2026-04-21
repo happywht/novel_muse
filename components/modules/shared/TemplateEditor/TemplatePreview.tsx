@@ -105,9 +105,9 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({
 
       {/* System Prompt */}
       <div className="mb-4">
-        <button
+        <div
           onClick={() => setShowSystemPrompt(!showSystemPrompt)}
-          className="w-full flex items-center justify-between p-3 bg-slate-800/30 border border-slate-700/50 rounded-lg hover:bg-slate-800/50 transition-colors"
+          className="w-full flex items-center justify-between p-3 bg-slate-800/30 border border-slate-700/50 rounded-lg hover:bg-slate-800/50 transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-2">
             {showSystemPrompt ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
@@ -128,7 +128,7 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({
           >
             {copiedField === 'system' ? <Check size={14} className="text-teal-400" /> : <Copy size={14} />}
           </button>
-        </button>
+        </div>
         {showSystemPrompt && (
           <div className="mt-2 p-4 bg-slate-900/50 border border-slate-700/50 rounded-lg">
             <pre className="text-xs text-slate-400 font-mono whitespace-pre-wrap overflow-x-auto">
@@ -140,9 +140,9 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({
 
       {/* User Prompt Blocks */}
       <div className="flex-1 min-h-0">
-        <button
+        <div
           onClick={() => setShowUserPrompt(!showUserPrompt)}
-          className="w-full flex items-center justify-between p-3 bg-slate-800/30 border border-slate-700/50 rounded-lg hover:bg-slate-800/50 transition-colors"
+          className="w-full flex items-center justify-between p-3 bg-slate-800/30 border border-slate-700/50 rounded-lg hover:bg-slate-800/50 transition-colors cursor-pointer"
         >
           <div className="flex items-center gap-2">
             {showUserPrompt ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
@@ -159,7 +159,7 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({
           >
             {copiedField === 'user' ? <Check size={14} className="text-teal-400" /> : <Copy size={14} />}
           </button>
-        </button>
+        </div>
 
         {showUserPrompt && (
           <div className="mt-2 space-y-2 max-h-[50vh] overflow-y-auto custom-scrollbar">
