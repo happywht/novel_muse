@@ -201,34 +201,34 @@ export const Dashboard: React.FC<DashboardProps> = ({ project: propProject, upda
             console.log('【创世纪】========== 开始生成角色 ==========');
             console.log('【创世纪】前提:', project.premise);
             console.log('【创世纪】类型:', project.genre);
-            console.log('【创世纪】创意设置:', project.creativeSettings);
-            
+            console.log('【创世纪】创意设置:', JSON.stringify(project.creativeSettings));
+
             const characters = await batchGenerateCharacters(project.premise, project.genre, project.creativeSettings);
-            
-            console.log('【创世纪】原始生成结果:', characters);
+
+            console.log('【创世纪】原始生成结果:', JSON.stringify(characters));
             console.log('【创世纪】结果类型:', typeof characters);
             console.log('【创世纪】结果是否为数组:', Array.isArray(characters));
             console.log('【创世纪】数组长度:', characters ? characters.length : 'N/A');
-            
+
             if (!characters) {
                 console.error('【创世纪】致命错误：batchGenerateCharacters返回null或undefined');
                 throw new Error('角色生成失败：返回值为null或undefined');
             }
-            
+
             if (!Array.isArray(characters)) {
                 console.error('【创世纪】致命错误：batchGenerateCharacters返回的不是数组，类型:', typeof characters);
                 throw new Error(`角色生成失败：返回类型为${typeof characters}，期望数组`);
             }
-            
+
             if (characters.length === 0) {
                 console.error('【创世纪】警告：batchGenerateCharacters返回空数组');
                 toast.warning('未生成任何角色');
             }
-            
+
             // 为生成的角色添加ID和所有必需字段
             console.log('【创世纪】为角色添加ID...');
             const charactersWithId = characters.map((char, index) => {
-                console.log(`【创世纪】处理角色${index}:`, char);
+                console.log(`【创世纪】处理角色${index}:`, JSON.stringify(char));
 
                 // 确保所有必需字段都存在
                 if (!char.name) {
@@ -256,7 +256,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ project: propProject, upda
                     char.description = descParts.length > 0
                         ? descParts.join('\n')
                         : (char.contrast || char.signature || '暂无描述');
-                    console.log(`【创世纪】角色${index} 自动生成description:`, char.description);
+                    console.log(`【创世纪】角色${index} 自动生成description:`, String(char.description));
                 }
 
                 const charWithId = {
@@ -266,25 +266,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ project: propProject, upda
                     foreshadowingHooks: [],
                     lastModified: Date.now()
                 };
-                console.log(`【创世纪】角色${index}处理后:`, charWithId);
+                console.log(`【创世纪】角色${index}处理后:`, JSON.stringify(charWithId));
                 return charWithId;
             });
             
-            console.log('【创世纪】准备更新的角色数组:', charactersWithId);
+            console.log('【创世纪】准备更新的角色数组:', JSON.stringify(charactersWithId));
             console.log('【创世纪】当前项目角色数:', project.characters.length);
-            
+
             const newCharacters = [...project.characters, ...charactersWithId];
             console.log('【创世纪】更新后的总角色数:', newCharacters.length);
-            
+
             updateProject({ characters: newCharacters });
             console.log('【创世纪】updateProject调用完成');
-            
+
             setKickstartStep(2);
             setKickstartStatus('正在构建世界观设定...');
 
             // 2. 生成世界观设定
             console.log('【创世纪】========== 开始生成世界观设定 ==========');
-            
+
             const worldPromises = WORLD_CATEGORIES.map(async (category) => {
                 console.log(`【创世纪】开始生成分类: ${category}`);
                 const settings = await batchGenerateWorldSettingsByCategory(
@@ -294,13 +294,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ project: propProject, upda
                     3,
                     project.creativeSettings
                 );
-                console.log(`【创世纪】分类${category}原始结果:`, settings);
+                console.log(`【创世纪】分类${category}原始结果:`, JSON.stringify(settings));
                 return { settings, category };
             });
-            
+
             const worldResults = await Promise.all(worldPromises);
-            console.log('【创世纪】所有分类生成完成:', worldResults);
-            
+            console.log('【创世纪】所有分类生成完成:', JSON.stringify(worldResults));
+
             const allWorldSettings = worldResults.flatMap(result => {
                 console.log(`【创世纪】处理分类: ${result.category}`);
                 if (!result.settings) {
@@ -315,15 +315,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ project: propProject, upda
                     console.warn(`【创世纪】警告: ${result.category} 返回空数组`);
                 }
                 return result.settings.map(setting => {
-                    console.log(`【创世纪】处理设定:`, setting);
+                    console.log(`【创世纪】处理设定:`, JSON.stringify(setting));
                     return {
                         ...setting,
                         category: result.category as WorldSetting['category']
                     };
                 });
             });
-            
-            console.log('【创世纪】所有设定合并后:', allWorldSettings);
+
+            console.log('【创世纪】所有设定合并后:', JSON.stringify(allWorldSettings));
             
             // 为生成的世界观设定添加唯一ID
             console.log('【创世纪】为世界观设定添加ID...');
@@ -337,7 +337,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ project: propProject, upda
                     console.error(`【创世纪】警告：设定${index}缺少content字段`);
                     setting.content = '暂无内容';
                 }
-                
+
                 const id = `world_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 6)}`;
                 console.log(`【创世纪】设定${index} ID: ${id}`);
                 return {
@@ -346,8 +346,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ project: propProject, upda
                     lastModified: Date.now()
                 };
             });
-            
-            console.log('【创世纪】最终世界观设定数组:', worldSettingsWithId);
+
+            console.log('【创世纪】最终世界观设定数组:', JSON.stringify(worldSettingsWithId));
             console.log('【创世纪】当前项目世界观数:', project.worldSettings.length);
 
             const newWorldSettings = [...project.worldSettings, ...worldSettingsWithId];
@@ -388,20 +388,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ project: propProject, upda
             console.log(summary);
 
             await new Promise(resolve => setTimeout(resolve, 1500));
-        } catch (error: any) {
-            console.error('【创世纪】捕获到错误:', error);
+        } catch (error: unknown) {
+            console.error('【创世纪】捕获到错误:', String(error));
+            const errorObj = error instanceof Error ? error.message : String(error);
 
             // 修复: 提供更详细的错误信息
             let errorMessage = '创世纪失败，请重试。';
 
-            if (error?.message?.includes('角色')) {
-                errorMessage = `角色生成失败: ${error.message}`;
-            } else if (error?.message?.includes('世界观') || error?.message?.includes('设定')) {
-                errorMessage = `世界观生成失败: ${error.message}`;
-            } else if (error?.message?.includes('剧情')) {
-                errorMessage = `剧情生成失败: ${error.message}`;
-            } else if (error?.message) {
-                errorMessage = `创世纪失败: ${error.message}`;
+            if (errorObj.includes('角色')) {
+                errorMessage = `角色生成失败: ${errorObj}`;
+            } else if (errorObj.includes('世界观') || errorObj.includes('设定')) {
+                errorMessage = `世界观生成失败: ${errorObj}`;
+            } else if (errorObj.includes('剧情')) {
+                errorMessage = `剧情生成失败: ${errorObj}`;
+            } else if (errorObj) {
+                errorMessage = `创世纪失败: ${errorObj}`;
             }
 
             setKickstartStatus(errorMessage);

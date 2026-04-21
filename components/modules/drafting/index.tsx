@@ -121,3 +121,5 @@ export const DraftingRoom: React.FC<DraftingRoomProps> = ({ project, updateProje
         </div>
     );
 };
+
+export default DraftingRoom;

@@ -878,60 +878,80 @@ interface BatchOperationRecord {
 
 // 保存批量操作到数据库
 const saveBatchOperation = async (projectId: string, operation: BatchOperationRecord) => {
-    await prisma.batchOperation.create({
-        data: {
-            id: operation.id,
-            projectId,
-            operation: operation.operation,
-            echoIds: JSON.stringify(operation.echoIds),
-            previousStates: JSON.stringify(operation.previousStates),
-            timestamp: BigInt(operation.timestamp),
-            expiresAt: BigInt(Date.now() + 5 * 60 * 1000), // 5分钟过期
-        }
-    });
+    try {
+        await prisma.batchOperation.create({
+            data: {
+                id: operation.id,
+                projectId,
+                operation: operation.operation,
+                echoIds: JSON.stringify(operation.echoIds),
+                previousStates: JSON.stringify(operation.previousStates),
+                timestamp: BigInt(operation.timestamp),
+                expiresAt: BigInt(Date.now() + 5 * 60 * 1000), // 5分钟过期
+            }
+        });
+    } catch (error) {
+        console.error('Failed to save batch operation:', error);
+        throw new Error(`Failed to save batch operation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 };
 
 // 获取最近的批量操作
 const getRecentBatchOperation = async (projectId: string, operationId?: string) => {
-    const fiveMinutesAgo = BigInt(Date.now() - 5 * 60 * 1000);
+    try {
+        const fiveMinutesAgo = BigInt(Date.now() - 5 * 60 * 1000);
 
-    if (operationId) {
+        if (operationId) {
+            return await prisma.batchOperation.findFirst({
+                where: {
+                    id: operationId,
+                    projectId,
+                    timestamp: { gte: fiveMinutesAgo }
+                }
+            });
+        }
+
         return await prisma.batchOperation.findFirst({
             where: {
-                id: operationId,
                 projectId,
                 timestamp: { gte: fiveMinutesAgo }
-            }
+            },
+            orderBy: { timestamp: 'desc' }
         });
+    } catch (error) {
+        console.error('Failed to get recent batch operation:', error);
+        throw new Error(`Failed to get recent batch operation: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-
-    return await prisma.batchOperation.findFirst({
-        where: {
-            projectId,
-            timestamp: { gte: fiveMinutesAgo }
-        },
-        orderBy: { timestamp: 'desc' }
-    });
 };
 
 // 获取批量操作历史列表
 const getBatchOperationHistory = async (projectId: string) => {
-    const fiveMinutesAgo = BigInt(Date.now() - 5 * 60 * 1000);
+    try {
+        const fiveMinutesAgo = BigInt(Date.now() - 5 * 60 * 1000);
 
-    return await prisma.batchOperation.findMany({
-        where: {
-            projectId,
-            timestamp: { gte: fiveMinutesAgo }
-        },
-        orderBy: { timestamp: 'desc' }
-    });
+        return await prisma.batchOperation.findMany({
+            where: {
+                projectId,
+                timestamp: { gte: fiveMinutesAgo }
+            },
+            orderBy: { timestamp: 'desc' }
+        });
+    } catch (error) {
+        console.error('Failed to get batch operation history:', error);
+        throw new Error(`Failed to get batch operation history: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 };
 
 // 删除批量操作记录
 const deleteBatchOperation = async (operationId: string) => {
-    await prisma.batchOperation.delete({
-        where: { id: operationId }
-    });
+    try {
+        await prisma.batchOperation.delete({
+            where: { id: operationId }
+        });
+    } catch (error) {
+        console.error('Failed to delete batch operation:', error);
+        throw new Error(`Failed to delete batch operation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 };
 
 // 定期清理过期记录
@@ -1254,6 +1274,137 @@ router.get('/:id/statistics', async (req: Request, res: Response) => {
     } catch (err: any) {
         console.error('Statistics error:', err);
         res.status(500).json({ error: err.message });
+    }
+});
+
+// ============================================
+// POST /api/projects/:id/plotnodes/convert-names-to-uuids
+// P2 增强：将PlotNode中的名称转换为UUID引用
+// ============================================
+router.post('/:id/plotnodes/convert-names-to-uuids', async (req: Request, res: Response) => {
+    const projectId = req.params.id as string;
+    const { nodes } = req.body as { nodes: any[] };
+
+    // 验证请求
+    if (!nodes || !Array.isArray(nodes)) {
+        return res.status(400).json({
+            error: 'Invalid request: nodes array is required'
+        });
+    }
+
+    try {
+        // 导入转换函数
+        const { convertPlotNodeNamesToUuids } = await import('../services/graph/mappers');
+
+        console.log(`[PlotNodes] Converting names to UUIDs for ${nodes.length} nodes in project ${projectId}`);
+
+        // 执行转换
+        const enhancedNodes = await convertPlotNodeNamesToUuids(nodes, projectId);
+
+        // 收集映射统计信息
+        const stats = {
+            totalNodes: enhancedNodes.length,
+            totalCharacterMappings: enhancedNodes.reduce((sum, node) =>
+                sum + (node._mappingInfo?.characters.mapped || 0), 0
+            ),
+            totalLocationMappings: enhancedNodes.reduce((sum, node) =>
+                sum + (node._mappingInfo?.locations.mapped || 0), 0
+            ),
+            totalCharacterWarnings: enhancedNodes.reduce((sum, node) =>
+                sum + (node._mappingInfo?.characters.unmapped.length || 0), 0
+            ),
+            totalLocationWarnings: enhancedNodes.reduce((sum, node) =>
+                sum + (node._mappingInfo?.locations.unmapped.length || 0), 0
+            ),
+        };
+
+        // 收集所有警告信息
+        const allWarnings: string[] = [];
+        enhancedNodes.forEach(node => {
+            if (node._mappingInfo) {
+                allWarnings.push(...node._mappingInfo.characters.warnings);
+                allWarnings.push(...node._mappingInfo.locations.warnings);
+            }
+        });
+
+        // 移除内部的_mappingInfo字段，只返回干净的PlotNode数据
+        const cleanedNodes = enhancedNodes.map(({ _mappingInfo, ...node }) => node);
+
+        res.json({
+            success: true,
+            nodes: cleanedNodes,
+            stats: {
+                ...stats,
+                hasWarnings: stats.totalCharacterWarnings > 0 || stats.totalLocationWarnings > 0
+            },
+            warnings: allWarnings.length > 0 ? allWarnings : undefined
+        });
+
+        // 记录转换摘要
+        console.log(`[PlotNodes] UUID conversion completed:`, {
+            project: projectId,
+            ...stats,
+            duration: 'completed'
+        });
+
+    } catch (err: any) {
+        console.error('[PlotNodes] UUID conversion error:', err);
+        res.status(500).json({
+            error: 'Failed to convert plot node names to UUIDs',
+            details: err.message
+        });
+    }
+});
+
+// ============================================
+// GET /api/projects/:id/mappings/characters
+// 获取项目角色的名称到UUID映射表
+// ============================================
+router.get('/:id/mappings/characters', async (req: Request, res: Response) => {
+    const projectId = req.params.id as string;
+
+    try {
+        const { getCharacterNameToIdMap } = await import('../services/graph/mappers');
+        const mapping = await getCharacterNameToIdMap(projectId);
+
+        res.json({
+            success: true,
+            projectId,
+            mapping,
+            count: Object.keys(mapping).length
+        });
+    } catch (err: any) {
+        console.error('[Mappings] Error fetching character mappings:', err);
+        res.status(500).json({
+            error: 'Failed to fetch character mappings',
+            details: err.message
+        });
+    }
+});
+
+// ============================================
+// GET /api/projects/:id/mappings/locations
+// 获取项目地点的名称到UUID映射表
+// ============================================
+router.get('/:id/mappings/locations', async (req: Request, res: Response) => {
+    const projectId = req.params.id as string;
+
+    try {
+        const { getLocationNameToIdMap } = await import('../services/graph/mappers');
+        const mapping = await getLocationNameToIdMap(projectId);
+
+        res.json({
+            success: true,
+            projectId,
+            mapping,
+            count: Object.keys(mapping).length
+        });
+    } catch (err: any) {
+        console.error('[Mappings] Error fetching location mappings:', err);
+        res.status(500).json({
+            error: 'Failed to fetch location mappings',
+            details: err.message
+        });
     }
 });
 

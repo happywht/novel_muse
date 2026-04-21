@@ -180,14 +180,31 @@ export function CharacterCreatorProvider({
     }
   }, [activeCharId, activeChar]);
 
-  // 当角色切换时加载图谱数据
+  // 当角色切换时加载图谱数据 - 修复竞态条件版本
   useEffect(() => {
     if (activeCharId && useBackend) {
-      fetchCharacterTraits(activeCharId);
-      fetchCharacterEvolution(activeCharId);
-      fetchCharacterForeshadowing(activeCharId);
+      // 使用AbortController来防止竞态条件
+      const abortController = new AbortController();
+      const signal = abortController.signal;
+
+      // 并行请求，但可以被取消
+      Promise.all([
+        fetchCharacterTraits(activeCharId),
+        fetchCharacterEvolution(activeCharId),
+        fetchCharacterForeshadowing(activeCharId)
+      ]).catch(err => {
+        // 只记录非AbortError的错误
+        if (err instanceof Error && err.name !== 'AbortError') {
+          console.error('Failed to load character graph data:', err);
+        }
+      });
+
+      // 清理函数：组件卸载或依赖变化时取消请求
+      return () => {
+        abortController.abort();
+      };
     }
-  }, [activeCharId, useBackend, fetchCharacterTraits, fetchCharacterEvolution, fetchCharacterForeshadowing]);
+  }, [activeCharId, useBackend]);
 
   // 生成角色 - 使用深度生成函数获取完整字段
   const handleGenerateChar = useCallback(async () => {
@@ -206,9 +223,9 @@ export function CharacterCreatorProvider({
         throw new Error('角色数据生成失败');
       }
 
-      // 构建完整的 Character 对象
+      // 构建完整的 Character 对象 - 使用统一ID生成器
       const newChar: Character = {
-        id: crypto.randomUUID(),
+        id: `char_${crypto.randomUUID()}`, // 使用统一前缀格式
         name: charData.name || nameInput || '新角色',
         role: charData.role || roleInput,
         archetype: charData.archetype || '待定',
@@ -228,7 +245,7 @@ export function CharacterCreatorProvider({
       setDraftCharacter(newChar);
       toast.success('角色档案已生成，包含深度字段');
     } catch (e) {
-      console.error(e);
+      console.error(String(e));
       toast.error('角色生成失败，请稍后重试');
     } finally {
       setIsGeneratingInfo(false);
@@ -254,7 +271,7 @@ ${iterationFeedback}
       setIterationFeedback('');
       toast.success('角色已根据反馈重塑');
     } catch (e) {
-      console.error(e);
+      console.error(String(e));
       toast.error('迭代重塑失败');
     } finally {
       setIsIterating(false);

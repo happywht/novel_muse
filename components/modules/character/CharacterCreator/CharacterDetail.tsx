@@ -30,7 +30,12 @@ import { CharacterRelationshipGraph } from '../CharacterRelationshipGraph';
 import { RelationshipTimeline } from '../RelationshipTimeline';
 import { CharacterRelationshipBatchEditor } from '../CharacterRelationshipBatchEditor';
 import { CharacterArcVisualization } from '../CharacterArcVisualization';
-import { CharacterArcVisualization } from '../CharacterArcVisualization';
+import type {
+  RelationshipGraphData,
+  CharacterTripleData,
+  CharacterEvolutionEntry,
+  getErrorMessage
+} from '@/types/components';
 
 /**
  * Echo 提案区域
@@ -278,7 +283,7 @@ function EvolutionSection() {
                 </div>
                 {evolution.triples && evolution.triples.length > 0 && (
                   <div className="mt-2 space-y-1">
-                    {evolution.triples.map((triple: any, tIdx: number) => (
+                    {evolution.triples.map((triple: CharacterTripleData, tIdx: number) => (
                       <div
                         key={tIdx}
                         className="text-[10px] text-cyan-400 bg-cyan-950/20 px-2 py-1 rounded inline-block mr-1"
@@ -485,10 +490,7 @@ function RelationshipsSection() {
  */
 function RelationshipGraphSection() {
   const { activeChar, project, setActiveCharId } = useCharacterCreator();
-  const [networkData, setNetworkData] = React.useState<{
-    nodes: any[];
-    edges: any[];
-  } | null>(null);
+  const [networkData, setNetworkData] = React.useState<RelationshipGraphData | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -508,9 +510,9 @@ function RelationshipGraphSection() {
         });
 
         setNetworkData(data);
-      } catch (err: any) {
-        console.error('Failed to fetch character network:', err);
-        setError(err.message || '加载关系网络失败');
+      } catch (err: unknown) {
+        console.error('Failed to fetch character network:', String(err));
+        setError(err instanceof Error ? err.message : '加载关系网络失败');
       } finally {
         setLoading(false);
       }
@@ -520,11 +522,11 @@ function RelationshipGraphSection() {
   }, [activeChar, project.id]);
 
   // 获取相关角色ID
-  const getRelatedCharacterIds = (char: any): string[] => {
+  const getRelatedCharacterIds = (char: Character): string[] => {
     const relatedIds: string[] = [];
 
     if (char.structuredRelations) {
-      char.structuredRelations.forEach((rel: any) => {
+      char.structuredRelations.forEach((rel: CharacterRelation) => {
         if (rel.targetCharacterId && !relatedIds.includes(rel.targetCharacterId)) {
           relatedIds.push(rel.targetCharacterId);
         }
@@ -535,7 +537,7 @@ function RelationshipGraphSection() {
   };
 
   // 处理节点点击
-  const handleNodeClick = (node: any) => {
+  const handleNodeClick = (node: RelationshipGraphNode) => {
     if (node.id !== activeChar?.id) {
       setActiveCharId(node.id);
     }
@@ -608,9 +610,9 @@ function RelationshipTimelineSection() {
 
         const data = await response.json();
         setTimelineData(data);
-      } catch (err: any) {
-        console.error('Failed to fetch relationship timeline:', err);
-        setError(err.message || '加载关系时间线失败');
+      } catch (err: unknown) {
+        console.error('Failed to fetch relationship timeline:', String(err));
+        setError(err instanceof Error ? err.message : '加载关系时间线失败');
       } finally {
         setLoading(false);
       }
@@ -723,7 +725,7 @@ function BatchRelationshipDialog() {
     relationships: any[];
   }>) => {
     // 更新所有角色的关系数据
-    const updatedCharacters = project.characters.map((char: any) => {
+    const updatedCharacters = project.characters.map((char: Character) => {
       const update = updates.find((u) => u.characterId === char.id);
       if (update) {
         return {
@@ -744,7 +746,7 @@ function BatchRelationshipDialog() {
   };
 
   const handleImport = (data: any[]) => {
-    console.log('Importing relationship data:', data);
+    console.log('Importing relationship data:', JSON.stringify(data));
   };
 
   return (

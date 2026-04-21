@@ -1,0 +1,697 @@
+openapi: 3.0.3
+info:
+  title: Muse Writing AI Continuation API
+  description: |
+    AI续写功能API接口规范
+
+    用于小说写作编辑器中的实时AI续写功能，支持流式和非流式输出。
+
+    ## 核心特性
+    - 基于上下文的智能续写（200-500字）
+    - 支持流式和非流式响应
+    - 自动提取章节上下文（角色、设定、情节）
+    - 支持自定义风格提示和约束
+    - 内置安全机制和内容过滤
+  version: 1.0.0
+  contact:
+    name: Muse System API Team
+    email: api@muse-system.com
+
+servers:
+  - url: http://localhost:3000/api
+    description: 本地开发服务器
+  - url: https://api.muse-system.com/api
+    description: 生产环境
+
+tags:
+  - name: Writing Continuation
+    description: AI续写相关接口
+  - name: Health & Monitoring
+    description: 健康检查和监控接口
+
+paths:
+  /projects/{projectId}/continue-writing:
+    post:
+      tags:
+        - Writing Continuation
+      summary: AI续写章节内容
+      description: |
+        根据光标位置和上下文，使用AI自动续写章节内容。
+
+        ## 功能特性
+        - 智能上下文提取：自动分析前文，提取角色、设定、情节信息
+        - 多模型支持：根据任务类型自动选择最佳AI模型（GLM-5/Gemini）
+        - 流式输出：支持Server-Sent Events (SSE)流式响应
+        - 风格一致性：自动匹配项目风格和类型
+
+        ## 使用场景
+        - 写作卡顿时获取灵感
+        - 快速生成草稿内容
+        - 探索不同写作方向
+      operationId: continueWriting
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          description: 项目ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContinueWritingRequest'
+            examples:
+              basic_continuation:
+                summary: 基础续写（默认配置）
+                description: 使用默认配置进行基础续写
+                value:
+                  chapterId: "chap_123456"
+                  cursorPosition: 2340
+                  targetLength: 400
+              streaming_with_context:
+                summary: 流式续写（带完整上下文）
+                description: 启用流式输出，提供完整的上下文信息
+                value:
+                  chapterId: "chap_123456"
+                  cursorPosition: 2340
+                  contextLength: 2000
+                  targetLength: 500
+                  useStreaming: true
+                  styleHints:
+                    - "保持悬疑氛围"
+                    - "突出主角心理活动"
+                  characterStates:
+                    char_789:
+                      location: "古堡大厅"
+                      state: "紧张警惕"
+                      isDead: false
+                  plotContext: "主角正在探索古堡秘密，即将发现关键线索"
+              advanced_configuration:
+                summary: 高级配置续写
+                description: 完整的高级配置示例
+                value:
+                  chapterId: "chap_123456"
+                  cursorPosition: 2340
+                  contextLength: 1500
+                  targetLength: 350
+                  useStreaming: false
+                  styleHints:
+                    - "第三人称限制视角"
+                    - "注重环境描写"
+                    - "节奏缓慢"
+                  characterStates:
+                    char_789:
+                      location: "森林边缘"
+                      state: "疲惫但坚定"
+                      isDead: false
+                    char_456:
+                      location: "未知"
+                      state: "失踪"
+                      isDead: false
+                  plotContext: "主角团队在森林中分散，主角正在寻找失散的同伴"
+                  pacingMode: "SLOW_BURN"
+                  includeGraphContext: true
+                  creativity: 0.85
+      responses:
+        '200':
+          description: 续写成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContinueWritingResponse'
+              example:
+                success: true
+                data:
+                  continuationText: "夜色渐深，古堡的轮廓在月光下若隐若现。陈默握紧了手中的手电筒，..."
+                  metadata:
+                    actualLength: 387
+                    estimatedTokens: 520
+                    modelUsed: "gemini-3-flash-preview"
+                    generationTime: 2.34
+                    contextExtraction:
+                      charactersDetected: 2
+                      settingsDetected: 1
+                      plotPointsDetected: 1
+                    styleWarnings: []
+                timestamp: 1634567890123
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                context_too_short:
+                  summary: 上下文过短
+                  value:
+                    success: false
+                    error: "CONTEXT_TOO_SHORT"
+                    message: "上下文文本过短（少于50字），无法进行有效续写。请提供更多上下文。"
+                    details:
+                      minRequiredLength: 50
+                      actualLength: 23
+                context_too_long:
+                  summary: 上下文过长
+                  value:
+                    success: false
+                    error: "CONTEXT_TOO_LONG"
+                    message: "上下文文本超过最大限制（10000字），可能影响生成质量。建议减少上下文长度。"
+                    details:
+                      maxAllowedLength: 10000
+                      actualLength: 12450
+                invalid_target_length:
+                  summary: 目标长度无效
+                  value:
+                    success: false
+                    error: "INVALID_TARGET_LENGTH"
+                    message: "目标续写长度超出允许范围（200-1000字）。"
+                    details:
+                      minLength: 200
+                      maxLength: 1000
+                      requestedLength: 1500
+        '401':
+          description: 未授权（API密钥无效）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error: "UNAUTHORIZED"
+                message: "API密钥无效或已过期。请检查您的API密钥配置。"
+        '429':
+          description: 请求过于频繁（Rate Limiting）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error: "RATE_LIMIT_EXCEEDED"
+                message: "请求频率超过限制。请稍后再试。"
+                details:
+                  retryAfter: 60
+                  limitPerMinute: 20
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                generation_failed:
+                  summary: AI生成失败
+                  value:
+                    success: false
+                    error: "GENERATION_FAILED"
+                    message: "AI内容生成失败。服务可能暂时不可用，请稍后重试。"
+                service_unavailable:
+                  summary: 服务不可用
+                  value:
+                    success: false
+                    error: "SERVICE_UNAVAILABLE"
+                    message: "AI服务暂时不可用。我们正在努力修复，请稍后再试。"
+        '503':
+          description: 服务暂时不可用
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error: "SERVICE_MAINTENANCE"
+                message: "系统正在维护中，预计恢复时间：2026-04-21 15:00:00"
+
+  /projects/{projectId}/continue-writing/stream:
+    post:
+      tags:
+        - Writing Continuation
+      summary: AI续写章节内容（流式）
+      description: |
+        流式版本的AI续写接口，使用Server-Sent Events (SSE)协议。
+
+        ## 流式输出优势
+        - 实时反馈：逐字输出，立即显示生成内容
+        - 更低延迟：无需等待完整生成
+        - 更好体验：用户可以看到AI的思考过程
+
+        ## SSE事件格式
+        - `data`: 增量文本片段
+        - `done`: 生成完成标志
+        - `error`: 错误信息
+      operationId: continueWritingStream
+      parameters:
+        - name: projectId
+          in: path
+          required: true
+          description: 项目ID
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContinueWritingRequest'
+      responses:
+        '200':
+          description: 流式响应
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-Sent Events流
+              example: |
+                event: data
+                data: {"type":"chunk","text":"夜色渐深，古堡的轮廓"}
+
+                event: data
+                data: {"type":"chunk","text":"在月光下若隐若现。陈默"}
+
+                event: data
+                data: {"type":"chunk","text":"握紧了手中的手电筒，"}
+
+                event: done
+                data: {"type":"done","metadata":{"actualLength":387}}
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: 请求过于频繁
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /health/ai-services:
+    get:
+      tags:
+        - Health & Monitoring
+      summary: 检查AI服务健康状态
+      description: |
+        检查所有AI服务的可用性和响应时间。
+
+        ## 监控指标
+        - 服务可用性
+        - 平均响应时间
+        - API密钥状态
+        - 配额使用情况
+      operationId: checkAIServicesHealth
+      responses:
+        '200':
+          description: 服务健康状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIHealthCheckResponse'
+              example:
+                success: true
+                services:
+                  gemini:
+                    status: "healthy"
+                    responseTime: 234
+                    apiKeyValid: true
+                    quotaRemaining: 95000
+                    lastCheckAt: 1634567890123
+                  glm:
+                    status: "healthy"
+                    responseTime: 456
+                    apiKeyValid: true
+                    quotaRemaining: 120000
+                    lastCheckAt: 1634567890123
+                overallStatus: "healthy"
+                recommendedProvider: "gemini"
+
+components:
+  schemas:
+    ContinueWritingRequest:
+      type: object
+      required:
+        - chapterId
+        - cursorPosition
+      properties:
+        chapterId:
+          type: string
+          format: uuid
+          description: 章节ID
+          example: "chap_123456"
+        cursorPosition:
+          type: integer
+          minimum: 0
+          description: 光标在章节内容中的位置（字符数）
+          example: 2340
+        contextLength:
+          type: integer
+          minimum: 50
+          maximum: 10000
+          default: 1500
+          description: |
+            前文提取长度（字符数）
+
+            - 最小值：50字符（确保有足够的上下文）
+            - 最大值：10000字符（避免超出token限制）
+            - 默认值：1500字符（平衡上下文质量和性能）
+          example: 1500
+        targetLength:
+          type: integer
+          minimum: 200
+          maximum: 1000
+          default: 400
+          description: |
+            目标续写长度（字符数）
+
+            - 最小值：200字符（确保内容有意义）
+            - 最大值：1000字符（避免生成过长内容）
+            - 默认值：400字符（适中的续写长度）
+          example: 400
+        styleHints:
+          type: array
+          items:
+            type: string
+            maxItems: 5
+          description: |
+            风格提示数组（最多5个）
+
+            用于指导AI的写作风格，例如：
+            - "保持悬疑氛围"
+            - "突出主角心理活动"
+            - "注重环境描写"
+            - "节奏缓慢"
+            - "对话驱动"
+          example:
+            - "保持悬疑氛围"
+            - "突出主角心理活动"
+        characterStates:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/CharacterState'
+          description: |
+            角色当前状态字典
+
+            键为角色ID，值为角色状态对象。
+            用于确保续写内容与角色当前状态一致。
+          example:
+            char_789:
+              location: "古堡大厅"
+              state: "紧张警惕"
+              isDead: false
+        plotContext:
+          type: string
+          maxLength: 500
+          description: |
+            情节上下文描述（最多500字符）
+
+            简要描述当前情节进展，帮助AI理解故事走向。
+          example: "主角正在探索古堡秘密，即将发现关键线索"
+        useStreaming:
+          type: boolean
+          default: false
+          description: |
+            是否使用流式输出
+
+            - false：返回完整生成内容（默认）
+            - true：使用Server-Sent Events流式输出
+          example: false
+        pacingMode:
+          type: string
+          enum: [SLOW_BURN, BALANCED, CLIMAX]
+          default: BALANCED
+          description: |
+            节奏模式
+
+            - SLOW_BURN：慢热铺垫，注重心理描写
+            - BALANCED：平衡推进，叙事流畅
+            - CLIMAX：高潮爆发，动作密集
+          example: BALANCED
+        includeGraphContext:
+          type: boolean
+          default: false
+          description: |
+            是否包含知识图谱上下文
+
+            启用后将从知识图谱中提取相关关系和设定，
+            可以提高内容一致性，但会增加响应时间。
+          example: false
+        creativity:
+          type: number
+          minimum: 0.0
+          maximum: 1.0
+          default: 0.8
+          description: |
+            创造性参数（0.0-1.0）
+
+            - 0.0：严格保守，倾向于传统表达
+            - 0.5：平衡创造性和可预测性
+            - 1.0：高度创造，可能出现意想不到的转折
+          example: 0.8
+
+    CharacterState:
+      type: object
+      required:
+        - location
+        - state
+        - isDead
+      properties:
+        location:
+          type: string
+          description: 角色当前位置
+          example: "古堡大厅"
+        state:
+          type: string
+          description: 角色当前生理/心理状态
+          example: "紧张警惕"
+        isDead:
+          type: boolean
+          description: 角色是否已死亡
+          example: false
+
+    ContinueWritingResponse:
+      type: object
+      required:
+        - success
+        - data
+        - timestamp
+      properties:
+        success:
+          type: boolean
+          description: 请求是否成功
+          example: true
+        data:
+          type: object
+          required:
+            - continuationText
+            - metadata
+          properties:
+            continuationText:
+              type: string
+              description: 生成的续写文本
+              example: "夜色渐深，古堡的轮廓在月光下若隐若现。陈默握紧了手中的手电筒，..."
+            metadata:
+              $ref: '#/components/schemas/ContinuationMetadata'
+        timestamp:
+          type: integer
+          format: int64
+          description: 响应时间戳（毫秒）
+          example: 1634567890123
+
+    ContinuationMetadata:
+      type: object
+      required:
+        - actualLength
+        - estimatedTokens
+        - modelUsed
+        - generationTime
+        - contextExtraction
+        - styleWarnings
+      properties:
+        actualLength:
+          type: integer
+          description: 实际生成的字符数
+          example: 387
+        estimatedTokens:
+          type: integer
+          description: 估算的token使用量
+          example: 520
+        modelUsed:
+          type: string
+          description: 使用的AI模型
+          example: "gemini-3-flash-preview"
+        generationTime:
+          type: number
+          format: float
+          description: 生成耗时（秒）
+          example: 2.34
+        contextExtraction:
+          type: object
+          description: 上下文提取结果统计
+          required:
+            - charactersDetected
+            - settingsDetected
+            - plotPointsDetected
+          properties:
+            charactersDetected:
+              type: integer
+              description: 检测到的角色数量
+              example: 2
+            settingsDetected:
+              type: integer
+              description: 检测到的设定数量
+              example: 1
+            plotPointsDetected:
+              type: integer
+              description: 检测到的情节点数量
+              example: 1
+        styleWarnings:
+          type: array
+          items:
+            type: string
+          description: |
+            风格一致性警告数组
+
+            如果生成内容与项目整体风格不一致，
+            会在此数组中返回警告信息。
+          example:
+            - "生成内容的悬疑氛围略低于项目平均水平"
+            - "对话比例较高，可能需要增加环境描写"
+
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+        - message
+      properties:
+        success:
+          type: boolean
+          description: 请求是否成功（错误时为false）
+          example: false
+        error:
+          type: string
+          description: |
+            错误代码
+
+            常见错误代码：
+            - CONTEXT_TOO_SHORT: 上下文过短
+            - CONTEXT_TOO_LONG: 上下文过长
+            - INVALID_TARGET_LENGTH: 目标长度无效
+            - UNAUTHORIZED: API密钥无效
+            - RATE_LIMIT_EXCEEDED: 请求过于频繁
+            - GENERATION_FAILED: AI生成失败
+            - SERVICE_UNAVAILABLE: 服务不可用
+            - SERVICE_MAINTENANCE: 系统维护中
+          example: "CONTEXT_TOO_SHORT"
+        message:
+          type: string
+          description: 错误消息（人类可读）
+          example: "上下文文本过短（少于50字），无法进行有效续写。请提供更多上下文。"
+        details:
+          type: object
+          description: 额外的错误详情（可选）
+          additionalProperties: true
+          example:
+            minRequiredLength: 50
+            actualLength: 23
+
+    AIHealthCheckResponse:
+      type: object
+      required:
+        - success
+        - services
+        - overallStatus
+      properties:
+        success:
+          type: boolean
+          example: true
+        services:
+          type: object
+          description: 各AI服务的健康状态
+          required:
+            - gemini
+            - glm
+          properties:
+            gemini:
+              $ref: '#/components/schemas/ServiceHealth'
+            glm:
+              $ref: '#/components/schemas/ServiceHealth'
+        overallStatus:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          description: |
+            整体服务状态
+
+            - healthy: 所有服务正常
+            - degraded: 部分服务异常但有替代方案
+            - unhealthy: 关键服务不可用
+          example: "healthy"
+        recommendedProvider:
+          type: string
+          enum: [gemini, glm]
+          description: 推荐使用的AI服务提供商
+          example: "gemini"
+
+    ServiceHealth:
+      type: object
+      required:
+        - status
+        - responseTime
+        - apiKeyValid
+        - quotaRemaining
+        - lastCheckAt
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy, unknown]
+          description: 服务状态
+          example: "healthy"
+        responseTime:
+          type: integer
+          description: 响应时间（毫秒）
+          example: 234
+        apiKeyValid:
+          type: boolean
+          description: API密钥是否有效
+          example: true
+        quotaRemaining:
+          type: integer
+          description: 剩余配额数量
+          example: 95000
+        lastCheckAt:
+          type: integer
+          format: int64
+          description: 最后检查时间戳（毫秒）
+          example: 1634567890123
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        API密钥认证
+
+        用于访问AI服务的API密钥。
+        请在请求头中包含有效的API密钥。
+
+security:
+  - ApiKeyAuth: []
+
+# 注意事项：
+# 1. 所有时间戳均使用毫秒级Unix时间戳
+# 2. 所有UUID使用标准UUID v4格式
+# 3. 字符串长度限制以中文字符计，英文/数字按1字符计
+# 4. 流式输出使用Server-Sent Events (SSE)协议
+# 5. Rate limiting: 每用户每分钟最多20次请求
+# 6. 内容过滤：所有生成内容都会经过安全过滤

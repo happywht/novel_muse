@@ -496,3 +496,5 @@ export const EchoChamber: React.FC<EchoChamberProps> = ({ project, updateProject
         </div>
     );
 };
+
+export default EchoChamber;

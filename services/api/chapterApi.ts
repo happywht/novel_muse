@@ -1,23 +1,34 @@
 import { apiClient } from './client';
+import type { Chapter, PlotNode, Character, WorldSetting } from '../../types';
+
+/**
+ * 章节节拍
+ */
+export interface ChapterBeat {
+  id: string;
+  type: string;
+  description: string;
+  isCompleted: boolean;
+}
 
 /**
  * 章节依赖关系
  */
 export interface ChapterDependencies {
-  chapter: any;
-  plotNode?: any;
-  involvedCharacters: any[];
-  setLocation?: any;
-  beats: any[];
-  predecessor?: any;
-  successor?: any;
+  chapter: Chapter;
+  plotNode?: PlotNode;
+  involvedCharacters: Character[];
+  setLocation?: WorldSetting;
+  beats: ChapterBeat[];
+  predecessor?: Chapter;
+  successor?: Chapter;
 }
 
 /**
  * 章节角色网络
  */
 export interface ChapterCharacterNetwork {
-  characters: any[];
+  characters: Character[];
   relationships: Array<{
     subject: string;
     relation: string;

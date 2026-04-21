@@ -360,18 +360,22 @@ router.post('/:projectId/sync', async (req: Request, res: Response) => {
         await syncProjectToGraph(req.body);
 
         // Clear all cache for this project
-        const cache = getGlobalCache();
-        const projectKeys = cache.keys(new RegExp(`:${req.params.projectId}:`));
-        cache.deleteMany(projectKeys);
-        console.log(`🗑️ Cleared ${projectKeys.length} cache entries for project ${req.params.projectId}`);
-
-            res.json({ success: true });
-        } catch (err: any) {
-            console.error('Graph sync error:', err);
-            res.status(500).json({ error: err.message });
+        try {
+            const cache = getGlobalCache();
+            const projectKeys = cache.keys(new RegExp(`:${req.params.projectId}:`));
+            cache.deleteMany(projectKeys);
+            console.log(`🗑️ Cleared ${projectKeys.length} cache entries for project ${req.params.projectId}`);
+        } catch (cacheError) {
+            console.warn('Failed to clear cache after sync:', cacheError);
+            // Don't fail the request if cache clearing fails
         }
+
+        res.json({ success: true });
+    } catch (err: any) {
+        console.error('Graph sync error:', err);
+        res.status(500).json({ error: err.message || 'Failed to sync project to graph' });
     }
-);
+});
 
 // Task 2.1 & 2.2: Get unresolved foreshadowing
 // Applied SHORT cache (1 min) - foreshadowing status changes frequently

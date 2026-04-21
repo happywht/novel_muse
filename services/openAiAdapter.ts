@@ -50,8 +50,9 @@ export const fetchOpenAICompatible = async (
         const textBlock = response.content.find(block => block.type === 'text') as Anthropic.TextBlock;
         return textBlock ? textBlock.text : "";
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error(`${provider} API Error details:`, error);
-        throw new Error(`${provider} API Error: ${error.message}`);
+        const message = error instanceof Error ? error.message : '未知错误';
+        throw new Error(`${provider} API Error: ${message}`);
     }
 };

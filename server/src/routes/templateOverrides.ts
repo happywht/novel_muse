@@ -161,6 +161,7 @@ function parseTemplateConfig(customTemplates: string | null): TemplateOverrideCo
     return config;
   } catch (error) {
     console.error('Failed to parse template config:', error);
+    // 静默失败，返回null
     return null;
   }
 }

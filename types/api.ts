@@ -453,3 +453,136 @@ export interface NarrativeInsightDTO {
   involvedEntities: string[];
   logic: string;
 }
+
+// ============================================================
+// 角色深度查询 DTO (P0 增强)
+// ============================================================
+
+/**
+ * 结构化关系
+ */
+export interface StructuredRelationDTO {
+  targetName: string;
+  type: 'ENEMY_OF' | 'ALLY_OF' | 'LOVES' | 'KIN_OF' | 'MENTORS' | 'RIVAL_OF' | 'SERVES' | 'FRIEND_OF' | 'RELATED_TO';
+  description?: string;
+}
+
+/**
+ * 角色深度信息
+ */
+export interface CharacterDepthDTO {
+  characterId: string;
+  name: string;
+  role: string;
+  archetype?: string;
+  description?: string;
+
+  // 深度属性
+  alignment?: string;
+  tags?: string[];
+  desire?: string;
+  fear?: string;
+  signature?: string;
+  contrast?: string;
+  weakness?: string;
+
+  // 关系信息
+  relationships?: string;
+  structuredRelations?: StructuredRelationDTO[];
+
+  // 世界关联
+  originLocation?: string;
+  residence?: string;
+  controlledTerritories?: string[];
+
+  // 图谱扩展信息
+  tripleCount?: number;
+  relationshipCount?: number;
+}
+
+/**
+ * 角色搜索结果
+ */
+export interface CharacterSearchResultDTO {
+  characterId: string;
+  name: string;
+  role: string;
+  alignment?: string;
+  tags?: string[];
+  matchScore?: number;
+}
+
+/**
+ * 动机网络节点
+ */
+export interface MotivationNetworkNodeDTO {
+  characterId: string;
+  name: string;
+  desire?: string;
+  fear?: string;
+  color?: string;
+}
+
+/**
+ * 动机网络边
+ */
+export interface MotivationNetworkEdgeDTO {
+  source: string;
+  target: string;
+  type: 'CONFLICT' | 'SYNERGY' | 'COMPLEX';
+  weight: number;
+}
+
+/**
+ * 动机网络
+ */
+export interface MotivationNetworkDTO {
+  nodes: MotivationNetworkNodeDTO[];
+  edges: MotivationNetworkEdgeDTO[];
+}
+
+/**
+ * 位置角色信息
+ */
+export interface LocationCharacterDTO {
+  characterId: string;
+  name: string;
+  role: string;
+  reason?: string; // 为什么在这个位置
+  isVisitor?: boolean; // 是否是访问者
+}
+
+// ============================================================
+// 角色关系网络 DTO (P1 增强)
+// ============================================================
+
+/**
+ * 关系网络节点
+ */
+export interface RelationshipNetworkNodeDTO {
+  id: string;
+  name: string;
+  type: 'Character';
+  alignment?: string;
+  role?: string;
+  weight?: number;
+}
+
+/**
+ * 关系网络边
+ */
+export interface RelationshipNetworkEdgeDTO {
+  source: string;
+  target: string;
+  type: string;
+  weight: number;
+  trajectory?: string;
+}
+
+/**
+ * 关系网络响应
+ */
+export interface RelationshipNetworkDTO {
+  nodes: RelationshipNetworkNodeDTO[];
+  edges: RelationshipNetworkEdgeDTO[];
+}

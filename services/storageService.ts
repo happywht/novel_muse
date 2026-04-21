@@ -57,6 +57,8 @@ export const storageService = {
 
     /**
      * Key migration helper: Checks if data exists in localStorage and moves it to IndexedDB
+     *
+     * ✅ Fixed: Automatically clears corrupted data to prevent infinite retry loops
      */
     async migrateFromLocalStorage(key: string): Promise<boolean> {
         const legacyData = localStorage.getItem(key);
@@ -69,6 +71,10 @@ export const storageService = {
                 return true;
             } catch (e) {
                 console.error(`❌ Failed to migrate ${key} during parsing:`, e);
+                // ✅ Fix: Clear corrupted data to prevent infinite retry loops
+                console.warn(`🧹 Clearing corrupted data for key: ${key}`);
+                localStorage.removeItem(key);
+                return false;
             }
         }
         return false;

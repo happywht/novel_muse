@@ -64,25 +64,28 @@ export const ManuscriptView: React.FC<ManuscriptViewProps> = ({
     }, []);
     
     // 当切换章节时，保持左侧滚动位置不变
-    const handleChapterSelect = (chapterId: string) => {
+    const handleChapterSelect = React.useCallback((chapterId: string) => {
         const leftElement = leftScrollRef.current;
         let currentScrollTop = 0;
-        
+
         // 保存当前左侧滚动位置
         if (leftElement) {
             currentScrollTop = leftElement.scrollTop;
         }
-        
+
         // 设置新的active章节
         setActiveChapterId(chapterId);
-        
+
         // 恢复左侧滚动位置（延迟执行，等待React更新）
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
             if (leftElement) {
                 leftElement.scrollTop = currentScrollTop;
             }
         }, 0);
-    };
+
+        // 清理函数
+        return () => clearTimeout(timeoutId);
+    }, [setActiveChapterId]);
 
     return (
         <div className="w-full flex gap-6 pt-10 overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>

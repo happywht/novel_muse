@@ -1,9 +1,10 @@
 {
     "name": "muse-server",
     "version": "1.0.0",
-    "description": "Muse: Novel Architect - Backend API Server",
+    "type": "module",
+    "description": "Muse: Novel Architect - Backend API Server with Performance Monitoring",
     "scripts": {
-        "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+        "dev": "tsx watch src/index.ts",
         "build": "tsc",
         "start": "node dist/index.js",
         "db:migrate": "prisma migrate dev",
@@ -13,7 +14,9 @@
         "test:watch": "jest --watch",
         "test:coverage": "jest --coverage",
         "test:auth": "ts-node test-auth.ts",
-        "generate-key": "node generate-api-key.js"
+        "test:performance": "ts-node src/__tests__/performance/performance.test.ts",
+        "generate-key": "node generate-api-key.js",
+        "performance:report": "node -e \"require('./dist/services/performance').getGlobalMonitor().generateReport()\""
     },
     "dependencies": {
         "@google/generative-ai": "^0.24.1",
@@ -35,6 +38,7 @@
         "prisma": "^6.5.0",
         "ts-jest": "^29.4.6",
         "ts-node-dev": "^2.0.0",
+        "tsx": "^4.21.0",
         "typescript": "^5.7.0"
     }
 }

@@ -1,0 +1,412 @@
+/**
+ * 主题CSS样式
+ * Theme CSS Styles
+ *
+ * 支持亮色/深色主题的完整样式系统
+ * Complete style system supporting light/dark themes
+ */
+
+/* ============================================
+   CSS自定义属性（CSS Variables）
+   CSS Custom Properties
+   ============================================ */
+
+:root {
+  /* 亮色主题变量 */
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f8fafc;
+  --color-bg-tertiary: #f1f5f9;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-tertiary: #94a3b8;
+  --color-border: #e2e8f0;
+  --color-primary: #6366f1;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+
+  /* 间距 */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+
+  /* 圆角 */
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] {
+  /* 深色主题变量 */
+  --color-bg-primary: #0f172a;
+  --color-bg-secondary: #1e293b;
+  --color-bg-tertiary: #334155;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #cbd5e1;
+  --color-text-tertiary: #94a3b8;
+  --color-border: #334155;
+  --color-primary: #818cf8;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+}
+
+/* ============================================
+   Tailwind暗色模式扩展
+   Tailwind Dark Mode Extension
+   ============================================ */
+
+/* 自动适配暗色模式 */
+.dark {
+  /* 背景色 */
+  .bg-white { background-color: var(--color-bg-primary) !important; }
+  .bg-slate-50 { background-color: #1e293b !important; }
+  .bg-slate-100 { background-color: #334155 !important; }
+  .bg-slate-200 { background-color: #475569 !important; }
+  .bg-slate-900 { background-color: #020617 !important; }
+  .bg-slate-800 { background-color: #0f172a !important; }
+
+  /* 文字色 */
+  .text-slate-900 { color: var(--color-text-primary) !important; }
+  .text-slate-700 { color: var(--color-text-secondary) !important; }
+  .text-slate-500 { color: var(--color-text-tertiary) !important; }
+
+  /* 边框色 */
+  .border-slate-200 { border-color: var(--color-border) !important; }
+  .border-slate-300 { border-color: #475569 !important; }
+}
+
+/* ============================================
+   全局主题样式
+   Global Theme Styles
+   ============================================ */
+
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* 平滑主题切换 */
+* {
+  transition: background-color 0.3s ease,
+              border-color 0.3s ease,
+              color 0.3s ease;
+}
+
+/* 禁用过渡的元素（性能优化） */
+.no-transition,
+.no-transition * {
+  transition: none !important;
+}
+
+/* ============================================
+   组件主题样式
+   Component Theme Styles
+   ============================================ */
+
+/* 按钮 */
+.button-themed {
+  background-color: var(--color-primary);
+  color: white;
+  border: none;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.button-themed:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.button-themed:active {
+  transform: translateY(0);
+}
+
+/* 输入框 */
+.input-themed {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+}
+
+.input-themed:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.input-themed::placeholder {
+  color: var(--color-text-tertiary);
+}
+
+/* 卡片 */
+.card-themed {
+  background-color: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  box-shadow: var(--shadow-md);
+  transition: all 0.3s ease;
+}
+
+.card-themed:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* ============================================
+   语义化颜色类
+   Semantic Color Classes
+   ============================================ */
+
+.text-success {
+  color: var(--color-success);
+}
+
+.text-warning {
+  color: var(--color-warning);
+}
+
+.text-error {
+  color: var(--color-error);
+}
+
+.bg-success {
+  background-color: var(--color-success);
+}
+
+.bg-warning {
+  background-color: var(--color-warning);
+}
+
+.bg-error {
+  background-color: var(--color-error);
+}
+
+/* ============================================
+   主题切换动画
+   Theme Transition Animation
+   ============================================ */
+
+@keyframes theme-transition {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+.theme-transitioning {
+  animation: theme-transition 0.3s ease;
+}
+
+/* ============================================
+   滚动条主题化
+   Scrollbar Theming
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-tertiary);
+}
+
+/* Firefox滚动条 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) var(--color-bg-secondary);
+}
+
+/* ============================================
+   选择文本主题化
+   Selection Theming
+   ============================================ */
+
+::selection {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+::-moz-selection {
+  background-color: var(--color-primary);
+  color: white;
+}
+
+/* ============================================
+   焦点样式主题化
+   Focus Styles Theming
+   ============================================ */
+
+*:focus-visible {
+  outline-color: var(--color-primary);
+  outline-width: 2px;
+  outline-offset: 2px;
+}
+
+/* ============================================
+   链接主题化
+ * Link Theming
+   ============================================ */
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover {
+  color: var(--color-primary);
+  filter: brightness(1.1);
+}
+
+a:visited {
+  color: var(--color-primary);
+}
+
+/* ============================================
+   表单主题化
+   Form Theming
+   ============================================ */
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea,
+select {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-primary);
+}
+
+/* ============================================
+   代码块主题化
+   Code Block Theming
+   ============================================ */
+
+code,
+pre {
+  background-color: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border-radius: var(--radius-sm);
+}
+
+pre {
+  padding: var(--spacing-md);
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+}
+
+/* ============================================
+   表格主题化
+   Table Theming
+   ============================================ */
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th,
+td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+th {
+  background-color: var(--color-bg-secondary);
+  font-weight: 600;
+}
+
+tr:hover {
+  background-color: var(--color-bg-secondary);
+}
+
+/* ============================================
+   分隔线主题化
+   Divider Theming
+   ============================================ */
+
+hr,
+.divider {
+  border-color: var(--color-border);
+}
+
+/* ============================================
+   工具类主题化
+   Utility Classes Theming
+   ============================================ */
+
+.bg-themed-primary {
+  background-color: var(--color-bg-primary);
+}
+
+.bg-themed-secondary {
+  background-color: var(--color-bg-secondary);
+}
+
+.bg-themed-tertiary {
+  background-color: var(--color-bg-tertiary);
+}
+
+.text-themed-primary {
+  color: var(--color-text-primary);
+}
+
+.text-themed-secondary {
+  color: var(--color-text-secondary);
+}
+
+.text-themed-tertiary {
+  color: var(--color-text-tertiary);
+}
+
+.border-themed {
+  border-color: var(--color-border);
+}

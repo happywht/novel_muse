@@ -82,11 +82,14 @@ export const createSyncSlice: StateCreator<
     const store = get() as any; // 需要访问project状态
     const project = store.project;
 
-    if (_internal.saveTimer) clearTimeout(_internal.saveTimer);
+    // 清理之前的定时器
+    if (_internal.saveTimer) {
+      clearTimeout(_internal.saveTimer as number);
+    }
     set({ isSaving: true });
 
     // 使用异步操作避免阻塞
-    setTimeout(async () => {
+    const timerId = setTimeout(async () => {
       try {
         const currentState = get() as any;
         const currentProject = currentState.project;
@@ -108,6 +111,7 @@ export const createSyncSlice: StateCreator<
           _internal: {
             ...state._internal,
             pendingPatch: {},
+            saveTimer: null,
           },
           isSaving: false,
         }));
@@ -115,15 +119,19 @@ export const createSyncSlice: StateCreator<
         console.warn('Backend sync failed:', err);
         set({
           isSaving: false,
-          lastError: '数据同步失败：已保存到本地，将在下次连接时重试'
+          lastError: '数据同步失败：已保存到本地，将在下次连接时重试',
+          _internal: {
+            ...get()._internal,
+            saveTimer: null,
+          }
         });
       }
-    }, 1000) as unknown as number;
+    }, 1000);
 
     set((state) => ({
       _internal: {
         ...state._internal,
-        saveTimer: Date.now(), // 简化处理
+        saveTimer: timerId as unknown as number,
       },
     }));
   },

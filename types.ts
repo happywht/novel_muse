@@ -64,15 +64,37 @@ export interface ParsedLegacyRelation {
 
 export type ConflictType = 'CONFRONTATION' | 'CLIMAX' | 'TWIST' | null;
 
+/**
+ * PlotNode元数据接口 - 包含名称和UUID引用
+ * 支持AI生成时使用名称，后端处理时转换为UUID
+ */
+export interface PlotNodeMetadata {
+  relatedCharacters: string[];  // UUID数组
+  relatedLocations: string[];   // UUID数组
+  beatTag: BeatTag;
+}
+
+/**
+ * PlotNode接口 - 支持名称到UUID的转换
+ * relatedCharacterNames和relatedLocationNames用于AI生成
+ * relatedCharacters和relatedLocations用于最终的UUID引用
+ */
 export interface PlotNode {
   id: string;
   title: string;
   content: string; // The beat/summary
   order: number;
   beatTag?: BeatTag; // NEW: Narrative milestone tag
-  relatedCharacters?: string[]; // IDs
-  relatedLocations?: string[]; // IDs
+
+  // AI生成的名称数组（用于前端显示和AI输入）
+  relatedCharacterNames?: string[]; // 角色名称数组
+  relatedLocationNames?: string[];  // 地点名称数组
+
+  // UUID引用数组（后端处理后）
+  relatedCharacters?: string[]; // UUID数组
+  relatedLocations?: string[]; // UUID数组
   relatedChapters?: string[]; // IDs of related chapters
+
   // NEW: 修罗场冲突场景元数据
   conflictScenario?: {
     type: ConflictType;
@@ -80,6 +102,23 @@ export interface PlotNode {
     stakes: string; // 赌注/冲突核心
     intensity: number; // 1-10强度等级
   };
+}
+
+/**
+ * PlotNode名称转换结果
+ */
+export interface PlotNodeConversionResult {
+  success: boolean;
+  nodes: PlotNode[];
+  stats: {
+    totalNodes: number;
+    totalCharacterMappings: number;
+    totalLocationMappings: number;
+    totalCharacterWarnings: number;
+    totalLocationWarnings: number;
+    hasWarnings: boolean;
+  };
+  warnings?: string[];
 }
 
 export interface Message {

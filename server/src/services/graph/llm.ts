@@ -107,6 +107,23 @@ ${charData}
             return AiKnowledgeTripleArraySchema.parse(parsed);
         } catch (error) {
             console.error("Graph AI Extraction Error:", error);
+
+            // 提供更详细的错误信息
+            if (error instanceof Error) {
+                console.error(`AI extraction failed: ${error.message}`);
+
+                // 检查是否是网络错误
+                if (error.message.includes('fetch') || error.message.includes('network')) {
+                    console.error('Network error during AI extraction, check connection');
+                }
+
+                // 检查是否是解析错误
+                if (error instanceof SyntaxError) {
+                    console.error('JSON parsing error, AI returned invalid format');
+                }
+            }
+
+            // 返回空数组而不是抛出异常，让系统能够继续运行
             return [];
         }
     }

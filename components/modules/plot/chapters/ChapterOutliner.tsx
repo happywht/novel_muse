@@ -213,7 +213,7 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                 toast.warning("局部重写未能生成有效内容，请重试。");
             }
         } catch (error) {
-            console.error("Regenerate Error:", error);
+            console.error("Regenerate Error:", String(error));
             toast.error("局部重写失败，请检查网络或配置后重试。");
         } finally {
             setRegeneratingChapterId(null);
@@ -313,7 +313,7 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
                 });
             }
         } catch (error) {
-            console.error("Fission Error:", error);
+            console.error("Fission Error:", String(error));
             toast.error("生成章节细纲失败，请检查网络或配置后重试。");
         } finally {
             setIsGenerating(false);
@@ -335,7 +335,7 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
             setAuditResult(result);
             setIsAuditCollapsed(false);
         } catch (error) {
-            console.error("Audit Error:", error);
+            console.error("Audit Error:", String(error));
             toast.error("审计失败，请重试。");
         } finally {
             setIsAuditing(false);

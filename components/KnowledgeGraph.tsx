@@ -10,12 +10,13 @@ import {
     GRAPH_LAYER_LABELS,
     GRAPH_RELATIONSHIP_LABELS
 } from '@/config/constants';
+import type { ProjectState } from '@/types';
 
 interface KnowledgeGraphProps {
     projectId: string;
     useBackend: boolean;
-    projectData: any; // Add projectData
-    updateProject: (data: any) => void; // Add updateProject
+    projectData: ProjectState; // Add projectData
+    updateProject: (data: ProjectState) => void; // Add updateProject
 }
 
 
@@ -94,8 +95,8 @@ export const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({ projectId, useBa
 
             setNodes(simNodes);
             setEdges(data.edges);
-        } catch (err: any) {
-            setError(err.message || '加载图谱失败');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : '加载图谱失败');
         }
         setLoading(false);
     }, [projectId, useBackend]);
@@ -669,23 +670,23 @@ const NodeEditSidebar: React.FC<NodeEditSidebarProps> = ({ node, projectId, onCl
             let updatedData = { ...projectData };
 
             if (node.type === 'Character') {
-                updatedData.characters = projectData.characters.map((c: any) =>
+                updatedData.characters = projectData.characters.map((c) =>
                     c.id === node.id ? { ...c, name: title, description: description } : c
                 );
             } else if (node.type === 'WorldSetting') {
-                updatedData.worldSettings = projectData.worldSettings.map((w: any) =>
+                updatedData.worldSettings = projectData.worldSettings.map((w) =>
                     w.id === node.id ? { ...w, title: title, content: description } : w
                 );
             } else if (node.type === 'Chapter') {
-                updatedData.chapters = projectData.chapters.map((c: any) =>
+                updatedData.chapters = projectData.chapters.map((c) =>
                     c.id === node.id ? { ...c, title: title, summary: description } : c
                 );
             } else if (node.type === 'PlotNode') {
-                updatedData.plotNodes = projectData.plotNodes.map((pn: any) =>
+                updatedData.plotNodes = projectData.plotNodes.map((pn) =>
                     pn.id === node.id ? { ...pn, title: title, description: description } : pn
                 );
             } else if (node.type === 'Event') {
-                updatedData.timeline = projectData.timeline.map((e: any) =>
+                updatedData.timeline = projectData.timeline.map((e) =>
                     e.id === node.id ? { ...e, title: title, description: description } : e
                 );
             } else if (node.type === 'Echo') {

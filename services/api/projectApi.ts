@@ -7,7 +7,7 @@ import type {
   ProjectStatisticsDTO
 } from '../../types/api';
 import { cacheManager, generateCacheKey } from '../cacheManager';
-import { DeepPartial, ProjectState } from '../../types';
+import { DeepPartial, ProjectState, PlotNode } from '../../types';
 
 /**
  * 项目管理 API
@@ -59,14 +59,14 @@ export const projectApi = {
   /**
    * 获取章节内容
    */
-  getChapter: (projectId: string, chapterId: string): Promise<ChapterContentDTO> =>
-    apiClient.get<ChapterContentDTO>(`/projects/${projectId}/chapters/${chapterId}`),
+  getChapter: (projectId: string, chapterId: string, signal?: AbortSignal): Promise<ChapterContentDTO> =>
+    apiClient.get<ChapterContentDTO>(`/projects/${projectId}/chapters/${chapterId}`, signal),
 
   /**
    * 获取所有非空章节内容
    */
-  getChaptersContent: (projectId: string): Promise<ChapterContentDTO[]> =>
-    apiClient.get<ChapterContentDTO[]>(`/projects/${projectId}/chapters-content`),
+  getChaptersContent: (projectId: string, signal?: AbortSignal): Promise<ChapterContentDTO[]> =>
+    apiClient.get<ChapterContentDTO[]>(`/projects/${projectId}/chapters-content`, signal),
 
   /**
    * 获取项目统计数据
@@ -79,5 +79,33 @@ export const projectApi = {
     const data = await apiClient.get<ProjectStatisticsDTO>(`/projects/${projectId}/statistics`);
     await cacheManager.set(cacheKey, data);
     return data;
+  },
+
+  /**
+   * P2 增强：将PlotNode中的名称转换为UUID引用
+   * @param projectId 项目ID
+   * @param nodes PlotNode数组（包含relatedCharacterNames和relatedLocationNames）
+   * @returns 转换后的PlotNode数组（包含relatedCharacters和relatedLocations UUIDs）
+   */
+  convertPlotNodeNamesToUUIDs: async (projectId: string, nodes: PlotNode[], signal?: AbortSignal): Promise<PlotNode[]> => {
+    return apiClient.post<PlotNode[]>(`/projects/${projectId}/plotnodes/convert-names-to-uuids`, { nodes }, signal);
+  },
+
+  /**
+   * 获取项目角色的名称到UUID映射表
+   * @param projectId 项目ID
+   * @returns 名称到ID的映射对象
+   */
+  getCharacterMappings: async (projectId: string, signal?: AbortSignal): Promise<{ mapping: Record<string, string>; count: number }> => {
+    return apiClient.get<{ mapping: Record<string, string>; count: number }>(`/projects/${projectId}/mappings/characters`, signal);
+  },
+
+  /**
+   * 获取项目地点的名称到UUID映射表
+   * @param projectId 项目ID
+   * @returns 名称到ID的映射对象
+   */
+  getLocationMappings: async (projectId: string, signal?: AbortSignal): Promise<{ mapping: Record<string, string>; count: number }> => {
+    return apiClient.get<{ mapping: Record<string, string>; count: number }>(`/projects/${projectId}/mappings/locations`, signal);
   },
 };

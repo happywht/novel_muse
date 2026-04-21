@@ -12,6 +12,12 @@ import {
   fetchCharacterEvolution,
   fetchCharacterForeshadowing
 } from '../../services/apiService';
+import type {
+  CharacterDepthDTO,
+  CharacterSearchResultDTO,
+  MotivationNetworkDTO,
+  LocationCharacterDTO
+} from '../../types/api';
 
 // 图谱查询结果类型定义
 export interface GraphQueryState {
@@ -57,10 +63,13 @@ export interface GraphQueryState {
   loadingForeshadowing: Set<string>;
 
   // P0 增强：角色深度查询缓存
-  characterDepthCache: Map<string, any>; // characterId -> depth data
-  motivationNetwork: any | null; // 动机网络数据
+  characterDepthCache: Map<string, CharacterDepthDTO>; // characterId -> depth data
+  motivationNetwork: MotivationNetworkDTO | null; // 动机网络数据
   loadingDepth: Set<string>; // 正在加载深度数据的角色ID
   loadingMotivationNetwork: boolean;
+
+  // AbortControllers for pending requests
+  abortControllers: Map<string, AbortController>;
 }
 
 export interface GraphSlice {
@@ -74,11 +83,11 @@ export interface GraphSlice {
   clearCharacterGraphData: (characterId: string) => void;
 
   // P0 增强：角色深度查询方法
-  fetchCharacterDepth: (characterId: string, projectId: string, useBackend: boolean) => Promise<any | null>;
-  searchCharactersByTags: (tags: string[], matchAll: boolean, projectId: string, useBackend: boolean) => Promise<any[]>;
-  fetchCharactersByAlignment: (alignmentPattern: string, projectId: string, useBackend: boolean) => Promise<any[]>;
-  fetchCharacterMotivationNetwork: (projectId: string, useBackend: boolean) => Promise<any | null>;
-  fetchCharactersAtLocation: (locationId: string, includeVisitors: boolean, projectId: string, useBackend: boolean) => Promise<any[]>;
+  fetchCharacterDepth: (characterId: string, projectId: string, useBackend: boolean) => Promise<CharacterDepthDTO | null>;
+  searchCharactersByTags: (tags: string[], matchAll: boolean, projectId: string, useBackend: boolean) => Promise<CharacterSearchResultDTO[]>;
+  fetchCharactersByAlignment: (alignmentPattern: string, projectId: string, useBackend: boolean) => Promise<CharacterSearchResultDTO[]>;
+  fetchCharacterMotivationNetwork: (projectId: string, useBackend: boolean) => Promise<MotivationNetworkDTO | null>;
+  fetchCharactersAtLocation: (locationId: string, includeVisitors: boolean, projectId: string, useBackend: boolean) => Promise<LocationCharacterDTO[]>;
   syncCharacterToGraph: (characterId: string, projectId: string, useBackend: boolean) => Promise<void>;
 }
 
@@ -102,27 +111,41 @@ export const createGraphSlice: StateCreator<
     motivationNetwork: null,
     loadingDepth: new Set(),
     loadingMotivationNetwork: false,
+
+    // AbortControllers for race condition prevention
+    abortControllers: new Map(),
   },
 
-  // 获取角色特征
+  // 获取角色特征 - 修复竞态条件版本
   fetchCharacterTraits: async (characterId: string, projectId: string, useBackend: boolean) => {
     if (!useBackend) return;
 
     const { graphQuery } = get();
 
-    // 如果正在加载，直接返回
-    if (graphQuery.loadingTraits.has(characterId)) return;
+    // 如果正在加载，取消之前的请求
+    if (graphQuery.loadingTraits.has(characterId)) {
+      const controllerKey = `traits_${characterId}`;
+      const existingController = graphQuery.abortControllers.get(controllerKey);
+      if (existingController) {
+        existingController.abort();
+      }
+    }
+
+    // 创建新的AbortController
+    const controller = new AbortController();
+    const controllerKey = `traits_${characterId}`;
 
     // 标记为加载中
     set({
       graphQuery: {
         ...graphQuery,
-        loadingTraits: new Set([...graphQuery.loadingTraits, characterId])
+        loadingTraits: new Set([...graphQuery.loadingTraits, characterId]),
+        abortControllers: new Map([...graphQuery.abortControllers, [controllerKey, controller]])
       }
     });
 
     try {
-      const traits = await fetchCharacterTraits(projectId, characterId);
+      const traits = await fetchCharacterTraits(projectId, characterId, controller.signal);
       const newTraitsMap = new Map(graphQuery.characterTraits);
       if (traits) {
         newTraitsMap.set(characterId, traits);
@@ -132,15 +155,20 @@ export const createGraphSlice: StateCreator<
         graphQuery: {
           ...get().graphQuery,
           characterTraits: newTraitsMap,
-          loadingTraits: new Set([...get().graphQuery.loadingTraits].filter(id => id !== characterId))
+          loadingTraits: new Set([...get().graphQuery.loadingTraits].filter(id => id !== characterId)),
+          abortControllers: new Map([...get().graphQuery.abortControllers].filter(([key]) => key !== controllerKey))
         }
       });
     } catch (err) {
-      console.error('Failed to fetch character traits:', err);
+      // 只处理非AbortError的错误
+      if (err instanceof Error && err.name !== 'AbortError') {
+        console.error('Failed to fetch character traits:', err);
+      }
       set({
         graphQuery: {
           ...get().graphQuery,
-          loadingTraits: new Set([...get().graphQuery.loadingTraits].filter(id => id !== characterId))
+          loadingTraits: new Set([...get().graphQuery.loadingTraits].filter(id => id !== characterId)),
+          abortControllers: new Map([...get().graphQuery.abortControllers].filter(([key]) => key !== controllerKey))
         }
       });
     }
@@ -255,16 +283,20 @@ export const createGraphSlice: StateCreator<
   // ============================================
 
   /**
-   * 获取角色深度属性（包含关系和世界关联）
+   * 获取角色深度属性（包含关系和世界关联）- 修复竞态条件版本
    */
   fetchCharacterDepth: async (characterId: string, projectId: string, useBackend: boolean) => {
     if (!useBackend) return null;
 
     const { graphQuery } = get();
 
-    // 如果正在加载，直接返回
+    // 如果正在加载，取消之前的请求
     if (graphQuery.loadingDepth.has(characterId)) {
-      return graphQuery.characterDepthCache.get(characterId) || null;
+      const controllerKey = `depth_${characterId}`;
+      const existingController = graphQuery.abortControllers.get(controllerKey);
+      if (existingController) {
+        existingController.abort();
+      }
     }
 
     // 检查缓存
@@ -272,16 +304,21 @@ export const createGraphSlice: StateCreator<
       return graphQuery.characterDepthCache.get(characterId);
     }
 
+    // 创建新的AbortController
+    const controller = new AbortController();
+    const controllerKey = `depth_${characterId}`;
+
     // 标记为加载中
     set({
       graphQuery: {
         ...graphQuery,
-        loadingDepth: new Set([...graphQuery.loadingDepth, characterId])
+        loadingDepth: new Set([...graphQuery.loadingDepth, characterId]),
+        abortControllers: new Map([...graphQuery.abortControllers, [controllerKey, controller]])
       }
     });
 
     try {
-      const depthData = await graphApi.getCharacterDepth(projectId, characterId);
+      const depthData = await graphApi.getCharacterDepth(projectId, characterId, controller.signal);
       const newCache = new Map(graphQuery.characterDepthCache);
       newCache.set(characterId, depthData);
 
@@ -289,17 +326,22 @@ export const createGraphSlice: StateCreator<
         graphQuery: {
           ...get().graphQuery,
           characterDepthCache: newCache,
-          loadingDepth: new Set([...get().graphQuery.loadingDepth].filter(id => id !== characterId))
+          loadingDepth: new Set([...get().graphQuery.loadingDepth].filter(id => id !== characterId)),
+          abortControllers: new Map([...get().graphQuery.abortControllers].filter(([key]) => key !== controllerKey))
         }
       });
 
       return depthData;
     } catch (err) {
-      console.error('Failed to fetch character depth:', err);
+      // 只处理非AbortError的错误
+      if (err instanceof Error && err.name !== 'AbortError') {
+        console.error('Failed to fetch character depth:', err);
+      }
       set({
         graphQuery: {
           ...get().graphQuery,
-          loadingDepth: new Set([...get().graphQuery.loadingDepth].filter(id => id !== characterId))
+          loadingDepth: new Set([...get().graphQuery.loadingDepth].filter(id => id !== characterId)),
+          abortControllers: new Map([...get().graphQuery.abortControllers].filter(([key]) => key !== controllerKey))
         }
       });
       return null;
@@ -340,16 +382,20 @@ export const createGraphSlice: StateCreator<
   },
 
   /**
-   * 获取角色动机网络（欲望和恐惧）
+   * 获取角色动机网络（欲望和恐惧）- 修复竞态条件版本
    */
   fetchCharacterMotivationNetwork: async (projectId: string, useBackend: boolean) => {
     if (!useBackend) return null;
 
     const { graphQuery } = get();
 
-    // 如果正在加载，直接返回缓存
+    // 如果正在加载，取消之前的请求
     if (graphQuery.loadingMotivationNetwork) {
-      return graphQuery.motivationNetwork;
+      const controllerKey = 'motivation_network';
+      const existingController = graphQuery.abortControllers.get(controllerKey);
+      if (existingController) {
+        existingController.abort();
+      }
     }
 
     // 检查缓存
@@ -357,32 +403,42 @@ export const createGraphSlice: StateCreator<
       return graphQuery.motivationNetwork;
     }
 
+    // 创建新的AbortController
+    const controller = new AbortController();
+    const controllerKey = 'motivation_network';
+
     // 标记为加载中
     set({
       graphQuery: {
         ...graphQuery,
-        loadingMotivationNetwork: true
+        loadingMotivationNetwork: true,
+        abortControllers: new Map([...graphQuery.abortControllers, [controllerKey, controller]])
       }
     });
 
     try {
-      const networkData = await graphApi.getCharacterMotivationNetwork(projectId);
+      const networkData = await graphApi.getCharacterMotivationNetwork(projectId, controller.signal);
 
       set({
         graphQuery: {
           ...get().graphQuery,
           motivationNetwork: networkData,
-          loadingMotivationNetwork: false
+          loadingMotivationNetwork: false,
+          abortControllers: new Map([...get().graphQuery.abortControllers].filter(([key]) => key !== controllerKey))
         }
       });
 
       return networkData;
     } catch (err) {
-      console.error('Failed to fetch character motivation network:', err);
+      // 只处理非AbortError的错误
+      if (err instanceof Error && err.name !== 'AbortError') {
+        console.error('Failed to fetch character motivation network:', err);
+      }
       set({
         graphQuery: {
           ...get().graphQuery,
-          loadingMotivationNetwork: false
+          loadingMotivationNetwork: false,
+          abortControllers: new Map([...get().graphQuery.abortControllers].filter(([key]) => key !== controllerKey))
         }
       });
       return null;

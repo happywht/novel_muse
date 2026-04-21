@@ -413,3 +413,5 @@ export const PlotWeaver: React.FC<PlotWeaverProps> = ({ project, updateProject }
         </div>
     );
 };
+
+export default PlotWeaver;

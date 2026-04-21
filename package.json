@@ -17,6 +17,9 @@
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:headed": "playwright test --headed",
     "test:all": "npm run test && npm run test:component && npm run test:e2e",
+    "test:performance": "ts-node scripts/performance-test.ts",
+    "test:performance:baseline": "ts-node scripts/performance-test.ts --set-baseline",
+    "test:lighthouse": "ts-node scripts/lighthouse-runner.ts",
     "docs:api": "typedoc --options typedoc.json",
     "docs:serve": "npx serve docs/api -l 8080"
   },
@@ -33,6 +36,7 @@
     "@tiptap/starter-kit": "^3.20.0",
     "@types/dompurify": "^3.0.5",
     "@types/react-window": "^1.8.8",
+    "clsx": "^2.1.1",
     "dompurify": "^3.2.4",
     "force-graph": "^1.51.4",
     "localforage": "^1.10.0",
@@ -42,6 +46,7 @@
     "react-force-graph-2d": "^1.29.1",
     "react-window": "^2.2.7",
     "recharts": "^3.7.0",
+    "tailwind-merge": "^3.5.0",
     "zod": "^4.3.6",
     "zustand": "^5.0.11"
   },

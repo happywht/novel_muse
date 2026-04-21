@@ -5,19 +5,25 @@ import type {
   ForgeGraphContextDTO,
   NarrativeInsightDTO,
   PlotNodeContextDTO,
-  ConsistencyIssueDTO
+  ConsistencyIssueDTO,
+  CharacterDepthDTO,
+  CharacterSearchResultDTO,
+  MotivationNetworkDTO,
+  LocationCharacterDTO,
+  RelationshipNetworkDTO
 } from '../../types/api';
 import { KnowledgeTriple, Faction, PropagationRisk, PhysicalStatus } from '../../types';
 import { cacheManager, generateCacheKey } from '../cacheManager';
 
 /**
  * 知识图谱 API
+ * 增强的性能优化：AbortController支持、请求去重、错误边界处理
  */
 export const graphApi = {
   /**
    * 获取图谱
    */
-  get: async (projectId: string, types?: string[]): Promise<GraphDTO> => {
+  get: async (projectId: string, types?: string[], signal?: AbortSignal): Promise<GraphDTO> => {
     const cacheKey = generateCacheKey('graph', projectId, types);
     const cached = await cacheManager.get<GraphDTO>(cacheKey);
     if (cached) return cached;
@@ -26,7 +32,7 @@ export const graphApi = {
       ? `/graph/${projectId}?types=${encodeURIComponent(types.join(','))}`
       : `/graph/${projectId}`;
 
-    const data = await apiClient.get<GraphDTO>(url);
+    const data = await apiClient.get<GraphDTO>(url, signal);
     await cacheManager.set(cacheKey, data);
     return data;
   },
@@ -34,25 +40,25 @@ export const graphApi = {
   /**
    * 获取节点邻居
    */
-  getNeighbors: (projectId: string, nodeId: string): Promise<NodeNeighborsDTO> =>
-    apiClient.get<NodeNeighborsDTO>(`/graph/${projectId}/neighbors/${nodeId}`),
+  getNeighbors: (projectId: string, nodeId: string, signal?: AbortSignal): Promise<NodeNeighborsDTO> =>
+    apiClient.get<NodeNeighborsDTO>(`/graph/${projectId}/neighbors/${nodeId}`, signal),
 
   /**
    * 创建边
    */
-  createEdge: (projectId: string, sourceId: string, targetId: string, type: string): Promise<void> =>
-    apiClient.post<void>(`/graph/${projectId}/edge`, { sourceId, targetId, type }),
+  createEdge: (projectId: string, sourceId: string, targetId: string, type: string, signal?: AbortSignal): Promise<void> =>
+    apiClient.post<void>(`/graph/${projectId}/edge`, { sourceId, targetId, type }, signal),
 
   /**
    * 获取相关子图
    */
-  getSubgraph: async (projectId: string, anchors: string[], branchId: string = 'main'): Promise<string> => {
+  getSubgraph: async (projectId: string, anchors: string[], branchId: string = 'main', signal?: AbortSignal): Promise<string> => {
     const cacheKey = generateCacheKey('subgraph', projectId, anchors.join(','), branchId);
     const cached = await cacheManager.get<string>(cacheKey);
     if (cached) return cached;
 
     const url = `/graph/${projectId}/subgraph?anchors=${encodeURIComponent(anchors.join(','))}&branchId=${branchId}`;
-    const data = await apiClient.get<{ subgraph: string }>(url);
+    const data = await apiClient.get<{ subgraph: string }>(url, signal);
     await cacheManager.set(cacheKey, data.subgraph);
     return data.subgraph;
   },
@@ -145,12 +151,12 @@ export const graphApi = {
   /**
    * 获取角色深度属性（包含关系和世界关联）
    */
-  getCharacterDepth: async (projectId: string, characterId: string): Promise<any> => {
+  getCharacterDepth: async (projectId: string, characterId: string, signal?: AbortSignal): Promise<CharacterDepthDTO> => {
     const cacheKey = generateCacheKey('characterDepth', projectId, characterId);
-    const cached = await cacheManager.get<any>(cacheKey);
+    const cached = await cacheManager.get<CharacterDepthDTO>(cacheKey);
     if (cached) return cached;
 
-    const data = await apiClient.get<any>(`/graph/${projectId}/characters/${characterId}/depth`);
+    const data = await apiClient.get<CharacterDepthDTO>(`/graph/${projectId}/characters/${characterId}/depth`, signal);
     await cacheManager.set(cacheKey, data);
     return data;
   },
@@ -160,12 +166,12 @@ export const graphApi = {
    * @param tags - 标签数组
    * @param matchAll - true=AND逻辑(所有标签), false=OR逻辑(任一标签)
    */
-  searchCharactersByTags: async (projectId: string, tags: string[], matchAll: boolean = false): Promise<any[]> => {
+  searchCharactersByTags: async (projectId: string, tags: string[], matchAll: boolean = false, signal?: AbortSignal): Promise<CharacterSearchResultDTO[]> => {
     const cacheKey = generateCacheKey('searchByTags', projectId, tags.join(','), matchAll.toString());
-    const cached = await cacheManager.get<any[]>(cacheKey);
+    const cached = await cacheManager.get<CharacterSearchResultDTO[]>(cacheKey);
     if (cached) return cached;
 
-    const data = await apiClient.post<any[]>(`/graph/${projectId}/characters/search/tags`, { tags, matchAll });
+    const data = await apiClient.post<CharacterSearchResultDTO[]>(`/graph/${projectId}/characters/search/tags`, { tags, matchAll }, signal);
     await cacheManager.set(cacheKey, data);
     return data;
   },
@@ -174,12 +180,12 @@ export const graphApi = {
    * 按道德阵营搜索角色（支持模糊匹配）
    * @param alignmentPattern - 阵营模式（如 "守序" 可匹配 "守序善良"、"守序中立" 等）
    */
-  getCharactersByAlignment: async (projectId: string, alignmentPattern: string): Promise<any[]> => {
+  getCharactersByAlignment: async (projectId: string, alignmentPattern: string): Promise<CharacterSearchResultDTO[]> => {
     const cacheKey = generateCacheKey('byAlignment', projectId, alignmentPattern);
-    const cached = await cacheManager.get<any[]>(cacheKey);
+    const cached = await cacheManager.get<CharacterSearchResultDTO[]>(cacheKey);
     if (cached) return cached;
 
-    const data = await apiClient.get<any[]>(`/graph/${projectId}/characters/search/alignment?pattern=${encodeURIComponent(alignmentPattern)}`);
+    const data = await apiClient.get<CharacterSearchResultDTO[]>(`/graph/${projectId}/characters/search/alignment?pattern=${encodeURIComponent(alignmentPattern)}`);
     await cacheManager.set(cacheKey, data);
     return data;
   },
@@ -187,12 +193,12 @@ export const graphApi = {
   /**
    * 获取角色动机网络（欲望和恐惧）
    */
-  getCharacterMotivationNetwork: async (projectId: string): Promise<any> => {
+  getCharacterMotivationNetwork: async (projectId: string, signal?: AbortSignal): Promise<MotivationNetworkDTO> => {
     const cacheKey = generateCacheKey('motivationNetwork', projectId);
-    const cached = await cacheManager.get<any>(cacheKey);
+    const cached = await cacheManager.get<MotivationNetworkDTO>(cacheKey);
     if (cached) return cached;
 
-    const data = await apiClient.get<any>(`/graph/${projectId}/characters/motivation-network`);
+    const data = await apiClient.get<MotivationNetworkDTO>(`/graph/${projectId}/characters/motivation-network`, signal);
     await cacheManager.set(cacheKey, data);
     return data;
   },
@@ -202,13 +208,13 @@ export const graphApi = {
    * @param locationId - 地点ID
    * @param includeVisitors - 是否包含访问者（起源地、控制领地）
    */
-  getCharactersAtLocation: async (projectId: string, locationId: string, includeVisitors: boolean = false): Promise<any[]> => {
+  getCharactersAtLocation: async (projectId: string, locationId: string, includeVisitors: boolean = false, signal?: AbortSignal): Promise<LocationCharacterDTO[]> => {
     const cacheKey = generateCacheKey('atLocation', projectId, locationId, includeVisitors.toString());
-    const cached = await cacheManager.get<any[]>(cacheKey);
+    const cached = await cacheManager.get<LocationCharacterDTO[]>(cacheKey);
     if (cached) return cached;
 
     const url = `/graph/${projectId}/world-settings/${locationId}/characters-enhanced?includeVisitors=${includeVisitors}`;
-    const data = await apiClient.get<any[]>(url);
+    const data = await apiClient.get<LocationCharacterDTO[]>(url, signal);
     await cacheManager.set(cacheKey, data);
     return data;
   },
@@ -237,7 +243,7 @@ export const graphApi = {
     minWeight?: number;
     alignments?: string[];
     includeCharacterIds?: string[];
-  }): Promise<{ nodes: any[]; edges: any[] }> => {
+  }): Promise<RelationshipNetworkDTO> => {
     const params = new URLSearchParams();
 
     if (filters?.relationTypes && filters.relationTypes.length > 0) {
@@ -259,7 +265,7 @@ export const graphApi = {
     const queryString = params.toString();
     const url = `/graph/${projectId}/character-network${queryString ? `?${queryString}` : ''}`;
 
-    const data = await apiClient.get<{ nodes: any[]; edges: any[] }>(url);
+    const data = await apiClient.get<RelationshipNetworkDTO>(url);
     return data;
   },
 };

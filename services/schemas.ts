@@ -287,8 +287,23 @@ export function safeParseAiJson<T>(
                 const sanitized: any = {};
                 for (const [key, value] of Object.entries(obj)) {
                     if (key === 'beatTag' && typeof value === 'string') {
-                        const validBeatTags = ['INCITING_INCIDENT', 'PLOT_POINT_1', 'MIDPOINT', 'PLOT_POINT_2', 'CLIMAX', 'RESOLUTION', 'OTHER'];
-                        sanitized[key] = validBeatTags.includes(value) ? value : 'OTHER';
+                        // Updated enum values to match expanded beat tag system
+                        const validBeatTags = [
+                            'INCITING_INCIDENT',
+                            'PLOT_POINT_1',
+                            'MIDPOINT',
+                            'PLOT_POINT_2',
+                            'CLIMAX',
+                            'RESOLUTION',
+                            'EXPOSITION',
+                            'RISING_ACTION',
+                            'FALLING_ACTION',
+                            'DENOUEMENT',
+                            'OTHER' // Legacy support
+                        ];
+                        // Convert to uppercase and remove spaces for validation
+                        const normalizedValue = value.toUpperCase().replace(/\s+/g, '_');
+                        sanitized[key] = validBeatTags.includes(normalizedValue) ? normalizedValue : 'RISING_ACTION';
                     } else {
                         sanitized[key] = sanitizeBeatTag(value);
                     }
@@ -407,14 +422,72 @@ export const AiPlotRhythmSchema = z.object({
 export const AiPlotRhythmArraySchema = z.array(AiPlotRhythmSchema);
 
 // --- Plot Nodes (generatePlotFromContext, rewritePlot) ---
+/**
+ * Plot Beat Type Enumeration
+ * 故事节拍类型枚举 - 用于标识情节节点在叙事结构中的角色
+ *
+ * 各类型说明：
+ * - INCITING_INCIDENT: 激励事件 - 打破主角日常生活的诱发事件
+ * - PLOT_POINT_1: 第一个转折点 - 故事进入第二幕，主角踏上旅程
+ * - MIDPOINT: 中点 - 故事中点的重大转折或 revelation
+ * - PLOT_POINT_2: 第二个转折点 - 故事进入第三幕，最低点时刻
+ * - CLIMAX: 高潮 - 故事最高潮，主角与反派的对决
+ * - RESOLUTION: 结局 - 故事收尾，展示新平衡
+ * - EXPOSITION: 说明 - 背景信息、世界观设定说明
+ * - RISING_ACTION: 上升动作 - 冲突升级、情节发展
+ * - FALLING_ACTION: 下降动作 - 高潮后的情节回落
+ * - DENOUEMENT: 尾声 - 最后的情节收束和余波
+ */
+export const PlotBeatTagEnum = z.enum([
+    'INCITING_INCIDENT',
+    'PLOT_POINT_1',
+    'MIDPOINT',
+    'PLOT_POINT_2',
+    'CLIMAX',
+    'RESOLUTION',
+    'EXPOSITION',
+    'RISING_ACTION',
+    'FALLING_ACTION',
+    'DENOUEMENT'
+]);
+
 export const AiPlotNodeSchema = z.object({
     title: z.string().min(1, '情节标题不能为空'),
     content: z.string().default(''),
-    beatTag: z.enum(['INCITING_INCIDENT', 'PLOT_POINT_1', 'MIDPOINT', 'PLOT_POINT_2', 'CLIMAX', 'RESOLUTION', 'OTHER']).optional(),
-    relatedCharacters: z.array(z.string()).optional(), // List of Character IDs
-    relatedLocations: z.array(z.string()).optional(),  // List of WorldSetting IDs
+
+    /**
+     * 情节类型标签
+     * 用于标识该节点在故事结构中的叙事角色
+     * 必须从预定义的枚举值中选择，确保结构化分析
+     */
+    beatTag: PlotBeatTagEnum,
+
+    /**
+     * 涉及的人物名称列表
+     * 记录本情节节点中出现的所有角色名称
+     * 注意：存储的是名称而非ID，便于AI生成和识别
+     * 后端可通过名称匹配转换为ID
+     */
+    relatedCharacterNames: z.array(z.string()).min(1, '至少需要一个相关角色名称'),
+
+    /**
+     * 涉及的地点名称列表
+     * 记录本情节节点中发生的所有地点/场景名称
+     * 注意：存储的是地点标题而非ID，便于AI生成和识别
+     * 后端可通过标题匹配转换为WorldSetting的ID
+     */
+    relatedLocationNames: z.array(z.string()).min(1, '至少需要一个相关地点名称'),
+
+    // 保留旧字段以向后兼容（标记为deprecated）
+    relatedCharacters: z.array(z.string()).optional(), // List of Character IDs (DEPRECATED - 使用 relatedCharacterNames)
+    relatedLocations: z.array(z.string()).optional(),  // List of WorldSetting IDs (DEPRECATED - 使用 relatedLocationNames)
     relatedChapters: z.array(z.string()).optional(),  // List of Chapter IDs
-    // NEW: 修罗场冲突场景元数据
+
+    /**
+     * 修罗场冲突场景元数据
+     * 用于识别和标记多角色冲突场景
+     * 当涉及2个或以上角色正面冲突、对峙或博弈时填充此字段
+     */
     conflictScenario: z.object({
         type: z.enum(['CONFRONTATION', 'CLIMAX', 'TWIST']).nullable().optional(),
         participants: z.array(z.string()).optional(), // 参与角色ID数组

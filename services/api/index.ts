@@ -9,14 +9,27 @@ export { apiClient, ApiClient } from './client';
 // ========== 旧的 API 层（向后兼容，不推荐使用） ==========
 // 这些 API 直接返回后端 DTO，需要手动处理数据转换
 
-// 领域 API 模块
-export { projectApi } from './projectApi';
-export { graphApi } from './graphApi';
-export { characterApi } from './characterApi';
-export { echoApi } from './echoApi';
-export { forgeApi } from './forgeApi';
-export { chapterApi } from './chapterApi';
-export { systemApi } from './systemApi';
+// 领域 API 模块 - 先导入再导出，避免作用域问题
+import { projectApi } from './projectApi';
+import { graphApi } from './graphApi';
+import { characterApi } from './characterApi';
+import { echoApi } from './echoApi';
+import { forgeApi } from './forgeApi';
+import { chapterApi } from './chapterApi';
+import { systemApi } from './systemApi';
+import { writingApi } from './writingApi';
+
+// 重新导出以保持模块接口
+export {
+  projectApi,
+  graphApi,
+  characterApi,
+  echoApi,
+  forgeApi,
+  chapterApi,
+  systemApi,
+  writingApi
+};
 
 // 类型导出
 export type {
@@ -38,6 +51,13 @@ export type {
   ConflictHeatmapEntry
 } from './chapterApi';
 
+export type {
+  ContinuationRequest,
+  ContinuationResponse,
+  ContextAnalysisRequest,
+  ContextAnalysisResponse
+} from './writingApi';
+
 /**
  * 便捷统一导出对象
  * 使用方式: api.project.list(), api.graph.get(), etc.
@@ -50,6 +70,7 @@ export const api = {
   forge: forgeApi,
   chapter: chapterApi,
   system: systemApi,
+  writing: writingApi,
 };
 
 // ========== 新的服务层（推荐使用） ==========
