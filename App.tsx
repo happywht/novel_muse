@@ -135,19 +135,65 @@ const App: React.FC = () => {
 
   const handleImportProject = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      console.log('❌ Import: No file selected');
+      return;
+    }
+
+    console.log('✅ Import: File selected:', file.name, file.size, 'bytes');
 
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
         const text = e.target?.result as string;
-        const parsed = JSON.parse(text);
+        console.log('📄 Import: File content loaded, length:', text.length);
 
-        // Validate basic structure
-        if (!parsed.project || !parsed.project.title === undefined) {
+        const parsed = JSON.parse(text);
+        console.log('📦 Import: Parsed JSON:', parsed);
+
+        // Validate basic structure (FIXED: corrected logic)
+        if (!parsed.project || parsed.project.title === undefined) {
+          console.error('❌ Import: Invalid file structure', { hasProject: !!parsed.project, hasTitle: parsed.project?.title });
           alert('无效的 .muse 文件格式。请检查文件内容。');
           return;
         }
+
+        console.log('✅ Import: Validation passed');
+
+        const importedProject: ProjectState = {
+          ...INITIAL_PROJECT, // Ensure all fields exist (schema safety)
+          ...parsed.project,
+          id: Date.now().toString(), // Assign new unique ID to avoid collisions
+          lastModified: Date.now(),
+        };
+
+        console.log('🆕 Import: Created project:', importedProject);
+
+        const { setSavedProjects, setProject, setActiveSection, savedProjects } = useProjectStore.getState();
+        const newList = [...savedProjects, importedProject];
+
+        console.log('💾 Import: Saving to storage...', newList.length, 'projects');
+
+        await storageService.setItem(STORAGE_KEYS.PROJECTS, newList);
+        setSavedProjects(newList);
+
+        console.log('✅ Import: Storage updated, switching to project');
+
+        setProject(importedProject);
+        setActiveSection(AppSection.DASHBOARD);
+        alert(`成功导入项目「${importedProject.title}」！`);
+      } catch (err) {
+        console.error('❌ Import failed:', err);
+        alert('导入失败：文件内容不是有效的 JSON 格式。');
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset file input so the same file can be imported again
+    if (importFileRef.current) {
+      importFileRef.current.value = '';
+    }
+  };
 
         const importedProject: ProjectState = {
           ...INITIAL_PROJECT, // Ensure all fields exist (schema safety)

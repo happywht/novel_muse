@@ -1,0 +1,29 @@
+{
+  "_museFileVersion": "1.0",
+  "_exportedAt": "2026-04-21T12:00:00.000Z",
+  "project": {
+    "id": "test-import-123",
+    "title": "测试导入项目",
+    "premise": "这是一个用于测试导入功能的项目",
+    "genre": "sci-fi",
+    "lastModified": 1713715200000,
+    "characters": [
+      {
+        "id": "char-1",
+        "name": "测试角色",
+        "role": "主角"
+      }
+    ],
+    "chapters": [],
+    "world": {},
+    "plotNodes": [],
+    "echoes": [],
+    "creativeSettings": {
+      "promptProfile": "WEB_NOVEL",
+      "tone": "史诗",
+      "creativity": 0.7,
+      "styleTags": [],
+      "targetAudience": ""
+    }
+  }
+}
