@@ -144,6 +144,9 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
   project,
   updateProject
 }) => {
+  // --- 语言状态 ---
+  const [language, setLanguage] = useState<'zh' | 'en'>('zh');
+
   // --- 状态管理 ---
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
