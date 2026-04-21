@@ -18,21 +18,21 @@ import { DataSourceIndicator } from '@/components/ui/DataSourceIndicator';
 
 // ==================== 懒加载组件 ====================
 // 主要业务模块 - 按需加载，减少首屏 bundle 大小
-// 统一使用.then()明确指定默认导出，确保React.lazy()能正确识别
-const Dashboard = lazy(() => import('@/components/Dashboard').then(m => ({ default: m.Dashboard })));
-const WorldBuilder = lazy(() => import('@/components/modules/world').then(m => ({ default: m.WorldBuilder })));
-const CharacterCreator = lazy(() => import('@/components/modules/character').then(m => ({ default: m.CharacterCreator })));
-const PlotWeaver = lazy(() => import('@/components/modules/plot').then(m => ({ default: m.PlotWeaver })));
-const ChapterOutliner = lazy(() => import('@/components/modules/plot/chapters/ChapterOutliner').then(m => ({ default: m.ChapterOutliner })));
-const DraftingRoom = lazy(() => import('@/components/modules/drafting').then(m => ({ default: m.DraftingRoom })));
-const EchoChamber = lazy(() => import('@/components/modules/echo').then(m => ({ default: m.EchoChamber })));
-const UserGuide = lazy(() => import('@/components/UserGuide').then(m => ({ default: m.UserGuide })));
-const SettingsPanel = lazy(() => import('@/components/modules/shared/SettingsPanel/index').then(m => ({ default: m.SettingsPanel })));
-const KnowledgeGraph = lazy(() => import('@/components/KnowledgeGraph').then(m => ({ default: m.KnowledgeGraph })));
+// 统一使用 m.default 访问默认导出，确保React.lazy()能正确识别
+const Dashboard = lazy(() => import('@/components/Dashboard').then(m => ({ default: m.default })));
+const WorldBuilder = lazy(() => import('@/components/modules/world').then(m => ({ default: m.default })));
+const CharacterCreator = lazy(() => import('@/components/modules/character').then(m => ({ default: m.default })));
+const PlotWeaver = lazy(() => import('@/components/modules/plot').then(m => ({ default: m.default })));
+const ChapterOutliner = lazy(() => import('@/components/modules/plot/chapters/ChapterOutliner').then(m => ({ default: m.default })));
+const DraftingRoom = lazy(() => import('@/components/modules/drafting').then(m => ({ default: m.default })));
+const EchoChamber = lazy(() => import('@/components/modules/echo').then(m => ({ default: m.default })));
+const UserGuide = lazy(() => import('@/components/UserGuide').then(m => ({ default: m.default })));
+const SettingsPanel = lazy(() => import('@/components/modules/shared/SettingsPanel/index').then(m => ({ default: m.default })));
+const KnowledgeGraph = lazy(() => import('@/components/KnowledgeGraph').then(m => ({ default: m.default })));
 const PromptTuner = lazy(() => import('@/components/modules/shared/PromptTuner').then(m => ({ default: m.default })));
-const CreativeCompassView = lazy(() => import('@/components/modules/drafting').then(m => ({ default: m.CreativeCompassView })));
-const ProjectLobby = lazy(() => import('@/components/layout/ProjectLobby').then(m => ({ default: m.ProjectLobby })));
-const TemplateEditor = lazy(() => import('@/components/modules/shared/TemplateEditor').then(m => ({ default: m.TemplateEditor })));
+const CreativeCompassView = lazy(() => import('@/components/modules/drafting').then(m => ({ default: m.default })));
+const ProjectLobby = lazy(() => import('@/components/layout/ProjectLobby').then(m => ({ default: m.default })));
+const TemplateEditor = lazy(() => import('@/components/modules/shared/TemplateEditor').then(m => ({ default: m.default })));
 
 // 加载状态组件
 const LoadingFallback = () => (
