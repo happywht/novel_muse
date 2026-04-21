@@ -726,43 +726,57 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
                 ))}
               </select>
             </div>
-            {/* 导入导出按钮 */}
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={handleExport}
-                disabled={isExporting || templates.length === 0}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs bg-slate-800/50 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition-colors disabled:opacity-50"
-                title={language === 'zh' ? '导出所有模板配置' : 'Export all template configurations'}
-              >
-                {isExporting ? (
-                  <div className="w-3.5 h-3.5 border-1.5 border-slate-500/30 border-t-slate-300 rounded-full animate-spin" />
-                ) : (
-                  <Download size={14} />
-                )}
-                {t.export}
-              </button>
-              <button
-                onClick={handleImportClick}
-                disabled={isImporting}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs bg-slate-800/50 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition-colors disabled:opacity-50"
-                title={language === 'zh' ? '导入模板配置' : 'Import template configuration'}
-              >
-                {isImporting ? (
-                  <div className="w-3.5 h-3.5 border-1.5 border-slate-500/30 border-t-slate-300 rounded-full animate-spin" />
-                ) : (
-                  <Upload size={14} />
-                )}
-                {t.import}
-              </button>
-              {/* 隐藏的文件输入 */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-            </div>
+
+            {/* 导入导出按钮 - 仅在专家模式显示 */}
+            {mode === 'expert' && (
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={handleExport}
+                  disabled={isExporting || templates.length === 0}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs bg-slate-800/50 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition-colors disabled:opacity-50"
+                  title={language === 'zh' ? '导出所有模板配置' : 'Export all template configurations'}
+                >
+                  {isExporting ? (
+                    <div className="w-3.5 h-3.5 border-1.5 border-slate-500/30 border-t-slate-300 rounded-full animate-spin" />
+                  ) : (
+                    <Download size={14} />
+                  )}
+                  {t.export}
+                </button>
+                <button
+                  onClick={handleImportClick}
+                  disabled={isImporting}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs bg-slate-800/50 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition-colors disabled:opacity-50"
+                  title={language === 'zh' ? '导入模板配置' : 'Import template configuration'}
+                >
+                  {isImporting ? (
+                    <div className="w-3.5 h-3.5 border-1.5 border-slate-500/30 border-t-slate-300 rounded-full animate-spin" />
+                  ) : (
+                    <Upload size={14} />
+                  )}
+                  {t.import}
+                </button>
+                {/* 隐藏的文件输入 */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+              </div>
+            )}
+
+            {/* 新手模式提示 */}
+            {mode === 'beginner' && (
+              <div className="pt-2 px-1">
+                <div className="bg-muse-500/10 border border-muse-500/30 rounded-lg p-3">
+                  <p className="text-xs text-muse-200 leading-relaxed">
+                    💡 {language === 'zh' ? '新手提示：只显示最常用的模板。切换到专家模式可查看完整功能。' : 'Beginner Tip: Only common templates are shown. Switch to Expert mode for full features.'}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 模板列表 */}
@@ -787,10 +801,12 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
             <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
               <FileCode size={64} className="text-slate-700 mb-4" />
               <h3 className="text-lg font-medium text-slate-400 mb-2">
-                选择一个模板开始编辑
+                {language === 'zh' ? '选择一个模板开始编辑' : 'Select a template to start editing'}
               </h3>
               <p className="text-sm text-slate-500 max-w-md">
-                从左侧列表中选择一个模板，您可以编辑其区块、变量默认值，并实时预览合并后的效果。
+                {language === 'zh'
+                  ? '从左侧列表中选择一个模板，您可以编辑其区块、变量默认值，并实时预览合并后的效果。'
+                  : 'Select a template from the list on the left. You can edit its blocks, variable defaults, and preview the merged results in real-time.'}
               </p>
             </div>
           ) : isLoading ? (
@@ -802,39 +818,57 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
               {/* 标签页切换 */}
               <div className="px-6 pt-4 border-b border-slate-800/50">
                 <div className="flex gap-1">
-                  <button
-                    onClick={() => setActiveTab('blocks')}
-                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                      activeTab === 'blocks'
-                        ? 'bg-slate-800 text-teal-400 border-b-2 border-teal-400'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Code size={16} className="inline mr-2" />
-                    {t.tabs.blocks}
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('variables')}
-                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                      activeTab === 'variables'
-                        ? 'bg-slate-800 text-teal-400 border-b-2 border-teal-400'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Settings2 size={16} className="inline mr-2" />
-                    {t.tabs.variables}
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('preview')}
-                    className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
-                      activeTab === 'preview'
-                        ? 'bg-slate-800 text-teal-400 border-b-2 border-teal-400'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Eye size={16} className="inline mr-2" />
-                    实时预览
-                  </button>
+                  {/* 新手模式：只显示预览标签 */}
+                  {mode === 'beginner' ? (
+                    <button
+                      onClick={() => setActiveTab('preview')}
+                      className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                        activeTab === 'preview'
+                          ? 'bg-slate-800 text-teal-400 border-b-2 border-teal-400'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Eye size={16} className="inline mr-2" />
+                      {t.tabs.preview}
+                    </button>
+                  ) : (
+                    <>
+                      {/* 专家模式：显示所有标签 */}
+                      <button
+                        onClick={() => setActiveTab('blocks')}
+                        className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                          activeTab === 'blocks'
+                            ? 'bg-slate-800 text-teal-400 border-b-2 border-teal-400'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Code size={16} className="inline mr-2" />
+                        {t.tabs.blocks}
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('variables')}
+                        className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                          activeTab === 'variables'
+                            ? 'bg-slate-800 text-teal-400 border-b-2 border-teal-400'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Settings2 size={16} className="inline mr-2" />
+                        {t.tabs.variables}
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('preview')}
+                        className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                          activeTab === 'preview'
+                            ? 'bg-slate-800 text-teal-400 border-b-2 border-teal-400'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        <Eye size={16} className="inline mr-2" />
+                        {t.tabs.preview}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
