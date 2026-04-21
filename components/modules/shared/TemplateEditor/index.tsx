@@ -686,15 +686,6 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
           </div>
         )}
       </div>
-                <>
-                  <Download size={16} />
-                  导出
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* 主内容区域 */}
       <div className="flex-1 flex min-h-0 overflow-hidden">
