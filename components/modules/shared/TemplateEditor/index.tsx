@@ -144,8 +144,66 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
   project,
   updateProject
 }) => {
-  // --- 语言状态 ---
+  // --- 语言和模式状态 ---
   const [language, setLanguage] = useState<'zh' | 'en'>('zh');
+  const [mode, setMode] = useState<'beginner' | 'expert'>('beginner');
+  const [showInfoPanel, setShowInfoPanel] = useState(true);
+
+  // --- 翻译映射 ---
+  const t = {
+    zh: {
+      title: '模板编辑器',
+      subtitle: 'Template Editor - 自定义您的创作模板',
+      whatIsThis: '什么是模板编辑器？',
+      whatIsThisDesc: '模板编辑器是AI提示词工程的管理后台。通过它，您可以：',
+      benefit1: '自定义所有AI生成功能的提示词模板',
+      benefit2: '覆盖默认模板行为，调整AI输出风格',
+      benefit3: '管理模板变量和区块结构',
+      benefit4: '实时预览和测试模板效果',
+      beginnerMode: '🌱 新手模式',
+      expertMode: '🚀 专家模式',
+      searchPlaceholder: '搜索模板...',
+      allCategories: '全部分类',
+      export: '导出',
+      import: '导入',
+      exporting: '导出中...',
+      tabs: {
+        blocks: '区块编辑',
+        variables: '变量管理',
+        preview: '模板预览'
+      },
+      unsavedChanges: '您有未保存的更改',
+      loadFailed: '加载模板失败',
+      hideInfo: '隐藏说明',
+      showInfo: '显示说明'
+    },
+    en: {
+      title: 'Template Editor',
+      subtitle: 'Customize your creative templates',
+      whatIsThis: 'What is Template Editor?',
+      whatIsThisDesc: 'Template Editor is the AI prompt engineering management console. With it, you can:',
+      benefit1: 'Customize AI prompt templates for all generation features',
+      benefit2: 'Override default templates and adjust AI output style',
+      benefit3: 'Manage template variables and block structure',
+      benefit4: 'Preview and test template effects in real-time',
+      beginnerMode: '🌱 Beginner',
+      expertMode: '🚀 Expert',
+      searchPlaceholder: 'Search templates...',
+      allCategories: 'All Categories',
+      export: 'Export',
+      import: 'Import',
+      exporting: 'Exporting...',
+      tabs: {
+        blocks: 'Block Editor',
+        variables: 'Variables',
+        preview: 'Preview'
+      },
+      unsavedChanges: 'You have unsaved changes',
+      loadFailed: 'Failed to load template',
+      hideInfo: 'Hide Info',
+      showInfo: 'Show Info'
+    }
+  }[language];
 
   // --- 状态管理 ---
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
@@ -484,40 +542,150 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
     <div className="flex-1 flex flex-col min-h-0 bg-[#0b1222] animate-fade-in">
       {/* 页面标题 */}
       <div className="p-6 border-b border-slate-800/80">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-teal-500/20 rounded-lg">
               <FileCode size={24} className="text-teal-400" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-white">模板编辑器</h2>
-              <p className="text-sm text-slate-400">Template Editor - 自定义您的创作模板</p>
+              <h2 className="text-2xl font-bold text-white">{t.title}</h2>
+              <p className="text-sm text-slate-400">{t.subtitle}</p>
             </div>
           </div>
 
-          {/* 操作按钮 */}
-          <div className="flex items-center gap-2">
+          {/* 中英文和模式切换按钮 */}
+          <div className="flex items-center gap-3">
+            {/* 中英文切换 */}
+            <div className="flex bg-slate-800/60 rounded-lg p-1">
+              <button
+                onClick={() => setLanguage('zh')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  language === 'zh'
+                    ? 'bg-teal-500 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🇨🇳
+              </button>
+              <button
+                onClick={() => setLanguage('en')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  language === 'en'
+                    ? 'bg-teal-500 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🇺🇸
+              </button>
+            </div>
+
+            {/* 模式切换 */}
+            <div className="flex bg-slate-800/60 rounded-lg p-1">
+              <button
+                onClick={() => setMode('beginner')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  mode === 'beginner'
+                    ? 'bg-muse-500 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {t.beginnerMode}
+              </button>
+              <button
+                onClick={() => setMode('expert')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                  mode === 'expert'
+                    ? 'bg-muse-500 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {t.expertMode}
+              </button>
+            </div>
+
+            {/* 显示/隐藏说明按钮 */}
+            <button
+              onClick={() => setShowInfoPanel(!showInfoPanel)}
+              className="p-2 text-slate-400 hover:text-teal-400 hover:bg-slate-800/60 rounded-lg transition-colors"
+              title={showInfoPanel ? t.hideInfo : t.showInfo}
+            >
+              {showInfoPanel ? <Eye size={18} /> : <EyeOff size={18} />}
+            </button>
+
+            {/* 导入导出按钮 */}
             <button
               onClick={handleImportClick}
               disabled={isLoading || isImporting}
               className="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"
-              title="导入配置"
+              title={t.import}
             >
               <Upload size={16} />
-              导入
+              {t.import}
             </button>
             <button
               onClick={handleExport}
               disabled={isLoading || isExporting}
               className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors disabled:opacity-50"
-              title="导出配置"
+              title={t.export}
             >
               {isExporting ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  导出中...
+                  {t.exporting}
                 </>
               ) : (
+                <>
+                  <Download size={16} />
+                  {t.export}
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* 功能说明面板 */}
+        {showInfoPanel && (
+          <div className="bg-gradient-to-r from-teal-500/10 to-sky-500/10 border border-teal-500/30 rounded-2xl p-5 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-start gap-4">
+              <div className="p-2 bg-teal-500/20 rounded-lg">
+                <Sparkles size={20} className="text-teal-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-bold text-teal-200 mb-2 flex items-center gap-2">
+                  {t.whatIsThis}
+                </h3>
+                <p className="text-sm text-slate-300 mb-3">
+                  {t.whatIsThisDesc}
+                </p>
+                <ul className="space-y-1.5 text-sm text-slate-400">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle size={14} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <span>{t.benefit1}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle size={14} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <span>{t.benefit2}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle size={14} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <span>{t.benefit3}</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle size={14} className="text-emerald-400 mt-0.5 flex-shrink-0" />
+                    <span>{t.benefit4}</span>
+                  </li>
+                </ul>
+              </div>
+              <button
+                onClick={() => setShowInfoPanel(false)}
+                className="text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
                 <>
                   <Download size={16} />
                   导出
@@ -540,7 +708,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="搜索模板..."
+                placeholder={t.searchPlaceholder}
                 className="w-full pl-9 pr-4 py-2 bg-slate-800/50 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500"
               />
             </div>
@@ -553,7 +721,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
               >
                 {categories.map(cat => (
                   <option key={cat} value={cat}>
-                    {cat === 'all' ? '全部分类' : cat}
+                    {cat === 'all' ? t.allCategories : cat}
                   </option>
                 ))}
               </select>
@@ -564,27 +732,27 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
                 onClick={handleExport}
                 disabled={isExporting || templates.length === 0}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs bg-slate-800/50 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition-colors disabled:opacity-50"
-                title="导出所有模板配置"
+                title={language === 'zh' ? '导出所有模板配置' : 'Export all template configurations'}
               >
                 {isExporting ? (
                   <div className="w-3.5 h-3.5 border-1.5 border-slate-500/30 border-t-slate-300 rounded-full animate-spin" />
                 ) : (
                   <Download size={14} />
                 )}
-                导出
+                {t.export}
               </button>
               <button
                 onClick={handleImportClick}
                 disabled={isImporting}
                 className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs bg-slate-800/50 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-lg transition-colors disabled:opacity-50"
-                title="导入模板配置"
+                title={language === 'zh' ? '导入模板配置' : 'Import template configuration'}
               >
                 {isImporting ? (
                   <div className="w-3.5 h-3.5 border-1.5 border-slate-500/30 border-t-slate-300 rounded-full animate-spin" />
                 ) : (
                   <Upload size={14} />
                 )}
-                导入
+                {t.import}
               </button>
               {/* 隐藏的文件输入 */}
               <input
@@ -643,7 +811,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
                     }`}
                   >
                     <Code size={16} className="inline mr-2" />
-                    区块编辑
+                    {t.tabs.blocks}
                   </button>
                   <button
                     onClick={() => setActiveTab('variables')}
@@ -654,7 +822,7 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
                     }`}
                   >
                     <Settings2 size={16} className="inline mr-2" />
-                    变量管理
+                    {t.tabs.variables}
                   </button>
                   <button
                     onClick={() => setActiveTab('preview')}
@@ -716,14 +884,14 @@ export const TemplateEditor: React.FC<TemplateEditorProps> = ({
                 <div className="px-6 py-3 bg-amber-900/20 border-t border-amber-500/20">
                   <p className="text-sm text-amber-300 flex items-center gap-2">
                     <Sparkles size={14} />
-                    您有未保存的更改
+                    {t.unsavedChanges}
                   </p>
                 </div>
               )}
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-slate-500">加载模板失败</p>
+              <p className="text-slate-500">{t.loadFailed}</p>
             </div>
           )}
         </div>
