@@ -30,7 +30,7 @@ const UserGuide = lazy(() => import('@/components/UserGuide').then(m => ({ defau
 const SettingsPanel = lazy(() => import('@/components/modules/shared/SettingsPanel/index').then(m => ({ default: m.default })));
 const KnowledgeGraph = lazy(() => import('@/components/KnowledgeGraph').then(m => ({ default: m.default })));
 const PromptTuner = lazy(() => import('@/components/modules/shared/PromptTuner').then(m => ({ default: m.default })));
-const CreativeCompassView = lazy(() => import('@/components/modules/drafting').then(m => ({ default: m.default })));
+const CreativeCompassView = lazy(() => import('@/components/modules/drafting/CreativeCompassView').then(m => ({ default: m.default })));
 const ProjectLobby = lazy(() => import('@/components/layout/ProjectLobby').then(m => ({ default: m.default })));
 const TemplateEditor = lazy(() => import('@/components/modules/shared/TemplateEditor').then(m => ({ default: m.default })));
 

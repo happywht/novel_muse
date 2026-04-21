@@ -242,4 +242,5 @@ export const CreativeCompassView: React.FC<CreativeCompassViewProps> = ({ projec
             </div>
         </div>
     );
-};export default CreativeCompassView;
+};
+export default CreativeCompassView;
