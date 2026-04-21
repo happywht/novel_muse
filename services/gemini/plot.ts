@@ -95,17 +95,46 @@ ${graphContext.characterRelationships.map(r =>
 
     const lookupTable = formatEntityLookupTable(characters, relevantSettings);
     const instruction = getInstructionWithSettings('plot_weaving', settings);
+    // 提取可用的人物和地点名称列表供AI参考
+    const availableCharacterNames = characters.map(c => c.name).join('、');
+    const availableLocationNames = relevantSettings.map(w => w.title).join('、');
+
 
     let taskRequirement = `
-  任务要求：
-  1. 结合人物的性格缺陷和目标，设计引发剧情的激励事件。
-  2. 利用【高相关度世界观法则】制造专属设定的障碍、谜题和转折。
-  3. 确保角色关系随着剧情推进而发生变化。
-  4. **整合【当前状态变更】**：剧情发展必须考虑角色当前的状态（如伤病、道具、已发生的事件）。
-  5. **结构化元数据**：为每个情节点分配一个叙事标签（beatTag），并精准关联涉及的实体 ID。
-     **严格约束**：beatTag只能从以下枚举值中选择，不能自定义其他值：INCITING_INCIDENT, PLOT_POINT_1, MIDPOINT, PLOT_POINT_2, CLIMAX, RESOLUTION, OTHER
-  6. **修罗场识别**：对于涉及2个或以上角色正面冲突、对峙或博弈的情节，自动识别为"冲突场景"，
-     明确标注冲突类型（CONFRONTATION对峙/CLIMAX高潮/TWIST反转）、参与角色、冲突核心赌注和强度等级（1-10）。`;
+	  任务要求：
+	  1. 结合人物的性格缺陷和目标，设计引发剧情的激励事件。
+	  2. 利用【高相关度世界观法则】制造专属设定的障碍、谜题和转折。
+	  3. 确保角色关系随着剧情推进而发生变化。
+	  4. **整合【当前状态变更】**：剧情发展必须考虑角色当前的状态（如伤病、道具、已发生的事件）。
+	  5. **结构化元数据（重要）**：为每个情节点必须提供以下元数据：
+
+	     【必须使用的人物名称】：${availableCharacterNames || '暂无'}
+	     【必须使用的地点名称】：${availableLocationNames || '暂无'}
+
+	     a) beatTag（情节类型标签）- 必须从以下10种类型中选择最合适的一个：
+	        - INCITING_INCIDENT（激励事件）：打破主角日常生活的诱发事件
+	        - PLOT_POINT_1（第一个转折点）：主角踏上旅程，故事进入第二幕
+	        - MIDPOINT（中点）：故事中点的重大转折或 revelation
+	        - PLOT_POINT_2（第二个转折点）：最低点时刻，故事进入第三幕
+	        - CLIMAX（高潮）：故事最高潮，主角与反派的对决
+	        - RESOLUTION（结局）：故事收尾，展示新平衡
+	        - EXPOSITION（说明）：背景信息、世界观设定说明
+	        - RISING_ACTION（上升动作）：冲突升级、情节发展
+	        - FALLING_ACTION（下降动作）：高潮后的情节回落
+	        - DENOUEMENT（尾声）：最后的情节收束和余波
+
+	     b) relatedCharacterNames（涉及人物名称数组）：
+	        - 必须从上述【必须使用的人物名称】列表中选择
+	        - 列出本情节节点中出现的所有角色名称
+	        - 至少包含1个角色
+
+	     c) relatedLocationNames（涉及地点名称数组）：
+	        - 必须从上述【必须使用的地点名称】列表中选择
+	        - 列出本情节节点中发生的所有地点/场景名称
+	        - 至少包含1个地点
+
+	  6. **修罗场识别**：对于涉及2个或以上角色正面冲突、对峙或博弈的情节，自动识别为"冲突场景"，
+	     明确标注冲突类型（CONFRONTATION对峙/CLIMAX高潮/TWIST反转）、参与角色、冲突核心赌注和强度等级（1-10）。`;
 
     if (template) {
         taskRequirement += `\n\n【关键要求】请严格按照以下经典故事结构模版进行填充 and 创作：\n${template}`;
@@ -134,9 +163,9 @@ ${graphContext.characterRelationships.map(r =>
     {
       "title": "情节标题",
       "content": "该情节点的详细描述...",
-      "beatTag": "INCITING_INCIDENT" | "PLOT_POINT_1" | "MIDPOINT" | "PLOT_POINT_2" | "CLIMAX" | "RESOLUTION" | "OTHER",
-      "relatedCharacters": ["ID1", "ID2"],
-      "relatedLocations": ["ID3"],
+      "beatTag": "INCITING_INCIDENT | PLOT_POINT_1 | MIDPOINT | PLOT_POINT_2 | CLIMAX | RESOLUTION | EXPOSITION | RISING_ACTION | FALLING_ACTION | DENOUEMENT",
+	      "relatedCharacterNames": ["角色名称1", "角色名称2"],
+	      "relatedLocationNames": ["地点名称1", "地点名称2"],
       "conflictScenario": {
         "type": "CONFRONTATION" | "CLIMAX" | "TWIST" | null,
         "participants": ["角色ID1", "角色ID2"],
@@ -146,7 +175,12 @@ ${graphContext.characterRelationships.map(r =>
     },
     ...
   ]
-  如果情节不涉及多角色冲突，conflictScenario字段可省略或为null。
+	  **重要提醒**：
+	  - relatedCharacterNames 必须从【必须使用的人物名称】列表中选择，不能编造新名称
+	  - relatedLocationNames 必须从【必须使用的地点名称】列表中选择，不能编造新地点
+	  - beatTag 必须从上述10种类型中精确选择，不能使用其他值
+	  - 如果情节不涉及多角色冲突，conflictScenario字段可省略或为null
+
   禁止包含任何开场白或解释文字。
   `;
 
@@ -310,6 +344,34 @@ export const analyzePlotRhythm = async (plotOutline: string): Promise<PlotRhythm
 
 /**
  * Split large plot node into detailed chapter outlines (Chapter Fission)
+ *
+ * @param genre - 小说类型
+ * @param fullPlotSummary - 项目全剧情概览
+ * @param targetNode - 需要拆解的情节节点
+ * @param characters - 角色列表
+ * @param worldSettings - 世界观设定列表
+ * @param settings - 创作设置
+ * @param echoes - 状态变更历史
+ * @param fissionCount - 拆分数量，'AUTO'表示自动决定
+ * @returns 章节数组，每个章节包含标题、摘要、视角人物和节拍列表
+ *
+ * @remarks
+ * 返回的每个beat对象都会自动添加以下字段：
+ * - id: string - 使用crypto.randomUUID()生成的唯一标识符
+ * - isCompleted: boolean - 初始完成状态，默认为false
+ *
+ * @example
+ * ```typescript
+ * const chapters = await splitPlotNodeIntoChapters(
+ *   '玄幻',
+ *   '总体剧情概览...',
+ *   plotNode,
+ *   characters,
+ *   worldSettings
+ * );
+ * // chapters[0].beats[0].id -> "550e8400-e29b-41d4-a716-446655440000"
+ * // chapters[0].beats[0].isCompleted -> false
+ * ```
  */
 export const splitPlotNodeIntoChapters = async (
     genre: string,
@@ -320,7 +382,12 @@ export const splitPlotNodeIntoChapters = async (
     settings?: CreativeSettings,
     echoes: Echo[] = [],
     fissionCount: number | 'AUTO' = 'AUTO'
-): Promise<{ title: string; summary: string; expectedPOV: string; beats?: any[] }[]> => {
+): Promise<{ title: string; summary: string; expectedPOV: string; beats?: Array<{
+    id: string;
+    type: 'CONTENT' | 'ACTION' | 'DIALOGUE' | 'TWIST';
+    description: string;
+    isCompleted: boolean;
+}> }> => {
     const contextStr = formatContext(characters, worldSettings, echoes);
     const instruction = getInstructionWithSettings('plot_fission', settings);
     const countInstruction = fissionCount === 'AUTO' ? '2-3 个' : `${fissionCount} 个`;
@@ -383,12 +450,13 @@ export const splitPlotNodeIntoChapters = async (
         const raw = safeParseAiJson(responseText, AiChapterOutlineArraySchema, "Chapter Fission");
         if (!raw) return [];
 
-        // Map to include IDs and initialized beat states
+        // 为每个beat添加唯一ID和初始完成状态
+        // 使用crypto.randomUUID()确保ID唯一性和符合UUID格式
         return raw.map(ch => ({
             ...ch,
             beats: ch.beats?.map(b => ({
                 ...b,
-                id: Math.random().toString(36).substr(2, 9),
+                id: crypto.randomUUID(),
                 isCompleted: false
             }))
         }));
@@ -400,6 +468,23 @@ export const splitPlotNodeIntoChapters = async (
 
 /**
  * Regenerate a single chapter outline
+ *
+ * @param genre - 小说类型
+ * @param fullPlotSummary - 项目全剧情概览
+ * @param targetNode - 所属的情节节点
+ * @param chapterToRewrite - 需要重写的章节
+ * @param previousChapter - 上一章（用于衔接）
+ * @param nextChapter - 下一章（用于衔接）
+ * @param characters - 角色列表
+ * @param worldSettings - 世界观设定列表
+ * @param settings - 创作设置
+ * @param echoes - 状态变更历史
+ * @returns 重写后的章节对象，包含beats数组（每个beat都有唯一ID和完成状态），失败返回null
+ *
+ * @remarks
+ * 返回的每个beat对象都会自动添加以下字段：
+ * - id: string - 使用crypto.randomUUID()生成的唯一标识符
+ * - isCompleted: boolean - 初始完成状态，默认为false
  */
 export const regenerateChapterOutline = async (
     genre: string,
@@ -412,7 +497,12 @@ export const regenerateChapterOutline = async (
     worldSettings: WorldSetting[],
     settings?: CreativeSettings,
     echoes: Echo[] = []
-): Promise<{ title: string; summary: string; expectedPOV: string; beats?: any[] } | null> => {
+): Promise<{ title: string; summary: string; expectedPOV: string; beats?: Array<{
+    id: string;
+    type: 'CONTENT' | 'ACTION' | 'DIALOGUE' | 'TWIST';
+    description: string;
+    isCompleted: boolean;
+}> } | null> => {
     const contextStr = formatContext(characters, worldSettings, echoes);
     const instruction = getInstructionWithSettings('plot_fission', settings);
 
@@ -488,9 +578,10 @@ export const regenerateChapterOutline = async (
         if (result) {
             return {
                 ...result,
+                // 为每个beat添加唯一ID和初始完成状态
                 beats: result.beats?.map(b => ({
                     ...b,
-                    id: Math.random().toString(36).substr(2, 9),
+                    id: crypto.randomUUID(),
                     isCompleted: false
                 }))
             };
