@@ -791,3 +791,4 @@ const NodeEditSidebar: React.FC<NodeEditSidebarProps> = ({ node, projectId, onCl
         </div>
     );
 };
+export default KnowledgeGraph;

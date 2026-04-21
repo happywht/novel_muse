@@ -152,3 +152,4 @@ export const PromptTuner: React.FC<PromptTunerProps> = ({ onClose }) => {
         </div>
     );
 };
+export default PromptTuner;

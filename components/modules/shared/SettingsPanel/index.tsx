@@ -110,3 +110,4 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ onClose }) => {
         </div>
     );
 };
+export default SettingsPanel;

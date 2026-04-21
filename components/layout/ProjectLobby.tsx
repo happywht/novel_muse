@@ -146,3 +146,5 @@ export const ProjectLobby: React.FC<ProjectLobbyProps> = ({
         </div>
     );
 };
+
+export default ProjectLobby;

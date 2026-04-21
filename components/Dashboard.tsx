@@ -769,3 +769,4 @@ export const Dashboard: React.FC<DashboardProps> = ({ project: propProject, upda
         </div>
     );
 };
+export default Dashboard;

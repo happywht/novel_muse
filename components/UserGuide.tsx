@@ -88,4 +88,4 @@ export const UserGuide: React.FC<UserGuideProps> = ({ onClose }) => {
       </div>
     </div>
   );
-};
+};export default UserGuide;

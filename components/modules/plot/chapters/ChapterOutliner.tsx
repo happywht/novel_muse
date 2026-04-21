@@ -824,3 +824,4 @@ export const ChapterOutliner: React.FC<ChapterOutlinerProps> = ({ project, updat
         </div>
     );
 };
+export default ChapterOutliner;
