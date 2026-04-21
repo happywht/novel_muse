@@ -22,7 +22,16 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     // 可以在这里上报错误到监控服务（如Sentry）
-    console.error('ErrorBoundary捕获到错误:', error, errorInfo);
+    // 安全地序列化错误对象，避免循环引用导致的转换错误
+    const errorMessage = error?.message || String(error);
+    const componentStack = errorInfo?.componentStack || 'N/A';
+
+    console.error(
+      'ErrorBoundary捕获到错误:',
+      errorMessage,
+      '\n组件栈:',
+      componentStack
+    );
   }
 
   render(): React.ReactNode {
