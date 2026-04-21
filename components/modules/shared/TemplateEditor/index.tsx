@@ -10,8 +10,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FileCode, Save, RotateCcw, ChevronDown, ChevronRight,
-  Sparkles, AlertTriangle, Search, Filter, Eye, Code, Settings2,
-  Download, Upload, CheckCircle, XCircle, AlertCircle
+  Sparkles, AlertTriangle, Search, Filter, Eye, EyeOff, Code, Settings2,
+  Download, Upload, CheckCircle, XCircle, AlertCircle, X
 } from 'lucide-react';
 import { useProjectStore } from '@/store';
 import { API_BASE } from '@/services/apiService';
