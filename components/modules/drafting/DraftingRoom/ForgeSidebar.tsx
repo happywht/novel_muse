@@ -63,20 +63,20 @@ function useDebounce<T>(value: T, delay: number): T {
 const SearchInput: React.FC<SearchInputProps> = ({ value, onChange, placeholder, onClear }) => (
     <div className="relative group">
         <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-muse-400 transition-colors"
+            size={16}
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-muse-400 transition-colors duration-200"
         />
         <input
             type="text"
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder={placeholder}
-            className="w-full pl-9 pr-8 py-2 bg-slate-900/80 border border-slate-700/50 rounded-lg text-sm text-white placeholder-slate-500 focus:ring-1 focus:ring-muse-500/50 focus:border-muse-500/50 outline-none transition-all"
+            className="w-full pl-11 pr-10 py-3.5 bg-gradient-to-r from-slate-800/90 to-slate-900/90 border border-slate-700/60 rounded-xl text-sm text-white placeholder-slate-400 focus:ring-2 focus:ring-muse-500/40 focus:border-muse-500/60 shadow-inner shadow-slate-900/50 outline-none transition-all duration-200 hover:border-slate-600"
         />
         {value && (
             <button
                 onClick={onClear}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors"
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 rounded-lg p-1 transition-all duration-200"
             >
                 <X size={14} />
             </button>
@@ -94,19 +94,25 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({
     onToggle
 }) => (
     <div
-        className={`flex items-center justify-between ${collapsible ? 'cursor-pointer hover:bg-slate-700/20 -mx-4 px-4 py-1 rounded' : ''}`}
+        className={`flex items-center justify-between ${
+            collapsible
+                ? 'cursor-pointer hover:bg-gradient-to-r hover:from-muse-500/10 hover:to-transparent -mx-4 px-5 py-2 rounded-xl transition-all duration-200'
+                : ''
+        }`}
         onClick={collapsible ? onToggle : undefined}
     >
-        <div className="flex items-center gap-2 text-muse-300 font-bold">
-            {icon}
-            <h3 className="text-sm">{title}</h3>
+        <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-lg bg-muse-500/10 text-muse-300">
+                {icon}
+            </div>
+            <h3 className="text-sm font-bold text-muse-200">{title}</h3>
             {badge}
         </div>
         <div className="flex items-center gap-2">
             {actions}
             {collapsible && (
-                <span className="text-slate-500">
-                    {collapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                <span className="text-slate-400 hover:text-slate-200 transition-colors">
+                    {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
                 </span>
             )}
         </div>
@@ -116,10 +122,10 @@ const SectionHeader: React.FC<SectionHeaderProps> = ({
 const TagButton: React.FC<TagButtonProps> = ({ tag, isSelected, onClick }) => (
     <button
         onClick={onClick}
-        className={`text-[9px] px-2 py-0.5 rounded border transition-all duration-200 ${
+        className={`text-[10px] px-3 py-1 rounded-lg border transition-all duration-200 ${
             isSelected
-                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-sm'
-                : 'bg-slate-900/60 border-slate-700/50 text-slate-400 hover:border-slate-500 hover:bg-slate-800/60'
+                ? 'bg-gradient-to-r from-amber-500/25 to-amber-500/15 border-amber-500/50 text-amber-200 shadow-md shadow-amber-500/20'
+                : 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:border-muse-500/40 hover:bg-muse-500/10 hover:text-muse-200 hover:shadow-md'
         }`}
     >
         {tag}
@@ -133,14 +139,14 @@ const CharacterChip: React.FC<{
 }> = ({ character, isSelected, onToggle }) => (
     <button
         onClick={onToggle}
-        className={`px-3 py-1.5 rounded-full text-xs border transition-all duration-200 flex items-center gap-1 ${
+        className={`px-4 py-2 rounded-full text-xs border transition-all duration-200 flex items-center gap-2 ${
             isSelected
-                ? 'bg-muse-600/80 border-muse-500 text-white shadow-md shadow-muse-900/30'
-                : 'bg-slate-900/80 border-slate-700/50 text-slate-400 hover:border-slate-500 hover:bg-slate-800/80'
+                ? 'bg-gradient-to-r from-muse-500 to-muse-600 border-muse-400 text-white shadow-lg shadow-muse-500/30'
+                : 'bg-slate-800/70 border-slate-700/50 text-slate-400 hover:border-muse-500/50 hover:bg-muse-500/10 hover:text-muse-200 hover:shadow-md'
         }`}
     >
-        {isSelected && <Plus size={10} className="rotate-45" />}
-        {character.name}
+        {isSelected && <Plus size={12} className="rotate-45" />}
+        <span className="font-medium">{character.name}</span>
     </button>
 );
 
@@ -151,15 +157,15 @@ const SettingChip: React.FC<{
 }> = ({ setting, isSelected, onToggle }) => (
     <button
         onClick={onToggle}
-        className={`px-3 py-1.5 rounded-full text-xs border transition-all duration-200 flex items-center gap-1 ${
+        className={`px-4 py-2 rounded-full text-xs border transition-all duration-200 flex items-center gap-2 ${
             isSelected
-                ? 'bg-muse-600/80 border-muse-500 text-white shadow-md shadow-muse-900/30'
-                : 'bg-slate-900/50 border-slate-700/50 text-slate-400 hover:border-slate-500 hover:bg-slate-800/50'
+                ? 'bg-gradient-to-r from-muse-500 to-muse-600 border-muse-400 text-white shadow-lg shadow-muse-500/30'
+                : 'bg-slate-800/70 border-slate-700/50 text-slate-400 hover:border-muse-500/50 hover:bg-muse-500/10 hover:text-muse-200 hover:shadow-md'
         }`}
     >
-        {isSelected && <Plus size={10} className="rotate-45" />}
+        {isSelected && <Plus size={12} className="rotate-45" />}
         <span className="opacity-50 mr-1">[{setting.category}]</span>
-        {setting.title}
+        <span className="font-medium">{setting.title}</span>
     </button>
 );
 
@@ -242,25 +248,28 @@ const DraftCard: React.FC<{
 }> = ({ draft, isActive, onLoad, onDelete }) => (
     <div
         onClick={onLoad}
-        className={`p-3 rounded-lg border cursor-pointer group flex justify-between items-start transition-all duration-200 ${
+        className={`p-5 rounded-2xl border cursor-pointer group flex justify-between items-start transition-all duration-200 ${
             isActive
-                ? 'bg-muse-900/30 border-muse-500/50 shadow-md shadow-muse-900/20'
-                : 'bg-slate-800/30 border-slate-700/50 hover:bg-slate-800/50 hover:border-slate-600'
+                ? 'bg-gradient-to-br from-muse-500/20 to-muse-600/10 border-muse-500/50 shadow-xl shadow-muse-900/30'
+                : 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-700/40 hover:border-muse-500/30 hover:shadow-lg hover:-translate-y-0.5'
         }`}
     >
         <div className="flex-1 min-w-0">
-            <h4 className={`text-xs font-medium truncate ${isActive ? 'text-muse-300' : 'text-slate-300'}`}>
+            <h4 className={`text-sm font-bold truncate mb-1.5 ${
+                isActive ? 'text-muse-200' : 'text-slate-200'
+            }`}>
                 {draft.title}
             </h4>
-            <p className="text-[10px] text-slate-500 mt-0.5">
+            <p className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                <FileText size={10} />
                 {new Date(draft.lastModified).toLocaleDateString()}
             </p>
         </div>
         <button
             onClick={onDelete}
-            className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all ml-2"
+            className="text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg p-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200"
         >
-            <Trash2 size={12} />
+            <Trash2 size={14} />
         </button>
     </div>
 );
