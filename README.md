@@ -1,7 +1,6 @@
 # Muse: 小说架构师 (Novel Architect)
 
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
 </div>
 
 **Muse: 小说架构师** 是一款基于大语言模型（Google Gemini API）的 AI 辅助小说创作工作台。本项目是一个由 React 和 Vite 驱动的前端渐进式 Web 应用，专为长篇小说创作者打造。它不仅能帮助创作者记录灵感，还能动态追踪错综复杂的世界观、角色成长和情节线。
